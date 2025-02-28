@@ -15,7 +15,6 @@ import (
 type Reader struct {
 	conf ReaderConfig
 	cl   *kgo.Client
-	adm  *kgo.Client
 	l    *slog.Logger
 }
 

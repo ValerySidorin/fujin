@@ -194,7 +194,9 @@ func (h *handler) handle(buf []byte) error {
 							h.mqman.PutWriter(w, pub, "")
 						}
 						if h.currentTxWriter != nil {
-							h.currentTxWriter.RollbackTx(h.ctx)
+							if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
+								h.l.Error("rollback tx", "err", err)
+							}
 							h.mqman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 							h.currentTxWriter = nil
 						}
@@ -1131,31 +1133,6 @@ func (h *handler) close() {
 		pool.Put(h.ps.payloadBuf)
 	}
 	close(h.closed)
-}
-
-func (h *handler) parseRequestID(i int, buf []byte) int {
-	h.ps.argBuf = pool.Get(4)
-	defer func() {
-		pool.Put(h.ps.argBuf)
-		h.ps.argBuf = nil
-	}()
-
-	h.ps.argBuf = pool.Get(int(h.ps.pa.pubLen))
-	toCopy := int(h.ps.pa.pubLen) - len(h.ps.argBuf)
-	avail := len(buf) - i
-
-	if avail < toCopy {
-		toCopy = avail
-	}
-
-	if toCopy > 0 {
-		start := len(h.ps.argBuf)
-		h.ps.argBuf = h.ps.argBuf[:start+toCopy]
-		copy(h.ps.argBuf[start:], buf[i:i+toCopy])
-		i = (i + toCopy) - 1
-	}
-
-	return i
 }
 
 func (h *handler) parseProducePubLenArg() error {

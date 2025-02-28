@@ -38,7 +38,9 @@ func main() {
 	defer cancel()
 
 	go func() {
-		http.ListenAndServe(":8090", nil)
+		if err := http.ListenAndServe(":8090", nil); err != nil {
+			log.Fatal(err)
+		}
 	}()
 
 	logLevel := parseLogLevel(conf.Log.Level)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/nats-io/nats.go"
 )
@@ -11,9 +12,10 @@ import (
 type Reader struct {
 	conf ReaderConfig
 	nc   *nats.Conn
+	l    *slog.Logger
 }
 
-func NewReader(conf ReaderConfig) (*Reader, error) {
+func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	nc, err := nats.Connect(conf.URL)
 	if err != nil {
 		return nil, fmt.Errorf("nats: connect: %w", err)
@@ -22,18 +24,23 @@ func NewReader(conf ReaderConfig) (*Reader, error) {
 	return &Reader{
 		conf: conf,
 		nc:   nc,
+		l:    l.With("reader_type", "nats"),
 	}, nil
 }
 
 func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any) error) error {
 	sub, err := r.nc.Subscribe(r.conf.Subject, func(msg *nats.Msg) {
-		h(msg.Data)
+		_ = h(msg.Data) // not checking err here for performance gains
 	})
 	if err != nil {
 		return fmt.Errorf("nats: subscribe: %w", err)
 	}
 
-	defer sub.Unsubscribe()
+	defer func() {
+		if err := sub.Unsubscribe(); err != nil {
+			r.l.Error("unsubscribe", "err", err)
+		}
+	}()
 
 	<-ctx.Done()
 

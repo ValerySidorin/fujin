@@ -125,21 +125,27 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					case <-t.C:
 						str, err := conn.OpenStreamSync(ctx)
 						if err != nil {
-							conn.CloseWithError(ferr.PingErr, "open stream: "+err.Error())
+							if err := conn.CloseWithError(ferr.PingErr, "open stream: "+err.Error()); err != nil {
+								s.l.Error("close with error", "err", err)
+							}
 							return
 						}
 
 						pingBuf[0] = byte(request.OP_CODE_PING)
 
 						if _, err := str.Write(pingBuf[:]); err != nil {
-							conn.CloseWithError(ferr.PingErr, "write: "+err.Error())
+							if err := conn.CloseWithError(ferr.PingErr, "write: "+err.Error()); err != nil {
+								s.l.Error("close with error", "err", err)
+							}
 							return
 						}
 						str.Close()
 
-						str.SetDeadline(time.Now().Add(s.conf.PingTimeout))
+						_ = str.SetDeadline(time.Now().Add(s.conf.PingTimeout))
 						if _, err := io.ReadAll(str); err != nil {
-							conn.CloseWithError(ferr.PingErr, "read: "+err.Error())
+							if err := conn.CloseWithError(ferr.PingErr, "read: "+err.Error()); err != nil {
+								s.l.Error("close with error", "err", err)
+							}
 						}
 					}
 				}
@@ -150,7 +156,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					str, err := conn.AcceptStream(ctx)
 					if err != nil {
 						if err != ctx.Err() {
-							conn.CloseWithError(ferr.ConnErr, "accept stream: "+err.Error())
+							if err := conn.CloseWithError(ferr.ConnErr, "accept stream: "+err.Error()); err != nil {
+								s.l.Error("close with error", "err", err)
+							}
 						}
 						return
 					}

@@ -101,9 +101,9 @@ func (o *outbound) flushOutbound() bool {
 		}
 		consumed := len(wv)
 
-		o.str.SetWriteDeadline(start.Add(o.wdl))
+		_ = o.str.SetWriteDeadline(start.Add(o.wdl))
 		wn, err = wv.WriteTo(o.str)
-		o.str.SetWriteDeadline(time.Time{})
+		_ = o.str.SetWriteDeadline(time.Time{})
 
 		n += wn
 		o.wv = o.wv[consumed-len(wv):]

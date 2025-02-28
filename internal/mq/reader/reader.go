@@ -26,7 +26,7 @@ func New(conf config.Config, l *slog.Logger) (Reader, error) {
 	case "kafka":
 		return kafka.NewReader(conf.Kafka, l)
 	case "nats":
-		return nats.NewReader(conf.Nats)
+		return nats.NewReader(conf.Nats, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)
