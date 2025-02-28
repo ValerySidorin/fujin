@@ -12,7 +12,7 @@ import (
 
 type Config struct {
 	Log   LogConfig   `yaml:"log"`
-	fujin FujinConfig `yaml:"fujin"`
+	Fujin FujinConfig `yaml:"fujin"`
 	MQ    mq.Config   `yaml:"mq"`
 }
 
@@ -42,41 +42,41 @@ func (c *Config) SetDefaults() {
 		c.Log.Level = "INFO"
 	}
 
-	if c.fujin.Addr == "" {
-		c.fujin.Addr = ":4848"
+	if c.Fujin.Addr == "" {
+		c.Fujin.Addr = ":4848"
 	}
 
-	if c.fujin.PingInterval == 0 {
-		c.fujin.PingInterval = 2 * time.Second
+	if c.Fujin.PingInterval == 0 {
+		c.Fujin.PingInterval = 2 * time.Second
 	}
 
-	if c.fujin.PingTimeout == 0 {
-		c.fujin.PingTimeout = 5 * time.Second
+	if c.Fujin.PingTimeout == 0 {
+		c.Fujin.PingTimeout = 5 * time.Second
 	}
 
-	if c.fujin.WriteDeadline == 0 {
-		c.fujin.WriteDeadline = 10 * time.Second
+	if c.Fujin.WriteDeadline == 0 {
+		c.Fujin.WriteDeadline = 10 * time.Second
 	}
 
-	if c.fujin.ForceTerminateTimeout == 0 {
-		c.fujin.ForceTerminateTimeout = 15 * time.Second
+	if c.Fujin.ForceTerminateTimeout == 0 {
+		c.Fujin.ForceTerminateTimeout = 15 * time.Second
 	}
 }
 
 func (c *Config) ParseQUICServerConfig() (*api_quirk.ServerConfig, error) {
-	tlsConf, err := c.fujin.TLS.Parse()
+	tlsConf, err := c.Fujin.TLS.Parse()
 	if err != nil {
 		return nil, fmt.Errorf("parse TLS conf: %w", err)
 	}
 
 	return &api_quirk.ServerConfig{
-		Addr:                  c.fujin.Addr,
-		PingInterval:          c.fujin.PingInterval,
-		PingTimeout:           c.fujin.PingTimeout,
-		WriteDeadine:          c.fujin.WriteDeadline,
-		ForceTerminateTimeout: c.fujin.ForceTerminateTimeout,
+		Addr:                  c.Fujin.Addr,
+		PingInterval:          c.Fujin.PingInterval,
+		PingTimeout:           c.Fujin.PingTimeout,
+		WriteDeadine:          c.Fujin.WriteDeadline,
+		ForceTerminateTimeout: c.Fujin.ForceTerminateTimeout,
 		TLS:                   tlsConf,
-		QUIC:                  c.fujin.QUIC.Parse(),
+		QUIC:                  c.Fujin.QUIC.Parse(),
 	}, nil
 }
 
