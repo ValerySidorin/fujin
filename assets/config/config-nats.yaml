@@ -1,0 +1,17 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+mq:
+  writers:
+    pub:
+      protocol: nats
+      nats:
+        url: nats://nats:4222
+        subject: my_subject
+  readers:
+    sub:
+      protocol: nats
+      nats:
+        url: nats://nats:4222
+        subject: my_subject

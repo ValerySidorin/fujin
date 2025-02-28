@@ -1,0 +1,41 @@
+
+log:
+  level: DEBUG
+fujin:
+  addr: :4848
+  ping_interval: 5s
+  ping_timeout: 5s
+  write_deadline: 10s
+  force_terminate_timeout: 15s
+  tls:
+    server_cert_pem_path: /Users/mak/src/fujin/assets/certs/fujin.io.pem
+    server_key_pem_path: /Users/mak/src/fujin/assets/certs/fujin.io-key.pem
+  quic:
+    max_incoming_streams: 10
+    max_idle_timeout: 5s
+    keepalive_period: 2s
+mq:
+  writers:
+    pub:
+      protocol: kafka
+      kafka:
+        brokers: [localhost:9092, localhost:9093, localhost:9094]
+        topic: my_pub_topic
+        allow_auto_topic_creation: true
+        linger: 10ms
+  readers:
+    sub:
+      protocol: kafka
+      kafka:
+        brokers: [localhost:9092, localhost:9093, localhost:9094]
+        topic: my_pub_topic
+        group: fujin
+        allow_auto_topic_creation: true
+        disable_auto_commit: false
+        max_poll_records: 0
+        # fetch_isolation_level: read_commited # read_uncommited/read_uncommited
+    # sub:
+    #   protocol: nats
+    #   nats:
+    #     url: nats://localhost:4222
+    #     subject: my_subject
