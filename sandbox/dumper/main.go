@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ValerySidorin/mimiq/internal/api/mimiq/proto/request"
-	"github.com/ValerySidorin/mimiq/internal/api/mimiq/proto/response"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 

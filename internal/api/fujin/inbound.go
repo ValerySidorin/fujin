@@ -1,4 +1,4 @@
-package mimiq
+package fujin
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ValerySidorin/mimiq/internal/api/mimiq/pool"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
 	"github.com/quic-go/quic-go"
 )
 

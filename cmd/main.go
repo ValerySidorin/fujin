@@ -14,9 +14,9 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/ValerySidorin/mimiq/internal/api/mimiq"
-	"github.com/ValerySidorin/mimiq/internal/config"
-	"github.com/ValerySidorin/mimiq/internal/mq"
+	"github.com/ValerySidorin/fujin/internal/api/fujin"
+	"github.com/ValerySidorin/fujin/internal/config"
+	"github.com/ValerySidorin/fujin/internal/mq"
 	_ "go.uber.org/automaxprocs"
 	"gopkg.in/yaml.v3"
 )
@@ -56,7 +56,7 @@ func main() {
 	mqman := mq.NewMQManager(conf.MQ, logger)
 	defer mqman.Close()
 
-	quicServer := mimiq.NewServer(*quicServerConf, mqman, logger)
+	quicServer := fujin.NewServer(*quicServerConf, mqman, logger)
 
 	if err := quicServer.ListenAndServe(ctx); err != nil {
 		logger.Error(fmt.Errorf("quic listen and serve: %w", err).Error())

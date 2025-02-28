@@ -18,7 +18,7 @@ func main() {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers("localhost:9092", "localhost:9093", "localhost:9094"),
 		kgo.ConsumeTopics("my_pub_topic"),
-		kgo.ConsumerGroup("mimiq1"),
+		kgo.ConsumerGroup("fujin1"),
 		kgo.FetchIsolationLevel(kgo.ReadCommitted()),
 	}
 

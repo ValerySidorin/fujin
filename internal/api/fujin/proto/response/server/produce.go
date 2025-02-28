@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/ValerySidorin/mimiq/internal/api/mimiq/proto/response"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
 )
 
 func ProduceResponse(buf []byte, rID []byte, success bool) []byte {
