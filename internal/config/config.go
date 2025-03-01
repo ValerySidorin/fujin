@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	api_quirk "github.com/ValerySidorin/fujin/internal/api/fujin"
+	"github.com/ValerySidorin/fujin/internal/api/fujin"
 	tls_config "github.com/ValerySidorin/fujin/internal/config/tls"
 	"github.com/ValerySidorin/fujin/internal/mq"
 	"github.com/quic-go/quic-go"
@@ -63,13 +63,13 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-func (c *Config) ParseQUICServerConfig() (*api_quirk.ServerConfig, error) {
+func (c *Config) ParseQUICServerConfig() (*fujin.ServerConfig, error) {
 	tlsConf, err := c.Fujin.TLS.Parse()
 	if err != nil {
 		return nil, fmt.Errorf("parse TLS conf: %w", err)
 	}
 
-	return &api_quirk.ServerConfig{
+	return &fujin.ServerConfig{
 		Addr:                  c.Fujin.Addr,
 		PingInterval:          c.Fujin.PingInterval,
 		PingTimeout:           c.Fujin.PingTimeout,

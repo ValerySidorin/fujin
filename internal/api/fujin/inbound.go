@@ -35,11 +35,14 @@ func newInbound(str quic.Stream, ftt time.Duration, h *handler, l *slog.Logger) 
 
 func (i *inbound) readLoop(ctx context.Context) {
 	stopCh := make(chan struct{})
+	buf := pool.Get(readBufferSize)
 
 	defer func() {
+		pool.Put(buf)
 		close(stopCh)
 		i.close()
 		i.h.out.c.Broadcast()
+
 	}()
 
 	var (
@@ -56,11 +59,8 @@ func (i *inbound) readLoop(ctx context.Context) {
 	}()
 
 	for {
-		// TODO: This can sometimes acquire buf from pool, and not return it
-		buf := pool.Get(readBufferSize)
 		n, err = i.str.Read(buf[:readBufferSize])
 		if n == 0 && err != nil {
-			pool.Put(buf)
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -71,11 +71,10 @@ func (i *inbound) readLoop(ctx context.Context) {
 
 		err := i.h.handle(buf[:n])
 		if err != nil {
-			pool.Put(buf)
 			i.l.Error("handle buf", "err", err)
 			break
 		}
-		pool.Put(buf)
+		buf = buf[:0]
 
 		if i.h.stopRead {
 			i.str.CancelRead(0x0)

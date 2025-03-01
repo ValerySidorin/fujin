@@ -38,9 +38,9 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := produceLoop(ctx, conn); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := produceLoop(ctx, conn); err != nil {
+		log.Fatal(err)
+	}
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -69,10 +69,10 @@ func main() {
 	// }
 	// fmt.Println("subscribed")
 
-	if err := subscribeByBytes(ctx, "sub", conn); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("subscribed")
+	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println("subscribed")
 
 	// time.Sleep(10 * time.Second)
 
@@ -686,7 +686,7 @@ func generateTLSConfig() *tls.Config {
 		Certificate: [][]byte{cert},
 		PrivateKey:  key,
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"quirk"}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
 }
 
 func read(str quic.ReceiveStream, prefix string) {

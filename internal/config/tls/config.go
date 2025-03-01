@@ -66,7 +66,7 @@ func (c *TLSConfig) Parse() (*tls.Config, error) {
 		clientAuth = tls.RequireAndVerifyClientCert
 	}
 
-	nextProtos := []string{"quirk"}
+	nextProtos := []string{"fujin"}
 
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
