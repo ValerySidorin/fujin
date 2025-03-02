@@ -1,7 +1,3 @@
-
-log:
-  level: DEBUG
-  type: text # text/json
 fujin:
   addr: :4848
   ping_interval: 5s
@@ -23,7 +19,7 @@ mq:
         brokers: [localhost:9092, localhost:9093, localhost:9094]
         topic: my_pub_topic
         allow_auto_topic_creation: true
-        linger: 10ms
+        # linger: 10ms
   readers:
     sub:
       protocol: kafka

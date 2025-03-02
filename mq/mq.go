@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/ValerySidorin/fujin/internal/common/pool"
-	"github.com/ValerySidorin/fujin/internal/mq/reader"
-	"github.com/ValerySidorin/fujin/internal/mq/writer"
+	"github.com/ValerySidorin/fujin/mq/reader"
+	"github.com/ValerySidorin/fujin/mq/writer"
 )
 
 var (

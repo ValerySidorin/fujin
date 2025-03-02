@@ -1,6 +1,6 @@
 package config
 
-import "github.com/ValerySidorin/fujin/internal/mq/impl/kafka"
+import "github.com/ValerySidorin/fujin/mq/impl/kafka"
 
 type Config struct {
 	Protocol string             `yaml:"protocol"`

@@ -9,20 +9,22 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/api/fujin/ferr"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/mq"
+	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
+	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/server/fujin/ferr"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 	"github.com/quic-go/quic-go"
 )
 
 type ServerConfig struct {
+	Disabled              bool
 	Addr                  string
 	PingInterval          time.Duration
 	PingTimeout           time.Duration
-	WriteDeadine          time.Duration
+	WriteDeadline         time.Duration
 	ForceTerminateTimeout time.Duration
 	TLS                   *tls.Config
 	QUIC                  *quic.Config
@@ -31,7 +33,10 @@ type ServerConfig struct {
 type Server struct {
 	conf  ServerConfig
 	mqman *mq.MQManager
-	l     *slog.Logger
+
+	ready atomic.Bool
+
+	l *slog.Logger
 }
 
 func NewServer(conf ServerConfig, mqman *mq.MQManager, l *slog.Logger) *Server {
@@ -64,6 +69,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	connWg := &sync.WaitGroup{}
 
 	defer func() {
+		s.ready.Store(false)
 		if err := ln.Close(); err != nil {
 			s.l.Error("close quic listener", "err", err)
 		}
@@ -93,6 +99,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		s.l.Info("fujin server stopped")
 	}()
 
+	s.ready.Store(true)
 	s.l.Info("fujin server started", "addr", ln.Addr())
 
 	for {
@@ -170,7 +177,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					go func() {
 						defer connWg.Done()
 
-						out := newOutbound(str, s.conf.WriteDeadine, s.l)
+						out := newOutbound(str, s.conf.WriteDeadline, s.l)
 						h := newHandler(ctx, s.mqman, out, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
 
@@ -182,4 +189,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			}()
 		}
 	}
+}
+
+func (s *Server) ReadyForConnections() bool {
+	return s.ready.Load()
 }

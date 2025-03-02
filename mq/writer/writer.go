@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ValerySidorin/fujin/internal/mq/impl/kafka"
-	"github.com/ValerySidorin/fujin/internal/mq/writer/config"
+	"github.com/ValerySidorin/fujin/mq/impl/kafka"
+	"github.com/ValerySidorin/fujin/mq/writer/config"
 )
 
 type Writer interface {

@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 
@@ -34,13 +34,13 @@ func main() {
 
 	// go produceLoopTx(ctx, conn)
 
-	// if err := produce(ctx, conn); err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	if err := produceLoop(ctx, conn); err != nil {
+	if err := produce(ctx, conn); err != nil {
 		log.Fatal(err)
 	}
+
+	// if err := produceLoop(ctx, conn); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -304,11 +304,17 @@ func produce(ctx context.Context, conn quic.Connection) error {
 		byte(request.OP_CODE_CONNECT_PRODUCER),
 		0, 0, 0, 0, // producer id is optional (for transactions)
 		byte(request.OP_CODE_PRODUCE),
-		0, 1, 1, 1, // request id
+		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
-		0, 0, 0, 5, // msg len
-		104, 101, 108, 108, 111, // msg
+		0, 0, 0, 2, // msg len
+		98, 98, // msg
+		byte(request.OP_CODE_PRODUCE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 2, // msg len
+		98, 98, // msg
 	}
 
 	str, err := conn.OpenStreamSync(ctx)
@@ -324,7 +330,7 @@ func produce(ctx context.Context, conn quic.Connection) error {
 	go read(str, "produce")
 
 	fmt.Println("produce: write req")
-	// time.Sleep(10 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	req2 := []byte{
 		byte(request.OP_CODE_DISCONNECT),
@@ -449,7 +455,7 @@ func produceLoop(ctx context.Context, conn quic.Connection) error {
 			if err := produce(ctx, conn); err != nil {
 				return err
 			}
-			// time.Sleep(10000 * time.Millisecond)
+			time.Sleep(10000 * time.Millisecond)
 		}
 	}
 }

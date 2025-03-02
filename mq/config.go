@@ -1,8 +1,8 @@
 package mq
 
 import (
-	reader "github.com/ValerySidorin/fujin/internal/mq/reader/config"
-	writer "github.com/ValerySidorin/fujin/internal/mq/writer/config"
+	reader "github.com/ValerySidorin/fujin/mq/reader/config"
+	writer "github.com/ValerySidorin/fujin/mq/writer/config"
 )
 
 type Config struct {

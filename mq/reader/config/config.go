@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/ValerySidorin/fujin/internal/mq/impl/kafka"
-	"github.com/ValerySidorin/fujin/internal/mq/impl/nats"
+	"github.com/ValerySidorin/fujin/mq/impl/kafka"
+	"github.com/ValerySidorin/fujin/mq/impl/nats"
 )
 
 type Config struct {

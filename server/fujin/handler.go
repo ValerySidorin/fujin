@@ -8,13 +8,13 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response/server"
-	"github.com/ValerySidorin/fujin/internal/mq"
-	"github.com/ValerySidorin/fujin/internal/mq/reader"
-	"github.com/ValerySidorin/fujin/internal/mq/writer"
+	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
+	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/mq/reader"
+	"github.com/ValerySidorin/fujin/mq/writer"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/server/fujin/proto/response/server"
 )
 
 const (
@@ -379,12 +379,12 @@ func (h *handler) handle(buf []byte) error {
 				if err := h.parseProduceMsgSizeArg(); err != nil {
 					h.l.Error("parse produce msg size arg", "err", err)
 					h.enqueueProduceResponse(false)
-					pool.Put(h.ps.argBuf) // put arg buf
-					pool.Put(h.ps.ra.rID) // put rid
+					pool.Put(h.ps.argBuf)
+					pool.Put(h.ps.ra.rID)
 					h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 					continue
 				}
-				pool.Put(h.ps.argBuf) // put arg buf
+				pool.Put(h.ps.argBuf)
 				h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_MSG_PAYLOAD
 			}
 		case OP_PRODUCE_MSG_PAYLOAD:
@@ -407,12 +407,18 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produce(h.ps.payloadBuf)
-					pool.Put(h.ps.ra.rID) // put rid
+					pool.Put(h.ps.ra.rID)
 					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			} else {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
+
+				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
+					h.produce(h.ps.payloadBuf)
+					pool.Put(h.ps.ra.rID)
+					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+				}
 			}
 		case OP_CONSUME_TRIGGER:
 			h.consumeTrigger()
@@ -678,6 +684,12 @@ func (h *handler) handle(buf []byte) error {
 			} else {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
+
+				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
+					h.produceTx(h.ps.payloadBuf)
+					pool.Put(h.ps.ra.rID)
+					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+				}
 			}
 		case OP_BEGIN_TX:
 			h.ps.ra.rID = pool.Get(4)

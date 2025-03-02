@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ValerySidorin/fujin/internal/mq/impl/kafka"
-	"github.com/ValerySidorin/fujin/internal/mq/impl/nats"
-	"github.com/ValerySidorin/fujin/internal/mq/reader/config"
+	"github.com/ValerySidorin/fujin/mq/impl/kafka"
+	"github.com/ValerySidorin/fujin/mq/impl/nats"
+	"github.com/ValerySidorin/fujin/mq/reader/config"
 )
 
 type Reader interface {

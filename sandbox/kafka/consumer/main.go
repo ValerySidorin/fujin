@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -36,6 +37,8 @@ func main() {
 
 	fmt.Println("started consuming")
 
+	n := atomic.Int32{}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -52,8 +55,9 @@ func main() {
 
 			iter := fetches.RecordIter()
 			for !iter.Done() {
+				n.Add(1)
 				record := iter.Next()
-				fmt.Println(time.Now(), string(record.Value))
+				fmt.Println(time.Now(), string(record.Value), n.Load())
 			}
 		}
 	}

@@ -1,0 +1,36 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/ValerySidorin/fujin/test
+cpu: Apple M2
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8            1              1708 ns/op           9.95 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.315s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8           10                33.30 ns/op      510.51 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.469s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8          100                 8.750 ns/op    1942.86 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.640s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8         1000                 3.833 ns/op    4435.17 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.488s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8        10000                85.14 ns/op      199.68 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.351s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8       100000               562.6 ns/op        30.21 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.597s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8      1000000              1021 ns/op          16.65 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     1.687s
+
+Benchmark_Produce_1BPayload_1NBatch_Kafka-8      3000000              1185 ns/op          14.34 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     5.415s
