@@ -6,19 +6,20 @@ import (
 	"io"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-
-	_ "net/http/pprof"
 
 	"github.com/ValerySidorin/fujin/internal/api/fujin"
 	"github.com/ValerySidorin/fujin/internal/config"
 	"github.com/ValerySidorin/fujin/internal/mq"
 	_ "go.uber.org/automaxprocs"
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	Commit string
 )
 
 func main() {
@@ -37,17 +38,24 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer cancel()
 
-	go func() {
-		if err := http.ListenAndServe(":8090", nil); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
 	logLevel := parseLogLevel(conf.Log.Level)
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-	}))
-	logger.Info("log level set to: " + logLevel.String())
+	var logger *slog.Logger
+	if conf.Log.Type != "json" && conf.Log.Type != "text" {
+		conf.Log.Type = "text"
+	}
+	switch conf.Log.Type {
+	case "json":
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: logLevel,
+		}))
+	default:
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: logLevel,
+		}))
+	}
+
+	logger.Info("starting fujin server")
+	logger.Info(fmt.Sprintf("commit: %s", Commit))
 
 	quicServerConf, err := conf.ParseQUICServerConfig()
 	if err != nil {

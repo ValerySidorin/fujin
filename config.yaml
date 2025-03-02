@@ -1,6 +1,7 @@
 
 log:
   level: DEBUG
+  type: text # text/json
 fujin:
   addr: :4848
   ping_interval: 5s

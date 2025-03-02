@@ -35,6 +35,7 @@ type QUICConfig struct {
 
 type LogConfig struct {
 	Level string `yaml:"level"`
+	Type  string `yaml:"type"`
 }
 
 func (c *Config) SetDefaults() {

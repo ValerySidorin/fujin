@@ -3,6 +3,7 @@ package fujin
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -101,7 +102,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		default:
 			conn, err := ln.Accept(ctx)
 			if err != nil {
-				s.l.Error(fmt.Errorf("accept conn: %w", err).Error())
+				if !errors.Is(err, ctx.Err()) {
+					s.l.Error(fmt.Errorf("accept conn: %w", err).Error())
+				}
 				continue
 			}
 
