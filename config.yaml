@@ -20,19 +20,24 @@ mq:
         topic: my_pub_topic
         allow_auto_topic_creation: true
         # linger: 10ms
-  readers:
-    sub:
-      protocol: kafka
-      kafka:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        topic: my_pub_topic
-        group: fujin
-        allow_auto_topic_creation: true
-        disable_auto_commit: false
-        max_poll_records: 0
-        # fetch_isolation_level: read_commited # read_uncommited/read_uncommited
-    # sub:
+    # pub:
     #   protocol: nats
     #   nats:
     #     url: nats://localhost:4222
     #     subject: my_subject
+  readers:
+    # sub:
+    #   protocol: kafka
+    #   kafka:
+    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
+    #     topic: my_pub_topic
+    #     group: fujin
+    #     allow_auto_topic_creation: true
+    #     disable_auto_commit: false
+    #     max_poll_records: 0
+        # fetch_isolation_level: read_commited # read_uncommited/read_uncommited
+    sub:
+      protocol: nats
+      nats:
+        url: nats://localhost:4222
+        subject: my_subject

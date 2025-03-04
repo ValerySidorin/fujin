@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"testing"
 
-	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 )
 
@@ -14,16 +14,27 @@ const (
 	PERF_ADDR = "localhost:4848"
 )
 
-func runBenchServerWithKafka(ctx context.Context) *server.Server {
-	return RunDefaultServerWithKafka(ctx)
+func Benchmark_Produce_1BPayload_Kafka(b *testing.B) {
+	benchProduce(b, "kafka", "pub", "b")
 }
 
-func benchProduceWithKafka(b *testing.B, pub, payload string, batchNum int) {
+// func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", "b")
+// }
+
+func benchProduce(b *testing.B, protocol, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
 	b.StopTimer()
-	runBenchServerWithKafka(ctx)
+	switch protocol {
+	case "kafka":
+		RunDefaultServerWithKafka(ctx)
+	case "nats":
+		RunDefaultServerWithNats(ctx)
+	default:
+		panic("invalid protocol")
+	}
 	c := createClientConn(ctx, PERF_ADDR)
 	p := doDefaultConnectProducer(c)
 
@@ -43,28 +54,26 @@ func benchProduceWithKafka(b *testing.B, pub, payload string, batchNum int) {
 	cmd = append(cmd, lenBuf...)
 	cmd = append(cmd, []byte(payload)...)
 
-	buf := make([]byte, 0)
-	for range batchNum {
-		buf = append(buf, cmd...)
-	}
-
-	b.SetBytes(int64(len(buf)))
+	b.SetBytes(int64(len(cmd)))
 	bw := bufio.NewWriterSize(p, defaultSendBufSize)
 
-	ch := make(chan struct{})
+	bytes := make(chan int)
+
+	go drainStream(b, p, bytes)
 
 	b.StartTimer()
 	for b.Loop() {
-		bw.Write(buf)
+		bw.Write(cmd)
 	}
-	go drainStream(b, p, ch, b.N*6)
-	bw.Flush()
-	<-ch
-	b.StopTimer()
-	disconnect(p)
-	_ = c.CloseWithError(0x0, "")
-}
+	bw.Write([]byte{byte(request.OP_CODE_DISCONNECT)})
 
-func Benchmark_Produce_1BPayload_1NBatch_Kafka(b *testing.B) {
-	benchProduceWithKafka(b, "pub", "b", 1)
+	bw.Flush()
+	res := <-bytes
+	b.StopTimer()
+	p.Close()
+	_ = c.CloseWithError(0x0, "")
+	expected := b.N*6 + 1
+	if res != expected {
+		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
+	}
 }

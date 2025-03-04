@@ -50,6 +50,20 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 }
 
 func (s *Server) ReadyForConnections(timeout time.Duration) bool {
-	<-time.After(timeout)
-	return s.fujinServer.ReadyForConnections()
+	ready := make(chan struct{})
+	go func() {
+		if s.fujinServer != nil {
+			if !s.fujinServer.ReadyForConnections(timeout) {
+				return
+			}
+		}
+		close(ready)
+	}()
+
+	select {
+	case <-time.After(timeout):
+		return false
+	case <-ready:
+		return true
+	}
 }

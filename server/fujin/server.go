@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
@@ -34,7 +33,7 @@ type Server struct {
 	conf  ServerConfig
 	mqman *mq.MQManager
 
-	ready atomic.Bool
+	ready chan struct{}
 
 	l *slog.Logger
 }
@@ -43,6 +42,7 @@ func NewServer(conf ServerConfig, mqman *mq.MQManager, l *slog.Logger) *Server {
 	return &Server{
 		conf:  conf,
 		mqman: mqman,
+		ready: make(chan struct{}),
 		l:     l,
 	}
 }
@@ -69,7 +69,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	connWg := &sync.WaitGroup{}
 
 	defer func() {
-		s.ready.Store(false)
 		if err := ln.Close(); err != nil {
 			s.l.Error("close quic listener", "err", err)
 		}
@@ -99,7 +98,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		s.l.Info("fujin server stopped")
 	}()
 
-	s.ready.Store(true)
+	close(s.ready)
 	s.l.Info("fujin server started", "addr", ln.Addr())
 
 	for {
@@ -191,6 +190,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 }
 
-func (s *Server) ReadyForConnections() bool {
-	return s.ready.Load()
+func (s *Server) ReadyForConnections(timeout time.Duration) bool {
+	select {
+	case <-time.After(timeout):
+		return false
+	case <-s.ready:
+		return true
+	}
 }

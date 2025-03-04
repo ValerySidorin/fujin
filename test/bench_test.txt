@@ -3,34 +3,34 @@ goarch: arm64
 pkg: github.com/ValerySidorin/fujin/test
 cpu: Apple M2
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8            1              1708 ns/op           9.95 MB/s
+Benchmark_Produce_1BPayload_Kafka-8            1               208.0 ns/op        81.73 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.315s
+ok      github.com/ValerySidorin/fujin/test     0.459s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8           10                33.30 ns/op      510.51 MB/s
+Benchmark_Produce_1BPayload_Kafka-8           10                41.70 ns/op      407.67 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.469s
+ok      github.com/ValerySidorin/fujin/test     0.368s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8          100                 8.750 ns/op    1942.86 MB/s
+Benchmark_Produce_1BPayload_Kafka-8          100                 7.080 ns/op    2401.13 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.640s
+ok      github.com/ValerySidorin/fujin/test     0.376s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8         1000                 3.833 ns/op    4435.17 MB/s
+Benchmark_Produce_1BPayload_Kafka-8         1000                 7.375 ns/op    2305.08 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.488s
+ok      github.com/ValerySidorin/fujin/test     0.414s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8        10000                85.14 ns/op      199.68 MB/s
+Benchmark_Produce_1BPayload_Kafka-8        10000                91.39 ns/op      186.02 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.351s
+ok      github.com/ValerySidorin/fujin/test     0.468s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8       100000               562.6 ns/op        30.21 MB/s
+Benchmark_Produce_1BPayload_Kafka-8       100000               487.7 ns/op        34.85 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     0.597s
+ok      github.com/ValerySidorin/fujin/test     0.453s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8      1000000              1021 ns/op          16.65 MB/s
+Benchmark_Produce_1BPayload_Kafka-8      1000000               678.7 ns/op        25.05 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     1.687s
+ok      github.com/ValerySidorin/fujin/test     1.072s
 
-Benchmark_Produce_1BPayload_1NBatch_Kafka-8      3000000              1185 ns/op          14.34 MB/s
+Benchmark_Produce_1BPayload_Kafka-8      3000000               601.0 ns/op        28.29 MB/s
 PASS
-ok      github.com/ValerySidorin/fujin/test     5.415s
+ok      github.com/ValerySidorin/fujin/test     2.669s

@@ -20,7 +20,6 @@ func main() {
 	defer nc.Close()
 
 	sub, err := nc.Subscribe("my_subject", func(msg *nats.Msg) {
-		fmt.Println("got msg")
 		fmt.Println(string(msg.Data))
 	})
 	if err != nil {

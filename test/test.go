@@ -17,6 +17,7 @@ import (
 	"github.com/ValerySidorin/fujin/config"
 	"github.com/ValerySidorin/fujin/mq"
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
+	"github.com/ValerySidorin/fujin/mq/impl/nats"
 	reader_config "github.com/ValerySidorin/fujin/mq/reader/config"
 	writer_config "github.com/ValerySidorin/fujin/mq/writer/config"
 	"github.com/ValerySidorin/fujin/server"
@@ -64,8 +65,36 @@ var DefaultTestConfigWithKafka = config.Config{
 	},
 }
 
+var DefaultTestConfigWithNats = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	MQ: mq.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "nats",
+				Nats: nats.ReaderConfig{
+					URL:     "nats://localhost:4222",
+					Subject: "my_subject",
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "nats",
+				Nats: nats.WriterConfig{
+					URL:     "nats://localhost:4222",
+					Subject: "my_subject",
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka)
+}
+
+func RunDefaultServerWithNats(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithNats)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {
@@ -127,27 +156,23 @@ func doDefaultConnectProducer(conn quic.Connection) quic.Stream {
 	return str
 }
 
-func drainStream(b *testing.B, str quic.Stream, ch chan struct{}, expected int) {
+func drainStream(b *testing.B, str quic.Stream, ch chan int) {
 	buf := make([]byte, defaultRecvBufSize)
 	bytes := 0
 
 	for {
 		str.SetReadDeadline(time.Now().Add(30 * time.Second))
 		n, err := str.Read(buf)
-		if err != nil {
-			b.Errorf("Error on read: %v\n", err)
-			break
-		}
 		bytes += n
-		if bytes >= expected {
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				b.Errorf("Error on read: %v\n", err)
+			}
 			break
 		}
 	}
-	if bytes != expected {
-		panic(fmt.Sprintf("Did not receive all bytes: %d vs %d\n", bytes, expected))
-	}
-	fmt.Println(bytes)
-	ch <- struct{}{}
+
+	ch <- bytes
 }
 
 func disconnect(str quic.Stream) {
@@ -169,6 +194,7 @@ func disconnect(str quic.Stream) {
 	}
 
 	str.Close()
+	fmt.Println("closed")
 }
 
 func handlePing(str quic.Stream) {

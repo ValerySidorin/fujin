@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
+	"github.com/ValerySidorin/fujin/mq/impl/nats"
 	"github.com/ValerySidorin/fujin/mq/writer/config"
 )
 
@@ -23,6 +24,8 @@ func NewWriter(conf config.Config, producerID string, l *slog.Logger) (Writer, e
 	switch conf.Protocol {
 	case "kafka":
 		return kafka.NewWriter(conf.Kafka, producerID, l)
+	case "nats":
+		return nats.NewWriter(conf.Nats, producerID, l)
 	}
 
 	return nil, fmt.Errorf("invalid writer protocol: %s", conf.Protocol)
