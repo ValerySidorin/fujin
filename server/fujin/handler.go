@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"unsafe"
 
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
 	"github.com/ValerySidorin/fujin/mq"
@@ -63,7 +64,8 @@ const (
 )
 
 var (
-	ErrParseProto = errors.New("parse proto")
+	ErrParseProto               = errors.New("parse proto")
+	ErrWriterCanNotBeReusedInTx = errors.New("writer can not be reuse in tx")
 )
 
 type sessionState byte
@@ -208,7 +210,6 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_CONNECT_SUBSCRIBER):
 					h.ps.state = OP_CONNECT_SUBSCRIBER
 				default:
-					h.out.enqueueProto(response.ERR_RESP)
 					h.close()
 					return ErrParseProto
 				}
@@ -223,7 +224,6 @@ func (h *handler) handle(buf []byte) error {
 					h.close()
 					return nil
 				default:
-					h.out.enqueueProto(response.ERR_RESP)
 					h.close()
 					return ErrParseProto
 				}
@@ -251,7 +251,6 @@ func (h *handler) handle(buf []byte) error {
 					h.close()
 					return nil
 				default:
-					h.out.enqueueProto(response.ERR_RESP)
 					h.close()
 					return ErrParseProto
 				}
@@ -265,7 +264,6 @@ func (h *handler) handle(buf []byte) error {
 					h.close()
 					return nil
 				default:
-					h.out.enqueueProto(response.ERR_RESP)
 					h.close()
 					return ErrParseProto
 				}
@@ -320,7 +318,7 @@ func (h *handler) handle(buf []byte) error {
 				if len(h.ps.argBuf) >= int(h.ps.pa.pubLen) {
 					if err := h.parseProducePubArg(); err != nil {
 						h.l.Error("parse produce pub arg", "err", err)
-						h.enqueueProduceResponse(false)
+						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ra.rID)
 						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
@@ -332,7 +330,7 @@ func (h *handler) handle(buf []byte) error {
 						w, err := h.mqman.GetWriter(h.ps.pa.pub, "")
 						if err != nil {
 							h.l.Error("get writer", "err", err)
-							h.enqueueProduceResponse(false)
+							h.enqueueProduceErrResponse(err)
 							pool.Put(h.ps.argBuf)
 							pool.Put(h.ps.ra.rID)
 							h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
@@ -352,7 +350,7 @@ func (h *handler) handle(buf []byte) error {
 				if h.ps.pa.pubLen == 0 {
 					if err := h.parseProducePubLenArg(); err != nil {
 						h.l.Error("parse produce pub len arg", "err", err)
-						h.enqueueProduceResponse(false)
+						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ra.rID)
 						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
@@ -363,8 +361,8 @@ func (h *handler) handle(buf []byte) error {
 					continue
 				}
 				pool.Put(h.ps.argBuf)
-				h.enqueueProduceResponse(false)
-				pool.Put(h.ps.ra.rID) // put rid
+				h.enqueueProduceErrResponse(ErrParseProto)
+				pool.Put(h.ps.ra.rID)
 				h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
 			}
@@ -378,7 +376,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= 4 {
 				if err := h.parseProduceMsgSizeArg(); err != nil {
 					h.l.Error("parse produce msg size arg", "err", err)
-					h.enqueueProduceResponse(false)
+					h.enqueueProduceErrResponse(err)
 					pool.Put(h.ps.argBuf)
 					pool.Put(h.ps.ra.rID)
 					h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
@@ -572,7 +570,7 @@ func (h *handler) handle(buf []byte) error {
 				if len(h.ps.argBuf) >= int(h.ps.pa.pubLen) {
 					if err := h.parseProducePubArg(); err != nil {
 						h.l.Error("parse produce pub arg", "err", err)
-						h.enqueueProduceResponse(false)
+						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ra.rID)
 						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
@@ -584,7 +582,7 @@ func (h *handler) handle(buf []byte) error {
 					if h.currentTxWriter != nil {
 						if !h.mqman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.pa.pub) {
 							h.l.Error("writer can not be reused in tx")
-							h.enqueueProduceResponse(false)
+							h.enqueueProduceErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ra.rID)
 							h.ps.ra.rID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
 							continue
@@ -594,7 +592,7 @@ func (h *handler) handle(buf []byte) error {
 						h.currentTxWriter, err = h.mqman.GetWriter(h.ps.pa.pub, h.producerID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
-							h.enqueueProduceResponse(false)
+							h.enqueueProduceErrResponse(err)
 							pool.Put(h.ps.ra.rID)
 							h.ps.ra.rID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
 							continue
@@ -602,7 +600,7 @@ func (h *handler) handle(buf []byte) error {
 
 						if err := h.currentTxWriter.BeginTx(h.ctx); err != nil {
 							h.l.Error("begin tx", "err", err)
-							h.enqueueProduceResponse(false)
+							h.enqueueProduceErrResponse(err)
 							pool.Put(h.ps.ra.rID)
 							continue
 						}
@@ -622,7 +620,7 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseProducePubLenArg(); err != nil {
 						h.l.Error("parse produce pub len arg", "err", err)
 						pool.Put(h.ps.argBuf)
-						h.enqueueProduceResponse(false)
+						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.ra.rID)
 						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 						continue
@@ -634,7 +632,7 @@ func (h *handler) handle(buf []byte) error {
 
 				// this should not happen ever
 				pool.Put(h.ps.argBuf)
-				h.enqueueProduceResponse(false)
+				h.enqueueProduceErrResponse(ErrParseProto)
 				pool.Put(h.ps.ra.rID)
 				h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
@@ -650,7 +648,7 @@ func (h *handler) handle(buf []byte) error {
 				if err := h.parseProduceMsgSizeArg(); err != nil {
 					h.l.Error("parse produce msg size arg", "err", err)
 					pool.Put(h.ps.argBuf)
-					h.enqueueProduceResponse(false)
+					h.enqueueProduceErrResponse(err)
 					pool.Put(h.ps.ra.rID)
 					h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 					continue
@@ -911,7 +909,7 @@ func (h *handler) handle(buf []byte) error {
 				go func() {
 					defer h.wg.Done()
 					if err := h.connectConsumer(r, h.ps.cca.n); err != nil {
-						h.out.enqueueProto(response.ERR_RESP)
+						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						h.l.Error("consume", "err", err)
 						return
@@ -929,9 +927,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= 4 {
 				if h.ps.cca.n == 0 {
 					if err := h.parseConsumeNArg(); err != nil {
-						pool.Put(h.ps.argBuf)
-						h.ps.argBuf, h.ps.cca, h.ps.state = nil, connectConsumerArgs{}, OP_START
-						h.out.enqueueProto(response.ERR_RESP)
+						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume n arg: %w", err)
 					}
@@ -943,7 +939,7 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseConsumePubLenArg(); err != nil {
 						pool.Put(h.ps.argBuf)
 						h.ps.argBuf, h.ps.cca, h.ps.state = nil, connectConsumerArgs{}, OP_START
-						h.out.enqueueProto(response.ERR_RESP)
+						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume pub len arg: %w", err)
 					}
@@ -952,7 +948,6 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				h.ps.argBuf, h.ps.cca, h.ps.state = nil, connectConsumerArgs{}, OP_START
-				h.out.enqueueProto(response.ERR_RESP)
 				h.close()
 				return ErrParseProto
 			}
@@ -966,7 +961,7 @@ func (h *handler) handle(buf []byte) error {
 				if err := h.parseSubscribeSizeArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.csa, h.ps.state = nil, connectSubscriberArgs{}, OP_START
-					h.out.enqueueProto(response.ERR_RESP)
+					enqueueErr(h.out, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 					h.close()
 					return fmt.Errorf("parse subscribe size arg: %w", err)
 				}
@@ -1009,7 +1004,7 @@ func (h *handler) handle(buf []byte) error {
 					go func() {
 						defer h.wg.Done()
 						if err := h.connectSubscriber(r); err != nil {
-							h.out.enqueueProto(response.ERR_RESP)
+							enqueueErr(h.out, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 							h.close()
 							h.l.Error("subscribe", "err", err)
 							return
@@ -1026,9 +1021,8 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 			}
 		default:
-			h.out.enqueueProto(response.ERR_RESP)
 			h.close()
-			return fmt.Errorf("parse proto: invalid input: %v", b)
+			return ErrParseProto
 		}
 	}
 
@@ -1104,28 +1098,40 @@ func (h *handler) consume(ctx context.Context, out *outbound, r reader.Reader, c
 
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	resp := server.ProduceResponse(buf, h.ps.ra.rID, true)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ra.rID)
 	h.nonTxSessionWriters[h.ps.pa.pub].Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
-			resp[5] = response.ERR_CODE_PRODUCE
 			h.l.Error("write", "err", err)
+
+			successResp[5] = response.ERR_CODE_PRODUCE
+			errProtoBuf := errProtoBuf(err)
+			h.out.enqueueProtoMulti(successResp, errProtoBuf)
+			pool.Put(errProtoBuf)
+			pool.Put(buf)
+			return
 		}
-		h.out.enqueueProto(resp)
+		h.out.enqueueProto(successResp)
 		pool.Put(buf)
 	})
 }
 
 func (h *handler) produceTx(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	resp := server.ProduceResponse(buf, h.ps.ra.rID, true)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ra.rID)
 	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
-			resp[5] = response.ERR_CODE_PRODUCE
 			h.l.Error("write", "err", err)
+
+			successResp[5] = response.ERR_CODE_PRODUCE
+			errProtoBuf := errProtoBuf(err)
+			h.out.enqueueProtoMulti(successResp, errProtoBuf)
+			pool.Put(errProtoBuf)
+			pool.Put(buf)
+			return
 		}
-		h.out.enqueueProto(resp)
+		h.out.enqueueProto(successResp)
 		pool.Put(buf)
 	})
 }
@@ -1210,10 +1216,18 @@ func (h *handler) parseSubscribeSizeArg() error {
 	return nil
 }
 
-func (h *handler) enqueueProduceResponse(success bool) {
-	respBuf := pool.Get(6)
-	h.out.enqueueProto(server.ProduceResponse(respBuf, h.ps.ra.rID, success))
-	pool.Put(respBuf)
+func (h *handler) enqueueProduceErrResponse(err error) {
+	errPayload := err.Error()
+	errLen := len(errPayload)
+	buf := pool.Get(10 + errLen) // resp code produce (1) + request id (4) + err code (1) + err len (4)
+	buf = append(buf, byte(response.RESP_CODE_PRODUCE))
+	buf = append(buf, h.ps.ra.rID...)
+	buf = append(buf, response.ERR_CODE_PRODUCE)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
+	buf = append(buf,
+		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
+	h.out.enqueueProto(buf)
+	pool.Put(buf)
 }
 
 func (h *handler) enqueueStop() {
@@ -1271,4 +1285,25 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 		buf = append(buf, message...)
 		out.enqueueProto(buf)
 	}
+}
+
+func enqueueErr(out *outbound, errCode response.ErrCode, err error) {
+	errPayload := err.Error()
+	errLen := len(errPayload)
+	buf := pool.Get(6 + errLen) // cmd + err code + err len + err payload
+	buf = append(buf, byte(response.RESP_CODE_ERR), byte(errCode))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
+	buf = append(buf,
+		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
+	out.enqueueProto(buf)
+	pool.Put(buf)
+}
+
+func errProtoBuf(err error) []byte {
+	errPayload := err.Error()
+	errLen := len(errPayload)
+	errBuf := pool.Get(4 + errLen)
+	errBuf = binary.BigEndian.AppendUint32(errBuf, uint32(errLen))
+	return append(errBuf,
+		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
 }

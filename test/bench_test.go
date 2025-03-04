@@ -18,9 +18,9 @@ func Benchmark_Produce_1BPayload_Kafka_3Brokers(b *testing.B) {
 	benchProduce(b, "kafka3", "pub", "b")
 }
 
-func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", "b")
-}
+// func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", "b")
+// }
 
 func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())

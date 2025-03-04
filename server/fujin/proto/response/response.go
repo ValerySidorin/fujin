@@ -4,10 +4,9 @@ type ErrCode byte
 
 const (
 	ERR_CODE_NO = iota
-	ERR_CODE_PARSE_PROTO
 	ERR_CODE_PRODUCE
-	ERR_CODE_SUBSCRIBE
-	ERR_CODE_CONSUME
+	ERR_CODE_CONNECT_SUBSCRIBER
+	ERR_CODE_CONNECT_CONSUMER
 )
 
 type RespCode byte
@@ -34,9 +33,6 @@ const (
 )
 
 var (
-	ERR_RESP = []byte{
-		byte(RESP_CODE_ERR), // cmd (4)
-	}
 	DISCONNECT_RESP = []byte{
 		byte(RESP_CODE_DISCONNECT), // cmd (8)
 	}

@@ -144,6 +144,19 @@ func (o *outbound) enqueueProto(proto []byte) {
 	o.signalFlush()
 }
 
+func (o *outbound) enqueueProtoMulti(protos ...[]byte) {
+	if o.isClosed() {
+		return
+	}
+
+	o.mu.Lock()
+	for _, proto := range protos {
+		o.queueOutboundNoLock(proto)
+	}
+	o.mu.Unlock()
+	o.signalFlush()
+}
+
 func (o *outbound) queueOutbound(data []byte) {
 	if o.isClosed() {
 		return
@@ -151,6 +164,28 @@ func (o *outbound) queueOutbound(data []byte) {
 
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	o.pb += int64(len(data))
+	toBuffer := data
+	if len(o.v) > 0 {
+		last := &o.v[len(o.v)-1]
+		if free := cap(*last) - len(*last); free > 0 {
+			if l := len(toBuffer); l < free {
+				free = l
+			}
+			*last = append(*last, toBuffer[:free]...)
+			toBuffer = toBuffer[free:]
+		}
+	}
+
+	for len(toBuffer) > 0 {
+		new := pool.Get(len(toBuffer))
+		n := copy(new[:cap(new)], toBuffer)
+		o.v = append(o.v, new[:n])
+		toBuffer = toBuffer[n:]
+	}
+}
+
+func (o *outbound) queueOutboundNoLock(data []byte) {
 	o.pb += int64(len(data))
 	toBuffer := data
 	if len(o.v) > 0 {
