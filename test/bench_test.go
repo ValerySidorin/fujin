@@ -14,26 +14,26 @@ const (
 	PERF_ADDR = "localhost:4848"
 )
 
-func Benchmark_Produce_1BPayload_Kafka(b *testing.B) {
-	benchProduce(b, "kafka", "pub", "b")
+func Benchmark_Produce_1BPayload_Kafka_3Brokers(b *testing.B) {
+	benchProduce(b, "kafka3", "pub", "b")
 }
 
-// func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
-// 	benchProduce(b, "nats", "pub", "b")
-// }
+func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
+	benchProduce(b, "nats", "pub", "b")
+}
 
-func benchProduce(b *testing.B, protocol, pub, payload string) {
+func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
 	b.StopTimer()
-	switch protocol {
-	case "kafka":
-		RunDefaultServerWithKafka(ctx)
+	switch typ {
+	case "kafka3":
+		RunDefaultServerWithKafka3Brokers(ctx)
 	case "nats":
 		RunDefaultServerWithNats(ctx)
 	default:
-		panic("invalid protocol")
+		panic("invalid typ")
 	}
 	c := createClientConn(ctx, PERF_ADDR)
 	p := doDefaultConnectProducer(c)

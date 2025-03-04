@@ -37,7 +37,7 @@ var DefaultFujinServerTestConfig = fujin.ServerConfig{
 	TLS:  generateTLSConfig(),
 }
 
-var DefaultTestConfigWithKafka = config.Config{
+var DefaultTestConfigWithKafka3Brokers = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
 	MQ: mq.Config{
 		Readers: map[string]reader_config.Config{
@@ -89,8 +89,8 @@ var DefaultTestConfigWithNats = config.Config{
 	},
 }
 
-func RunDefaultServerWithKafka(ctx context.Context) *server.Server {
-	return RunServer(ctx, DefaultTestConfigWithKafka)
+func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
 
 func RunDefaultServerWithNats(ctx context.Context) *server.Server {
@@ -173,28 +173,6 @@ func drainStream(b *testing.B, str quic.Stream, ch chan int) {
 	}
 
 	ch <- bytes
-}
-
-func disconnect(str quic.Stream) {
-	_, err := str.Write([]byte{byte(request.OP_CODE_DISCONNECT)})
-	if err != nil {
-		panic(fmt.Sprintf("Error on write disconnect: %v\n", err))
-	}
-
-	buf := make([]byte, 1)
-	str.SetReadDeadline(time.Now().Add(30 * time.Second))
-	n, err := str.Read(buf[:])
-	if err != nil {
-		if !errors.Is(err, io.EOF) {
-			panic(fmt.Sprintf("Error on read disconnect: %v\n", err))
-		}
-	}
-	if n != 1 {
-		panic(fmt.Sprintf("invalid disconnect resp len: %d\n", n))
-	}
-
-	str.Close()
-	fmt.Println("closed")
 }
 
 func handlePing(str quic.Stream) {
