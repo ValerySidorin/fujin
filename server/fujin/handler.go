@@ -909,7 +909,7 @@ func (h *handler) handle(buf []byte) error {
 				go func() {
 					defer h.wg.Done()
 					if err := h.connectConsumer(r, h.ps.cca.n); err != nil {
-						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						h.l.Error("consume", "err", err)
 						return
@@ -927,7 +927,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= 4 {
 				if h.ps.cca.n == 0 {
 					if err := h.parseConsumeNArg(); err != nil {
-						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume n arg: %w", err)
 					}
@@ -939,7 +939,7 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseConsumePubLenArg(); err != nil {
 						pool.Put(h.ps.argBuf)
 						h.ps.argBuf, h.ps.cca, h.ps.state = nil, connectConsumerArgs{}, OP_START
-						enqueueErr(h.out, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume pub len arg: %w", err)
 					}
@@ -961,7 +961,7 @@ func (h *handler) handle(buf []byte) error {
 				if err := h.parseSubscribeSizeArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.csa, h.ps.state = nil, connectSubscriberArgs{}, OP_START
-					enqueueErr(h.out, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
+					enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 					h.close()
 					return fmt.Errorf("parse subscribe size arg: %w", err)
 				}
@@ -1004,7 +1004,7 @@ func (h *handler) handle(buf []byte) error {
 					go func() {
 						defer h.wg.Done()
 						if err := h.connectSubscriber(r); err != nil {
-							enqueueErr(h.out, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
+							enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 							h.close()
 							h.l.Error("subscribe", "err", err)
 							return
@@ -1060,7 +1060,7 @@ func (h *handler) connectConsumer(r reader.Reader, n uint32) error {
 }
 
 func (h *handler) subscribe(ctx context.Context, out *outbound, r reader.Reader) error {
-	enqueueConnected(out, r)
+	enqueueConnectSuccess(out, r)
 	h.sessionReader = r
 	constLen := h.sessionReaderMsgMetaLen + 5
 	handler := enqueueMsgFunc(out, r, constLen)
@@ -1075,7 +1075,7 @@ func (h *handler) subscribe(ctx context.Context, out *outbound, r reader.Reader)
 }
 
 func (h *handler) consume(ctx context.Context, out *outbound, r reader.Reader, ch <-chan struct{}, n uint32) error {
-	enqueueConnected(out, r)
+	enqueueConnectSuccess(out, r)
 	h.sessionReader = r
 
 	h.ackRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
@@ -1250,16 +1250,17 @@ func (h *handler) enqueueNAckResp(meta, rID []byte, success byte) {
 	h.nAckRespTemplate = h.nAckRespTemplate[:1]
 }
 
-func enqueueConnected(out *outbound, r reader.Reader) {
+func enqueueConnectSuccess(out *outbound, r reader.Reader) {
 	var autoCommit byte
 	if r.IsAutoCommit() {
 		autoCommit = 1
 	}
 
-	sbuf := pool.Get(3)
-	sbuf = append(sbuf, byte(response.RESP_CODE_CONNECTED))
-	sbuf = append(sbuf, autoCommit)
-	sbuf = append(sbuf, byte(r.MessageMetaLen()))
+	sbuf := pool.Get(4)
+	sbuf = append(sbuf,
+		byte(response.RESP_CODE_CONNECT_READER), byte(response.ERR_CODE_NO),
+		autoCommit, byte(r.MessageMetaLen()),
+	)
 	out.enqueueProto(sbuf)
 	pool.Put(sbuf)
 }
@@ -1287,11 +1288,11 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 	}
 }
 
-func enqueueErr(out *outbound, errCode response.ErrCode, err error) {
+func enqueueErr(out *outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
 	buf := pool.Get(6 + errLen) // cmd + err code + err len + err payload
-	buf = append(buf, byte(response.RESP_CODE_ERR), byte(errCode))
+	buf = append(buf, byte(respCode), byte(errCode))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
@@ -1302,7 +1303,7 @@ func enqueueErr(out *outbound, errCode response.ErrCode, err error) {
 func errProtoBuf(err error) []byte {
 	errPayload := err.Error()
 	errLen := len(errPayload)
-	errBuf := pool.Get(4 + errLen)
+	errBuf := pool.Get(4 + errLen) // err len + err payload
 	errBuf = binary.BigEndian.AppendUint32(errBuf, uint32(errLen))
 	return append(errBuf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
