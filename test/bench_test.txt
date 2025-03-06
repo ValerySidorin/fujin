@@ -3,6 +3,8 @@ goarch: arm64
 pkg: github.com/ValerySidorin/fujin/test
 cpu: Apple M2
 
+--- 1B Payload ---
+
 Benchmark_Produce_1BPayload_Kafka_3Brokers-8           1               125.0 ns/op       136.00 MB/s
 PASS
 ok      github.com/ValerySidorin/fujin/test     0.467s
@@ -38,3 +40,33 @@ ok      github.com/ValerySidorin/fujin/test     2.241s
 Benchmark_Produce_1BPayload_Kafka_3Brokers-8    10000000               664.2 ns/op        25.59 MB/s
 PASS
 ok      github.com/ValerySidorin/fujin/test     7.490s
+
+--- 32KB Payload ---
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8                 1           2466167 ns/op          13.29 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.411s
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8                10            926933 ns/op          35.37 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.462s
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8               100            354741 ns/op          92.42 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.608s
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8              1000            452499 ns/op          72.45 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.955s
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8             10000            418657 ns/op          78.31 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     4.768s
+
+Benchmark_Produce_32KBPayload_Kafka_3Brokers-8            100000            160968 ns/op         203.67 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     16.469s
+
+Benchmark_Produce_32KBPayload_Nats-8      100000            281658 ns/op         116.40 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     29.159s

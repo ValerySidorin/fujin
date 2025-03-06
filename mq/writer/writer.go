@@ -7,6 +7,7 @@ import (
 
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
 	"github.com/ValerySidorin/fujin/mq/impl/nats"
+	"github.com/ValerySidorin/fujin/mq/protocol"
 	"github.com/ValerySidorin/fujin/mq/writer/config"
 )
 
@@ -22,9 +23,9 @@ type Writer interface {
 
 func NewWriter(conf config.Config, producerID string, l *slog.Logger) (Writer, error) {
 	switch conf.Protocol {
-	case "kafka":
+	case protocol.Kafka:
 		return kafka.NewWriter(conf.Kafka, producerID, l)
-	case "nats":
+	case protocol.Nats:
 		return nats.NewWriter(conf.Nats, producerID, l)
 	}
 

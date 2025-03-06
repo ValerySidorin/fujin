@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ValerySidorin/fujin/internal/common/pool"
+	"github.com/ValerySidorin/fujin/mq/protocol"
 	"github.com/ValerySidorin/fujin/mq/reader"
 	"github.com/ValerySidorin/fujin/mq/writer"
 )
@@ -151,8 +152,10 @@ func (m *MQManager) Close() {
 func (m *MQManager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	conf := m.conf.Writers[pub]
 	switch conf.Protocol {
-	case "kafka":
+	case protocol.Kafka:
 		return conf.Kafka.Endpoint == w.Endpoint()
+	case protocol.Nats:
+		return conf.Nats.URL == w.Endpoint()
 	}
 
 	return false

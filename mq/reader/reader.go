@@ -7,6 +7,7 @@ import (
 
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
 	"github.com/ValerySidorin/fujin/mq/impl/nats"
+	"github.com/ValerySidorin/fujin/mq/protocol"
 	"github.com/ValerySidorin/fujin/mq/reader/config"
 )
 
@@ -23,9 +24,9 @@ type Reader interface {
 
 func New(conf config.Config, l *slog.Logger) (Reader, error) {
 	switch conf.Protocol {
-	case "kafka":
+	case protocol.Kafka:
 		return kafka.NewReader(conf.Kafka, l)
-	case "nats":
+	case protocol.Nats:
 		return nats.NewReader(conf.Nats, l)
 	}
 
