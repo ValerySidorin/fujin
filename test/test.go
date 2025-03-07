@@ -16,6 +16,7 @@ import (
 
 	"github.com/ValerySidorin/fujin/config"
 	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/mq/impl/amqp091"
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
 	"github.com/ValerySidorin/fujin/mq/impl/nats"
 	reader_config "github.com/ValerySidorin/fujin/mq/reader/config"
@@ -89,12 +90,69 @@ var DefaultTestConfigWithNats = config.Config{
 	},
 }
 
+var DefaultTestConfigWithAMQP091 = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	MQ: mq.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "amqp091",
+				AMQP091: amqp091.ReaderConfig{
+					Conn: amqp091.ConnConfig{
+						URL: "amqp://guest:guest@localhost",
+					},
+					Exchange: amqp091.ExchangeConfig{
+						Name: "events",
+						Kind: "fanout",
+					},
+					Queue: amqp091.QueueConfig{
+						Name: "my_queue",
+					},
+					QueueBind: amqp091.QueueBindConfig{
+						RoutingKey: "my_routing_key",
+					},
+					Consume: amqp091.ConsumeConfig{
+						Consumer: "fujin",
+						AutoAck:  true,
+					},
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "amqp091",
+				AMQP091: amqp091.WriterConfig{
+					Conn: amqp091.ConnConfig{
+						URL: "amqp://guest:guest@localhost",
+					},
+					Exchange: amqp091.ExchangeConfig{
+						Name: "events",
+						Kind: "fanout",
+					},
+					Queue: amqp091.QueueConfig{
+						Name: "my_queue",
+					},
+					QueueBind: amqp091.QueueBindConfig{
+						RoutingKey: "my_routing_key",
+					},
+					Publish: amqp091.PublishConfig{
+						ContentType: "text/plain",
+					},
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
 
 func RunDefaultServerWithNats(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithNats)
+}
+
+func RunDefaultServerWithAMQP091(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithAMQP091)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {

@@ -34,13 +34,13 @@ func main() {
 
 	// go produceLoopTx(ctx, conn)
 
-	if err := produce(ctx, conn); err != nil {
-		log.Fatal(err)
-	}
-
-	// if err := produceLoop(ctx, conn); err != nil {
+	// if err := produce(ctx, conn); err != nil {
 	// 	log.Fatal(err)
 	// }
+
+	if err := produceLoop(ctx, conn); err != nil {
+		log.Fatal(err)
+	}
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -130,15 +130,15 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 
 	go read(str, "subscribe")
 
-	ackReq := []byte{
-		byte(request.OP_CODE_ACK),
-		0, 0, 0, 1,
-		1, 0, 0, 0, 0, 0, 0, 1,
-	}
+	// ackReq := []byte{
+	// 	byte(request.OP_CODE_ACK),
+	// 	0, 0, 0, 1,
+	// 	1, 0, 0, 0, 0, 0, 0, 1,
+	// }
 
-	if _, err := str.Write(ackReq); err != nil {
-		return err
-	}
+	// if _, err := str.Write(ackReq); err != nil {
+	// 	return err
+	// }
 
 	// time.Sleep(10 * time.Second)
 	// dReq := []byte{
@@ -455,7 +455,7 @@ func produceLoop(ctx context.Context, conn quic.Connection) error {
 			if err := produce(ctx, conn); err != nil {
 				return err
 			}
-			time.Sleep(10000 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 		}
 	}
 }

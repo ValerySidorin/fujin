@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ValerySidorin/fujin/mq/impl/amqp091"
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
 	"github.com/ValerySidorin/fujin/mq/impl/nats"
 	"github.com/ValerySidorin/fujin/mq/protocol"
@@ -26,7 +27,9 @@ func NewWriter(conf config.Config, producerID string, l *slog.Logger) (Writer, e
 	case protocol.Kafka:
 		return kafka.NewWriter(conf.Kafka, producerID, l)
 	case protocol.Nats:
-		return nats.NewWriter(conf.Nats, producerID, l)
+		return nats.NewWriter(conf.Nats, l)
+	case protocol.AMQP091:
+		return amqp091.NewWriter(conf.AMQP091, l)
 	}
 
 	return nil, fmt.Errorf("invalid writer protocol: %s", conf.Protocol)

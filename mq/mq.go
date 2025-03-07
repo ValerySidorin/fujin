@@ -156,6 +156,8 @@ func (m *MQManager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 		return conf.Kafka.Endpoint == w.Endpoint()
 	case protocol.Nats:
 		return conf.Nats.URL == w.Endpoint()
+	case protocol.AMQP091:
+		return conf.AMQP091.Conn.URL == w.Endpoint()
 	}
 
 	return false

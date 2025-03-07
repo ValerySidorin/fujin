@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/nats-io/nats.go v1.39.1
 	github.com/quic-go/quic-go v0.50.0
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/stretchr/testify v1.10.0
 	github.com/twmb/franz-go v1.18.1
 	github.com/twmb/franz-go/pkg/kmsg v1.9.0

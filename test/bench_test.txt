@@ -3,6 +3,8 @@ goarch: arm64
 pkg: github.com/ValerySidorin/fujin/test
 cpu: Apple M2
 
+--- Kafka ---
+
 --- 1B Payload ---
 
 Benchmark_Produce_1BPayload_Kafka_3Brokers-8           1               125.0 ns/op       136.00 MB/s
@@ -67,6 +69,126 @@ Benchmark_Produce_32KBPayload_Kafka_3Brokers-8            100000            1609
 PASS
 ok      github.com/ValerySidorin/fujin/test     16.469s
 
+--- Nats ---
+
+--- 1B Payload ---
+
+Benchmark_Produce_1BPayload_Nats-8             1               542.0 ns/op        31.37 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.393s
+
+Benchmark_Produce_1BPayload_Nats-8            10               237.5 ns/op        71.58 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.393s
+
+Benchmark_Produce_1BPayload_Nats-8           100                 5.830 ns/op    2915.95 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.396s
+
+Benchmark_Produce_1BPayload_Nats-8          1000                 4.792 ns/op    3547.58 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.561s
+
+Benchmark_Produce_1BPayload_Nats-8         10000                58.98 ns/op      288.26 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.491s
+
+Benchmark_Produce_1BPayload_Nats-8        100000               491.8 ns/op        34.57 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.533s
+
+Benchmark_Produce_1BPayload_Nats-8       1000000               727.3 ns/op        23.38 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     1.267s
+
+Benchmark_Produce_1BPayload_Nats-8       3000000               662.4 ns/op        25.66 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     2.657s
+
+--- 32KB Payload ---
+
+Benchmark_Produce_32KBPayload_Nats-8           1            109666 ns/op         298.94 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.496s
+
+Benchmark_Produce_32KBPayload_Nats-8          10            120708 ns/op         271.60 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.504s
+
+Benchmark_Produce_32KBPayload_Nats-8         100            123482 ns/op         265.50 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.484s
+
+Benchmark_Produce_32KBPayload_Nats-8        1000            211250 ns/op         155.19 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.591s
+
+Benchmark_Produce_32KBPayload_Nats-8       10000            295023 ns/op         111.12 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     3.514s
+
 Benchmark_Produce_32KBPayload_Nats-8      100000            281658 ns/op         116.40 MB/s
 PASS
 ok      github.com/ValerySidorin/fujin/test     29.159s
+
+--- RabbitMQ ---
+
+--- 1B Payload ---
+
+Benchmark_Produce_1BPayload_RabbitMQ-8                 1               333.0 ns/op        51.05 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.409s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8                10                41.70 ns/op      407.67 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.464s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8               100                 8.750 ns/op    1942.86 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.519s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8              1000                 5.292 ns/op    3212.40 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.454s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8             10000                73.28 ns/op      231.99 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.534s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8            100000              6871 ns/op           2.47 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     1.489s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8           1000000             10535 ns/op           1.61 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     11.284s
+
+Benchmark_Produce_1BPayload_RabbitMQ-8           3000000             14143 ns/op           1.20 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     43.635s
+
+--- 32KB Payload ---
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8               1             93833 ns/op         349.39 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.557s
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8              10            137550 ns/op         238.34 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.425s
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8             100            308645 ns/op         106.22 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.372s
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8            1000            274145 ns/op         119.59 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     0.695s
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8           10000            315291 ns/op         103.98 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     3.600s
+
+Benchmark_Produce_32KBPayload_RabbitMQ-8          100000            313877 ns/op         104.45 MB/s
+PASS
+ok      github.com/ValerySidorin/fujin/test     31.843s

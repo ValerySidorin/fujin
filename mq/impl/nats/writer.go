@@ -17,7 +17,7 @@ type Writer struct {
 	l    *slog.Logger
 }
 
-func NewWriter(conf WriterConfig, _ string, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	nc, err := nats.Connect(conf.URL)
 	if err != nil {
 		return nil, fmt.Errorf("nats: connect: %w", err)

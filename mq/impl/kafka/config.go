@@ -1,6 +1,10 @@
 package kafka
 
-import "time"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
 type IsolationLevel string
 
@@ -9,6 +13,8 @@ const (
 	IsolationLevelReadUncommited = "read_uncommited"
 	IsolationLevelReadCommited   = "read_commited"
 )
+
+var ErrValidateKafkaConf = errors.New("validate kafka config")
 
 type ReaderConfig struct {
 	Brokers                []string       `yaml:"brokers"`
@@ -27,4 +33,30 @@ type WriterConfig struct {
 	AllowAutoTopicCreation bool          `yaml:"allow_auto_topic_creation"`
 
 	Endpoint string `yaml:"-"` // Used to compare writers that can be shared in tx
+}
+
+func (c *ReaderConfig) Validate() error {
+	if len(c.Brokers) <= 0 {
+		return validationErr("brokers not defined")
+	}
+	if c.Topic == "" {
+		return validationErr("topic not defined")
+	}
+
+	return nil
+}
+
+func (c *WriterConfig) Validate() error {
+	if len(c.Brokers) <= 0 {
+		return validationErr("brokers not defined")
+	}
+	if c.Topic == "" {
+		return validationErr("topic not defined")
+	}
+
+	return nil
+}
+
+func validationErr(text string) error {
+	return fmt.Errorf(text+": %w", ErrValidateKafkaConf)
 }

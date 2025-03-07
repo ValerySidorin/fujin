@@ -81,6 +81,15 @@ func Benchmark_Produce_32KBPayload_Nats(b *testing.B) {
 	benchProduce(b, "nats", "pub", sizedString(32*1024))
 }
 
+// RabbitMQ benchmarks
+func Benchmark_Produce_1BPayload_RabbitMQ(b *testing.B) {
+	benchProduce(b, "rabbitmq", "pub", sizedString(1))
+}
+
+func Benchmark_Produce_32KBPayload_RabbitMQ(b *testing.B) {
+	benchProduce(b, "rabbitmq", "pub", sizedString(32*1024))
+}
+
 func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
@@ -91,6 +100,8 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 		RunDefaultServerWithKafka3Brokers(ctx)
 	case "nats":
 		RunDefaultServerWithNats(ctx)
+	case "rabbitmq":
+		RunDefaultServerWithAMQP091(ctx)
 	default:
 		panic("invalid typ")
 	}

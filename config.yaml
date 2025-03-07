@@ -13,31 +13,61 @@ fujin:
     keepalive_period: 2s
 mq:
   writers:
-    pub:
-      protocol: kafka
-      kafka:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        topic: my_pub_topic
-        allow_auto_topic_creation: true
+    # pub:
+    #   protocol: kafka
+    #   kafka:
+    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
+    #     topic: my_pub_topic
+    #     allow_auto_topic_creation: true
         # linger: 10ms
     # pub:
     #   protocol: nats
     #   nats:
     #     url: nats://localhost:4222
     #     subject: my_subject
+    pub:
+      protocol: amqp091
+      amqp091:
+        conn:
+          url: amqp://guest:guest@localhost
+        exchange:
+          name: events
+          kind: fanout
+        queue:
+          name: my_queue
+        queue_bind:
+          binding_key: my_routing_key
+        publish:
+          content_type: text/plain
   readers:
-    sub:
-      protocol: kafka
-      kafka:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        topic: my_pub_topic
-        group: fujin
-        allow_auto_topic_creation: true
-        disable_auto_commit: false
-        max_poll_records: 0
+    # sub:
+    #   protocol: kafka
+    #   kafka:
+    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
+    #     topic: my_pub_topic
+    #     group: fujin
+    #     allow_auto_topic_creation: true
+    #     disable_auto_commit: false
+    #     max_poll_records: 0
         # fetch_isolation_level: read_commited # read_uncommited/read_uncommited
     # sub:
     #   protocol: nats
     #   nats:
     #     url: nats://localhost:4222
     #     subject: my_subject
+    sub:
+      protocol: amqp091
+      amqp091:
+        conn:
+          url: amqp://guest:guest@localhost
+        exchange:
+          name: events
+          kind: fanout
+        queue:
+          name: my_queue
+        queue_bind:
+          routing_key: my_routing_key
+        consume:
+          consumer: fujin
+        nack:
+          requeue: true

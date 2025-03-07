@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ValerySidorin/fujin/mq/impl/amqp091"
 	"github.com/ValerySidorin/fujin/mq/impl/kafka"
 	"github.com/ValerySidorin/fujin/mq/impl/nats"
 	"github.com/ValerySidorin/fujin/mq/protocol"
@@ -28,6 +29,8 @@ func New(conf config.Config, l *slog.Logger) (Reader, error) {
 		return kafka.NewReader(conf.Kafka, l)
 	case protocol.Nats:
 		return nats.NewReader(conf.Nats, l)
+	case protocol.AMQP091:
+		return amqp091.NewReader(conf.AMQP091, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)
