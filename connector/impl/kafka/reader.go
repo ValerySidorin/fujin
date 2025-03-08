@@ -185,7 +185,7 @@ func (r *Reader) Ack(ctx context.Context, meta []byte) error {
 	return rerr
 }
 
-func (r *Reader) NAck(ctx context.Context, meta []byte) error {
+func (r *Reader) Nack(ctx context.Context, meta []byte) error {
 	return nil
 }
 

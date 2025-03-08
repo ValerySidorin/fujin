@@ -1,14 +1,11 @@
 package amqp091
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
+	"github.com/ValerySidorin/fujin/connector/cerr"
 	"github.com/rabbitmq/amqp091-go"
 )
-
-var ErrValidateAMQP091Conf = errors.New("validate amqp091 config")
 
 type ConnConfig struct {
 	URL string `yaml:"url"`
@@ -97,16 +94,16 @@ type WriterConfig struct {
 
 func (c *ReaderConfig) Validate() error {
 	if c.Conn.URL == "" {
-		return validationErr("url not defined")
+		return cerr.ValidationErr("url not defined")
 	}
 	if c.Exchange.Name == "" {
-		return validationErr("exchange name not defined")
+		return cerr.ValidationErr("exchange name not defined")
 	}
 	if c.Exchange.Kind == "" {
-		return validationErr("exchange kind not defined")
+		return cerr.ValidationErr("exchange kind not defined")
 	}
 	if c.Queue.Name == "" {
-		return validationErr("queue name not defined")
+		return cerr.ValidationErr("queue name not defined")
 	}
 
 	return nil
@@ -114,21 +111,17 @@ func (c *ReaderConfig) Validate() error {
 
 func (c *WriterConfig) Validate() error {
 	if c.Conn.URL == "" {
-		return validationErr("url not defined")
+		return cerr.ValidationErr("url not defined")
 	}
 	if c.Exchange.Name == "" {
-		return validationErr("exchange name not defined")
+		return cerr.ValidationErr("exchange name not defined")
 	}
 	if c.Exchange.Kind == "" {
-		return validationErr("exchange kind not defined")
+		return cerr.ValidationErr("exchange kind not defined")
 	}
 	if c.Queue.Name == "" {
-		return validationErr("queue name not defined")
+		return cerr.ValidationErr("queue name not defined")
 	}
 
 	return nil
-}
-
-func validationErr(text string) error {
-	return fmt.Errorf(text+": %w", ErrValidateAMQP091Conf)
 }

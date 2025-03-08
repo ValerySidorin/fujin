@@ -1,11 +1,8 @@
 package nats
 
 import (
-	"errors"
-	"fmt"
+	"github.com/ValerySidorin/fujin/connector/cerr"
 )
-
-var ErrValidateNatsConf = errors.New("validate nats config")
 
 type ReaderConfig struct {
 	URL     string `json:"url"`
@@ -19,10 +16,10 @@ type WriterConfig struct {
 
 func (c *ReaderConfig) Validate() error {
 	if c.URL == "" {
-		return validationErr("url not defined")
+		return cerr.ValidationErr("url not defined")
 	}
 	if c.Subject == "" {
-		return validationErr("subject not defined")
+		return cerr.ValidationErr("subject not defined")
 	}
 
 	return nil
@@ -30,15 +27,11 @@ func (c *ReaderConfig) Validate() error {
 
 func (c *WriterConfig) Validate() error {
 	if c.URL == "" {
-		return validationErr("url not defined")
+		return cerr.ValidationErr("url not defined")
 	}
 	if c.Subject == "" {
-		return validationErr("subject not defined")
+		return cerr.ValidationErr("subject not defined")
 	}
 
 	return nil
-}
-
-func validationErr(text string) error {
-	return fmt.Errorf(text+": %w", ErrValidateNatsConf)
 }

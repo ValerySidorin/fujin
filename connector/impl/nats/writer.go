@@ -2,14 +2,12 @@ package nats
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/ValerySidorin/fujin/connector/cerr"
 	"github.com/nats-io/nats.go"
 )
-
-var ErrNotSupported = errors.New("not supported")
 
 type Writer struct {
 	conf WriterConfig
@@ -41,15 +39,15 @@ func (w *Writer) Flush(_ context.Context) error {
 }
 
 func (w *Writer) BeginTx(_ context.Context) error {
-	return ErrNotSupported
+	return cerr.ErrNotSupported
 }
 
 func (w *Writer) CommitTx(_ context.Context) error {
-	return ErrNotSupported
+	return cerr.ErrNotSupported
 }
 
 func (w *Writer) RollbackTx(_ context.Context) error {
-	return ErrNotSupported
+	return cerr.ErrNotSupported
 }
 
 func (w *Writer) Endpoint() string {

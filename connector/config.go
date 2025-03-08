@@ -28,6 +28,10 @@ func (c *Config) Validate() error {
 			if err := r.AMQP091.Validate(); err != nil {
 				return fmt.Errorf("validate reader config: %w", err)
 			}
+		case protocol.AMQP10:
+			if err := r.AMQP10.Validate(); err != nil {
+				return fmt.Errorf("validate reader config: %w", err)
+			}
 		}
 	}
 
@@ -43,6 +47,10 @@ func (c *Config) Validate() error {
 			}
 		case protocol.AMQP091:
 			if err := r.AMQP091.Validate(); err != nil {
+				return fmt.Errorf("validate writer config: %w", err)
+			}
+		case protocol.AMQP10:
+			if err := r.AMQP10.Validate(); err != nil {
 				return fmt.Errorf("validate writer config: %w", err)
 			}
 		}

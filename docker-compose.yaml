@@ -93,3 +93,10 @@ services:
     environment:
       RABBITMQ_DEFAULT_VHOST: /
     restart: always
+  artemismq:
+    image: apache/activemq-artemis:latest-alpine
+    container_name: artemismq
+    ports:
+      - "61616:61616"
+      - "8161:8161"
+    restart: always

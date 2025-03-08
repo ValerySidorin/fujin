@@ -25,20 +25,27 @@ connectors:
     #   nats:
     #     url: nats://localhost:4222
     #     subject: my_subject
+    # pub:
+    #   protocol: amqp091
+    #   amqp091:
+    #     conn:
+    #       url: amqp://guest:guest@localhost
+    #     exchange:
+    #       name: events
+    #       kind: fanout
+    #     queue:
+    #       name: my_queue
+    #     queue_bind:
+    #       binding_key: my_routing_key
+    #     publish:
+    #       content_type: text/plain
     pub:
-      protocol: amqp091
-      amqp091:
+      protocol: amqp10
+      amqp10:
         conn:
-          url: amqp://guest:guest@localhost
-        exchange:
-          name: events
-          kind: fanout
-        queue:
-          name: my_queue
-        queue_bind:
-          binding_key: my_routing_key
-        publish:
-          content_type: text/plain
+          addr: amqp://artemis:artemis@localhost:61616
+        sender:
+          target: exchange
   readers:
     # sub:
     #   protocol: kafka
@@ -55,19 +62,26 @@ connectors:
     #   nats:
     #     url: nats://localhost:4222
     #     subject: my_subject
+    # sub:
+    #   protocol: amqp091
+    #   amqp091:
+    #     conn:
+    #       url: amqp://guest:guest@localhost
+    #     exchange:
+    #       name: events
+    #       kind: fanout
+    #     queue:
+    #       name: my_queue
+    #     queue_bind:
+    #       routing_key: my_routing_key
+    #     consume:
+    #       consumer: fujin
+    #     nack:
+    #       requeue: true
     sub:
-      protocol: amqp091
-      amqp091:
+      protocol: amqp10
+      amqp10:
         conn:
-          url: amqp://guest:guest@localhost
-        exchange:
-          name: events
-          kind: fanout
-        queue:
-          name: my_queue
-        queue_bind:
-          routing_key: my_routing_key
-        consume:
-          consumer: fujin
-        nack:
-          requeue: true
+          addr: amqp://artemis:artemis@localhost:61616
+        receiver:
+          source: exchange

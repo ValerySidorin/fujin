@@ -3,6 +3,7 @@ module github.com/ValerySidorin/fujin
 go 1.24.0
 
 require (
+	github.com/Azure/go-amqp v1.4.0
 	github.com/nats-io/nats.go v1.39.1
 	github.com/quic-go/quic-go v0.50.0
 	github.com/rabbitmq/amqp091-go v1.10.0

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
+	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/nats"
 	"github.com/ValerySidorin/fujin/connector/protocol"
@@ -16,7 +17,7 @@ type Reader interface {
 	Subscribe(ctx context.Context, h func(message []byte, args ...any) error) error
 	Consume(ctx context.Context, ch <-chan struct{}, n uint32, h func(message []byte, args ...any) error) error
 	Ack(ctx context.Context, meta []byte) error
-	NAck(ctx context.Context, meta []byte) error
+	Nack(ctx context.Context, meta []byte) error
 	MessageMetaLen() byte
 	EncodeMeta(buf []byte, args ...any) []byte
 	IsAutoCommit() bool
@@ -31,6 +32,8 @@ func New(conf config.Config, l *slog.Logger) (Reader, error) {
 		return nats.NewReader(conf.Nats, l)
 	case protocol.AMQP091:
 		return amqp091.NewReader(conf.AMQP091, l)
+	case protocol.AMQP10:
+		return amqp10.NewReader(conf.AMQP10, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)

@@ -500,7 +500,7 @@ func (h *handler) handle(buf []byte) error {
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= h.sessionReaderMsgMetaLen {
 				// TODO: Handle nack errors properly
-				if err := h.sessionReader.NAck(h.ctx, h.ps.argBuf); err != nil {
+				if err := h.sessionReader.Nack(h.ctx, h.ps.argBuf); err != nil {
 					h.l.Error("ack", "err", err)
 					h.enqueueNAckResp(h.ps.argBuf, h.ps.ra.rID, 0)
 					pool.Put(h.ps.argBuf)

@@ -121,8 +121,6 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 		}
 	}
 
-	fmt.Println("started consuming")
-
 	go func() {
 		for d := range msgs {
 			_ = handler(d)
@@ -148,7 +146,7 @@ func (r *Reader) Ack(ctx context.Context, meta []byte) error {
 	return r.channel.Ack(binary.BigEndian.Uint64(meta), r.conf.Ack.Multiple)
 }
 
-func (r *Reader) NAck(ctx context.Context, meta []byte) error {
+func (r *Reader) Nack(ctx context.Context, meta []byte) error {
 	return r.channel.Nack(binary.BigEndian.Uint64(meta), r.conf.Nack.Multiple, r.conf.Nack.Requeue)
 }
 
