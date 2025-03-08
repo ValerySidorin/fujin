@@ -9,10 +9,10 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/ValerySidorin/fujin/connector"
+	"github.com/ValerySidorin/fujin/connector/reader"
+	"github.com/ValerySidorin/fujin/connector/writer"
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
-	"github.com/ValerySidorin/fujin/mq"
-	"github.com/ValerySidorin/fujin/mq/reader"
-	"github.com/ValerySidorin/fujin/mq/writer"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/response/server"
@@ -120,9 +120,9 @@ type connectProducerArgs struct {
 }
 
 type handler struct {
-	ctx   context.Context
-	out   *outbound
-	mqman *mq.MQManager
+	ctx  context.Context
+	out  *outbound
+	cman *connector.Manager
 
 	ps           *parseState
 	sessionState sessionState
@@ -153,12 +153,12 @@ type handler struct {
 }
 
 func newHandler(
-	ctx context.Context, mqman *mq.MQManager,
+	ctx context.Context, cman *connector.Manager,
 	out *outbound, l *slog.Logger,
 ) *handler {
 	return &handler{
 		ctx:          ctx,
-		mqman:        mqman,
+		cman:         cman,
 		l:            l,
 		out:          out,
 		ps:           &parseState{},
@@ -191,13 +191,13 @@ func (h *handler) handle(buf []byte) error {
 					h.disconnect = func() {
 						for pub, w := range h.nonTxSessionWriters {
 							w.Flush(h.ctx)
-							h.mqman.PutWriter(w, pub, "")
+							h.cman.PutWriter(w, pub, "")
 						}
 						if h.currentTxWriter != nil {
 							if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
 								h.l.Error("rollback tx", "err", err)
 							}
-							h.mqman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 							h.currentTxWriter = nil
 						}
 						h.out.enqueueProto(response.DISCONNECT_RESP)
@@ -325,7 +325,7 @@ func (h *handler) handle(buf []byte) error {
 					pool.Put(h.ps.argBuf)
 
 					if _, ok := h.nonTxSessionWriters[h.ps.pa.pub]; !ok {
-						w, err := h.mqman.GetWriter(h.ps.pa.pub, "")
+						w, err := h.cman.GetWriter(h.ps.pa.pub, "")
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueProduceErrResponse(err)
@@ -578,7 +578,7 @@ func (h *handler) handle(buf []byte) error {
 					h.ps.argBuf = nil
 
 					if h.currentTxWriter != nil {
-						if !h.mqman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.pa.pub) {
+						if !h.cman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.pa.pub) {
 							h.l.Error("writer can not be reused in tx")
 							h.enqueueProduceErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ra.rID)
@@ -587,7 +587,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						h.currentTxWriter, err = h.mqman.GetWriter(h.ps.pa.pub, h.producerID)
+						h.currentTxWriter, err = h.cman.GetWriter(h.ps.pa.pub, h.producerID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueProduceErrResponse(err)
@@ -761,7 +761,7 @@ func (h *handler) handle(buf []byte) error {
 						h.ps.ra.rID, h.ps.state = nil, OP_START
 						continue
 					}
-					h.mqman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
+					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 					h.txCommitRespTemplate = append(h.txCommitRespTemplate, 0)
 					h.out.enqueueProto(h.txCommitRespTemplate)
 					pool.Put(h.ps.ra.rID)
@@ -804,7 +804,7 @@ func (h *handler) handle(buf []byte) error {
 						h.ps.ra.rID, h.ps.state = nil, OP_START
 						continue
 					}
-					h.mqman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
+					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 					h.txRollbackRespTemplate = append(h.txRollbackRespTemplate, 0)
 					h.out.enqueueProto(h.txRollbackRespTemplate)
 					pool.Put(h.ps.ra.rID)
@@ -896,7 +896,7 @@ func (h *handler) handle(buf []byte) error {
 
 				h.sessionState = SESSION_STATE_CONSUMER
 
-				r, err := h.mqman.GetReader(h.ps.cca.sub)
+				r, err := h.cman.GetReader(h.ps.cca.sub)
 				if err != nil {
 					return fmt.Errorf("get reader: %w", err)
 				}
@@ -991,7 +991,7 @@ func (h *handler) handle(buf []byte) error {
 
 					h.sessionState = SESSION_STATE_SUBSCRIBER
 
-					r, err := h.mqman.GetReader(sub)
+					r, err := h.cman.GetReader(sub)
 					if err != nil {
 						return fmt.Errorf("get reader: %w", err)
 					}

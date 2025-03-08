@@ -1,11 +1,11 @@
-package mq
+package connector
 
 import (
 	"fmt"
 
-	"github.com/ValerySidorin/fujin/mq/protocol"
-	reader "github.com/ValerySidorin/fujin/mq/reader/config"
-	writer "github.com/ValerySidorin/fujin/mq/writer/config"
+	"github.com/ValerySidorin/fujin/connector/protocol"
+	reader "github.com/ValerySidorin/fujin/connector/reader/config"
+	writer "github.com/ValerySidorin/fujin/connector/writer/config"
 )
 
 type Config struct {

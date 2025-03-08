@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/config"
-	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin"
 	"github.com/quic-go/quic-go"
@@ -26,8 +26,8 @@ import (
 )
 
 type Config struct {
-	Fujin FujinConfig `yaml:"fujin"`
-	MQ    mq.Config   `yaml:"mq"`
+	Fujin      FujinConfig      `yaml:"fujin"`
+	Connectors connector.Config `yaml:"connectors"`
 }
 
 type FujinConfig struct {
@@ -69,8 +69,8 @@ func (c *Config) parse() (config.Config, error) {
 	}
 
 	return config.Config{
-		Fujin: fujinConf,
-		MQ:    c.MQ,
+		Fujin:      fujinConf,
+		Connectors: c.Connectors,
 	}, nil
 }
 

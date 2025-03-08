@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/config"
-	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/server/fujin"
 	"golang.org/x/sync/errgroup"
 )
@@ -15,7 +15,7 @@ type Server struct {
 	conf config.Config
 
 	fujinServer *fujin.Server
-	mqman       *mq.MQManager
+	cman        *connector.Manager
 
 	l *slog.Logger
 }
@@ -28,10 +28,10 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 		l:    l,
 	}
 
-	s.mqman = mq.NewMQManager(s.conf.MQ, s.l)
+	s.cman = connector.NewManager(s.conf.Connectors, s.l)
 
 	if !conf.Fujin.Disabled {
-		s.fujinServer = fujin.NewServer(conf.Fujin, s.mqman, s.l)
+		s.fujinServer = fujin.NewServer(conf.Fujin, s.cman, s.l)
 	}
 
 	return s, nil

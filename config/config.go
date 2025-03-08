@@ -3,13 +3,13 @@ package config
 import (
 	"time"
 
-	"github.com/ValerySidorin/fujin/mq"
+	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/server/fujin"
 )
 
 type Config struct {
-	Fujin fujin.ServerConfig
-	MQ    mq.Config
+	Fujin      fujin.ServerConfig
+	Connectors connector.Config
 }
 
 func (c *Config) SetDefaults() {
@@ -33,7 +33,7 @@ func (c *Config) SetDefaults() {
 		c.Fujin.ForceTerminateTimeout = 15 * time.Second
 	}
 
-	for _, c := range c.MQ.Readers {
+	for _, c := range c.Connectors.Readers {
 		switch c.Protocol {
 		// no reusable readers for now
 		case "kafka":

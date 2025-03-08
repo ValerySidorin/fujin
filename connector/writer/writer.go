@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ValerySidorin/fujin/mq/impl/amqp091"
-	"github.com/ValerySidorin/fujin/mq/impl/kafka"
-	"github.com/ValerySidorin/fujin/mq/impl/nats"
-	"github.com/ValerySidorin/fujin/mq/protocol"
-	"github.com/ValerySidorin/fujin/mq/writer/config"
+	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
+	"github.com/ValerySidorin/fujin/connector/impl/kafka"
+	"github.com/ValerySidorin/fujin/connector/impl/nats"
+	"github.com/ValerySidorin/fujin/connector/protocol"
+	"github.com/ValerySidorin/fujin/connector/writer/config"
 )
 
 type Writer interface {

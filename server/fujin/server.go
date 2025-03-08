@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
-	"github.com/ValerySidorin/fujin/mq"
 	"github.com/ValerySidorin/fujin/server/fujin/ferr"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 	"github.com/quic-go/quic-go"
@@ -30,18 +30,18 @@ type ServerConfig struct {
 }
 
 type Server struct {
-	conf  ServerConfig
-	mqman *mq.MQManager
+	conf ServerConfig
+	cman *connector.Manager
 
 	ready chan struct{}
 
 	l *slog.Logger
 }
 
-func NewServer(conf ServerConfig, mqman *mq.MQManager, l *slog.Logger) *Server {
+func NewServer(conf ServerConfig, cman *connector.Manager, l *slog.Logger) *Server {
 	return &Server{
 		conf:  conf,
-		mqman: mqman,
+		cman:  cman,
 		ready: make(chan struct{}),
 		l:     l,
 	}
@@ -177,7 +177,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 						defer connWg.Done()
 
 						out := newOutbound(str, s.conf.WriteDeadline, s.l)
-						h := newHandler(ctx, s.mqman, out, s.l)
+						h := newHandler(ctx, s.cman, out, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
 
 						go in.readLoop(ctx)

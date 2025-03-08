@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/config"
-	"github.com/ValerySidorin/fujin/mq"
-	"github.com/ValerySidorin/fujin/mq/impl/amqp091"
-	"github.com/ValerySidorin/fujin/mq/impl/kafka"
-	"github.com/ValerySidorin/fujin/mq/impl/nats"
-	reader_config "github.com/ValerySidorin/fujin/mq/reader/config"
-	writer_config "github.com/ValerySidorin/fujin/mq/writer/config"
+	"github.com/ValerySidorin/fujin/connector"
+	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
+	"github.com/ValerySidorin/fujin/connector/impl/kafka"
+	"github.com/ValerySidorin/fujin/connector/impl/nats"
+	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
+	writer_config "github.com/ValerySidorin/fujin/connector/writer/config"
 	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
@@ -40,7 +40,7 @@ var DefaultFujinServerTestConfig = fujin.ServerConfig{
 
 var DefaultTestConfigWithKafka3Brokers = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	MQ: mq.Config{
+	Connectors: connector.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "kafka",
@@ -68,7 +68,7 @@ var DefaultTestConfigWithKafka3Brokers = config.Config{
 
 var DefaultTestConfigWithNats = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	MQ: mq.Config{
+	Connectors: connector.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "nats",
@@ -92,7 +92,7 @@ var DefaultTestConfigWithNats = config.Config{
 
 var DefaultTestConfigWithAMQP091 = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	MQ: mq.Config{
+	Connectors: connector.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "amqp091",

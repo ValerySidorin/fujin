@@ -1,4 +1,4 @@
-package mq
+package connector
 
 import (
 	"errors"
@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ValerySidorin/fujin/connector/protocol"
+	"github.com/ValerySidorin/fujin/connector/reader"
+	"github.com/ValerySidorin/fujin/connector/writer"
 	"github.com/ValerySidorin/fujin/internal/common/pool"
-	"github.com/ValerySidorin/fujin/mq/protocol"
-	"github.com/ValerySidorin/fujin/mq/reader"
-	"github.com/ValerySidorin/fujin/mq/writer"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 	ErrWriterNotFound = errors.New("writer not found")
 )
 
-type MQManager struct {
+type Manager struct {
 	conf Config
 
 	readers map[string]reader.Reader
@@ -32,8 +32,8 @@ type MQManager struct {
 	l *slog.Logger
 }
 
-func NewMQManager(conf Config, l *slog.Logger) *MQManager {
-	mqman := &MQManager{
+func NewManager(conf Config, l *slog.Logger) *Manager {
+	cman := &Manager{
 		conf: conf,
 
 		readers: make(map[string]reader.Reader, len(conf.Readers)),
@@ -45,13 +45,13 @@ func NewMQManager(conf Config, l *slog.Logger) *MQManager {
 	getReaderFuncs := make(map[string]func(name string) (reader.Reader, error), len(conf.Readers))
 	for name, conf := range conf.Readers {
 		if conf.Reusable {
-			getReaderFuncs[name] = mqman.getReaderReuse
+			getReaderFuncs[name] = cman.getReaderReuse
 		} else {
-			getReaderFuncs[name] = mqman.getReaderNoReuse
+			getReaderFuncs[name] = cman.getReaderNoReuse
 		}
 	}
 
-	mqman.getReaderFuncs = getReaderFuncs
+	cman.getReaderFuncs = getReaderFuncs
 
 	for name, c := range conf.Writers {
 		rewriteConf := c
@@ -59,10 +59,10 @@ func NewMQManager(conf Config, l *slog.Logger) *MQManager {
 		conf.Writers[name] = rewriteConf
 	}
 
-	return mqman
+	return cman
 }
 
-func (m *MQManager) GetReader(name string) (reader.Reader, error) {
+func (m *Manager) GetReader(name string) (reader.Reader, error) {
 	f, ok := m.getReaderFuncs[name]
 	if !ok {
 		return nil, fmt.Errorf("reader func not found for name: %s", name)
@@ -71,7 +71,7 @@ func (m *MQManager) GetReader(name string) (reader.Reader, error) {
 	return f(name)
 }
 
-func (m *MQManager) GetWriter(name, producerID string) (writer.Writer, error) {
+func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
 	m.pmu.RLock()
 
 	wpoolm, ok := m.wpoolms[name]
@@ -134,14 +134,14 @@ func (m *MQManager) GetWriter(name, producerID string) (writer.Writer, error) {
 	return w.(writer.Writer), nil
 }
 
-func (m *MQManager) PutWriter(w writer.Writer, name, producerID string) {
+func (m *Manager) PutWriter(w writer.Writer, name, producerID string) {
 	m.pmu.Lock()
 	defer m.pmu.Unlock()
 
 	m.wpoolms[name][producerID].Put(w)
 }
 
-func (m *MQManager) Close() {
+func (m *Manager) Close() {
 	for _, wpoolm := range m.wpoolms {
 		for _, p := range wpoolm {
 			p.Close()
@@ -149,7 +149,7 @@ func (m *MQManager) Close() {
 	}
 }
 
-func (m *MQManager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
+func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	conf := m.conf.Writers[pub]
 	switch conf.Protocol {
 	case protocol.Kafka:
@@ -163,7 +163,7 @@ func (m *MQManager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	return false
 }
 
-func (m *MQManager) getReaderReuse(name string) (reader.Reader, error) {
+func (m *Manager) getReaderReuse(name string) (reader.Reader, error) {
 	m.cmu.RLock()
 	r, ok := m.readers[name]
 	if ok {
@@ -192,7 +192,7 @@ func (m *MQManager) getReaderReuse(name string) (reader.Reader, error) {
 	return r, nil
 }
 
-func (m *MQManager) getReaderNoReuse(name string) (reader.Reader, error) {
+func (m *Manager) getReaderNoReuse(name string) (reader.Reader, error) {
 	conf, ok := m.conf.Readers[name]
 	if !ok {
 		return nil, ErrReaderNotFound
