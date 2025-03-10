@@ -17,6 +17,7 @@ import (
 	"github.com/ValerySidorin/fujin/config"
 	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
+	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/nats"
 	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
@@ -143,6 +144,38 @@ var DefaultTestConfigWithAMQP091 = config.Config{
 	},
 }
 
+var DefaultTestConfigWithAMQP10 = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	Connectors: connector.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "amqp10",
+				AMQP10: amqp10.ReaderConfig{
+					Conn: amqp10.ConnConfig{
+						Addr: "amqp://artemis:artemis@localhost:61616",
+					},
+					Receiver: amqp10.ReceiverConfig{
+						Source: "queue",
+					},
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "amqp10",
+				AMQP10: amqp10.WriterConfig{
+					Conn: amqp10.ConnConfig{
+						Addr: "amqp://artemis:artemis@localhost:61616",
+					},
+					Sender: amqp10.SenderConfig{
+						Target: "queue",
+					},
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
@@ -153,6 +186,10 @@ func RunDefaultServerWithNats(ctx context.Context) *server.Server {
 
 func RunDefaultServerWithAMQP091(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithAMQP091)
+}
+
+func RunDefaultServerWithAMQP10(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithAMQP10)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {

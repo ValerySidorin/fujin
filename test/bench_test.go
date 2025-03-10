@@ -90,6 +90,15 @@ func Benchmark_Produce_32KBPayload_RabbitMQ(b *testing.B) {
 	benchProduce(b, "rabbitmq", "pub", sizedString(32*1024))
 }
 
+// ArtemisMQ benchmarks
+func Benchmark_Produce_1BPayload_ArtemisMQ(b *testing.B) {
+	benchProduce(b, "artemismq", "pub", sizedString(1))
+}
+
+func Benchmark_Produce_32KBPayload_ArtemisMQ(b *testing.B) {
+	benchProduce(b, "artemismq", "pub", sizedString(32*1024))
+}
+
 func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
@@ -102,6 +111,8 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 		RunDefaultServerWithNats(ctx)
 	case "rabbitmq":
 		RunDefaultServerWithAMQP091(ctx)
+	case "artemismq":
+		RunDefaultServerWithAMQP10(ctx)
 	default:
 		panic("invalid typ")
 	}
