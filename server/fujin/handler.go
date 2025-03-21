@@ -81,7 +81,7 @@ type parseState struct {
 	argBuf     []byte
 	payloadBuf []byte
 
-	ra requestIDArg
+	ca correlationIDArg
 
 	cpa connectProducerArgs
 	pa  publishArgs
@@ -91,8 +91,8 @@ type parseState struct {
 	csa connectSubscriberArgs
 }
 
-type requestIDArg struct {
-	rID []byte
+type correlationIDArg struct {
+	cID []byte
 }
 
 type publishArgs struct {
@@ -267,11 +267,11 @@ func (h *handler) handle(buf []byte) error {
 				}
 			}
 		case OP_PRODUCE:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_PRODUCE_REQUEST_ID_ARG
 		case OP_PRODUCE_REQUEST_ID_ARG:
-			toCopy := 4 - len(h.ps.ra.rID)
+			toCopy := 4 - len(h.ps.ca.cID)
 			avail := len(buf) - i
 
 			if avail < toCopy {
@@ -279,15 +279,15 @@ func (h *handler) handle(buf []byte) error {
 			}
 
 			if toCopy > 0 {
-				start := len(h.ps.ra.rID)
-				h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-				copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 				i = (i + toCopy) - 1
 			} else {
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 
-			if len(h.ps.ra.rID) >= 4 {
+			if len(h.ps.ca.cID) >= 4 {
 				h.ps.argBuf = pool.Get(4)
 				h.ps.state = OP_PRODUCE_ARG
 			}
@@ -318,8 +318,8 @@ func (h *handler) handle(buf []byte) error {
 						h.l.Error("parse produce pub arg", "err", err)
 						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
-						pool.Put(h.ps.ra.rID)
-						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 						continue
 					}
 					pool.Put(h.ps.argBuf)
@@ -330,8 +330,8 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("get writer", "err", err)
 							h.enqueueProduceErrResponse(err)
 							pool.Put(h.ps.argBuf)
-							pool.Put(h.ps.ra.rID)
-							h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+							pool.Put(h.ps.ca.cID)
+							h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 							continue
 						}
 
@@ -350,8 +350,8 @@ func (h *handler) handle(buf []byte) error {
 						h.l.Error("parse produce pub len arg", "err", err)
 						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
-						pool.Put(h.ps.ra.rID)
-						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 						continue
 					}
 					pool.Put(h.ps.argBuf)
@@ -360,8 +360,8 @@ func (h *handler) handle(buf []byte) error {
 				}
 				pool.Put(h.ps.argBuf)
 				h.enqueueProduceErrResponse(ErrParseProto)
-				pool.Put(h.ps.ra.rID)
-				h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+				pool.Put(h.ps.ca.cID)
+				h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
 			}
 		case OP_PRODUCE_MSG_ARG:
@@ -376,8 +376,8 @@ func (h *handler) handle(buf []byte) error {
 					h.l.Error("parse produce msg size arg", "err", err)
 					h.enqueueProduceErrResponse(err)
 					pool.Put(h.ps.argBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 					continue
 				}
 				pool.Put(h.ps.argBuf)
@@ -403,8 +403,8 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produce(h.ps.payloadBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			} else {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
@@ -412,20 +412,20 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produce(h.ps.payloadBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			}
 		case OP_CONSUME_TRIGGER:
 			h.consumeTrigger()
 			h.ps.state = OP_START
 		case OP_ACK:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_ACK_REQUEST_ID_ARG
 		case OP_ACK_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -433,21 +433,21 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					h.ps.argBuf = pool.Get(h.sessionReaderMsgMetaLen)
 					h.ps.state = OP_ACK_ARG
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_ACK_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
@@ -455,24 +455,24 @@ func (h *handler) handle(buf []byte) error {
 				// TODO: Handle ack errors properly
 				if err := h.sessionReader.Ack(h.ctx, h.ps.argBuf); err != nil {
 					h.l.Error("ack", "err", err)
-					h.enqueueAckResp(h.ps.argBuf, h.ps.ra.rID, 0)
+					h.enqueueAckResp(h.ps.argBuf, h.ps.ca.cID, 0)
 					pool.Put(h.ps.argBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.state = nil, nil, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 					continue
 				}
-				h.enqueueAckResp(h.ps.argBuf, h.ps.ra.rID, 1)
+				h.enqueueAckResp(h.ps.argBuf, h.ps.ca.cID, 1)
 				pool.Put(h.ps.argBuf)
-				pool.Put(h.ps.ra.rID)
-				h.ps.argBuf, h.ps.ra.rID, h.ps.state = nil, nil, OP_START
+				pool.Put(h.ps.ca.cID)
+				h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 			}
 		case OP_NACK:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_ACK_REQUEST_ID_ARG
 		case OP_NACK_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -480,21 +480,21 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					h.ps.argBuf = pool.Get(h.sessionReaderMsgMetaLen)
 					h.ps.state = OP_NACK_ARG
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_NACK_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
@@ -502,24 +502,24 @@ func (h *handler) handle(buf []byte) error {
 				// TODO: Handle nack errors properly
 				if err := h.sessionReader.Nack(h.ctx, h.ps.argBuf); err != nil {
 					h.l.Error("ack", "err", err)
-					h.enqueueNAckResp(h.ps.argBuf, h.ps.ra.rID, 0)
+					h.enqueueNAckResp(h.ps.argBuf, h.ps.ca.cID, 0)
 					pool.Put(h.ps.argBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.state = nil, nil, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 					continue
 				}
-				h.enqueueNAckResp(h.ps.argBuf, h.ps.ra.rID, 1)
+				h.enqueueNAckResp(h.ps.argBuf, h.ps.ca.cID, 1)
 				pool.Put(h.ps.argBuf)
-				pool.Put(h.ps.ra.rID)
-				h.ps.argBuf, h.ps.ra.rID, h.ps.state = nil, nil, OP_START
+				pool.Put(h.ps.ca.cID)
+				h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 			}
 		case OP_PRODUCE_TX:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_PRODUCE_TX_REQUEST_ID_ARG
 		case OP_PRODUCE_TX_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -527,21 +527,21 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					h.ps.argBuf = pool.Get(4)
 					h.ps.state = OP_PRODUCE_TX_ARG
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_PRODUCE_TX_ARG:
 			if h.ps.pa.pubLen != 0 {
@@ -570,8 +570,8 @@ func (h *handler) handle(buf []byte) error {
 						h.l.Error("parse produce pub arg", "err", err)
 						h.enqueueProduceErrResponse(err)
 						pool.Put(h.ps.argBuf)
-						pool.Put(h.ps.ra.rID)
-						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 						continue
 					}
 					pool.Put(h.ps.argBuf)
@@ -581,8 +581,8 @@ func (h *handler) handle(buf []byte) error {
 						if !h.cman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.pa.pub) {
 							h.l.Error("writer can not be reused in tx")
 							h.enqueueProduceErrResponse(ErrWriterCanNotBeReusedInTx)
-							pool.Put(h.ps.ra.rID)
-							h.ps.ra.rID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
+							pool.Put(h.ps.ca.cID)
+							h.ps.ca.cID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
 							continue
 						}
 					} else {
@@ -591,15 +591,15 @@ func (h *handler) handle(buf []byte) error {
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueProduceErrResponse(err)
-							pool.Put(h.ps.ra.rID)
-							h.ps.ra.rID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
+							pool.Put(h.ps.ca.cID)
+							h.ps.ca.cID, h.ps.pa, h.ps.state = nil, publishArgs{}, OP_START
 							continue
 						}
 
 						if err := h.currentTxWriter.BeginTx(h.ctx); err != nil {
 							h.l.Error("begin tx", "err", err)
 							h.enqueueProduceErrResponse(err)
-							pool.Put(h.ps.ra.rID)
+							pool.Put(h.ps.ca.cID)
 							continue
 						}
 
@@ -619,8 +619,8 @@ func (h *handler) handle(buf []byte) error {
 						h.l.Error("parse produce pub len arg", "err", err)
 						pool.Put(h.ps.argBuf)
 						h.enqueueProduceErrResponse(err)
-						pool.Put(h.ps.ra.rID)
-						h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 						continue
 					}
 					pool.Put(h.ps.argBuf)
@@ -631,8 +631,8 @@ func (h *handler) handle(buf []byte) error {
 				// this should not happen ever
 				pool.Put(h.ps.argBuf)
 				h.enqueueProduceErrResponse(ErrParseProto)
-				pool.Put(h.ps.ra.rID)
-				h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+				pool.Put(h.ps.ca.cID)
+				h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
 			}
 		case OP_PRODUCE_TX_MSG_ARG:
@@ -647,8 +647,8 @@ func (h *handler) handle(buf []byte) error {
 					h.l.Error("parse produce msg size arg", "err", err)
 					pool.Put(h.ps.argBuf)
 					h.enqueueProduceErrResponse(err)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 					continue
 				}
 				pool.Put(h.ps.argBuf)
@@ -674,8 +674,8 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produceTx(h.ps.payloadBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			} else {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
@@ -683,17 +683,17 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produceTx(h.ps.payloadBuf)
-					pool.Put(h.ps.ra.rID)
-					h.ps.argBuf, h.ps.ra.rID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.argBuf, h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			}
 		case OP_BEGIN_TX:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_BEGIN_TX_REQUEST_ID_ARG
 		case OP_BEGIN_TX_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -701,15 +701,15 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					for _, sw := range h.nonTxSessionWriters {
 						// TODO: on flush err return fail
 						if err := sw.Flush(h.ctx); err != nil {
@@ -718,23 +718,23 @@ func (h *handler) handle(buf []byte) error {
 					}
 					// TODO: Refactor
 					h.txBeginRespTemplate = h.txBeginRespTemplate[:1]
-					h.txBeginRespTemplate = append(h.txBeginRespTemplate, h.ps.ra.rID...)
+					h.txBeginRespTemplate = append(h.txBeginRespTemplate, h.ps.ca.cID...)
 					h.txBeginRespTemplate = append(h.txBeginRespTemplate, 0)
 					h.out.enqueueProto(h.txBeginRespTemplate)
-					pool.Put(h.ps.ra.rID)
-					h.ps.ra.rID, h.sessionState, h.ps.state = nil, SESSION_STATE_TX, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.sessionState, h.ps.state = nil, SESSION_STATE_TX, OP_START
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_COMMIT_TX:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_COMMIT_TX_REQUEST_ID_ARG
 		case OP_COMMIT_TX_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -742,42 +742,42 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					h.txCommitRespTemplate = h.txCommitRespTemplate[:1]
-					h.txCommitRespTemplate = append(h.txCommitRespTemplate, h.ps.ra.rID...)
+					h.txCommitRespTemplate = append(h.txCommitRespTemplate, h.ps.ca.cID...)
 					if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
 						h.l.Error("commit tx", "err", err)
 						h.txCommitRespTemplate = append(h.txCommitRespTemplate, 1)
 						h.out.enqueueProto(h.txCommitRespTemplate)
-						pool.Put(h.ps.ra.rID)
-						h.ps.ra.rID, h.ps.state = nil, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.ca.cID, h.ps.state = nil, OP_START
 						continue
 					}
 					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 					h.txCommitRespTemplate = append(h.txCommitRespTemplate, 0)
 					h.out.enqueueProto(h.txCommitRespTemplate)
-					pool.Put(h.ps.ra.rID)
-					h.ps.ra.rID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_PRODUCER, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_PRODUCER, OP_START
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_ROLLBACK_TX:
-			h.ps.ra.rID = pool.Get(4)
-			h.ps.ra.rID = append(h.ps.ra.rID, b)
+			h.ps.ca.cID = pool.Get(4)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_COMMIT_TX_REQUEST_ID_ARG
 		case OP_ROLLBACK_TX_REQUEST_ID_ARG:
-			if h.ps.ra.rID != nil {
-				toCopy := 4 - len(h.ps.ra.rID)
+			if h.ps.ca.cID != nil {
+				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -785,34 +785,34 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if toCopy > 0 {
-					start := len(h.ps.ra.rID)
-					h.ps.ra.rID = h.ps.ra.rID[:start+toCopy]
-					copy(h.ps.ra.rID[start:], buf[i:i+toCopy])
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
 					i = (i + toCopy) - 1
 				} else {
-					h.ps.ra.rID = append(h.ps.ra.rID, b)
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
 				}
 
-				if len(h.ps.ra.rID) >= 4 {
+				if len(h.ps.ca.cID) >= 4 {
 					h.txRollbackRespTemplate = h.txRollbackRespTemplate[:1]
-					h.txRollbackRespTemplate = append(h.txRollbackRespTemplate, h.ps.ra.rID...)
+					h.txRollbackRespTemplate = append(h.txRollbackRespTemplate, h.ps.ca.cID...)
 					if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
 						h.l.Error("rollback tx", "err", err)
 						h.txRollbackRespTemplate = append(h.txRollbackRespTemplate, 1)
 						h.out.enqueueProto(h.txRollbackRespTemplate)
-						pool.Put(h.ps.ra.rID)
-						h.ps.ra.rID, h.ps.state = nil, OP_START
+						pool.Put(h.ps.ca.cID)
+						h.ps.ca.cID, h.ps.state = nil, OP_START
 						continue
 					}
 					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.producerID)
 					h.txRollbackRespTemplate = append(h.txRollbackRespTemplate, 0)
 					h.out.enqueueProto(h.txRollbackRespTemplate)
-					pool.Put(h.ps.ra.rID)
-					h.ps.ra.rID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_PRODUCER, OP_START
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_PRODUCER, OP_START
 				}
 			} else {
-				h.ps.ra.rID = pool.Get(4)
-				h.ps.ra.rID = append(h.ps.ra.rID, b)
+				h.ps.ca.cID = pool.Get(4)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_CONNECT_PRODUCER:
 			h.ps.state = OP_CONNECT_PRODUCER_ARG
@@ -1096,7 +1096,7 @@ func (h *handler) consume(ctx context.Context, out *outbound, r reader.Reader, c
 
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	successResp := server.ProduceResponseSuccess(buf, h.ps.ra.rID)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
 	h.nonTxSessionWriters[h.ps.pa.pub].Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
@@ -1116,7 +1116,7 @@ func (h *handler) produce(msg []byte) {
 
 func (h *handler) produceTx(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	successResp := server.ProduceResponseSuccess(buf, h.ps.ra.rID)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
 	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
@@ -1137,9 +1137,9 @@ func (h *handler) produceTx(msg []byte) {
 func (h *handler) close() {
 	h.stopRead = true
 	h.disconnect()
-	if h.ps.ra.rID != nil {
-		pool.Put(h.ps.ra.rID)
-		h.ps.ra.rID = nil
+	if h.ps.ca.cID != nil {
+		pool.Put(h.ps.ca.cID)
+		h.ps.ca.cID = nil
 	}
 	if h.ps.argBuf != nil {
 		pool.Put(h.ps.argBuf)
@@ -1219,7 +1219,7 @@ func (h *handler) enqueueProduceErrResponse(err error) {
 	errLen := len(errPayload)
 	buf := pool.Get(10 + errLen) // resp code produce (1) + request id (4) + err code (1) + err len (4)
 	buf = append(buf, byte(response.RESP_CODE_PRODUCE))
-	buf = append(buf, h.ps.ra.rID...)
+	buf = append(buf, h.ps.ca.cID...)
 	buf = append(buf, response.ERR_CODE_PRODUCE)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
