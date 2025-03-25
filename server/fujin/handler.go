@@ -24,7 +24,7 @@ const (
 	OP_CONNECT_PRODUCER
 	OP_CONNECT_PRODUCER_ARG
 	OP_PRODUCE
-	OP_PRODUCE_REQUEST_ID_ARG
+	OP_PRODUCE_CORRELATION_ID_ARG
 	OP_PRODUCE_ARG
 	OP_PRODUCE_MSG_ARG
 	OP_PRODUCE_MSG_PAYLOAD
@@ -38,24 +38,24 @@ const (
 	OP_CONSUME_TRIGGER
 
 	OP_ACK
-	OP_ACK_REQUEST_ID_ARG
+	OP_ACK_CORRELATION_ID_ARG
 	OP_ACK_ARG
 
 	OP_NACK
-	OP_NACK_REQUEST_ID_ARG
+	OP_NACK_CORRELATION_ID_ARG
 	OP_NACK_ARG
 
 	OP_BEGIN_TX
-	OP_BEGIN_TX_REQUEST_ID_ARG
+	OP_BEGIN_TX_CORRELATION_ID_ARG
 
 	OP_COMMIT_TX
-	OP_COMMIT_TX_REQUEST_ID_ARG
+	OP_COMMIT_TX_CORRELATION_ID_ARG
 
 	OP_ROLLBACK_TX
-	OP_ROLLBACK_TX_REQUEST_ID_ARG
+	OP_ROLLBACK_TX_CORRELATION_ID_ARG
 
 	OP_PRODUCE_TX
-	OP_PRODUCE_TX_REQUEST_ID_ARG
+	OP_PRODUCE_TX_CORRELATION_ID_ARG
 	OP_PRODUCE_TX_ARG
 	OP_PRODUCE_TX_MSG_ARG
 	OP_PRODUCE_TX_MSG_PAYLOAD
@@ -269,8 +269,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_PRODUCE:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_REQUEST_ID_ARG
-		case OP_PRODUCE_REQUEST_ID_ARG:
+			h.ps.state = OP_PRODUCE_CORRELATION_ID_ARG
+		case OP_PRODUCE_CORRELATION_ID_ARG:
 			toCopy := 4 - len(h.ps.ca.cID)
 			avail := len(buf) - i
 
@@ -422,8 +422,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_ACK:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_ACK_REQUEST_ID_ARG
-		case OP_ACK_REQUEST_ID_ARG:
+			h.ps.state = OP_ACK_CORRELATION_ID_ARG
+		case OP_ACK_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -469,8 +469,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_NACK:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_ACK_REQUEST_ID_ARG
-		case OP_NACK_REQUEST_ID_ARG:
+			h.ps.state = OP_ACK_CORRELATION_ID_ARG
+		case OP_NACK_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -516,8 +516,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_PRODUCE_TX:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_TX_REQUEST_ID_ARG
-		case OP_PRODUCE_TX_REQUEST_ID_ARG:
+			h.ps.state = OP_PRODUCE_TX_CORRELATION_ID_ARG
+		case OP_PRODUCE_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -690,8 +690,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_BEGIN_TX:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_BEGIN_TX_REQUEST_ID_ARG
-		case OP_BEGIN_TX_REQUEST_ID_ARG:
+			h.ps.state = OP_BEGIN_TX_CORRELATION_ID_ARG
+		case OP_BEGIN_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -731,8 +731,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_COMMIT_TX:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_COMMIT_TX_REQUEST_ID_ARG
-		case OP_COMMIT_TX_REQUEST_ID_ARG:
+			h.ps.state = OP_COMMIT_TX_CORRELATION_ID_ARG
+		case OP_COMMIT_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -774,8 +774,8 @@ func (h *handler) handle(buf []byte) error {
 		case OP_ROLLBACK_TX:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_COMMIT_TX_REQUEST_ID_ARG
-		case OP_ROLLBACK_TX_REQUEST_ID_ARG:
+			h.ps.state = OP_COMMIT_TX_CORRELATION_ID_ARG
+		case OP_ROLLBACK_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -907,7 +907,7 @@ func (h *handler) handle(buf []byte) error {
 				go func() {
 					defer h.wg.Done()
 					if err := h.connectConsumer(r, h.ps.cca.n); err != nil {
-						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						h.l.Error("consume", "err", err)
 						return
@@ -925,7 +925,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= 4 {
 				if h.ps.cca.n == 0 {
 					if err := h.parseConsumeNArg(); err != nil {
-						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume n arg: %w", err)
 					}
@@ -937,7 +937,7 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseConsumePubLenArg(); err != nil {
 						pool.Put(h.ps.argBuf)
 						h.ps.argBuf, h.ps.cca, h.ps.state = nil, connectConsumerArgs{}, OP_START
-						enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
+						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_CONSUMER, err)
 						h.close()
 						return fmt.Errorf("parse consume pub len arg: %w", err)
 					}
@@ -959,7 +959,7 @@ func (h *handler) handle(buf []byte) error {
 				if err := h.parseSubscribeSizeArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.csa, h.ps.state = nil, connectSubscriberArgs{}, OP_START
-					enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
+					enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 					h.close()
 					return fmt.Errorf("parse subscribe size arg: %w", err)
 				}
@@ -1002,7 +1002,7 @@ func (h *handler) handle(buf []byte) error {
 					go func() {
 						defer h.wg.Done()
 						if err := h.connectSubscriber(r); err != nil {
-							enqueueErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
+							enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_CONNECT_SUBSCRIBER, err)
 							h.close()
 							h.l.Error("subscribe", "err", err)
 							return
@@ -1256,8 +1256,9 @@ func enqueueConnectSuccess(out *outbound, r reader.Reader) {
 
 	sbuf := pool.Get(4)
 	sbuf = append(sbuf,
-		byte(response.RESP_CODE_CONNECT_READER), byte(response.ERR_CODE_NO),
+		byte(response.RESP_CODE_CONNECT_READER),
 		autoCommit, byte(r.MessageMetaLen()),
+		byte(response.ERR_CODE_NO),
 	)
 	out.enqueueProto(sbuf)
 	pool.Put(sbuf)
@@ -1286,11 +1287,11 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 	}
 }
 
-func enqueueErr(out *outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
+func enqueueConnectReaderErr(out *outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
-	buf := pool.Get(6 + errLen) // cmd + err code + err len + err payload
-	buf = append(buf, byte(respCode), byte(errCode))
+	buf := pool.Get(8 + errLen) // cmd + auto commit + msg meta len + err code + err len + err payload
+	buf = append(buf, byte(respCode), 0, 0, byte(errCode))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
