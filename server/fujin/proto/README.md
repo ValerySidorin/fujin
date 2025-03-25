@@ -14,12 +14,13 @@ The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylR
 
 Before we can move to Commands description, we should explore types, that are being utilized by the Fujin protocol.
 
-| Type   | Length                                           | Example         |
-|--------|--------------------------------------------------|-----------------|
-| byte   | 1                                                | [12]            |
-| uint32 | 4                                                | [0, 0, 0, 0]    |
-| string | Dynamic. String length (int32) + payload (bytes) | [0, 0, 0, 1, 1] |
-| bool   | 1                                                | [0]             |
+| Type   | Length  | Example         |
+|--------|---------|-----------------|
+| byte   | 1       | [12]            |
+| uint32 | 4       | [0, 0, 0, 0]    |
+| string | 4 + N   | [0, 0, 0, 1, 1] |
+| bool   | 1       | [0]             |
+| dynamic| dynamic | [1, 1, 1, 1]    |
 
 ## Protocol messages
 ![plot](./protocol.png)
