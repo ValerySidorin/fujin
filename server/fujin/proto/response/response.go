@@ -13,8 +13,6 @@ type RespCode byte
 
 const (
 	RESP_CODE_UNKNOWN RespCode = iota
-	// Client response opcodes
-	RESP_CODE_PONG
 
 	// Server response opcodes
 	RESP_CODE_CONNECT_READER
@@ -27,14 +25,13 @@ const (
 	RESP_CODE_TX_ROLLBACK
 
 	RESP_CODE_DISCONNECT
-	RESP_CODE_STOP
+
+	// Client response opcodes
+	RESP_CODE_PONG
 )
 
 var (
 	DISCONNECT_RESP = []byte{
 		byte(RESP_CODE_DISCONNECT), // cmd (8)
-	}
-	STOP_RESP = []byte{
-		byte(RESP_CODE_STOP), // cmd (9)
 	}
 )

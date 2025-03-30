@@ -6,7 +6,7 @@ const (
 	OP_CODE_UNKNOWN OpCode = iota
 
 	// Client request opcodes
-	OP_CODE_CONNECT_PRODUCER
+	OP_CODE_CONNECT_WRITER
 	OP_CODE_CONNECT_SUBSCRIBER
 	OP_CODE_CONNECT_CONSUMER
 	OP_CODE_PRODUCE
@@ -20,4 +20,11 @@ const (
 
 	// Server request opcodes
 	OP_CODE_PING
+	OP_CODE_STOP
+)
+
+var (
+	STOP_REQ = []byte{
+		byte(OP_CODE_STOP), // cmd (9)
+	}
 )

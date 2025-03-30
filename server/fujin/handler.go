@@ -185,7 +185,7 @@ func (h *handler) handle(buf []byte) error {
 			switch h.sessionState {
 			case SESSION_STATE_UNKNOWN:
 				switch b {
-				case byte(request.OP_CODE_CONNECT_PRODUCER):
+				case byte(request.OP_CODE_CONNECT_WRITER):
 					h.sessionState = SESSION_STATE_PRODUCER
 					h.nonTxSessionWriters = make(map[string]writer.Writer)
 					h.disconnect = func() {
@@ -1060,6 +1060,13 @@ func (h *handler) connectConsumer(r reader.Reader, n uint32) error {
 func (h *handler) subscribe(ctx context.Context, out *outbound, r reader.Reader) error {
 	enqueueConnectSuccess(out, r)
 	h.sessionReader = r
+
+	h.ackRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.ackRespTemplate = append(h.ackRespTemplate, byte(response.RESP_CODE_ACK))
+
+	h.nAckRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.nAckRespTemplate = append(h.nAckRespTemplate, byte(response.RESP_CODE_NACK))
+
 	constLen := h.sessionReaderMsgMetaLen + 5
 	handler := enqueueMsgFunc(out, r, constLen)
 	if err := r.Subscribe(ctx, func(message []byte, args ...any) error {
@@ -1229,21 +1236,21 @@ func (h *handler) enqueueProduceErrResponse(err error) {
 }
 
 func (h *handler) enqueueStop() {
-	h.out.enqueueProto(response.STOP_RESP)
+	h.out.enqueueProto(request.STOP_REQ)
 }
 
 func (h *handler) enqueueAckResp(meta, rID []byte, success byte) {
-	h.ackRespTemplate = append(h.ackRespTemplate, success)
 	h.ackRespTemplate = append(h.ackRespTemplate, rID...)
 	h.ackRespTemplate = append(h.ackRespTemplate, meta...)
+	h.ackRespTemplate = append(h.ackRespTemplate, success)
 	h.out.enqueueProto(h.ackRespTemplate)
 	h.ackRespTemplate = h.ackRespTemplate[:1]
 }
 
 func (h *handler) enqueueNAckResp(meta, rID []byte, success byte) {
-	h.nAckRespTemplate = append(h.nAckRespTemplate, success)
 	h.nAckRespTemplate = append(h.nAckRespTemplate, rID...)
 	h.nAckRespTemplate = append(h.nAckRespTemplate, meta...)
+	h.nAckRespTemplate = append(h.nAckRespTemplate, success)
 	h.out.enqueueProto(h.nAckRespTemplate)
 	h.nAckRespTemplate = h.nAckRespTemplate[:1]
 }

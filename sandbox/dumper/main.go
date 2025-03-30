@@ -182,7 +182,7 @@ func subscribeByBytes(ctx context.Context, sub string, conn quic.Connection) err
 
 func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_PRODUCER),
+		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 0, // producer id is optional (for transactions)
 		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
@@ -248,7 +248,7 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 
 func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_PRODUCER),
+		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
@@ -301,7 +301,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 
 func produce(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_PRODUCER),
+		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 0, // producer id is optional (for transactions)
 		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
@@ -345,7 +345,7 @@ func produce(ctx context.Context, conn quic.Connection) error {
 
 func produceTx(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_PRODUCER),
+		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
