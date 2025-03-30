@@ -13,9 +13,9 @@ The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylR
 
 ## Protocol conventions
 
-**Command Array of Bytes with Optional Content**: Each interaction between the client and server consists of a control, or protocol, array of bytes followed, optionally by message content.
-**No Command Delimiters**: The Fujin server recieves Commands as a plain stream of bytes. Commands are splitted based on its structure.
-**Byte Order**: The Fujin server uses Big Endian byte order.
+**Command Array of Bytes with Optional Content**: Each interaction between the client and server consists of a control, or protocol, array of bytes followed, optionally by message content.  
+**No Command Delimiters**: The Fujin server recieves Commands as a plain stream of bytes. Commands are splitted based on its structure.  
+**Byte Order**: The Fujin server uses Big Endian byte order.  
 
 ## Types
 
