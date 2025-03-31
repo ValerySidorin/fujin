@@ -266,9 +266,9 @@ When connected as a consumer, the client should send to the server `FETCH` comma
 ##### Request
 `[8, <num messages in batch>]`
 where:
-| name                    | description                                                         | type    | required |
-| ----------------------- | ------------------------------------------------------------------- | ------- | -------- |
-| `num messages in batch` | A number of messages, the server will send to the client in stream. | uint32  | true     |
+| name                  | description                                                      | type    | required |
+| ----------------- | -------------------------------------------------------------------- | ------- | -------- |
+| `num messages in batch`  | A number of messages, the server will send to the client in stream. | uint32  | true   |
 
 ##### Response
 `-`
@@ -299,5 +299,7 @@ The server can sometimes send `STOP` command to the client, when trying to shutd
 ### Syntax
 ##### Request
 `[13]`
+##### Response
+`-`
 ### Examples
-- `[13]` -> `[]`
+- `[13]` -> `-`
