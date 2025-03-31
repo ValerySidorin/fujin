@@ -21,13 +21,13 @@ import (
 const (
 	OP_START int = iota
 
-	OP_CONNECT_PRODUCER
-	OP_CONNECT_PRODUCER_ARG
-	OP_PRODUCE
-	OP_PRODUCE_CORRELATION_ID_ARG
-	OP_PRODUCE_ARG
-	OP_PRODUCE_MSG_ARG
-	OP_PRODUCE_MSG_PAYLOAD
+	OP_CONNECT_WRITER
+	OP_CONNECT_WRITER_ARG
+	OP_WRITE
+	OP_WRITE_CORRELATION_ID_ARG
+	OP_WRITE_ARG
+	OP_WRITE_MSG_ARG
+	OP_WRITE_MSG_PAYLOAD
 
 	OP_CONNECT_SUBSCRIBER
 	OP_CONNECT_SUBSCRIBER_ARG
@@ -35,7 +35,7 @@ const (
 
 	OP_CONNECT_CONSUMER
 	OP_CONNECT_CONSUMER_ARG
-	OP_CONSUME_TRIGGER
+	OP_FETCH
 
 	OP_ACK
 	OP_ACK_CORRELATION_ID_ARG
@@ -54,11 +54,11 @@ const (
 	OP_ROLLBACK_TX
 	OP_ROLLBACK_TX_CORRELATION_ID_ARG
 
-	OP_PRODUCE_TX
-	OP_PRODUCE_TX_CORRELATION_ID_ARG
-	OP_PRODUCE_TX_ARG
-	OP_PRODUCE_TX_MSG_ARG
-	OP_PRODUCE_TX_MSG_PAYLOAD
+	OP_WRITE_TX
+	OP_WRITE_TX_CORRELATION_ID_ARG
+	OP_WRITE_TX_ARG
+	OP_WRITE_TX_MSG_ARG
+	OP_WRITE_TX_MSG_PAYLOAD
 )
 
 var (
@@ -202,7 +202,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 						h.out.enqueueProto(response.DISCONNECT_RESP)
 					}
-					h.ps.state = OP_CONNECT_PRODUCER
+					h.ps.state = OP_CONNECT_WRITER
 				case byte(request.OP_CODE_CONNECT_CONSUMER):
 					h.ps.state = OP_CONNECT_CONSUMER
 				case byte(request.OP_CODE_CONNECT_SUBSCRIBER):
@@ -214,7 +214,7 @@ func (h *handler) handle(buf []byte) error {
 			case SESSION_STATE_PRODUCER:
 				switch b {
 				case byte(request.OP_CODE_PRODUCE):
-					h.ps.state = OP_PRODUCE
+					h.ps.state = OP_WRITE
 				case byte(request.OP_CODE_TX_BEGIN):
 					h.ps.state = OP_BEGIN_TX
 					h.sessionState = SESSION_STATE_TX
@@ -228,7 +228,7 @@ func (h *handler) handle(buf []byte) error {
 			case SESSION_STATE_TX:
 				switch b {
 				case byte(request.OP_CODE_PRODUCE):
-					h.ps.state = OP_PRODUCE_TX
+					h.ps.state = OP_WRITE_TX
 				case byte(request.OP_CODE_TX_COMMIT):
 					h.ps.state = OP_COMMIT_TX
 				case byte(request.OP_CODE_TX_ROLLBACK):
@@ -239,8 +239,8 @@ func (h *handler) handle(buf []byte) error {
 				}
 			case SESSION_STATE_CONSUMER:
 				switch b {
-				case byte(request.OP_CODE_CONSUME):
-					h.ps.state = OP_CONSUME_TRIGGER
+				case byte(request.OP_CODE_FETCH):
+					h.ps.state = OP_FETCH
 				case byte(request.OP_CODE_ACK):
 					h.ps.state = OP_ACK
 				case byte(request.OP_CODE_NACK):
@@ -266,11 +266,11 @@ func (h *handler) handle(buf []byte) error {
 					return ErrParseProto
 				}
 			}
-		case OP_PRODUCE:
+		case OP_WRITE:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_CORRELATION_ID_ARG
-		case OP_PRODUCE_CORRELATION_ID_ARG:
+			h.ps.state = OP_WRITE_CORRELATION_ID_ARG
+		case OP_WRITE_CORRELATION_ID_ARG:
 			toCopy := 4 - len(h.ps.ca.cID)
 			avail := len(buf) - i
 
@@ -289,9 +289,9 @@ func (h *handler) handle(buf []byte) error {
 
 			if len(h.ps.ca.cID) >= 4 {
 				h.ps.argBuf = pool.Get(4)
-				h.ps.state = OP_PRODUCE_ARG
+				h.ps.state = OP_WRITE_ARG
 			}
-		case OP_PRODUCE_ARG:
+		case OP_WRITE_ARG:
 			if h.ps.pa.pubLen != 0 {
 				if h.ps.argBuf == nil {
 					h.ps.argBuf = pool.Get(int(h.ps.pa.pubLen))
@@ -337,7 +337,7 @@ func (h *handler) handle(buf []byte) error {
 
 						h.nonTxSessionWriters[h.ps.pa.pub] = w
 					}
-					h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_MSG_ARG
+					h.ps.argBuf, h.ps.state = nil, OP_WRITE_MSG_ARG
 				}
 				continue
 			}
@@ -364,7 +364,7 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
 			}
-		case OP_PRODUCE_MSG_ARG:
+		case OP_WRITE_MSG_ARG:
 			if h.ps.argBuf == nil {
 				h.ps.argBuf = pool.Get(4)
 				h.ps.argBuf = append(h.ps.argBuf, b)
@@ -381,9 +381,9 @@ func (h *handler) handle(buf []byte) error {
 					continue
 				}
 				pool.Put(h.ps.argBuf)
-				h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_MSG_PAYLOAD
+				h.ps.argBuf, h.ps.state = nil, OP_WRITE_MSG_PAYLOAD
 			}
-		case OP_PRODUCE_MSG_PAYLOAD:
+		case OP_WRITE_MSG_PAYLOAD:
 			if h.ps.payloadBuf != nil {
 				toCopy := int(h.ps.pma.size) - len(h.ps.payloadBuf)
 				avail := len(buf) - i
@@ -416,7 +416,7 @@ func (h *handler) handle(buf []byte) error {
 					h.ps.argBuf, h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, nil, publishArgs{}, OP_START
 				}
 			}
-		case OP_CONSUME_TRIGGER:
+		case OP_FETCH:
 			h.consumeTrigger()
 			h.ps.state = OP_START
 		case OP_ACK:
@@ -513,11 +513,11 @@ func (h *handler) handle(buf []byte) error {
 				pool.Put(h.ps.ca.cID)
 				h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 			}
-		case OP_PRODUCE_TX:
+		case OP_WRITE_TX:
 			h.ps.ca.cID = pool.Get(4)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_TX_CORRELATION_ID_ARG
-		case OP_PRODUCE_TX_CORRELATION_ID_ARG:
+			h.ps.state = OP_WRITE_TX_CORRELATION_ID_ARG
+		case OP_WRITE_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := 4 - len(h.ps.ca.cID)
 				avail := len(buf) - i
@@ -537,13 +537,13 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.ca.cID) >= 4 {
 					h.ps.argBuf = pool.Get(4)
-					h.ps.state = OP_PRODUCE_TX_ARG
+					h.ps.state = OP_WRITE_TX_ARG
 				}
 			} else {
 				h.ps.ca.cID = pool.Get(4)
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
-		case OP_PRODUCE_TX_ARG:
+		case OP_WRITE_TX_ARG:
 			if h.ps.pa.pubLen != 0 {
 				if h.ps.argBuf == nil {
 					h.ps.argBuf = pool.Get(int(h.ps.pa.pubLen))
@@ -606,7 +606,7 @@ func (h *handler) handle(buf []byte) error {
 						h.currentTxWriterPub = h.ps.pa.pub
 					}
 
-					h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_TX_MSG_ARG
+					h.ps.argBuf, h.ps.state = nil, OP_WRITE_TX_MSG_ARG
 				}
 				continue
 			}
@@ -635,7 +635,7 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, publishArgs{}, OP_START
 				continue
 			}
-		case OP_PRODUCE_TX_MSG_ARG:
+		case OP_WRITE_TX_MSG_ARG:
 			if h.ps.argBuf == nil {
 				h.ps.argBuf = pool.Get(4)
 				h.ps.argBuf = append(h.ps.argBuf, b)
@@ -652,9 +652,9 @@ func (h *handler) handle(buf []byte) error {
 					continue
 				}
 				pool.Put(h.ps.argBuf)
-				h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_TX_MSG_PAYLOAD
+				h.ps.argBuf, h.ps.state = nil, OP_WRITE_TX_MSG_PAYLOAD
 			}
-		case OP_PRODUCE_TX_MSG_PAYLOAD:
+		case OP_WRITE_TX_MSG_PAYLOAD:
 			if h.ps.payloadBuf != nil {
 				toCopy := int(h.ps.pma.size) - len(h.ps.payloadBuf)
 				avail := len(buf) - i
@@ -814,11 +814,11 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.ca.cID = pool.Get(4)
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
-		case OP_CONNECT_PRODUCER:
-			h.ps.state = OP_CONNECT_PRODUCER_ARG
+		case OP_CONNECT_WRITER:
+			h.ps.state = OP_CONNECT_WRITER_ARG
 			h.ps.argBuf = pool.Get(4)
 			h.ps.argBuf = append(h.ps.argBuf, b)
-		case OP_CONNECT_PRODUCER_ARG:
+		case OP_CONNECT_WRITER_ARG:
 			if h.ps.cpa.producerIDlen != 0 {
 				if h.ps.argBuf == nil {
 					h.ps.argBuf = pool.Get(int(h.ps.cpa.producerIDlen))
@@ -1103,13 +1103,13 @@ func (h *handler) consume(ctx context.Context, out *outbound, r reader.Reader, c
 
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
+	successResp := server.WriteResponseSuccess(buf, h.ps.ca.cID)
 	h.nonTxSessionWriters[h.ps.pa.pub].Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
 			h.l.Error("write", "err", err)
 
-			successResp[5] = response.ERR_CODE_PRODUCE
+			successResp[5] = response.ERR_CODE_WRITE
 			errProtoBuf := errProtoBuf(err)
 			h.out.enqueueProtoMulti(successResp, errProtoBuf)
 			pool.Put(errProtoBuf)
@@ -1123,13 +1123,13 @@ func (h *handler) produce(msg []byte) {
 
 func (h *handler) produceTx(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
+	successResp := server.WriteResponseSuccess(buf, h.ps.ca.cID)
 	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
 			h.l.Error("write", "err", err)
 
-			successResp[5] = response.ERR_CODE_PRODUCE
+			successResp[5] = response.ERR_CODE_WRITE
 			errProtoBuf := errProtoBuf(err)
 			h.out.enqueueProtoMulti(successResp, errProtoBuf)
 			pool.Put(errProtoBuf)
@@ -1225,9 +1225,9 @@ func (h *handler) enqueueProduceErrResponse(err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
 	buf := pool.Get(10 + errLen) // resp code produce (1) + request id (4) + err code (1) + err len (4)
-	buf = append(buf, byte(response.RESP_CODE_PRODUCE))
+	buf = append(buf, byte(response.RESP_CODE_WRITE))
 	buf = append(buf, h.ps.ca.cID...)
-	buf = append(buf, response.ERR_CODE_PRODUCE)
+	buf = append(buf, response.ERR_CODE_WRITE)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)

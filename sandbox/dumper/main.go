@@ -412,7 +412,7 @@ func consume(ctx context.Context, conn quic.Connection) error {
 	}
 
 	tReq := []byte{
-		byte(request.OP_CODE_CONSUME), // cmd
+		byte(request.OP_CODE_FETCH), // cmd
 	}
 
 	go func() {

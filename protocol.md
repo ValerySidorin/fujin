@@ -109,6 +109,9 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
 
+### Examples
+- `[5, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1]`
+
 ## COMMIT TX
 ### Direction
 Client -> Server
@@ -130,6 +133,9 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
 
+### Examples
+- `[6, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1]`
+
 ## ROLLBACK TX
 ### Direction
 Client -> Server
@@ -150,6 +156,9 @@ where:
 | name             | description                                                          | type   | presence |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
+
+### Examples
+- `[7, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1]`
 
 ## CONNECT READER
 
@@ -191,7 +200,7 @@ where:
 | `message meta`        | Message meta. Propagated by server if auto commit is disabled.  | dynamic  | optional |
 | `message payload`     | Message payload.                                                | string   | always   |
 ### Examples
-- `[ 3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `-` -> `[ 3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
 ## ACK
 
@@ -217,6 +226,9 @@ where:
 | `error code`       | Error code. 0 is no error.                                           | byte   | always   |
 | `error payload`    | Error payload text.                                                  | string | optional |
 
+### Examples
+- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
+
 ## NACK
 
 ### Direction
@@ -239,6 +251,30 @@ where:
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
 | `error code`      | Error code. 0 is no error.                                           | byte    | always   |
 | `error payload`   | Error payload text.                                                  | string  | optional |
+
+### Examples
+- `[10, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
+
+## FETCH
+
+### Direction
+Client -> Server
+## Description
+When connected as a consumer, the client should send to the server `FETCH` command to receive messages is current reader stream.
+
+## Syntax
+##### Request
+`[8, <num messages in batch>]`
+where:
+| name                    | description                                                         | type    | required |
+| ----------------------- | ------------------------------------------------------------------- | ------- | -------- |
+| `num messages in batch` | A number of messages, the server will send to the client in stream. | uint32  | true     |
+
+##### Response
+`-`
+
+### Examples
+- `[8, 0, 0, 0, 1]` -> `-`
 
 ## DISCONNECT
 
