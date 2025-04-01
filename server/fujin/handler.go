@@ -454,15 +454,15 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= h.sessionReaderMsgMetaLen {
 				// TODO: Handle ack errors properly
 				if err := h.sessionReader.Ack(h.ctx, h.ps.argBuf); err != nil {
-					h.l.Error("ack", "err", err)
-					h.enqueueAckResp(h.ps.argBuf, h.ps.ca.cID, 0)
 					pool.Put(h.ps.argBuf)
+					h.l.Error("ack", "err", err)
+					h.enqueueAckResp(h.ps.ca.cID, 0)
 					pool.Put(h.ps.ca.cID)
 					h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 					continue
 				}
-				h.enqueueAckResp(h.ps.argBuf, h.ps.ca.cID, 1)
 				pool.Put(h.ps.argBuf)
+				h.enqueueAckResp(h.ps.ca.cID, 1)
 				pool.Put(h.ps.ca.cID)
 				h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 			}
@@ -501,15 +501,15 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= h.sessionReaderMsgMetaLen {
 				// TODO: Handle nack errors properly
 				if err := h.sessionReader.Nack(h.ctx, h.ps.argBuf); err != nil {
-					h.l.Error("ack", "err", err)
-					h.enqueueNAckResp(h.ps.argBuf, h.ps.ca.cID, 0)
 					pool.Put(h.ps.argBuf)
+					h.l.Error("ack", "err", err)
+					h.enqueueNAckResp(h.ps.ca.cID, 0)
 					pool.Put(h.ps.ca.cID)
 					h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 					continue
 				}
-				h.enqueueNAckResp(h.ps.argBuf, h.ps.ca.cID, 1)
 				pool.Put(h.ps.argBuf)
+				h.enqueueNAckResp(h.ps.ca.cID, 1)
 				pool.Put(h.ps.ca.cID)
 				h.ps.argBuf, h.ps.ca.cID, h.ps.state = nil, nil, OP_START
 			}
@@ -1061,10 +1061,10 @@ func (h *handler) subscribe(ctx context.Context, out *outbound, r reader.Reader)
 	enqueueConnectSuccess(out, r)
 	h.sessionReader = r
 
-	h.ackRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.ackRespTemplate = make([]byte, 0, 6)
 	h.ackRespTemplate = append(h.ackRespTemplate, byte(response.RESP_CODE_ACK))
 
-	h.nAckRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.nAckRespTemplate = make([]byte, 0, 6)
 	h.nAckRespTemplate = append(h.nAckRespTemplate, byte(response.RESP_CODE_NACK))
 
 	constLen := h.sessionReaderMsgMetaLen + 5
@@ -1083,10 +1083,10 @@ func (h *handler) consume(ctx context.Context, out *outbound, r reader.Reader, c
 	enqueueConnectSuccess(out, r)
 	h.sessionReader = r
 
-	h.ackRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.ackRespTemplate = make([]byte, 0, 6)
 	h.ackRespTemplate = append(h.ackRespTemplate, byte(response.RESP_CODE_ACK))
 
-	h.nAckRespTemplate = make([]byte, 0, h.sessionReaderMsgMetaLen+6)
+	h.nAckRespTemplate = make([]byte, 0, 6)
 	h.nAckRespTemplate = append(h.nAckRespTemplate, byte(response.RESP_CODE_NACK))
 
 	constLen := h.sessionReaderMsgMetaLen + 5
@@ -1239,17 +1239,15 @@ func (h *handler) enqueueStop() {
 	h.out.enqueueProto(request.STOP_REQ)
 }
 
-func (h *handler) enqueueAckResp(meta, rID []byte, success byte) {
-	h.ackRespTemplate = append(h.ackRespTemplate, rID...)
-	h.ackRespTemplate = append(h.ackRespTemplate, meta...)
+func (h *handler) enqueueAckResp(cID []byte, success byte) {
+	h.ackRespTemplate = append(h.ackRespTemplate, cID...)
 	h.ackRespTemplate = append(h.ackRespTemplate, success)
 	h.out.enqueueProto(h.ackRespTemplate)
 	h.ackRespTemplate = h.ackRespTemplate[:1]
 }
 
-func (h *handler) enqueueNAckResp(meta, rID []byte, success byte) {
-	h.nAckRespTemplate = append(h.nAckRespTemplate, rID...)
-	h.nAckRespTemplate = append(h.nAckRespTemplate, meta...)
+func (h *handler) enqueueNAckResp(cID []byte, success byte) {
+	h.nAckRespTemplate = append(h.nAckRespTemplate, cID...)
 	h.nAckRespTemplate = append(h.nAckRespTemplate, success)
 	h.out.enqueueProto(h.nAckRespTemplate)
 	h.nAckRespTemplate = h.nAckRespTemplate[:1]

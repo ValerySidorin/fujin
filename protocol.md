@@ -1,7 +1,6 @@
 # Fujin protocol
 
 // TODO:
-// Remove message meta from ACK/NACK
 // Replace CONNECT SUBSCRIBER/CONNECT CONSUMER with CONNECT READER with reader type arg
 // Add error to ACK/NACK
 // Remove message meta from ACK/NACK response
