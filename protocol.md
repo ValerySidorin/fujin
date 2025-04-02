@@ -6,8 +6,8 @@ The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylR
 
 ## Protocol conventions
 
-**Command as an Array of Bytes with Optional Content**: Each interaction between the client and server consists of a control (protocol) byte array, optionally followed by message content..  
-**No Command Delimiters**: The Fujin server receives commands as a plain stream of bytes. Commands are parsed based on their structure. 
+**Command as an Array of Bytes with Optional Content**: Each interaction between the client and server consists of a control (protocol) byte array, optionally followed by message content.  
+**No Command Delimiters**: The Fujin server receives commands as a plain stream of bytes. Commands are parsed based on their structure.  
 **Byte Order**: The Fujin server uses big-endian byte order.  
 
 ## Types
@@ -45,7 +45,7 @@ Client -> Server
 Before producing messages, the client must open a QUIC stream and send a `CONNECT WRITER` command to the server. When using Kafka, `writer id` is required for transactions and must not be equal to `[0, 0, 0, 0]`.
 ### Syntax
 ##### Request
- `[1, <writer id>]`
+ `[1, <writer id>]`  
  where:
  | name       | description                                                                    | type   | required |
 | ----------- | ------------------------------------------------------------------------------ | ------ | -------- |
@@ -64,7 +64,7 @@ Client -> Server
 Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT WRITER` command was previously issued.
 ### Syntax
 ##### Request
-`[4, <correlation id>, <topic>, <message>]`
+`[4, <correlation id>, <topic>, <message>]`  
 where:
 | name             | description                                                               | type   | required |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
@@ -90,13 +90,13 @@ Begins transaction. Must be send in a QUIC stream, where `CONNECT WRITER` comman
 
 ### Syntax
 ##### Request
-`[5, <correlation id>]`
+`[5, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[6, <correlation id>]`
+`[6, <correlation id>]`  
 where:
 | name             | description                                                          | type   | presence |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
@@ -114,13 +114,13 @@ Commits transaction. Must be send in a QUIC stream, where `CONNECT WRITER` comma
 
 ### Syntax
 ##### Request
-`[6, <correlation id>]`
+`[6, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[7, <correlation id>]`
+`[7, <correlation id>]`  
 where:
 | name             | description                                                          | type   | presence |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
@@ -138,13 +138,13 @@ Rolls back transaction. Must be send in a QUIC stream, where `CONNECT WRITER` co
 
 ### Syntax
 ##### Request
-`[7, <correlation id>]`
+`[7, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[8, <correlation id>]`
+`[8, <correlation id>]`  
 where:
 | name             | description                                                          | type   | presence |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
@@ -162,14 +162,14 @@ Client opens QUIC stream and initiates a subscription to a topic. Messages will 
 
 ### Syntax
 ##### Request
-`[2, <topic>, <type>]`
+`[2, <topic>, <type>]`  
 where:
 | name    | description                                     | type   | required |
 | ------- | ----------------------------------------------- | ------ | -------- |
 | `topic` | Topic to read from.                             | string | true     |
 | `type`  | Type of reader. 0 is subscriber, 1 is consumer. | byte   | true     |
 ##### Response
-`[1, <is auto commit>, <message meta length>, <error code>, <error payload>]`
+`[1, <is auto commit>, <message meta length>, <error code>, <error payload>]`  
 where:
 | name                  | description                                          |  type  | presence |
 | --------------------- | ---------------------------------------------------- | ------ | -------- |
@@ -186,7 +186,7 @@ Server -> Client
 ### Description
 A message propagated by the server in a client-opened reader QUIC stream.
 ### Syntax
-`[3, <message meta>, <message payload>]`
+`[3, <message meta>, <message payload>]`  
 where:
 | name                  | description                                                     | type     | presence |
 | --------------------- | --------------------------------------------------------------- | -------- | -------- |
@@ -204,14 +204,14 @@ Must be sent in a QUIC stream, where `CONNECT READER` command was sent previousl
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[9, <correlation id>, <message meta>]`
+`[9, <correlation id>, <message meta>]`  
 where:
 | name                  | description                                                      | type    | required |
 | ----------------- | ---------------------------------------------------------------------| ------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
 | `message meta`    | Message meta.                                                        | dynamic | always   |
 ##### Response
-`[4, <correlation id>, <error code>, <error payload>]`
+`[4, <correlation id>, <error code>, <error payload>]`  
 where:
 | name               | description                                                          | type   | presence |
 | ------------------ | -------------------------------------------------------------------- | ------ | -------- |
@@ -230,14 +230,14 @@ Client -> Server
 Works similarly to `ACK`.
 ### Syntax
 ##### Request
-`[10, <correlation id>, <message meta>]`
+`[10, <correlation id>, <message meta>]`  
 where:
 | name                  | description                                                      | type    | required |
 | ----------------- | ---------------------------------------------------------------------| ------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
 | `message meta`    | Message meta.                                                        | dynamic | always   |
 ##### Response
-`[5, <correlation id>, <error code>, <error payload>]`
+`[5, <correlation id>, <error code>, <error payload>]`  
 where:
 | name                  | description                                                      | type    | presence |
 | ----------------- | -------------------------------------------------------------------- | ------- | -------- |
@@ -257,7 +257,7 @@ When connected as a consumer, the client must send a FETCH command to the server
 
 ## Syntax
 ##### Request
-`[8, <num messages in batch>]`
+`[8, <num messages in batch>]`  
 where:
 | name                     | description                                                          | type    | required |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
