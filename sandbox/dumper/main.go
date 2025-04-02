@@ -184,31 +184,31 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 0, // producer id is optional (for transactions)
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -253,7 +253,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -261,7 +261,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 		104, 101, 108, 108, 111, // msg
 		byte(request.OP_CODE_TX_COMMIT),
 		0, 0, 1, 1, // request id
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		1, 1, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -303,13 +303,13 @@ func produce(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT_WRITER),
 		0, 0, 0, 0, // producer id is optional (for transactions)
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 2, // msg len
 		98, 98, // msg
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -350,7 +350,7 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -358,7 +358,7 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 		104, 101, 108, 108, 111, // msg
 		byte(request.OP_CODE_TX_COMMIT),
 		0, 0, 1, 1, // request id
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		1, 1, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val

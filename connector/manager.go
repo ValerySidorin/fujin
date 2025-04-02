@@ -22,7 +22,7 @@ type Manager struct {
 	conf Config
 
 	readers map[string]reader.Reader
-	wpoolms map[string]map[string]*pool.Pool // a map of writer pools grouped by pub and producer ID
+	wpoolms map[string]map[string]*pool.Pool // a map of writer pools grouped by topic and writer ID
 
 	getReaderFuncs map[string]func(name string) (reader.Reader, error)
 
@@ -71,7 +71,7 @@ func (m *Manager) GetReader(name string) (reader.Reader, error) {
 	return f(name)
 }
 
-func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
+func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
 	m.pmu.RLock()
 
 	wpoolm, ok := m.wpoolms[name]
@@ -87,9 +87,9 @@ func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
 
 		wpoolm = make(map[string]*pool.Pool, 1)
 		pool := pool.NewPool(func() (any, error) {
-			return writer.NewWriter(conf, producerID, m.l)
+			return writer.NewWriter(conf, writerID, m.l)
 		})
-		wpoolm[producerID] = pool
+		wpoolm[writerID] = pool
 		m.wpoolms[name] = wpoolm
 
 		w, err := pool.Get()
@@ -100,7 +100,7 @@ func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
 		return w.(writer.Writer), nil
 	}
 
-	p, ok := wpoolm[producerID]
+	p, ok := wpoolm[writerID]
 	if !ok {
 		m.pmu.RUnlock()
 		m.pmu.Lock()
@@ -113,9 +113,9 @@ func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
 
 		wpoolm = make(map[string]*pool.Pool, 1)
 		pool := pool.NewPool(func() (any, error) {
-			return writer.NewWriter(conf, producerID, m.l)
+			return writer.NewWriter(conf, writerID, m.l)
 		})
-		wpoolm[producerID] = pool
+		wpoolm[writerID] = pool
 		m.wpoolms[name] = wpoolm
 
 		w, err := pool.Get()
@@ -134,11 +134,11 @@ func (m *Manager) GetWriter(name, producerID string) (writer.Writer, error) {
 	return w.(writer.Writer), nil
 }
 
-func (m *Manager) PutWriter(w writer.Writer, name, producerID string) {
+func (m *Manager) PutWriter(w writer.Writer, name, writerID string) {
 	m.pmu.Lock()
 	defer m.pmu.Unlock()
 
-	m.wpoolms[name][producerID].Put(w)
+	m.wpoolms[name][writerID].Put(w)
 }
 
 func (m *Manager) Close() {

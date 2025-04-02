@@ -6,7 +6,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-func kgoOptsFromWriterConf(conf WriterConfig, producerID string) []kgo.Opt {
+func kgoOptsFromWriterConf(conf WriterConfig, writerID string) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(conf.Brokers...),
 		kgo.DefaultProduceTopic(conf.Topic),
@@ -22,8 +22,8 @@ func kgoOptsFromWriterConf(conf WriterConfig, producerID string) []kgo.Opt {
 		opts = append(opts, kgo.ProducerLinger(conf.Linger))
 	}
 
-	if producerID != "" {
-		opts = append(opts, kgo.TransactionalID(producerID))
+	if writerID != "" {
+		opts = append(opts, kgo.TransactionalID(writerID))
 	}
 
 	return opts

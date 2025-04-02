@@ -23,10 +23,10 @@ type Writer interface {
 	Close() error
 }
 
-func NewWriter(conf config.Config, producerID string, l *slog.Logger) (Writer, error) {
+func NewWriter(conf config.Config, writerID string, l *slog.Logger) (Writer, error) {
 	switch conf.Protocol {
 	case protocol.Kafka:
-		return kafka.NewWriter(conf.Kafka, producerID, l)
+		return kafka.NewWriter(conf.Kafka, writerID, l)
 	case protocol.Nats:
 		return nats.NewWriter(conf.Nats, l)
 	case protocol.AMQP091:

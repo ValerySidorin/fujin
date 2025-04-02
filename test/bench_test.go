@@ -120,7 +120,7 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 	p := doDefaultConnectProducer(c)
 
 	cmd := []byte{
-		byte(request.OP_CODE_PRODUCE),
+		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0,
 	}
 

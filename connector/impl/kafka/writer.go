@@ -18,8 +18,8 @@ type Writer struct {
 	wg       sync.WaitGroup
 }
 
-func NewWriter(conf WriterConfig, producerID string, l *slog.Logger) (*Writer, error) {
-	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, producerID)...)
+func NewWriter(conf WriterConfig, writerID string, l *slog.Logger) (*Writer, error) {
+	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, writerID)...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: new client: %w", err)
 	}
