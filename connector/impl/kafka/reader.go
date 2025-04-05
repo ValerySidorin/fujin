@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -15,7 +16,8 @@ type Reader struct {
 	conf ReaderConfig
 	cl   *kgo.Client
 
-	handler func(r *kgo.Record, h func(message []byte, args ...any))
+	handler  func(r *kgo.Record, h func(message []byte, args ...any))
+	fetching atomic.Bool
 
 	l *slog.Logger
 }
@@ -45,9 +47,10 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}
 
 	reader := &Reader{
-		conf: conf,
-		cl:   client,
-		l:    l.With("reader_type", "kafka"),
+		conf:     conf,
+		cl:       client,
+		fetching: atomic.Bool{},
+		l:        l.With("reader_type", "kafka"),
 	}
 
 	if !conf.DisableAutoCommit {
@@ -89,18 +92,25 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	}
 }
 
-func (r *Reader) Fetch(ctx context.Context, n uint32,
+func (r *Reader) Fetch(
+	ctx context.Context, n uint32,
 	fetchResponseHandler func(n uint32),
 	msgHandler func(message []byte, args ...any),
 ) error {
-	fetches := r.cl.PollRecords(ctx, int(n))
-	fetchResponseHandler(uint32(fetches.NumRecords()))
-	if ctx.Err() != nil {
+	if r.fetching.Load() {
+		fetchResponseHandler(0)
 		return nil
 	}
+
+	r.fetching.Store(true)
+	defer r.fetching.Store(false)
+
+	fetches := r.cl.PollRecords(ctx, int(n))
 	if errs := fetches.Errors(); len(errs) > 0 {
 		return fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs))
 	}
+
+	fetchResponseHandler(uint32(fetches.NumRecords()))
 
 	iter := fetches.RecordIter()
 	for !iter.Done() {
@@ -108,71 +118,6 @@ func (r *Reader) Fetch(ctx context.Context, n uint32,
 	}
 	return nil
 }
-
-// func (r *Reader) Consume(ctx context.Context, trigger <-chan struct{}, n uint32,
-// 	h func(message []byte, args ...any) error) error {
-// 	if err := r.cl.Ping(ctx); err != nil {
-// 		return fmt.Errorf("kafka: ping: %w", err)
-// 	}
-
-// 	var wg sync.WaitGroup
-
-// 	busy := make(chan struct{}, 1)
-// 	errCh := make(chan error)
-
-// 	defer func() {
-// 		close(busy)
-// 		close(errCh)
-// 		wg.Wait()
-// 	}()
-
-// 	var handler func(r *kgo.Record) error
-// 	if r.IsAutoCommit() {
-// 		handler = func(r *kgo.Record) error {
-// 			return h(r.Value)
-// 		}
-// 	} else {
-// 		handler = func(r *kgo.Record) error {
-// 			return h(r.Value, r.Partition, r.LeaderEpoch, r.Offset)
-// 		}
-// 	}
-
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			return nil
-// 		case err := <-errCh:
-// 			return err
-// 		case <-trigger:
-// 			select {
-// 			case busy <- struct{}{}:
-// 				wg.Add(1)
-// 				go func() {
-// 					defer wg.Done()
-// 					fetches := r.cl.PollRecords(ctx, int(n))
-// 					if ctx.Err() != nil {
-// 						return
-// 					}
-// 					if errs := fetches.Errors(); len(errs) > 0 {
-// 						errCh <- fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs))
-// 						return
-// 					}
-
-// 					iter := fetches.RecordIter()
-// 					for !iter.Done() {
-// 						record := iter.Next()
-// 						if err := handler(record); err != nil {
-// 							errCh <- fmt.Errorf("kafka: handle message: %w", err)
-// 							return
-// 						}
-// 					}
-// 					<-busy
-// 				}()
-// 			default:
-// 			}
-// 		}
-// 	}
-// }
 
 func (r *Reader) Ack(ctx context.Context, meta []byte) error {
 	offsets := map[string]map[int32]kgo.EpochOffset{

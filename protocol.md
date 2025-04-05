@@ -72,7 +72,8 @@ where:
 | `topic`          | The target topic for the message.                                         | string | true     |
 | `message`        | The message content.                                                      | string | true     |
 ##### Response
-`[2, <correlation id>, <error code>, <error payload>]`
+`[2, <correlation id>, <error code>, <error payload>]`  
+where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
@@ -162,12 +163,12 @@ Client opens QUIC stream and initiates a subscription to a topic. Messages will 
 
 ### Syntax
 ##### Request
-`[2, <topic>, <type>]`  
+`[2, <type>, <topic>]`  
 where:
 | name    | description                                     | type   | required |
 | ------- | ----------------------------------------------- | ------ | -------- |
 | `topic` | Topic to read from.                             | string | true     |
-| `type`  | Type of reader. 0 is subscriber, 1 is consumer. | byte   | true     |
+| `type`  | Type of reader. 1 is subscriber, 2 is consumer. | byte   | true     |
 ##### Response
 `[1, <is auto commit>, <message meta length>, <error code>, <error payload>]`  
 where:
@@ -257,7 +258,7 @@ When connected as a consumer, the client must send a FETCH command to the server
 
 ## Syntax
 ##### Request
-`[8, <num messages in batch>]`  
+`[8, <correlation id>, <num messages in batch>]`  
 where:
 | name                     | description                                                          | type    | required |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
@@ -265,12 +266,20 @@ where:
 | `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
 
 ##### Response
-`-`
+`[6, <correlation id>, <num messages in batch>, <error code>, <error payload>, <batch of messages>]`  
+where:
+| name                     | description                                                          | type    | required |
+| ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | always   |
+| `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
+| `error code`             | Error code. 0 is no error. 1 is error.                               | byte    | always   |
+| `error payload`          | Error payload text.                                                  | string  | optional |
+
 
 ### Examples
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 0]`
-
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
 ## DISCONNECT
 
 ### Direction

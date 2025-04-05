@@ -45,7 +45,7 @@ func main() {
 					fmt.Printf("record had a produce error: %v\n", err)
 				}
 			})
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }

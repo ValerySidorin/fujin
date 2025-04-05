@@ -2,10 +2,10 @@ package nats
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/ValerySidorin/fujin/connector/cerr"
 	"github.com/nats-io/nats.go"
 )
 
@@ -28,9 +28,9 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any) error) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
 	sub, err := r.nc.Subscribe(r.conf.Subject, func(msg *nats.Msg) {
-		_ = h(msg.Data) // not checking err here for performance gains
+		h(msg.Data)
 	})
 	if err != nil {
 		return fmt.Errorf("nats: subscribe: %w", err)
@@ -47,9 +47,12 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	return nil
 }
 
-func (r *Reader) Consume(ctx context.Context, trigger <-chan struct{}, n uint32,
-	h func(message []byte, args ...any) error) error {
-	return errors.New("nats: consume pattern not implemented")
+func (r *Reader) Fetch(
+	ctx context.Context, n uint32,
+	fetchResponseHandler func(n uint32),
+	msgHandler func(message []byte, args ...any),
+) error {
+	return cerr.ErrNotSupported
 }
 
 func (r *Reader) Ack(ctx context.Context, meta []byte) error {

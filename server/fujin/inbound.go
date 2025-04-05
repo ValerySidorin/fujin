@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
+	"github.com/ValerySidorin/fujin/server/fujin/ferr"
 	"github.com/quic-go/quic-go"
 )
 
@@ -77,7 +78,7 @@ func (i *inbound) readLoop(ctx context.Context) {
 		buf = buf[:0]
 
 		if i.h.stopRead {
-			i.str.CancelRead(0x0)
+			i.str.CancelRead(ferr.NoErr)
 			break
 		}
 	}
@@ -91,7 +92,7 @@ func (i *inbound) waitAndDisconnect() {
 }
 
 func (i *inbound) close() {
-	i.str.CancelRead(0x0)
+	i.str.CancelRead(ferr.NoErr)
 	i.h.wg.Wait()
 	i.h.out.close()
 	<-i.h.closed

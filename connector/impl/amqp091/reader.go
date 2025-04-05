@@ -3,11 +3,11 @@ package amqp091
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 
+	"github.com/ValerySidorin/fujin/connector/cerr"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -39,7 +39,7 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any) error) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
 	r.mu.Lock()
 	if r.channel != nil {
 		return fmt.Errorf("amqp091: reader busy")
@@ -110,20 +110,20 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 		return err
 	}
 
-	var handler func(d amqp.Delivery) error
+	var handler func(d amqp.Delivery)
 	if r.IsAutoCommit() {
-		handler = func(d amqp.Delivery) error {
-			return h(d.Body)
+		handler = func(d amqp.Delivery) {
+			h(d.Body)
 		}
 	} else {
-		handler = func(d amqp.Delivery) error {
-			return h(d.Body, d.DeliveryTag)
+		handler = func(d amqp.Delivery) {
+			h(d.Body, d.DeliveryTag)
 		}
 	}
 
 	go func() {
 		for d := range msgs {
-			_ = handler(d)
+			handler(d)
 		}
 	}()
 
@@ -138,8 +138,12 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	return nil
 }
 
-func (r *Reader) Consume(ctx context.Context, ch <-chan struct{}, n uint32, h func(message []byte, args ...any) error) error {
-	return errors.New("amqp091: consume pattern not implemented")
+func (r *Reader) Fetch(
+	ctx context.Context, n uint32,
+	fetchResponseHandler func(n uint32),
+	msgHandler func(message []byte, args ...any),
+) error {
+	return cerr.ErrNotSupported
 }
 
 func (r *Reader) Ack(ctx context.Context, meta []byte) error {

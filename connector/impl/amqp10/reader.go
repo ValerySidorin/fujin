@@ -67,17 +67,18 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any) error) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
 	var handler func(msg *amqp.Message) error
 	fmt.Println(r.IsAutoCommit())
 	if r.IsAutoCommit() {
 		handler = func(msg *amqp.Message) error {
-			_ = h(msg.GetData())
+			h(msg.GetData())
 			return r.receiver.AcceptMessage(ctx, msg)
 		}
 	} else {
 		handler = func(msg *amqp.Message) error {
-			return h(msg.GetData(), GetDeliveryId(msg))
+			h(msg.GetData(), GetDeliveryId(msg))
+			return nil
 		}
 	}
 
@@ -89,8 +90,18 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 		if err := r.receiver.AcceptMessage(ctx, msg); err != nil {
 			return err
 		}
-		_ = handler(msg)
+		if err := handler(msg); err != nil {
+			return fmt.Errorf("amqp10: handler: %w", err)
+		}
 	}
+}
+
+func (r *Reader) Fetch(
+	ctx context.Context, n uint32,
+	fetchResponseHandler func(n uint32),
+	msgHandler func(message []byte, args ...any),
+) error {
+	return cerr.ErrNotSupported
 }
 
 func (r *Reader) Consume(ctx context.Context, ch <-chan struct{}, n uint32, h func(message []byte, args ...any) error) error {

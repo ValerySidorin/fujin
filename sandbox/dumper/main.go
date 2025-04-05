@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ValerySidorin/fujin/server/fujin/ferr"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
 	"github.com/quic-go/quic-go"
@@ -38,9 +39,9 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	if err := produceLoop(ctx, conn); err != nil {
-		log.Fatal(err)
-	}
+	// if err := produceLoop(ctx, conn); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -54,20 +55,19 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := consume(ctx, conn); err != nil {
+	// if err := consume(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
 	// }
 	// fmt.Println("consuming")
-	//time.Sleep(10 * time.Second)
 
 	// if err := produce(ctx, conn); err != nil {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := subscribe(ctx, "sub", conn); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("subscribed")
+	if err := subscribe(ctx, "sub", conn); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("subscribed")
 
 	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -79,7 +79,8 @@ func main() {
 	// time.Sleep(5 * time.Second)
 
 	<-ctx.Done()
-	conn.CloseWithError(0x0, "")
+	conn.CloseWithError(ferr.NoErr, "")
+
 }
 
 func setup(ctx context.Context) (quic.Connection, error) {
@@ -104,17 +105,11 @@ func setup(ctx context.Context) (quic.Connection, error) {
 }
 
 func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
-	// req := make([]byte, 0, 9+len(sub))
-	// req = append(req, byte(request.ConnectSubscriberOpCode))
-	// req = req[:9]
-	// binary.BigEndian.PutUint32(req[1:5], 0)
-	// binary.BigEndian.PutUint32(req[5:9], uint32(len(sub)))
-	// req = append(req, []byte(sub)...)
-
-	req := make([]byte, 0, 5+len(sub))
-	req = append(req, byte(request.OP_CODE_CONNECT_SUBSCRIBER))
-	req = req[:5]
-	binary.BigEndian.PutUint32(req[1:5], uint32(len(sub)))
+	req := make([]byte, 0, 6+len(sub))
+	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, 1)
+	req = req[:6]
+	binary.BigEndian.PutUint32(req[2:6], uint32(len(sub)))
 	req = append(req, []byte(sub)...)
 
 	str, err := conn.OpenStreamSync(ctx)
@@ -153,12 +148,13 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 	return nil
 }
 
-func subscribeByBytes(ctx context.Context, sub string, conn quic.Connection) error {
-	req := make([]byte, 0, 5+len(sub))
-	req = append(req, byte(request.OP_CODE_CONNECT_SUBSCRIBER))
-	req = req[:5]
-	binary.BigEndian.PutUint32(req[1:5], uint32(len(sub)))
-	req = append(req, []byte(sub)...)
+func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) error {
+	req := make([]byte, 0, 6+len(topic))
+	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, 1)
+	req = req[:6]
+	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
+	req = append(req, []byte(topic)...)
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -392,14 +388,13 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func consume(ctx context.Context, conn quic.Connection) error {
-	req := []byte{
-		byte(request.OP_CODE_CONNECT_CONSUMER), // cmd
-		0, 0, 0, 0,                             // request id
-		0, 0, 0, 2, // num msgs to consume in batch
-		0, 0, 0, 3, // sub len
-		115, 117, 98, // sub val
-	}
+func consume(ctx context.Context, topic string, conn quic.Connection) error {
+	req := make([]byte, 0, 6+len(topic))
+	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, 2)
+	req = req[:6]
+	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
+	req = append(req, []byte(topic)...)
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -411,8 +406,9 @@ func consume(ctx context.Context, conn quic.Connection) error {
 		return err
 	}
 
-	tReq := []byte{
+	fetchReq := []byte{
 		byte(request.OP_CODE_FETCH), // cmd
+		0, 0, 0, 1, 0, 0, 0, 1,
 	}
 
 	go func() {
@@ -421,10 +417,10 @@ func consume(ctx context.Context, conn quic.Connection) error {
 			case <-ctx.Done():
 				return
 			default:
-				if _, err := str.Write(tReq); err != nil {
+				time.Sleep(1 * time.Second)
+				if _, err := str.Write(fetchReq); err != nil {
 					log.Fatal(err)
 				}
-				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
