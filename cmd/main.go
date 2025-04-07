@@ -68,6 +68,10 @@ func (c *Config) parse() (config.Config, error) {
 		}
 	}
 
+	if err := c.Connectors.Validate(); err != nil {
+		return config.Config{}, fmt.Errorf("validate connectors config: %w", err)
+	}
+
 	return config.Config{
 		Fujin:      fujinConf,
 		Connectors: c.Connectors,

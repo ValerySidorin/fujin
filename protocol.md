@@ -16,10 +16,10 @@ Before describing the commands, let's explore the data types used in the Fujin p
 
 | Type   | Length                | Example                                 | Representation              |
 |--------|-----------------------|-----------------------------------------| --------------------------- |
-| byte   | 1                     | `[12]`                                  | `12`                        |
+| byte   | 1                     | `[12]`                                  | `0x0C`                      |
 | uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
 | string | dynamic (len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]` | `hello`                     |
-| bool   | 1                     | `[0]`                                   | `true`                      |  
+| bool   | 1                     | `[0]`                                   | `false`                     |  
 | dynamic| dynamic               | `[1, 1, 1, 1]`                          | `[1, 1, 1, 1]`              |
 
 ## PING
@@ -165,10 +165,10 @@ Client opens QUIC stream and initiates a subscription to a topic. Messages will 
 ##### Request
 `[2, <type>, <topic>]`  
 where:
-| name    | description                                     | type   | required |
-| ------- | ----------------------------------------------- | ------ | -------- |
-| `topic` | Topic to read from.                             | string | true     |
-| `type`  | Type of reader. 1 is subscriber, 2 is consumer. | byte   | true     |
+| name    | description                                                     | type   | required |
+| ------- | --------------------------------------------------------------- | ------ | -------- |
+| `topic` | Topic to read from.                                             | string | true     |
+| `type`  | Type of reader: `1` — subscriber (push), `2` — consumer (pull). | byte   | true     |
 ##### Response
 `[1, <is auto commit>, <message meta length>, <error code>, <error payload>]`  
 where:
@@ -185,7 +185,7 @@ where:
 ### Direction
 Server -> Client
 ### Description
-A message propagated by the server in a client-opened reader QUIC stream.
+A message propagated by the server in a client-opened reader QUIC stream. Message meta length is returned from `CONNECT READER` response.
 ### Syntax
 `[3, <message meta>, <message payload>]`  
 where:
@@ -274,6 +274,7 @@ where:
 | `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
 | `error code`             | Error code. 0 is no error. 1 is error.                               | byte    | always   |
 | `error payload`          | Error payload text.                                                  | string  | optional |
+| `batch of messages`      | Just an array of `MSG`s.                                             | string  | optional |
 
 
 ### Examples
@@ -285,7 +286,7 @@ where:
 ### Direction
 Client -> Server
 ### Description
-The client should send `DISCONNECT` request to the server and receive response before closing QUIC streams and connection. `DISCONNECT` should be sent both in writer and reader streams.
+The client should send `DISCONNECT` request to the server and receive response before closing QUIC streams and connection. `DISCONNECT` should be sent both in writer and reader streams. Server will close QUIC stream after receiving `DISCONNECT` response.
 ### Syntax
 ##### Request
 `[11]`

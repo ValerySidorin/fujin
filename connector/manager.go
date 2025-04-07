@@ -56,6 +56,7 @@ func NewManager(conf Config, l *slog.Logger) *Manager {
 	for name, c := range conf.Writers {
 		rewriteConf := c
 		rewriteConf.Kafka.Endpoint = strings.Join(rewriteConf.Kafka.Brokers, ",")
+		rewriteConf.RedisPubSub.Endpoint = strings.Join(rewriteConf.RedisPubSub.InitAddress, ",")
 		conf.Writers[name] = rewriteConf
 	}
 
@@ -154,7 +155,7 @@ func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	switch conf.Protocol {
 	case protocol.Kafka:
 		return conf.Kafka.Endpoint == w.Endpoint()
-	case protocol.Nats:
+	case protocol.NatsStreaming:
 		return conf.Nats.URL == w.Endpoint()
 	case protocol.AMQP091:
 		return conf.AMQP091.Conn.URL == w.Endpoint()

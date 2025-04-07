@@ -8,7 +8,8 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	"github.com/ValerySidorin/fujin/connector/impl/nats"
+	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
+	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	"github.com/ValerySidorin/fujin/connector/protocol"
 	"github.com/ValerySidorin/fujin/connector/reader/config"
 )
@@ -40,12 +41,14 @@ func New(conf config.Config, l *slog.Logger) (Reader, error) {
 	switch conf.Protocol {
 	case protocol.Kafka:
 		return kafka.NewReader(conf.Kafka, l)
-	case protocol.Nats:
-		return nats.NewReader(conf.Nats, l)
+	case protocol.NatsStreaming:
+		return nats_streaming.NewReader(conf.NatsStreaming, l)
 	case protocol.AMQP091:
 		return amqp091.NewReader(conf.AMQP091, l)
 	case protocol.AMQP10:
 		return amqp10.NewReader(conf.AMQP10, l)
+	case protocol.RedisPubSub:
+		return redis_pubsub.NewReader(conf.RedisPubSub, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)

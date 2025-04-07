@@ -19,7 +19,8 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	"github.com/ValerySidorin/fujin/connector/impl/nats"
+	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
+	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
 	writer_config "github.com/ValerySidorin/fujin/connector/writer/config"
 	"github.com/ValerySidorin/fujin/server"
@@ -73,7 +74,7 @@ var DefaultTestConfigWithNats = config.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "nats",
-				Nats: nats.ReaderConfig{
+				NatsStreaming: nats_streaming.ReaderConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -82,7 +83,7 @@ var DefaultTestConfigWithNats = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "nats",
-				Nats: nats.WriterConfig{
+				Nats: nats_streaming.WriterConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -176,6 +177,32 @@ var DefaultTestConfigWithAMQP10 = config.Config{
 	},
 }
 
+var DefaultTestConfigWithRedisPubSub = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	Connectors: connector.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "redis_pubsub",
+				RedisPubSub: pubsub.ReaderConfig{
+					InitAddress: []string{"localhost:6379"},
+					Channel:     "channel",
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "redis_pubsub",
+				RedisPubSub: pubsub.WriterConfig{
+					InitAddress: []string{"localhost:6379"},
+					Channel:     "channel",
+					BatchSize:   10000,
+					Linger:      5 * time.Millisecond,
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
@@ -190,6 +217,10 @@ func RunDefaultServerWithAMQP091(ctx context.Context) *server.Server {
 
 func RunDefaultServerWithAMQP10(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithAMQP10)
+}
+
+func RunDefaultServerWithRedisPubSub(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithRedisPubSub)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {

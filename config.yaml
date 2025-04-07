@@ -5,8 +5,8 @@ fujin:
   write_deadline: 10s
   force_terminate_timeout: 15s
   tls:
-    server_cert_pem_path: /Users/mak/src/fujin/assets/certs/fujin.io.pem
-    server_key_pem_path: /Users/mak/src/fujin/assets/certs/fujin.io-key.pem
+    server_cert_pem_path: C://src/fujin/assets/certs/fujin.io.pem
+    server_key_pem_path: C://src/fujin/assets/certs/fujin.io-key.pem
   quic:
     max_incoming_streams: 10
     max_idle_timeout: 5s
@@ -19,7 +19,7 @@ connectors:
     #     brokers: [localhost:9092, localhost:9093, localhost:9094]
     #     topic: my_pub_topic
     #     allow_auto_topic_creation: true
-        # linger: 10ms
+    #     linger: 10ms
     # pub:
     #   protocol: nats
     #   nats:
@@ -39,13 +39,13 @@ connectors:
     #       binding_key: my_routing_key
     #     publish:
     #       content_type: text/plain
-    pub:
-      protocol: amqp10
-      amqp10:
-        conn:
-          addr: amqp://artemis:artemis@localhost:61616
-        sender:
-          target: exchange
+    # pub:
+    #   protocol: amqp10
+    #   amqp10:
+    #     conn:
+    #       addr: amqp://artemis:artemis@localhost:61616
+    #     sender:
+    #       target: exchange
   readers:
     # sub:
     #   protocol: kafka
@@ -56,7 +56,7 @@ connectors:
     #     allow_auto_topic_creation: true
     #     disable_auto_commit: false
     #     max_poll_records: 0
-        # fetch_isolation_level: read_commited # read_uncommited/read_uncommited
+    #     fetch_isolation_level: read_commited # read_uncommited/read_uncommited
     # sub:
     #   protocol: nats
     #   nats:
@@ -78,10 +78,16 @@ connectors:
     #       consumer: fujin
     #     nack:
     #       requeue: true
-    sub:
-      protocol: amqp10
-      amqp10:
-        conn:
-          addr: amqp://artemis:artemis@localhost:61616
-        receiver:
-          source: exchange
+    # sub:
+    #   protocol: amqp10
+    #   amqp10:
+    #     conn:
+    #       addr: amqp://artemis:artemis@localhost:61616
+    #     receiver:
+    #       source: exchange
+    # sub:
+    #   protocol: redis_pubsub
+    #   redis_pubsub:
+    #     init_address: ["localhost:6379"]
+    #     channel: example-channel
+

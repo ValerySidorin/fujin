@@ -1249,7 +1249,7 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 func enqueueConnectReaderErr(out *outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
-	buf := pool.Get(8 + errLen) // cmd + auto commit + msg meta len + err code + err len + err payload
+	buf := pool.Get(8 + errLen) // cmd (1) + auto commit (1) + msg meta len (1) + err code (1) + err len (4) + err payload (errLen)
 	buf = append(buf, byte(respCode), 0, 0, byte(errCode))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,

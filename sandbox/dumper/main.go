@@ -39,9 +39,9 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := produceLoop(ctx, conn); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := produceLoop(ctx, conn); err != nil {
+		log.Fatal(err)
+	}
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -64,10 +64,10 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	if err := subscribe(ctx, "sub", conn); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("subscribed")
+	// if err := subscribe(ctx, "sub", conn); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println("subscribed")
 
 	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)

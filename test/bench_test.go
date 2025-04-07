@@ -99,6 +99,39 @@ func Benchmark_Produce_32KBPayload_ArtemisMQ(b *testing.B) {
 	benchProduce(b, "artemismq", "pub", sizedString(32*1024))
 }
 
+// Redis Pub/Sub benchmarks
+func Benchmark_Produce_1BPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(1))
+}
+
+func Benchmark_Produce_32BPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(32))
+}
+
+func Benchmark_Produce_128BPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(128))
+}
+
+func Benchmark_Produce_256BPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(256))
+}
+
+func Benchmark_Produce_1KBPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(1024))
+}
+
+func Benchmark_Produce_4KBPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(4*1024))
+}
+
+func Benchmark_Produce_8KBPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(8*1024))
+}
+
+func Benchmark_Produce_32KBPayload_RedisPubSub(b *testing.B) {
+	benchProduce(b, "redis_pubsub", "pub", sizedString(32*1024))
+}
+
 func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
@@ -113,6 +146,8 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 		RunDefaultServerWithAMQP091(ctx)
 	case "artemismq":
 		RunDefaultServerWithAMQP10(ctx)
+	case "redis_pubsub":
+		RunDefaultServerWithRedisPubSub(ctx)
 	default:
 		panic("invalid typ")
 	}
