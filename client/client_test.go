@@ -39,6 +39,33 @@ func TestConnect(t *testing.T) {
 	time.Sleep(5 * time.Second)
 }
 
+func TestConnectWriter(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	go func() {
+		_, shutdown := RunServer(ctx)
+		shutdown()
+	}()
+
+	time.Sleep(1 * time.Second)
+
+	addr := "localhost:4848"
+	conn, err := client.Connect(ctx, addr, generateTLSConfig())
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	writer, err := conn.ConnectWriter(1)
+	if err != nil {
+		t.Fatalf("failed to connect writer: %v", err)
+	}
+	defer writer.Close()
+
+	time.Sleep(5 * time.Second)
+}
+
 func generateTLSConfig() *tls.Config {
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 	template := x509.Certificate{SerialNumber: big.NewInt(1)}

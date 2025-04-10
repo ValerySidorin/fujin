@@ -12,6 +12,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/connector/writer"
+	"github.com/ValerySidorin/fujin/internal/common/fnet"
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
@@ -115,7 +116,7 @@ type connectWriterArgs struct {
 
 type handler struct {
 	ctx  context.Context
-	out  *outbound
+	out  *fnet.Outbound
 	cman *connector.Manager
 
 	ps           *parseState
@@ -157,7 +158,7 @@ type handler struct {
 
 func newHandler(
 	ctx context.Context, cman *connector.Manager,
-	out *outbound, l *slog.Logger,
+	out *fnet.Outbound, l *slog.Logger,
 ) *handler {
 	return &handler{
 		ctx:          ctx,
@@ -211,7 +212,7 @@ func (h *handler) handle(buf []byte) error {
 							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
 							h.currentTxWriter = nil
 						}
-						h.out.enqueueProto(response.DISCONNECT_RESP)
+						h.out.EnqueueProto(response.DISCONNECT_RESP)
 					}
 					h.ps.state = OP_CONNECT_WRITER
 				case byte(request.OP_CODE_CONNECT_READER):
@@ -979,7 +980,7 @@ func (h *handler) connectReader(r reader.Reader, typ reader.ReaderType) error {
 	h.disconnect = func() {
 		r.Close()
 		cancel()
-		h.out.enqueueProto(response.DISCONNECT_RESP)
+		h.out.EnqueueProto(response.DISCONNECT_RESP)
 	}
 
 	constLen := h.sessionReaderMsgMetaLen + 5
@@ -1007,12 +1008,12 @@ func (h *handler) produce(msg []byte) {
 
 			successResp[5] = response.ERR_CODE_YES
 			errProtoBuf := errProtoBuf(err)
-			h.out.enqueueProtoMulti(successResp, errProtoBuf)
+			h.out.EnqueueProtoMulti(successResp, errProtoBuf)
 			pool.Put(errProtoBuf)
 			pool.Put(buf)
 			return
 		}
-		h.out.enqueueProto(successResp)
+		h.out.EnqueueProto(successResp)
 		pool.Put(buf)
 	})
 }
@@ -1027,12 +1028,12 @@ func (h *handler) produceTx(msg []byte) {
 
 			successResp[5] = response.ERR_CODE_YES
 			errProtoBuf := errProtoBuf(err)
-			h.out.enqueueProtoMulti(successResp, errProtoBuf)
+			h.out.EnqueueProtoMulti(successResp, errProtoBuf)
 			pool.Put(errProtoBuf)
 			pool.Put(buf)
 			return
 		}
-		h.out.enqueueProto(successResp)
+		h.out.EnqueueProto(successResp)
 		pool.Put(buf)
 	})
 }
@@ -1045,7 +1046,7 @@ func (h *handler) fetch(val uint32) {
 	go func() {
 		if val == 0 {
 			buf[9] = 1
-			h.out.enqueueProtoMulti(buf, errProtoBuf(ErrFetchArgNotProvided))
+			h.out.EnqueueProtoMulti(buf, errProtoBuf(ErrFetchArgNotProvided))
 			pool.Put(buf)
 			return
 		}
@@ -1053,7 +1054,7 @@ func (h *handler) fetch(val uint32) {
 		if err := h.sessionReader.Fetch(h.ctx, val,
 			func(n uint32) {
 				replaceUnsafe(buf, 5, binary.BigEndian.AppendUint32(nil, n))
-				h.out.enqueueProto(buf)
+				h.out.EnqueueProto(buf)
 				pool.Put(buf)
 			},
 			func(message []byte, args ...any) {
@@ -1061,7 +1062,7 @@ func (h *handler) fetch(val uint32) {
 			},
 		); err != nil {
 			buf[9] = 1
-			h.out.enqueueProtoMulti(buf, errProtoBuf(err))
+			h.out.EnqueueProtoMulti(buf, errProtoBuf(err))
 			pool.Put(buf)
 		}
 	}()
@@ -1149,65 +1150,65 @@ func (h *handler) enqueueWriteErrResponse(err error) {
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
-	h.out.enqueueProto(buf)
+	h.out.EnqueueProto(buf)
 	pool.Put(buf)
 }
 
 func (h *handler) enqueueStop() {
-	h.out.enqueueProto(request.STOP_REQ)
+	h.out.EnqueueProto(request.STOP_REQ)
 }
 
 func (h *handler) enqueueAckSuccess(cID []byte) {
 	replaceUnsafe(h.ackSuccessRespTemplate, 1, cID)
-	h.out.enqueueProto(h.ackSuccessRespTemplate)
+	h.out.EnqueueProto(h.ackSuccessRespTemplate)
 }
 
 func (h *handler) enqueueAckErr(cID []byte, err error) {
 	replaceUnsafe(h.ackErrRespTemplate, 1, cID)
-	h.out.enqueueProtoMulti(h.ackErrRespTemplate, errProtoBuf(err))
+	h.out.EnqueueProtoMulti(h.ackErrRespTemplate, errProtoBuf(err))
 }
 
 func (h *handler) enqueueNAckSuccess(cID []byte) {
 	replaceUnsafe(h.nAckSuccessRespTemplate, 1, cID)
-	h.out.enqueueProto(h.nAckSuccessRespTemplate)
+	h.out.EnqueueProto(h.nAckSuccessRespTemplate)
 }
 
 func (h *handler) enqueueNAckErr(cID []byte, err error) {
 	replaceUnsafe(h.nAckErrRespTemplate, 1, cID)
-	h.out.enqueueProtoMulti(h.nAckErrRespTemplate, errProtoBuf(err))
+	h.out.EnqueueProtoMulti(h.nAckErrRespTemplate, errProtoBuf(err))
 }
 
 func (h *handler) enqueueTxBeginSuccess(cID []byte) {
 	replaceUnsafe(h.txBeginSuccessRespTemplate, 1, cID)
-	h.out.enqueueProto(h.txBeginSuccessRespTemplate)
+	h.out.EnqueueProto(h.txBeginSuccessRespTemplate)
 }
 
 func (h *handler) enqueueTxBeginErr(cID []byte, err error) {
 	replaceUnsafe(h.txBeginErrRespTemplate, 1, cID)
-	h.out.enqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
+	h.out.EnqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
 }
 
 func (h *handler) enqueueTxCommitSuccess(cID []byte) {
 	replaceUnsafe(h.txCommitSuccessRespTemplate, 1, cID)
-	h.out.enqueueProto(h.txCommitSuccessRespTemplate)
+	h.out.EnqueueProto(h.txCommitSuccessRespTemplate)
 }
 
 func (h *handler) enqueueTxCommitErr(cID []byte, err error) {
 	replaceUnsafe(h.txBeginErrRespTemplate, 1, cID)
-	h.out.enqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
+	h.out.EnqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
 }
 
 func (h *handler) enqueueTxRollbackSuccess(cID []byte) {
 	replaceUnsafe(h.txRollbackSuccessRespTemplate, 1, cID)
-	h.out.enqueueProto(h.txRollbackSuccessRespTemplate)
+	h.out.EnqueueProto(h.txRollbackSuccessRespTemplate)
 }
 
 func (h *handler) enqueueTxRollbackErr(cID []byte, err error) {
 	replaceUnsafe(h.txRollbackErrRespTemplate, 1, cID)
-	h.out.enqueueProtoMulti(h.txRollbackErrRespTemplate, errProtoBuf(err))
+	h.out.EnqueueProtoMulti(h.txRollbackErrRespTemplate, errProtoBuf(err))
 }
 
-func enqueueConnectSuccess(out *outbound, r reader.Reader) {
+func enqueueConnectSuccess(out *fnet.Outbound, r reader.Reader) {
 	var autoCommit byte
 	if r.IsAutoCommit() {
 		autoCommit = 1
@@ -1220,10 +1221,10 @@ func enqueueConnectSuccess(out *outbound, r reader.Reader) {
 		autoCommit, byte(r.MessageMetaLen()),
 		byte(response.ERR_CODE_NO),
 	)
-	out.enqueueProto(sbuf)
+	out.EnqueueProto(sbuf)
 }
 
-func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message []byte, args ...any) {
+func enqueueMsgFunc(out *fnet.Outbound, r reader.Reader, constLen int) func(message []byte, args ...any) {
 	if constLen == 5 { // This means msg ID len == 0, and we do not need to encode it, as consumer is already aware of it
 		return func(message []byte, args ...any) {
 			buf := pool.Get(len(message) + constLen)
@@ -1231,7 +1232,7 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 			buf = append(buf, byte(response.RESP_CODE_MSG))
 			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
 			buf = append(buf, message...)
-			out.enqueueProto(buf)
+			out.EnqueueProto(buf)
 		}
 	}
 
@@ -1242,11 +1243,11 @@ func enqueueMsgFunc(out *outbound, r reader.Reader, constLen int) func(message [
 		buf = r.EncodeMeta(buf, args...)
 		buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
 		buf = append(buf, message...)
-		out.enqueueProto(buf)
+		out.EnqueueProto(buf)
 	}
 }
 
-func enqueueConnectReaderErr(out *outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
+func enqueueConnectReaderErr(out *fnet.Outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
 	buf := pool.Get(8 + errLen) // cmd (1) + auto commit (1) + msg meta len (1) + err code (1) + err len (4) + err payload (errLen)
@@ -1254,7 +1255,7 @@ func enqueueConnectReaderErr(out *outbound, respCode response.RespCode, errCode 
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)
-	out.enqueueProto(buf)
+	out.EnqueueProto(buf)
 	pool.Put(buf)
 }
 

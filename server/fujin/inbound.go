@@ -42,7 +42,7 @@ func (i *inbound) readLoop(ctx context.Context) {
 		pool.Put(buf)
 		close(stopCh)
 		i.close()
-		i.h.out.c.Broadcast()
+		i.h.out.BroadcastCond()
 
 	}()
 
@@ -94,6 +94,6 @@ func (i *inbound) waitAndDisconnect() {
 func (i *inbound) close() {
 	i.str.CancelRead(ferr.NoErr)
 	i.h.wg.Wait()
-	i.h.out.close()
+	i.h.out.Close()
 	<-i.h.closed
 }

@@ -3,38 +3,50 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 
+var (
+	ErrConnClosed = errors.New("connection closed")
+	ErrTimeout    = errors.New("timeout")
+)
+
 type Conn struct {
 	qconn quic.Connection
 
-	closed atomic.Bool
+	timeout time.Duration
+	closed  atomic.Bool
 
 	l *slog.Logger
 }
 
-func Connect(ctx context.Context, addr string, tlsConf *tls.Config) (*Conn, error) {
+func Connect(ctx context.Context, addr string, tlsConf *tls.Config, opts ...Option) (*Conn, error) {
 	conn, err := quic.DialAddr(ctx, addr, tlsConf, nil)
 	if err != nil {
 		return nil, fmt.Errorf("quic: dial addr: %w", err)
 	}
 
 	l := slog.Default()
+	timeout := 10 * time.Second
 
 	c := &Conn{
-		qconn:  conn,
-		closed: atomic.Bool{},
-		l:      l,
+		qconn:   conn,
+		timeout: timeout,
+		closed:  atomic.Bool{},
+		l:       l,
 	}
 
-	// apply opts
+	for _, opt := range opts {
+		opt(c)
+	}
 
 	go func() {
 		var pingBuf [1]byte

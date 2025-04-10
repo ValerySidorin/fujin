@@ -1,4 +1,4 @@
-package fujin
+package fnet
 
 import (
 	"log/slog"
@@ -16,7 +16,7 @@ const (
 	MaxVectorSize = 1024
 )
 
-type outbound struct {
+type Outbound struct {
 	v      net.Buffers   // vector
 	wv     net.Buffers   // working vector
 	wdl    time.Duration // write deadline
@@ -28,10 +28,10 @@ type outbound struct {
 	l      *slog.Logger
 }
 
-func newOutbound(
+func NewOutbound(
 	str quic.SendStream, wdl time.Duration,
-	l *slog.Logger) *outbound {
-	o := &outbound{
+	l *slog.Logger) *Outbound {
+	o := &Outbound{
 		str: str,
 		wdl: wdl,
 		l:   l,
@@ -41,7 +41,7 @@ func newOutbound(
 	return o
 }
 
-func (o *outbound) writeloop() {
+func (o *Outbound) WriteLoop() {
 	waitOK := true
 	var closed bool
 
@@ -65,7 +65,29 @@ func (o *outbound) writeloop() {
 	}
 }
 
-func (o *outbound) flushOutbound() bool {
+func (o *Outbound) EnqueueProto(proto []byte) {
+	if o.isClosed() {
+		return
+	}
+
+	o.queueOutbound(proto)
+	o.signalFlush()
+}
+
+func (o *Outbound) EnqueueProtoMulti(protos ...[]byte) {
+	if o.isClosed() {
+		return
+	}
+
+	o.mu.Lock()
+	for _, proto := range protos {
+		o.queueOutboundNoLock(proto)
+	}
+	o.mu.Unlock()
+	o.signalFlush()
+}
+
+func (o *Outbound) flushOutbound() bool {
 	defer func() {
 		if o.isClosed() {
 			for i := range o.wv {
@@ -127,37 +149,15 @@ func (o *outbound) flushOutbound() bool {
 	return true
 }
 
-func (o *outbound) getV() (net.Buffers, int64) {
+func (o *Outbound) getV() (net.Buffers, int64) {
 	return o.v, o.pb
 }
 
-func (o *outbound) signalFlush() {
+func (o *Outbound) signalFlush() {
 	o.c.Signal()
 }
 
-func (o *outbound) enqueueProto(proto []byte) {
-	if o.isClosed() {
-		return
-	}
-
-	o.queueOutbound(proto)
-	o.signalFlush()
-}
-
-func (o *outbound) enqueueProtoMulti(protos ...[]byte) {
-	if o.isClosed() {
-		return
-	}
-
-	o.mu.Lock()
-	for _, proto := range protos {
-		o.queueOutboundNoLock(proto)
-	}
-	o.mu.Unlock()
-	o.signalFlush()
-}
-
-func (o *outbound) queueOutbound(data []byte) {
+func (o *Outbound) queueOutbound(data []byte) {
 	if o.isClosed() {
 		return
 	}
@@ -185,7 +185,7 @@ func (o *outbound) queueOutbound(data []byte) {
 	}
 }
 
-func (o *outbound) queueOutboundNoLock(data []byte) {
+func (o *Outbound) queueOutboundNoLock(data []byte) {
 	o.pb += int64(len(data))
 	toBuffer := data
 	if len(o.v) > 0 {
@@ -207,11 +207,15 @@ func (o *outbound) queueOutboundNoLock(data []byte) {
 	}
 }
 
-func (o *outbound) isClosed() bool {
+func (o *Outbound) isClosed() bool {
 	return o.closed.Load()
 }
 
-func (o *outbound) close() {
+func (o *Outbound) Close() {
 	o.closed.Store(true)
+	o.c.Broadcast()
+}
+
+func (o *Outbound) BroadcastCond() {
 	o.c.Broadcast()
 }

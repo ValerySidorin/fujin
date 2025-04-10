@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/connector"
+	"github.com/ValerySidorin/fujin/internal/common/fnet"
 	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
 	"github.com/ValerySidorin/fujin/server/fujin/ferr"
 	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
@@ -176,12 +177,12 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					go func() {
 						defer connWg.Done()
 
-						out := newOutbound(str, s.conf.WriteDeadline, s.l)
+						out := fnet.NewOutbound(str, s.conf.WriteDeadline, s.l)
 						h := newHandler(ctx, s.cman, out, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
 
 						go in.readLoop(ctx)
-						out.writeloop()
+						out.WriteLoop()
 						str.Close()
 					}()
 				}
