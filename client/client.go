@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
@@ -19,6 +20,8 @@ var (
 	ErrTimeout    = errors.New("timeout")
 
 	ReadBufferSize = 512
+
+	DISCONNECT_REQ = []byte{byte(request.OP_CODE_DISCONNECT)}
 )
 
 type Conn struct {

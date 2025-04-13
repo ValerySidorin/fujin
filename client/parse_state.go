@@ -9,6 +9,8 @@ const (
 	OP_ERROR_CODE_ARG
 	OP_ERROR_PAYLOAD_ARG
 	OP_ERROR_PAYLOAD
+
+	OP_DISCONNECT
 )
 
 type parseState struct {

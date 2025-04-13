@@ -45,7 +45,7 @@ func TestConnectWriter(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+	t.Run("success with id", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -62,6 +62,32 @@ func TestWrite(t *testing.T) {
 		defer conn.Close()
 
 		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.Write("pub", []byte("test data"))
+		assert.NoError(t, err)
+	})
+
+	t.Run("success empty id", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		time.Sleep(1 * time.Second)
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("")
 		if err != nil {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
@@ -94,6 +120,32 @@ func TestWrite(t *testing.T) {
 		defer writer.Close()
 
 		err = writer.Write("non_existent_topic", []byte("test data"))
-		assert.NoError(t, err)
+		assert.Error(t, err)
+	})
+
+	t.Run("write after close", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		time.Sleep(1 * time.Second)
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		writer.Close()
+
+		err = writer.Write("pub", []byte("test data"))
+		assert.Error(t, err)
 	})
 }

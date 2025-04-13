@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/fujin"
@@ -13,6 +14,10 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
 	"github.com/quic-go/quic-go"
+)
+
+var (
+	ErrWriterClosed = errors.New("writer closed")
 )
 
 type Writer struct {
@@ -23,12 +28,10 @@ type Writer struct {
 	out *fujin.Outbound
 
 	wcm *defaultCorrelationManager
-	bcm *defaultCorrelationManager
-	ccm *defaultCorrelationManager
-	rcm *defaultCorrelationManager
 
-	mu sync.Mutex
-	wg sync.WaitGroup
+	closed       atomic.Bool
+	disconnectCh chan struct{}
+	wg           sync.WaitGroup
 }
 
 func (c *Conn) ConnectWriter(id string) (*Writer, error) {
@@ -56,19 +59,16 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 		stream.Close()
 		return nil, fmt.Errorf("quic: write connect writer: %w", err)
 	}
-	fmt.Println("write:", buf)
 
 	out := fujin.NewOutbound(stream, 5*time.Second, c.l)
 
 	w := &Writer{
-		conn: c,
-		out:  out,
-		r:    stream,
-		ps:   &parseState{},
-		wcm:  newDefaultCorrelationManager(),
-		bcm:  newDefaultCorrelationManager(),
-		ccm:  newDefaultCorrelationManager(),
-		rcm:  newDefaultCorrelationManager(),
+		conn:         c,
+		out:          out,
+		r:            stream,
+		ps:           &parseState{},
+		wcm:          newDefaultCorrelationManager(),
+		disconnectCh: make(chan struct{}),
 	}
 
 	w.wg.Add(2)
@@ -82,6 +82,10 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 }
 
 func (w *Writer) Write(topic string, p []byte) error {
+	if w.closed.Load() {
+		return ErrWriterClosed
+	}
+
 	buf := pool.Get(len(topic) + len(p) + 13)
 	defer pool.Put(buf)
 
@@ -98,7 +102,6 @@ func (w *Writer) Write(topic string, p []byte) error {
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(p)))
 	buf = append(buf, p...)
 
-	fmt.Println("write:", buf)
 	w.out.EnqueueProto(buf)
 
 	select {
@@ -110,7 +113,11 @@ func (w *Writer) Write(topic string, p []byte) error {
 }
 
 func (w *Writer) Close() error {
-	// Send - receive disconnect
+	w.closed.Store(true)
+
+	w.out.EnqueueProto(DISCONNECT_REQ)
+	<-w.disconnectCh
+
 	w.out.Close()
 	w.r.Close()
 
@@ -120,9 +127,6 @@ func (w *Writer) Close() error {
 
 func (w *Writer) readLoop() {
 	defer w.wg.Done()
-
-	w.conn.l.Debug("writer read loop started")
-	defer w.conn.l.Debug("writer read loop stopped")
 
 	buf := pool.Get(ReadBufferSize)[:ReadBufferSize]
 	defer pool.Put(buf)
@@ -169,6 +173,9 @@ func (w *Writer) parse(buf []byte) error {
 			switch b {
 			case byte(response.RESP_CODE_WRITE):
 				w.ps.state = OP_WRITE
+			case byte(response.RESP_CODE_DISCONNECT):
+				close(w.disconnectCh)
+				return nil
 			}
 		case OP_WRITE:
 			w.ps.ca.cID = pool.Get(fujin.Uint32Len)
@@ -202,7 +209,6 @@ func (w *Writer) parse(buf []byte) error {
 				w.ps.ca, w.ps.state = correlationIDArg{}, OP_START
 				continue
 			case byte(response.ERR_CODE_YES):
-				// TODO: parse error payload
 				w.ps.argBuf = pool.Get(fujin.Uint32Len)
 				w.ps.state = OP_ERROR_PAYLOAD_ARG
 			default:
@@ -212,13 +218,11 @@ func (w *Writer) parse(buf []byte) error {
 		case OP_ERROR_PAYLOAD_ARG:
 			w.ps.argBuf = append(w.ps.argBuf, b)
 			if len(w.ps.argBuf) >= fujin.Uint32Len {
-				// TODO: should disconnect here
 				if err := w.parseWriteErrLenArg(); err != nil {
-					w.conn.l.Error("parse write msg err len arg", "err", err)
 					pool.Put(w.ps.argBuf)
 					pool.Put(w.ps.ca.cID)
 					w.r.Close()
-					return ErrParseProto
+					return fmt.Errorf("parse write err len arg: %w", err)
 				}
 				pool.Put(w.ps.argBuf)
 				w.ps.argBuf, w.ps.state = nil, OP_ERROR_PAYLOAD
@@ -266,7 +270,7 @@ func (w *Writer) parse(buf []byte) error {
 func (w *Writer) parseWriteErrLenArg() error {
 	w.ps.wma.errLen = binary.BigEndian.Uint32(w.ps.argBuf[0:fujin.Uint32Len])
 	if w.ps.wma.errLen == 0 {
-		return errors.New("write msg response err len arg not provided")
+		return ErrParseProto
 	}
 
 	return nil

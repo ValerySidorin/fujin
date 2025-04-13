@@ -24,6 +24,6 @@ const (
 
 var (
 	STOP_REQ = []byte{
-		byte(OP_CODE_STOP), // cmd (9)
+		byte(OP_CODE_STOP),
 	}
 )
