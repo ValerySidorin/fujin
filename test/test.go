@@ -225,8 +225,6 @@ func RunDefaultServerWithRedisPubSub(ctx context.Context) *server.Server {
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {
-	// logger := slog.New(slog.DiscardHandler)
-
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
