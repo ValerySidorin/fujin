@@ -31,6 +31,6 @@ const (
 
 var (
 	DISCONNECT_RESP = []byte{
-		byte(RESP_CODE_DISCONNECT), // cmd (8)
+		byte(RESP_CODE_DISCONNECT),
 	}
 )

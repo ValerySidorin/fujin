@@ -60,7 +60,7 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 		return nil, fmt.Errorf("quic: write connect writer: %w", err)
 	}
 
-	out := fujin.NewOutbound(stream, 5*time.Second, c.l)
+	out := fujin.NewOutbound(stream, c.wdl, c.l)
 
 	w := &Writer{
 		conn:         c,
@@ -113,10 +113,17 @@ func (w *Writer) Write(topic string, p []byte) error {
 }
 
 func (w *Writer) Close() error {
+	if w.closed.Load() {
+		return nil
+	}
+
 	w.closed.Store(true)
 
 	w.out.EnqueueProto(DISCONNECT_REQ)
-	<-w.disconnectCh
+	select {
+	case <-time.After(w.conn.timeout):
+	case <-w.disconnectCh:
+	}
 
 	w.out.Close()
 	w.r.Close()
@@ -136,7 +143,6 @@ func (w *Writer) readLoop() {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
-					fmt.Println("read:", buf[:n])
 					err = w.parse(buf[:n])
 					if err != nil {
 						w.conn.l.Error("writer read loop", "err", err)
@@ -175,6 +181,9 @@ func (w *Writer) parse(buf []byte) error {
 				w.ps.state = OP_WRITE
 			case byte(response.RESP_CODE_DISCONNECT):
 				close(w.disconnectCh)
+				return nil
+			case byte(request.OP_CODE_STOP):
+				go w.Close() // we probably can do something smarter here
 				return nil
 			}
 		case OP_WRITE:

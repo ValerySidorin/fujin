@@ -28,6 +28,7 @@ type Conn struct {
 	qconn quic.Connection
 
 	timeout time.Duration
+	wdl     time.Duration
 	closed  atomic.Bool
 
 	l *slog.Logger
@@ -39,14 +40,11 @@ func Connect(ctx context.Context, addr string, tlsConf *tls.Config, opts ...Opti
 		return nil, fmt.Errorf("quic: dial addr: %w", err)
 	}
 
-	l := slog.Default()
-	timeout := 10 * time.Second
-
 	c := &Conn{
 		qconn:   conn,
-		timeout: timeout,
-		closed:  atomic.Bool{},
-		l:       l,
+		timeout: 10 * time.Second,
+		wdl:     5 * time.Second,
+		l:       slog.Default(),
 	}
 
 	for _, opt := range opts {
