@@ -97,14 +97,16 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[6, <correlation id>]`  
+`[6, <correlation id>, <error code>, <error payload>]`  
 where:
-| name             | description                                                          | type   | presence |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
+| name             | description                                                               | type   | presence |
+| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
+| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
+| `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[5, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1]`
+- `[5, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0]`
 
 ## COMMIT TX
 ### Direction
@@ -121,14 +123,16 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[7, <correlation id>]`  
+`[7, <correlation id>, <error code>, <error payload>]`  
 where:
-| name             | description                                                          | type   | presence |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
+| name             | description                                                               | type   | presence |
+| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
+| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
+| `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[6, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1]`
+- `[6, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0]`
 
 ## ROLLBACK TX
 ### Direction
@@ -145,14 +149,16 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[8, <correlation id>]`  
+`[8, <correlation id>, <error code>, <error payload>]`  
 where:
-| name             | description                                                          | type   | presence |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | always   |
+| name             | description                                                               | type   | presence |
+| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
+| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
+| `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[7, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1]`
+- `[7, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
 
 ## CONNECT READER
 

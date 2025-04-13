@@ -13,6 +13,7 @@ import (
 func main() {
 	cl, err := kgo.NewClient(
 		kgo.SeedBrokers("localhost:9092", "localhost:9093", "localhost:9094"),
+		kgo.TransactionalID("id"),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -30,6 +31,11 @@ func main() {
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
+
+	err = cl.EndTransaction(ctx, kgo.TryCommit)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for {
 		select {

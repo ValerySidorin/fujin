@@ -18,8 +18,6 @@ func TestConnectWriter(t *testing.T) {
 	_, shutdown := RunTestServer(ctx)
 	defer shutdown()
 
-	time.Sleep(1 * time.Second)
-
 	addr := "localhost:4848"
 	conn, err := client.Connect(ctx, addr, generateTLSConfig(),
 		client.WithLogger(
@@ -52,8 +50,6 @@ func TestWrite(t *testing.T) {
 		_, shutdown := RunTestServer(ctx)
 		defer shutdown()
 
-		time.Sleep(1 * time.Second)
-
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
 		if err != nil {
@@ -77,8 +73,6 @@ func TestWrite(t *testing.T) {
 
 		_, shutdown := RunTestServer(ctx)
 		defer shutdown()
-
-		time.Sleep(1 * time.Second)
 
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
@@ -104,8 +98,6 @@ func TestWrite(t *testing.T) {
 		_, shutdown := RunTestServer(ctx)
 		defer shutdown()
 
-		time.Sleep(1 * time.Second)
-
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
 		if err != nil {
@@ -130,8 +122,6 @@ func TestWrite(t *testing.T) {
 		_, shutdown := RunTestServer(ctx)
 		defer shutdown()
 
-		time.Sleep(1 * time.Second)
-
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
 		if err != nil {
@@ -147,5 +137,135 @@ func TestWrite(t *testing.T) {
 
 		err = writer.Write("pub", []byte("test data"))
 		assert.Error(t, err)
+	})
+
+	// NATS streaming does not support transactions, so Fujin will return ok results anyway
+	// We are testing request-response logic here
+	t.Run("begin tx", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.BeginTx()
+		assert.NoError(t, err)
+	})
+
+	t.Run("commit tx", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.BeginTx()
+		assert.NoError(t, err)
+
+		err = writer.CommitTx()
+		assert.NoError(t, err)
+	})
+
+	t.Run("rollback tx", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.BeginTx()
+		assert.NoError(t, err)
+
+		err = writer.RollbackTx()
+		assert.NoError(t, err)
+	})
+
+	t.Run("commit tx invalid tx state", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.CommitTx()
+		assert.Error(t, err)
+		assert.Equal(t, "invalid tx state", err.Error())
+	})
+
+	t.Run("rollback tx invalid state", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.RollbackTx()
+		assert.Error(t, err)
+		assert.Equal(t, "invalid tx state", err.Error())
 	})
 }

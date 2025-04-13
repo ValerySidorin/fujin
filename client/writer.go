@@ -27,7 +27,7 @@ type Writer struct {
 	r   quic.Stream
 	out *fujin.Outbound
 
-	wcm *defaultCorrelationManager
+	cm *defaultCorrelationManager
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
@@ -67,7 +67,7 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 		out:          out,
 		r:            stream,
 		ps:           &parseState{},
-		wcm:          newDefaultCorrelationManager(),
+		cm:           newDefaultCorrelationManager(),
 		disconnectCh: make(chan struct{}),
 	}
 
@@ -92,8 +92,8 @@ func (w *Writer) Write(topic string, p []byte) error {
 	ch := make(chan error, 1)
 	defer close(ch)
 
-	id := w.wcm.next(ch)
-	defer w.wcm.delete(id)
+	id := w.cm.next(ch)
+	defer w.cm.delete(id)
 
 	buf = append(buf, byte(request.OP_CODE_WRITE))
 	buf = binary.BigEndian.AppendUint32(buf, id)
@@ -110,6 +110,20 @@ func (w *Writer) Write(topic string, p []byte) error {
 	case err := <-ch:
 		return err
 	}
+}
+
+func (w *Writer) BeginTx() error {
+	return w.sendTxCmd(byte(request.OP_CODE_TX_BEGIN))
+}
+
+// TODO: Fix
+func (w *Writer) CommitTx() error {
+	return w.sendTxCmd(byte(request.OP_CODE_TX_COMMIT))
+}
+
+// TODO: Fix
+func (w *Writer) RollbackTx() error {
+	return w.sendTxCmd(byte(request.OP_CODE_TX_ROLLBACK))
 }
 
 func (w *Writer) Close() error {
@@ -130,6 +144,33 @@ func (w *Writer) Close() error {
 
 	w.wg.Wait()
 	return nil
+}
+
+func (w *Writer) sendTxCmd(cmd byte) error {
+	if w.closed.Load() {
+		return ErrWriterClosed
+	}
+
+	buf := pool.Get(5)
+	defer pool.Put(buf)
+
+	ch := make(chan error, 1)
+	defer close(ch)
+
+	id := w.cm.next(ch)
+	defer w.cm.delete(id)
+
+	buf = append(buf, cmd)
+	buf = binary.BigEndian.AppendUint32(buf, id)
+
+	w.out.EnqueueProto(buf)
+
+	select {
+	case <-time.After(w.conn.timeout):
+		return ErrTimeout
+	case err := <-ch:
+		return err
+	}
 }
 
 func (w *Writer) readLoop() {
@@ -179,6 +220,12 @@ func (w *Writer) parse(buf []byte) error {
 			switch b {
 			case byte(response.RESP_CODE_WRITE):
 				w.ps.state = OP_WRITE
+			case byte(response.RESP_CODE_TX_BEGIN):
+				w.ps.state = OP_TX_BEGIN
+			case byte(response.RESP_CODE_TX_COMMIT):
+				w.ps.state = OP_TX_COMMIT
+			case byte(response.RESP_CODE_TX_ROLLBACK):
+				w.ps.state = OP_TX_ROLLBACK
 			case byte(response.RESP_CODE_DISCONNECT):
 				close(w.disconnectCh)
 				return nil
@@ -189,8 +236,8 @@ func (w *Writer) parse(buf []byte) error {
 		case OP_WRITE:
 			w.ps.ca.cID = pool.Get(fujin.Uint32Len)
 			w.ps.ca.cID = append(w.ps.ca.cID, b)
-			w.ps.state = OP_WRITE_CORRELATION_ID_ARG
-		case OP_WRITE_CORRELATION_ID_ARG:
+			w.ps.state = OP_CORRELATION_ID_ARG
+		case OP_CORRELATION_ID_ARG:
 			toCopy := fujin.Uint32Len - len(w.ps.ca.cID)
 			avail := len(buf) - i
 
@@ -213,7 +260,7 @@ func (w *Writer) parse(buf []byte) error {
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
-				w.wcm.send(binary.BigEndian.Uint32(w.ps.ca.cID), nil)
+				w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), nil)
 				pool.Put(w.ps.ca.cID)
 				w.ps.ca, w.ps.state = correlationIDArg{}, OP_START
 				continue
@@ -255,7 +302,7 @@ func (w *Writer) parse(buf []byte) error {
 				}
 
 				if len(w.ps.payloadBuf) >= int(w.ps.wma.errLen) {
-					w.wcm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
+					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
 					w.ps.ca.cID, w.ps.payloadBuf, w.ps.wma, w.ps.state = nil, nil, writeMessageArg{}, OP_START
 				}
 			} else {
@@ -263,10 +310,22 @@ func (w *Writer) parse(buf []byte) error {
 				w.ps.payloadBuf = append(w.ps.payloadBuf, b)
 
 				if len(w.ps.payloadBuf) >= int(w.ps.wma.errLen) {
-					w.wcm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
+					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
 					w.ps.ca.cID, w.ps.payloadBuf, w.ps.wma, w.ps.state = nil, nil, writeMessageArg{}, OP_START
 				}
 			}
+		case OP_TX_BEGIN:
+			w.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			w.ps.ca.cID = append(w.ps.ca.cID, b)
+			w.ps.state = OP_CORRELATION_ID_ARG
+		case OP_TX_COMMIT:
+			w.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			w.ps.ca.cID = append(w.ps.ca.cID, b)
+			w.ps.state = OP_CORRELATION_ID_ARG
+		case OP_TX_ROLLBACK:
+			w.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			w.ps.ca.cID = append(w.ps.ca.cID, b)
+			w.ps.state = OP_CORRELATION_ID_ARG
 		default:
 			w.r.Close()
 			return ErrParseProto

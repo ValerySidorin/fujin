@@ -49,11 +49,20 @@ const (
 	OP_BEGIN_TX
 	OP_BEGIN_TX_CORRELATION_ID_ARG
 
+	OP_BEGIN_TX_FAIL
+	OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG
+
 	OP_COMMIT_TX
 	OP_COMMIT_TX_CORRELATION_ID_ARG
 
+	OP_COMMIT_TX_FAIL
+	OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG
+
 	OP_ROLLBACK_TX
 	OP_ROLLBACK_TX_CORRELATION_ID_ARG
+
+	OP_ROLLBACK_TX_FAIL
+	OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG
 
 	OP_WRITE_TX
 	OP_WRITE_TX_CORRELATION_ID_ARG
@@ -66,6 +75,8 @@ var (
 	ErrParseProto               = errors.New("parse proto")
 	ErrWriterCanNotBeReusedInTx = errors.New("writer can not be reuse in tx")
 	ErrFetchArgNotProvided      = errors.New("fetch arg not provided")
+
+	ErrInvalidTxState = errors.New("invalid tx state")
 )
 
 type sessionState byte
@@ -228,6 +239,10 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_TX_BEGIN):
 					h.ps.state = OP_BEGIN_TX
 					h.sessionState = SESSION_STATE_TX
+				case byte(request.OP_CODE_TX_COMMIT):
+					h.ps.state = OP_COMMIT_TX_FAIL
+				case byte(request.OP_CODE_TX_ROLLBACK):
+					h.ps.state = OP_ROLLBACK_TX_FAIL
 				case byte(request.OP_CODE_DISCONNECT):
 					h.close()
 					return nil
@@ -239,6 +254,9 @@ func (h *handler) handle(buf []byte) error {
 				switch b {
 				case byte(request.OP_CODE_WRITE):
 					h.ps.state = OP_WRITE_TX
+				case byte(request.OP_CODE_TX_BEGIN):
+					h.ps.state = OP_BEGIN_TX_FAIL
+					h.sessionState = SESSION_STATE_TX
 				case byte(request.OP_CODE_TX_COMMIT):
 					h.ps.state = OP_COMMIT_TX
 				case byte(request.OP_CODE_TX_ROLLBACK):
@@ -612,7 +630,6 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.argBuf) >= int(h.ps.wa.topicLen) {
 					if err := h.parseWriteTopicArg(); err != nil {
-						h.l.Error("parse write topic arg", "err", err)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
@@ -632,7 +649,6 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
 				if h.ps.wa.topicLen == 0 {
 					if err := h.parseWriteTopicLenArg(); err != nil {
-						h.l.Error("parse write topic len arg", "err", err)
 						pool.Put(h.ps.argBuf)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
@@ -793,7 +809,47 @@ func (h *handler) handle(buf []byte) error {
 					}
 
 					h.enqueueTxBeginSuccess(h.ps.ca.cID)
+					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.sessionState, h.ps.state = nil, SESSION_STATE_TX, OP_START
+				}
+			} else {
+				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+		case OP_BEGIN_TX_FAIL:
+			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
+			h.ps.state = OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG
+		case OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG:
+			if h.ps.ca.cID != nil {
+				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
+				}
+
+				if len(h.ps.ca.cID) >= fujin.Uint32Len {
+					if err := h.flushWriters(); err != nil {
+						h.enqueueTxBeginErr(h.ps.ca.cID, err)
+						h.l.Error("begin tx", "err", err)
+						pool.Put(h.ps.ca.cID)
+						h.ps.ca.cID, h.ps.state = nil, OP_START
+						continue
+					}
+
+					h.enqueueTxBeginErr(h.ps.ca.cID, ErrInvalidTxState)
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.ps.state = nil, OP_START
 				}
 			} else {
 				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
@@ -822,17 +878,52 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if len(h.ps.ca.cID) >= fujin.Uint32Len {
-					if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
-						h.enqueueTxCommitErr(h.ps.ca.cID, err)
-						h.l.Error("commit tx", "err", err)
-						pool.Put(h.ps.ca.cID)
-						h.ps.ca.cID, h.ps.state = nil, OP_START // We are keeping transaction opened here?
-						continue
+					if h.currentTxWriter != nil {
+						if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
+							h.enqueueTxCommitErr(h.ps.ca.cID, err)
+							h.l.Error("commit tx", "err", err)
+							pool.Put(h.ps.ca.cID)
+							h.ps.ca.cID, h.ps.state = nil, OP_START // We are keeping transaction opened here?
+							continue
+						}
+						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+						h.currentTxWriter = nil
 					}
 					h.enqueueTxCommitSuccess(h.ps.ca.cID)
-					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+					fmt.Println("success commit")
 					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_WRITER, OP_START
+					h.ps.ca.cID, h.sessionState, h.ps.state = nil, SESSION_STATE_WRITER, OP_START
+				}
+			} else {
+				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+		case OP_COMMIT_TX_FAIL:
+			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
+			h.ps.state = OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG
+		case OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG:
+			if h.ps.ca.cID != nil {
+				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
+				}
+
+				if len(h.ps.ca.cID) >= fujin.Uint32Len {
+					h.enqueueTxCommitErr(h.ps.ca.cID, ErrInvalidTxState)
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.ps.state = nil, OP_START
 				}
 			} else {
 				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
@@ -841,7 +932,7 @@ func (h *handler) handle(buf []byte) error {
 		case OP_ROLLBACK_TX:
 			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_COMMIT_TX_CORRELATION_ID_ARG
+			h.ps.state = OP_ROLLBACK_TX_CORRELATION_ID_ARG
 		case OP_ROLLBACK_TX_CORRELATION_ID_ARG:
 			if h.ps.ca.cID != nil {
 				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
@@ -861,19 +952,52 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				if len(h.ps.ca.cID) >= fujin.Uint32Len {
-					if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
-						h.enqueueTxRollbackErr(h.ps.ca.cID, err)
-						h.l.Error("rollback tx", "err", err)
+					if h.currentTxWriter != nil {
+						if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
+							h.enqueueTxRollbackErr(h.ps.ca.cID, err)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+							pool.Put(h.ps.ca.cID)
+							// We are not keeping tx opened here after rollback error
+							h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_WRITER, OP_START
+							continue
+						}
 						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
-						pool.Put(h.ps.ca.cID)
-						// We are not keeping tx opened here after rollback error
-						h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_WRITER, OP_START
-						continue
+						h.currentTxWriter = nil
 					}
 					h.enqueueTxRollbackSuccess(h.ps.ca.cID)
-					h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
 					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_WRITER, OP_START
+					h.ps.ca.cID, h.sessionState, h.ps.state = nil, SESSION_STATE_WRITER, OP_START
+				}
+			} else {
+				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+		case OP_ROLLBACK_TX_FAIL:
+			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
+			h.ps.state = OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG
+		case OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG:
+			if h.ps.ca.cID != nil {
+				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(h.ps.ca.cID)
+					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					h.ps.ca.cID = append(h.ps.ca.cID, b)
+				}
+
+				if len(h.ps.ca.cID) >= fujin.Uint32Len {
+					h.enqueueTxRollbackErr(h.ps.ca.cID, ErrInvalidTxState)
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.ps.state = nil, OP_START
 				}
 			} else {
 				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
