@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/config"
-	"github.com/ValerySidorin/fujin/connector"
+	"github.com/ValerySidorin/fujin/internal/connector"
 	"github.com/ValerySidorin/fujin/server/fujin"
 	"golang.org/x/sync/errgroup"
 )

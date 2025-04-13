@@ -26,7 +26,7 @@ func (m *defaultCorrelationManager) next(c chan error) uint32 {
 	return m.n
 }
 
-func (m *defaultCorrelationManager) send(id uint32, err error) (chan error, bool) {
+func (m *defaultCorrelationManager) send(id uint32, err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -34,7 +34,6 @@ func (m *defaultCorrelationManager) send(id uint32, err error) (chan error, bool
 	if ok {
 		c <- err
 	}
-	return c, ok
 }
 
 func (m *defaultCorrelationManager) delete(id uint32) {

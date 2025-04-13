@@ -1,4 +1,4 @@
-package fnet
+package fujin
 
 import (
 	"log/slog"
@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/quic-go/quic-go"
 )
 
@@ -42,7 +42,7 @@ func NewOutbound(
 }
 
 func (o *Outbound) WriteLoop() {
-	waitOK := true
+	waitOK := false
 	var closed bool
 
 	for {

@@ -10,13 +10,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 
 var (
 	ErrConnClosed = errors.New("connection closed")
 	ErrTimeout    = errors.New("timeout")
+
+	ReadBufferSize = 512
 )
 
 type Conn struct {

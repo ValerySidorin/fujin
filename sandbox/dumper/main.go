@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ValerySidorin/fujin/server/fujin/ferr"
-	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 
@@ -35,13 +35,13 @@ func main() {
 
 	// go produceLoopTx(ctx, conn)
 
-	// if err := produce(ctx, conn); err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	if err := produceLoop(ctx, conn); err != nil {
+	if err := produce(ctx, conn); err != nil {
 		log.Fatal(err)
 	}
+
+	// if err := produceLoop(ctx, conn); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// if err := produceByBytes(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -298,19 +298,21 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 func produce(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT_WRITER),
-		0, 0, 0, 0, // producer id is optional (for transactions)
+		0, 0, 0, 3, // producer id len
+		112, 117, 98, // // producer id
+		// 0, 0, 0, 1, // producer id is optional (for transactions)
 		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0, // request id
-		0, 0, 0, 3, // pub len
-		112, 117, 98, // pub val
-		0, 0, 0, 2, // msg len
-		98, 98, // msg
-		byte(request.OP_CODE_WRITE),
-		0, 0, 0, 0, // request id
-		0, 0, 0, 3, // pub len
-		112, 117, 98, // pub val
-		0, 0, 0, 2, // msg len
-		98, 98, // msg
+		0, 0, 0, 5, // pub len
+		116, 111, 112, 105, 99, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		// byte(request.OP_CODE_WRITE),
+		// 0, 0, 0, 0, // request id
+		// 0, 0, 0, 3, // pub len
+		// 112, 117, 98, // pub val
+		// 0, 0, 0, 2, // msg len
+		// 98, 98, // msg
 	}
 
 	str, err := conn.OpenStreamSync(ctx)
@@ -326,7 +328,8 @@ func produce(ctx context.Context, conn quic.Connection) error {
 	go read(str, "produce")
 
 	fmt.Println("produce: write req")
-	time.Sleep(10 * time.Millisecond)
+
+	time.Sleep(1 * time.Second)
 
 	req2 := []byte{
 		byte(request.OP_CODE_DISCONNECT),
@@ -485,7 +488,9 @@ func read(str quic.ReceiveStream, prefix string) {
 	buf := make([]byte, 32768)
 
 	for {
+		fmt.Println("before read")
 		n, err := str.Read(buf)
+		fmt.Println("after read")
 		if err == io.EOF {
 			if n != 0 {
 				fmt.Printf("%s: read stream: id: %d data: %v\n", prefix, str.StreamID(), buf[:n])
@@ -497,7 +502,7 @@ func read(str quic.ReceiveStream, prefix string) {
 			log.Fatalf("%s: read: %s", prefix, err)
 		}
 
-		// fmt.Println("read")
+		fmt.Println("read")
 
 		// comment this for maximum throughput
 		fmt.Printf("%s: read stream: id: %d data: %v\n", prefix, str.StreamID(), buf[:n])

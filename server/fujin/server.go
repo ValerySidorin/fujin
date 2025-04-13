@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ValerySidorin/fujin/connector"
-	"github.com/ValerySidorin/fujin/internal/common/fnet"
-	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
-	"github.com/ValerySidorin/fujin/server/fujin/ferr"
-	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/connector"
+	"github.com/ValerySidorin/fujin/internal/fujin"
+	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/quic-go/quic-go"
 )
 
@@ -177,7 +177,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					go func() {
 						defer connWg.Done()
 
-						out := fnet.NewOutbound(str, s.conf.WriteDeadline, s.l)
+						out := fujin.NewOutbound(str, s.conf.WriteDeadline, s.l)
 						h := newHandler(ctx, s.cman, out, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
 

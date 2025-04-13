@@ -100,37 +100,6 @@ func TestDefaultCorrelationManager_DeleteNonExistent(t *testing.T) {
 		t.Errorf("Expected map to remain empty, but it has %d entries", len(manager.m))
 	}
 }
-func TestDefaultCorrelationManager_Send(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error, 1)
-
-	id := manager.next(ch)
-	err := &struct{ error }{}
-
-	sentCh, ok := manager.send(id, err)
-	if !ok {
-		t.Errorf("Expected to find channel with id %d, but it was not found", id)
-	}
-
-	select {
-	case receivedErr := <-sentCh:
-		if receivedErr != err {
-			t.Errorf("Expected error %v, but got %v", err, receivedErr)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatal("Expected error to be sent to the channel, but it was not received")
-	}
-}
-
-func TestDefaultCorrelationManager_SendNonExistentID(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	err := &struct{ error }{}
-
-	_, ok := manager.send(12345, err)
-	if ok {
-		t.Errorf("Expected not to find a channel with id 12345, but it was found")
-	}
-}
 
 func TestDefaultCorrelationManager_EmptyMap(t *testing.T) {
 	manager := newDefaultCorrelationManager()

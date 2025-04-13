@@ -46,7 +46,7 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("validate reader config: kafka: %w", err)
 			}
 		case protocol.NatsStreaming:
-			if err := r.Nats.Validate(); err != nil {
+			if err := r.NatsStreaming.Validate(); err != nil {
 				return fmt.Errorf("validate reader config: nats_streaming: %w", err)
 			}
 		case protocol.AMQP091:

@@ -1,0 +1,54 @@
+package main
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"log"
+	"log/slog"
+	"math/big"
+	"os"
+	"os/signal"
+	"time"
+
+	"github.com/ValerySidorin/fujin/client"
+)
+
+func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), client.WithLogger(
+		slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		})),
+	))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer conn.Close()
+
+	w, err := conn.ConnectWriter("")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer w.Close()
+
+	time.Sleep(5 * time.Second)
+}
+
+func generateTLSConfig() *tls.Config {
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	cert, _ := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	tlsCert := tls.Certificate{
+		Certificate: [][]byte{cert},
+		PrivateKey:  key,
+	}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
+}

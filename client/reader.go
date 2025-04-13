@@ -3,7 +3,7 @@ package client
 import "io"
 
 type reader struct {
-	r   io.Reader
+	r   io.ReadCloser
 	buf []byte
 	off int
 	n   int
@@ -18,4 +18,8 @@ func (r *reader) Read() ([]byte, error) {
 	var err error
 	r.n, err = r.r.Read(r.buf)
 	return r.buf[:r.n], err
+}
+
+func (r *reader) Close() error {
+	return r.r.Close()
 }

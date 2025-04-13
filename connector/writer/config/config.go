@@ -10,10 +10,10 @@ import (
 )
 
 type Config struct {
-	Protocol    protocol.Protocol           `yaml:"protocol"`
-	Kafka       kafka.WriterConfig          `yaml:"kafka"`
-	Nats        nats_streaming.WriterConfig `yaml:"nats_streaming"`
-	AMQP091     amqp091.WriterConfig        `yaml:"amqp091"`
-	AMQP10      amqp10.WriterConfig         `yaml:"amqp10"`
-	RedisPubSub redis_pubsub.WriterConfig   `yaml:"redis_pubsub"`
+	Protocol      protocol.Protocol           `yaml:"protocol"`
+	Kafka         kafka.WriterConfig          `yaml:"kafka"`
+	NatsStreaming nats_streaming.WriterConfig `yaml:"nats_streaming"`
+	AMQP091       amqp091.WriterConfig        `yaml:"amqp091"`
+	AMQP10        amqp10.WriterConfig         `yaml:"amqp10"`
+	RedisPubSub   redis_pubsub.WriterConfig   `yaml:"redis_pubsub"`
 }

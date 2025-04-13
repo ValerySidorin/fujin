@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/connector/protocol"
 	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/connector/writer"
@@ -19,7 +20,7 @@ var (
 )
 
 type Manager struct {
-	conf Config
+	conf connector.Config
 
 	readers map[string]reader.Reader
 	wpoolms map[string]map[string]*pool.Pool // a map of writer pools grouped by topic and writer ID
@@ -32,7 +33,7 @@ type Manager struct {
 	l *slog.Logger
 }
 
-func NewManager(conf Config, l *slog.Logger) *Manager {
+func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 	cman := &Manager{
 		conf: conf,
 
@@ -155,8 +156,6 @@ func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	switch conf.Protocol {
 	case protocol.Kafka:
 		return conf.Kafka.Endpoint == w.Endpoint()
-	case protocol.NatsStreaming:
-		return conf.Nats.URL == w.Endpoint()
 	case protocol.AMQP091:
 		return conf.AMQP091.Conn.URL == w.Endpoint()
 	}

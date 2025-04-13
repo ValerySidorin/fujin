@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 )
 
 const (

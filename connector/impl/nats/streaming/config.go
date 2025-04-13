@@ -1,4 +1,4 @@
-package nats
+package streaming
 
 import (
 	"github.com/ValerySidorin/fujin/connector/cerr"

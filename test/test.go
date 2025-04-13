@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -23,10 +24,10 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
 	writer_config "github.com/ValerySidorin/fujin/connector/writer/config"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
 	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin"
-	"github.com/ValerySidorin/fujin/server/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/server/fujin/proto/response"
 	"github.com/quic-go/quic-go"
 )
 
@@ -73,7 +74,7 @@ var DefaultTestConfigWithNats = config.Config{
 	Connectors: connector.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
-				Protocol: "nats",
+				Protocol: "nats_streaming",
 				NatsStreaming: nats_streaming.ReaderConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
@@ -82,8 +83,8 @@ var DefaultTestConfigWithNats = config.Config{
 		},
 		Writers: map[string]writer_config.Config{
 			"pub": {
-				Protocol: "nats",
-				Nats: nats_streaming.WriterConfig{
+				Protocol: "nats_streaming",
+				NatsStreaming: nats_streaming.WriterConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -224,7 +225,14 @@ func RunDefaultServerWithRedisPubSub(ctx context.Context) *server.Server {
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {
-	s, _ := server.NewServer(conf, slog.New(slog.DiscardHandler))
+	// logger := slog.New(slog.DiscardHandler)
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+	}))
+
+	s, _ := server.NewServer(conf, logger)
 
 	go func() {
 		if err := s.ListenAndServe(ctx); err != nil {

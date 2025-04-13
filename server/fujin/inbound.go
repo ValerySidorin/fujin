@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/server/fujin/pool"
-	"github.com/ValerySidorin/fujin/server/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/quic-go/quic-go"
 )
 

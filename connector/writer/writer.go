@@ -29,7 +29,7 @@ func NewWriter(conf config.Config, writerID string, l *slog.Logger) (Writer, err
 	case protocol.Kafka:
 		return kafka.NewWriter(conf.Kafka, writerID, l)
 	case protocol.NatsStreaming:
-		return nats_streaming.NewWriter(conf.Nats, l)
+		return nats_streaming.NewWriter(conf.NatsStreaming, l)
 	case protocol.AMQP091:
 		return amqp091.NewWriter(conf.AMQP091, l)
 	case protocol.AMQP10:
