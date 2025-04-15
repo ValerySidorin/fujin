@@ -54,7 +54,6 @@ connectors:
     #     topic: my_pub_topic
     #     group: fujin
     #     allow_auto_topic_creation: true
-    #     disable_auto_commit: false
     #     max_poll_records: 0
     #     fetch_isolation_level: read_commited # read_uncommited/read_uncommited
     # sub:
