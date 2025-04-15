@@ -25,7 +25,7 @@ type Manager struct {
 	readers map[string]reader.Reader
 	wpoolms map[string]map[string]*pool.Pool // a map of writer pools grouped by topic and writer ID
 
-	getReaderFuncs map[string]func(name string) (reader.Reader, error)
+	getReaderFuncs map[string]func(name string, autoCommit bool) (reader.Reader, error)
 
 	cmu sync.RWMutex
 	pmu sync.RWMutex
@@ -43,7 +43,7 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 		l: l,
 	}
 
-	getReaderFuncs := make(map[string]func(name string) (reader.Reader, error), len(conf.Readers))
+	getReaderFuncs := make(map[string]func(name string, autoCommit bool) (reader.Reader, error), len(conf.Readers))
 	for name, conf := range conf.Readers {
 		if conf.Reusable {
 			getReaderFuncs[name] = cman.getReaderReuse
@@ -64,13 +64,13 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 	return cman
 }
 
-func (m *Manager) GetReader(name string) (reader.Reader, error) {
+func (m *Manager) GetReader(name string, autoCommit bool) (reader.Reader, error) {
 	f, ok := m.getReaderFuncs[name]
 	if !ok {
 		return nil, fmt.Errorf("reader func not found for name: %s", name)
 	}
 
-	return f(name)
+	return f(name, autoCommit)
 }
 
 func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
@@ -163,7 +163,7 @@ func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	return false
 }
 
-func (m *Manager) getReaderReuse(name string) (reader.Reader, error) {
+func (m *Manager) getReaderReuse(name string, autoCommit bool) (reader.Reader, error) {
 	m.cmu.RLock()
 	r, ok := m.readers[name]
 	if ok {
@@ -184,7 +184,7 @@ func (m *Manager) getReaderReuse(name string) (reader.Reader, error) {
 		return nil, ErrReaderNotFound
 	}
 
-	r, err := reader.New(conf, m.l)
+	r, err := reader.New(conf, autoCommit, m.l)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
@@ -192,13 +192,13 @@ func (m *Manager) getReaderReuse(name string) (reader.Reader, error) {
 	return r, nil
 }
 
-func (m *Manager) getReaderNoReuse(name string) (reader.Reader, error) {
+func (m *Manager) getReaderNoReuse(name string, autoCommit bool) (reader.Reader, error) {
 	conf, ok := m.conf.Readers[name]
 	if !ok {
 		return nil, ErrReaderNotFound
 	}
 
-	r, err := reader.New(conf, m.l)
+	r, err := reader.New(conf, autoCommit, m.l)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
 	}

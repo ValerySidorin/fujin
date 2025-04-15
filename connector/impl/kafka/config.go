@@ -19,7 +19,6 @@ type ReaderConfig struct {
 	Topic                  string         `yaml:"topic"`
 	Group                  string         `yaml:"group"`
 	AllowAutoTopicCreation bool           `yaml:"allow_auto_topic_creation"`
-	DisableAutoCommit      bool           `yaml:"disable_auto_commit"`
 	MaxPollRecords         int            `yaml:"max_poll_records"`
 	FetchIsolationLevel    IsolationLevel `yaml:"fetch_isolation_level"`
 }

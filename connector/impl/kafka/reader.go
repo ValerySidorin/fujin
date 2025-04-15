@@ -16,13 +16,14 @@ type Reader struct {
 	conf ReaderConfig
 	cl   *kgo.Client
 
-	handler  func(r *kgo.Record, h func(message []byte, args ...any))
-	fetching atomic.Bool
+	handler    func(r *kgo.Record, h func(message []byte, args ...any))
+	fetching   atomic.Bool
+	autoCommit bool
 
 	l *slog.Logger
 }
 
-func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
+func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(conf.Brokers...),
 		kgo.ConsumeTopics(conf.Topic),
@@ -33,7 +34,7 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 		opts = append(opts, kgo.AllowAutoTopicCreation())
 	}
 
-	if conf.DisableAutoCommit {
+	if !autoCommit {
 		opts = append(opts, kgo.DisableAutoCommit())
 	}
 
@@ -47,13 +48,14 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}
 
 	reader := &Reader{
-		conf:     conf,
-		cl:       client,
-		fetching: atomic.Bool{},
-		l:        l.With("reader_type", "kafka"),
+		conf:       conf,
+		cl:         client,
+		fetching:   atomic.Bool{},
+		autoCommit: autoCommit,
+		l:          l.With("reader_type", "kafka"),
 	}
 
-	if !conf.DisableAutoCommit {
+	if !autoCommit {
 		reader.handler = func(r *kgo.Record, h func(message []byte, args ...any)) {
 			h(r.Value)
 		}
@@ -168,7 +170,7 @@ func (r *Reader) MessageMetaLen() byte {
 }
 
 func (r *Reader) IsAutoCommit() bool {
-	return !r.conf.DisableAutoCommit
+	return r.autoCommit
 }
 
 func (r *Reader) Close() {

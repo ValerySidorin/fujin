@@ -18,10 +18,12 @@ type Reader struct {
 	session  *amqp.Session
 	receiver *amqp.Receiver
 
+	autoCommit bool
+
 	l *slog.Logger
 }
 
-func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
+func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
 	conn, err := amqp.Dial(context.Background(), conf.Conn.Addr, &amqp.ConnOptions{
 		ContainerID:  conf.Conn.ContainerID,
 		HostName:     conf.Conn.HostName,
@@ -42,6 +44,11 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 		return nil, fmt.Errorf("amqp10: new session: %w", err)
 	}
 
+	settlementMode := amqp.ReceiverSettleModeFirst
+	if !autoCommit {
+		settlementMode = amqp.ReceiverSettleModeSecond
+	}
+
 	receiver, err := session.NewReceiver(context.Background(), conf.Receiver.Source, &amqp.ReceiverOptions{
 		Credit:                    conf.Receiver.Credit,
 		Durability:                conf.Receiver.Durability,
@@ -52,7 +59,7 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 		Name:                      conf.Receiver.Name,
 		Properties:                conf.Receiver.Properties,
 		RequestedSenderSettleMode: conf.Receiver.RequestedSenderSettleMode,
-		SettlementMode:            conf.Receiver.SettlementMode,
+		SettlementMode:            &settlementMode,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("amqp10: new receiver: %w", err)
@@ -140,7 +147,7 @@ func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
 }
 
 func (r *Reader) IsAutoCommit() bool {
-	return r.conf.Receiver.SettlementMode == nil || *r.conf.Receiver.SettlementMode == amqp.ReceiverSettleModeFirst
+	return r.autoCommit
 }
 
 func (r *Reader) Close() {

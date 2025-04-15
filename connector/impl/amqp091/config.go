@@ -45,7 +45,6 @@ type QueueBindConfig struct {
 
 type ConsumeConfig struct {
 	Consumer  string        `yaml:"consumer"`
-	AutoAck   bool          `yaml:"auto_ack"`
 	Exclusive bool          `yaml:"exclusive"`
 	NoLocal   bool          `yaml:"no_local"`
 	NoWait    bool          `yaml:"no_wait"`

@@ -37,16 +37,16 @@ type Reader interface {
 	Close()
 }
 
-func New(conf config.Config, l *slog.Logger) (Reader, error) {
+func New(conf config.Config, autoCommit bool, l *slog.Logger) (Reader, error) {
 	switch conf.Protocol {
 	case protocol.Kafka:
-		return kafka.NewReader(conf.Kafka, l)
+		return kafka.NewReader(conf.Kafka, autoCommit, l)
 	case protocol.NatsStreaming:
 		return nats_streaming.NewReader(conf.NatsStreaming, l)
 	case protocol.AMQP091:
-		return amqp091.NewReader(conf.AMQP091, l)
+		return amqp091.NewReader(conf.AMQP091, autoCommit, l)
 	case protocol.AMQP10:
-		return amqp10.NewReader(conf.AMQP10, l)
+		return amqp10.NewReader(conf.AMQP10, autoCommit, l)
 	case protocol.RedisPubSub:
 		return redis_pubsub.NewReader(conf.RedisPubSub, l)
 	}

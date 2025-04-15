@@ -15,13 +15,14 @@ type Reader struct {
 	conf ReaderConfig
 	mu   sync.Mutex
 
-	conn    *amqp.Connection
-	channel *amqp.Channel
+	conn       *amqp.Connection
+	channel    *amqp.Channel
+	autoCommit bool
 
 	l *slog.Logger
 }
 
-func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
+func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
 	conn, err := amqp.DialConfig(conf.Conn.URL, amqp.Config{
 		Vhost:      conf.Conn.Vhost,
 		ChannelMax: conf.Conn.ChannelMax,
@@ -33,9 +34,10 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}
 
 	return &Reader{
-		conf: conf,
-		conn: conn,
-		l:    l,
+		conf:       conf,
+		conn:       conn,
+		autoCommit: autoCommit,
+		l:          l,
 	}, nil
 }
 
@@ -100,7 +102,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	msgs, err := r.channel.Consume(
 		r.conf.Queue.Name,
 		r.conf.Consume.Consumer,
-		r.conf.Consume.AutoAck,
+		r.autoCommit,
 		r.conf.Consume.Exclusive,
 		r.conf.Consume.NoLocal,
 		r.conf.Consume.NoWait,
@@ -166,7 +168,7 @@ func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
 }
 
 func (r *Reader) IsAutoCommit() bool {
-	return r.conf.Consume.AutoAck
+	return r.autoCommit
 }
 
 func (r *Reader) Close() {

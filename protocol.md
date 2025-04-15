@@ -14,7 +14,7 @@ The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylR
 
 Before describing the commands, let's explore the data types used in the Fujin protocol.
 
-| Type   | Length                | Example                                 | Representation              |
+| Type   | Length (bytes)        | Example                                 | Representation              |
 |--------|-----------------------|-----------------------------------------| --------------------------- |
 | byte   | 1                     | `[12]`                                  | `0x0C`                      |
 | uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
@@ -169,23 +169,23 @@ Client opens QUIC stream and initiates a subscription to a topic. Messages will 
 
 ### Syntax
 ##### Request
-`[2, <type>, <topic>]`  
+`[2, <type>, <auto commit>, <topic>]`  
 where:
-| name    | description                                                     | type   | required |
-| ------- | --------------------------------------------------------------- | ------ | -------- |
-| `topic` | Topic to read from.                                             | string | true     |
-| `type`  | Type of reader: `1` — subscriber (push), `2` — consumer (pull). | byte   | true     |
+| name             | description                                                     | type   | required |
+| ---------------- | --------------------------------------------------------------- | ------ | -------- |
+| `type`           | Type of reader: `1` — subscriber (push), `2` — consumer (pull). | byte   | true     |
+| `auto commit`    | Connect with auto commit.                                       | bool   | true     |
+| `topic`          | Topic to read from.                                             | string | true     |
 ##### Response
-`[1, <is auto commit>, <message meta length>, <error code>, <error payload>]`  
+`[1, <message meta length>, <error code>, <error payload>]`  
 where:
 | name                  | description                                          |  type  | presence |
 | --------------------- | ---------------------------------------------------- | ------ | -------- |
-| `is auto commit`      | Topic is configured as auto commit.                  | bool   | always   |
 | `message meta length` | Message meta length. Used to pass in commit request. | byte   | always   |
 | `error code`          | Error code. 0 is no error. 1 is error.               | byte   | always   |
 | `error payload`       | Error payload text.                                  | string | optional |
 ### Examples
-- `[2, 0, 0, 0, 3, 112, 117, 98, 0]` -> `[1, 0, 0, 0]`
+- `[2, 1, 0, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0]`
 ## MSG
 
 ### Direction

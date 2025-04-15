@@ -76,6 +76,8 @@ var (
 	ErrWriterCanNotBeReusedInTx = errors.New("writer can not be reuse in tx")
 	ErrFetchArgNotProvided      = errors.New("fetch arg not provided")
 
+	ErrConnectReaderIsAutoCommitArgInvalid = errors.New("connect reader is auto commit arg invalid")
+
 	ErrInvalidTxState = errors.New("invalid tx state")
 )
 
@@ -116,8 +118,9 @@ type writeMsgArgs struct {
 }
 
 type connectReaderArgs struct {
-	size uint32
-	typ  byte
+	size       uint32
+	typ        byte
+	autoCommit bool
 }
 
 type connectWriterArgs struct {
@@ -134,10 +137,10 @@ type handler struct {
 	sessionState sessionState
 
 	// producer
-	writerID            string
-	nonTxSessionWriters map[string]writer.Writer
-	currentTxWriter     writer.Writer
-	currentTxWriterPub  string
+	writerID             string
+	nonTxSessionWriters  map[string]writer.Writer
+	currentTxWriter      writer.Writer
+	currentTxWriterTopic string
 
 	// consumer/subscriber
 	sessionReader           reader.Reader
@@ -217,10 +220,8 @@ func (h *handler) handle(buf []byte) error {
 							h.cman.PutWriter(w, pub, "")
 						}
 						if h.currentTxWriter != nil {
-							if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
-								h.l.Error("rollback tx", "err", err)
-							}
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+							h.currentTxWriter.RollbackTx(h.ctx)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 							h.currentTxWriter = nil
 						}
 						h.out.EnqueueProto(response.DISCONNECT_RESP)
@@ -664,8 +665,8 @@ func (h *handler) handle(buf []byte) error {
 				pool.Put(h.ps.argBuf)
 				h.enqueueWriteErrResponse(ErrParseProto)
 				pool.Put(h.ps.ca.cID)
-				h.ps.argBuf, h.ps.ca.cID, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
-				continue
+				h.close()
+				return ErrParseProto
 			}
 		case OP_WRITE_TX_MSG_ARG:
 			if h.ps.argBuf == nil {
@@ -715,7 +716,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						h.currentTxWriter, err = h.cman.GetWriter(h.ps.wa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.wa.topic, h.writerID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -724,14 +725,15 @@ func (h *handler) handle(buf []byte) error {
 							continue
 						}
 
-						if err := h.currentTxWriter.BeginTx(h.ctx); err != nil {
+						if err := currentTxWriter.BeginTx(h.ctx); err != nil {
 							h.l.Error("begin tx", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
 
-						h.currentTxWriterPub = h.ps.wa.topic
+						h.currentTxWriter, h.currentTxWriterTopic = currentTxWriter, h.ps.wa.topic
 					}
 
 					h.produceTx(h.ps.payloadBuf)
@@ -745,7 +747,7 @@ func (h *handler) handle(buf []byte) error {
 				if len(h.ps.payloadBuf) >= int(h.ps.wma.size) {
 					if h.currentTxWriter != nil {
 						if !h.cman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.wa.topic) {
-							h.l.Error("writer can not be reused in tx")
+							h.l.Error("writer can not be reused in tx1")
 							h.enqueueWriteErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ca.cID)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
@@ -753,7 +755,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						h.currentTxWriter, err = h.cman.GetWriter(h.ps.wa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.wa.topic, h.writerID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -762,14 +764,15 @@ func (h *handler) handle(buf []byte) error {
 							continue
 						}
 
-						if err := h.currentTxWriter.BeginTx(h.ctx); err != nil {
+						if err := currentTxWriter.BeginTx(h.ctx); err != nil {
 							h.l.Error("begin tx", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
 
-						h.currentTxWriterPub = h.ps.wa.topic
+						h.currentTxWriter, h.currentTxWriterTopic = currentTxWriter, h.ps.wa.topic
 					}
 
 					h.produceTx(h.ps.payloadBuf)
@@ -881,16 +884,14 @@ func (h *handler) handle(buf []byte) error {
 					if h.currentTxWriter != nil {
 						if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
 							h.enqueueTxCommitErr(h.ps.ca.cID, err)
-							h.l.Error("commit tx", "err", err)
 							pool.Put(h.ps.ca.cID)
 							h.ps.ca.cID, h.ps.state = nil, OP_START // We are keeping transaction opened here?
 							continue
 						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 						h.currentTxWriter = nil
 					}
 					h.enqueueTxCommitSuccess(h.ps.ca.cID)
-					fmt.Println("success commit")
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.sessionState, h.ps.state = nil, SESSION_STATE_WRITER, OP_START
 				}
@@ -955,13 +956,13 @@ func (h *handler) handle(buf []byte) error {
 					if h.currentTxWriter != nil {
 						if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
 							h.enqueueTxRollbackErr(h.ps.ca.cID, err)
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 							pool.Put(h.ps.ca.cID)
 							// We are not keeping tx opened here after rollback error
 							h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, SESSION_STATE_WRITER, OP_START
 							continue
 						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterPub, h.writerID)
+						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 						h.currentTxWriter = nil
 					}
 					h.enqueueTxRollbackSuccess(h.ps.ca.cID)
@@ -1052,11 +1053,20 @@ func (h *handler) handle(buf []byte) error {
 				}
 			}
 		case OP_CONNECT_READER:
-			if err := h.parseReaderTypeArg(b); err != nil {
+			if h.ps.cra.typ == 0 {
+				if err := h.parseReaderTypeArg(b); err != nil {
+					enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+					h.close()
+					return err
+				}
+				continue
+			}
+			if err := h.parseReaderIsAutoCommitArg(b); err != nil {
 				enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
 				h.close()
 				return err
 			}
+
 			h.ps.argBuf = pool.Get(fujin.Uint32Len)
 			h.ps.state = OP_CONNECT_READER_ARG
 		case OP_CONNECT_READER_ARG:
@@ -1097,7 +1107,7 @@ func (h *handler) handle(buf []byte) error {
 
 					h.sessionState = SESSION_STATE_READER
 
-					r, err := h.cman.GetReader(sub)
+					r, err := h.cman.GetReader(sub, h.ps.cra.autoCommit)
 					if err != nil {
 						return fmt.Errorf("get reader: %w", err)
 					}
@@ -1105,7 +1115,7 @@ func (h *handler) handle(buf []byte) error {
 					h.sessionReaderMsgMetaLen = int(r.MessageMetaLen())
 					readerType := reader.ReaderType(h.ps.cra.typ)
 
-					enqueueConnectSuccess(h.out, r)
+					enqueueConnectReaderSuccess(h.out, r)
 					h.sessionReader = r
 
 					h.wg.Add(1)
@@ -1293,6 +1303,18 @@ func (h *handler) parseReaderTypeArg(b byte) error {
 	return nil
 }
 
+func (h *handler) parseReaderIsAutoCommitArg(b byte) error {
+	switch b {
+	case 0:
+	case 1:
+		h.ps.cra.autoCommit = true
+	default:
+		return ErrConnectReaderIsAutoCommitArgInvalid
+	}
+
+	return nil
+}
+
 func (h *handler) flushWriters() error {
 	for _, sw := range h.nonTxSessionWriters {
 		// TODO: on flush err return fail
@@ -1372,17 +1394,12 @@ func (h *handler) enqueueTxRollbackErr(cID []byte, err error) {
 	h.out.EnqueueProtoMulti(h.txRollbackErrRespTemplate, errProtoBuf(err))
 }
 
-func enqueueConnectSuccess(out *fujin.Outbound, r reader.Reader) {
-	var autoCommit byte
-	if r.IsAutoCommit() {
-		autoCommit = 1
-	}
-
+func enqueueConnectReaderSuccess(out *fujin.Outbound, r reader.Reader) {
 	sbuf := pool.Get(fujin.Uint32Len)
 	defer pool.Put(sbuf)
 	sbuf = append(sbuf,
 		byte(response.RESP_CODE_CONNECT_READER),
-		autoCommit, byte(r.MessageMetaLen()),
+		byte(r.MessageMetaLen()),
 		byte(response.ERR_CODE_NO),
 	)
 	out.EnqueueProto(sbuf)
@@ -1414,8 +1431,8 @@ func enqueueMsgFunc(out *fujin.Outbound, r reader.Reader, constLen int) func(mes
 func enqueueConnectReaderErr(out *fujin.Outbound, respCode response.RespCode, errCode response.ErrCode, err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
-	buf := pool.Get(8 + errLen) // cmd (1) + auto commit (1) + msg meta len (1) + err code (1) + err len (4) + err payload (errLen)
-	buf = append(buf, byte(respCode), 0, 0, byte(errCode))
+	buf := pool.Get(7 + errLen) // cmd (1)  + msg meta len (1) + err code (1) + err len (4) + err payload (errLen)
+	buf = append(buf, byte(respCode), 0, byte(errCode))
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
 	buf = append(buf,
 		unsafe.Slice((*byte)(unsafe.Pointer((*[2]uintptr)(unsafe.Pointer(&errPayload))[0])), len(errPayload))...)

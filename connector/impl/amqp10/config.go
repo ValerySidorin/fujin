@@ -43,17 +43,16 @@ type SenderConfig struct {
 }
 
 type ReceiverConfig struct {
-	Source                    string                   `yaml:"source"`
-	Credit                    int32                    `yaml:"credit"`
-	Durability                amqp.Durability          `yaml:"durability"`
-	DynamicAddress            bool                     `yaml:"dynamic_address"`
-	ExpiryPolicy              amqp.ExpiryPolicy        `yaml:"expiry_policy"`
-	ExpiryTimeout             uint32                   `yaml:"expiry_timeout"`
-	Filters                   []amqp.LinkFilter        `yaml:"filters"`
-	Name                      string                   `yaml:"name"`
-	Properties                map[string]any           `yaml:"properties"`
-	RequestedSenderSettleMode *amqp.SenderSettleMode   `yaml:"requested_sender_settle_mode"`
-	SettlementMode            *amqp.ReceiverSettleMode `yaml:"settlement_mode"`
+	Source                    string                 `yaml:"source"`
+	Credit                    int32                  `yaml:"credit"`
+	Durability                amqp.Durability        `yaml:"durability"`
+	DynamicAddress            bool                   `yaml:"dynamic_address"`
+	ExpiryPolicy              amqp.ExpiryPolicy      `yaml:"expiry_policy"`
+	ExpiryTimeout             uint32                 `yaml:"expiry_timeout"`
+	Filters                   []amqp.LinkFilter      `yaml:"filters"`
+	Name                      string                 `yaml:"name"`
+	Properties                map[string]any         `yaml:"properties"`
+	RequestedSenderSettleMode *amqp.SenderSettleMode `yaml:"requested_sender_settle_mode"`
 }
 
 type SendConfig struct {

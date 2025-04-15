@@ -115,7 +115,6 @@ var DefaultTestConfigWithAMQP091 = config.Config{
 					},
 					Consume: amqp091.ConsumeConfig{
 						Consumer: "fujin",
-						AutoAck:  true,
 					},
 				},
 			},

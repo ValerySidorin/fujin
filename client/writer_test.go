@@ -139,8 +139,8 @@ func TestWrite(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	// NATS streaming does not support transactions, so Fujin will return ok results anyway
-	// We are testing request-response logic here
+	// Begin transaction will not open transaction in underlying broker straight away.
+	// So it will return ok even with NATS under the hood.
 	t.Run("begin tx", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -165,6 +165,8 @@ func TestWrite(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// Commit transaction will do nothing, if no messages are written in it.
+	// So it will return ok even with NATS under the hood.
 	t.Run("commit tx", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -192,6 +194,8 @@ func TestWrite(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// Rollback transaction will do nothing, if no messages are written in it.
+	// So it will return ok even with NATS under the hood.
 	t.Run("rollback tx", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -217,6 +221,34 @@ func TestWrite(t *testing.T) {
 
 		err = writer.RollbackTx()
 		assert.NoError(t, err)
+	})
+
+	// Write to NATS in transaction will return 'begin tx' error, because is is not supported.
+	t.Run("write msg in tx", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		_, shutdown := RunTestServer(ctx)
+		defer shutdown()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+
+		err = writer.BeginTx()
+		assert.NoError(t, err)
+
+		err = writer.Write("pub", []byte("test data1"))
+		assert.Error(t, err)
 	})
 
 	t.Run("commit tx invalid tx state", func(t *testing.T) {

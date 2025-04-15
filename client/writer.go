@@ -102,6 +102,7 @@ func (w *Writer) Write(topic string, p []byte) error {
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(p)))
 	buf = append(buf, p...)
 
+	fmt.Println("write:", buf)
 	w.out.EnqueueProto(buf)
 
 	select {
@@ -116,12 +117,10 @@ func (w *Writer) BeginTx() error {
 	return w.sendTxCmd(byte(request.OP_CODE_TX_BEGIN))
 }
 
-// TODO: Fix
 func (w *Writer) CommitTx() error {
 	return w.sendTxCmd(byte(request.OP_CODE_TX_COMMIT))
 }
 
-// TODO: Fix
 func (w *Writer) RollbackTx() error {
 	return w.sendTxCmd(byte(request.OP_CODE_TX_ROLLBACK))
 }
@@ -163,6 +162,7 @@ func (w *Writer) sendTxCmd(cmd byte) error {
 	buf = append(buf, cmd)
 	buf = binary.BigEndian.AppendUint32(buf, id)
 
+	fmt.Println("write:", buf)
 	w.out.EnqueueProto(buf)
 
 	select {
@@ -184,6 +184,7 @@ func (w *Writer) readLoop() {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
+					fmt.Println("read:", buf[:n])
 					err = w.parse(buf[:n])
 					if err != nil {
 						w.conn.l.Error("writer read loop", "err", err)
@@ -198,6 +199,7 @@ func (w *Writer) readLoop() {
 			continue
 		}
 
+		fmt.Println("read:", buf[:n])
 		err = w.parse(buf[:n])
 		if err != nil {
 			w.conn.l.Error("writer read loop", "err", err)
