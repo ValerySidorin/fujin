@@ -1109,6 +1109,7 @@ func (h *handler) handle(buf []byte) error {
 
 					r, err := h.cman.GetReader(sub, h.ps.cra.autoCommit)
 					if err != nil {
+						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
 						return fmt.Errorf("get reader: %w", err)
 					}
 

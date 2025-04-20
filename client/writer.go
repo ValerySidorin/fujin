@@ -27,7 +27,7 @@ type Writer struct {
 	r   quic.Stream
 	out *fujin.Outbound
 
-	cm *defaultCorrelationManager
+	cm *correlator
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
@@ -45,7 +45,7 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 
 	stream, err := c.qconn.OpenStream()
 	if err != nil {
-		return nil, fmt.Errorf("quic: open stream: %w", err)
+		return nil, fmt.Errorf("open stream: %w", err)
 	}
 
 	buf := pool.Get(5)
@@ -57,7 +57,7 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 
 	if _, err := stream.Write(buf); err != nil {
 		stream.Close()
-		return nil, fmt.Errorf("quic: write connect writer: %w", err)
+		return nil, fmt.Errorf("write connect writer: %w", err)
 	}
 
 	out := fujin.NewOutbound(stream, c.wdl, c.l)
@@ -67,7 +67,7 @@ func (c *Conn) ConnectWriter(id string) (*Writer, error) {
 		out:          out,
 		r:            stream,
 		ps:           &parseState{},
-		cm:           newDefaultCorrelationManager(),
+		cm:           newCorrelator(),
 		disconnectCh: make(chan struct{}),
 	}
 
@@ -89,7 +89,7 @@ func (w *Writer) Write(topic string, p []byte) error {
 	buf := pool.Get(len(topic) + len(p) + 13)
 	defer pool.Put(buf)
 
-	ch := make(chan error, 1)
+	ch := make(chan model, 1)
 	defer close(ch)
 
 	id := w.cm.next(ch)
@@ -102,14 +102,13 @@ func (w *Writer) Write(topic string, p []byte) error {
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(p)))
 	buf = append(buf, p...)
 
-	fmt.Println("write:", buf)
 	w.out.EnqueueProto(buf)
 
 	select {
 	case <-time.After(w.conn.timeout):
 		return ErrTimeout
-	case err := <-ch:
-		return err
+	case m := <-ch:
+		return m.err
 	}
 }
 
@@ -153,7 +152,7 @@ func (w *Writer) sendTxCmd(cmd byte) error {
 	buf := pool.Get(5)
 	defer pool.Put(buf)
 
-	ch := make(chan error, 1)
+	ch := make(chan model, 1)
 	defer close(ch)
 
 	id := w.cm.next(ch)
@@ -162,14 +161,13 @@ func (w *Writer) sendTxCmd(cmd byte) error {
 	buf = append(buf, cmd)
 	buf = binary.BigEndian.AppendUint32(buf, id)
 
-	fmt.Println("write:", buf)
 	w.out.EnqueueProto(buf)
 
 	select {
 	case <-time.After(w.conn.timeout):
 		return ErrTimeout
-	case err := <-ch:
-		return err
+	case m := <-ch:
+		return m.err
 	}
 }
 
@@ -184,7 +182,6 @@ func (w *Writer) readLoop() {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
-					fmt.Println("read:", buf[:n])
 					err = w.parse(buf[:n])
 					if err != nil {
 						w.conn.l.Error("writer read loop", "err", err)
@@ -199,7 +196,6 @@ func (w *Writer) readLoop() {
 			continue
 		}
 
-		fmt.Println("read:", buf[:n])
 		err = w.parse(buf[:n])
 		if err != nil {
 			w.conn.l.Error("writer read loop", "err", err)
@@ -262,7 +258,7 @@ func (w *Writer) parse(buf []byte) error {
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
-				w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), nil)
+				w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{})
 				pool.Put(w.ps.ca.cID)
 				w.ps.ca, w.ps.state = correlationIDArg{}, OP_START
 				continue
@@ -276,7 +272,7 @@ func (w *Writer) parse(buf []byte) error {
 		case OP_ERROR_PAYLOAD_ARG:
 			w.ps.argBuf = append(w.ps.argBuf, b)
 			if len(w.ps.argBuf) >= fujin.Uint32Len {
-				if err := w.parseWriteErrLenArg(); err != nil {
+				if err := w.parseErrLenArg(); err != nil {
 					pool.Put(w.ps.argBuf)
 					pool.Put(w.ps.ca.cID)
 					w.r.Close()
@@ -287,7 +283,7 @@ func (w *Writer) parse(buf []byte) error {
 			}
 		case OP_ERROR_PAYLOAD:
 			if w.ps.payloadBuf != nil {
-				toCopy := int(w.ps.wma.errLen) - len(w.ps.payloadBuf)
+				toCopy := int(w.ps.ea.errLen) - len(w.ps.payloadBuf)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -303,17 +299,19 @@ func (w *Writer) parse(buf []byte) error {
 					w.ps.payloadBuf = append(w.ps.payloadBuf, b)
 				}
 
-				if len(w.ps.payloadBuf) >= int(w.ps.wma.errLen) {
-					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
-					w.ps.ca.cID, w.ps.payloadBuf, w.ps.wma, w.ps.state = nil, nil, writeMessageArg{}, OP_START
+				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
+					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{err: errors.New(string(w.ps.payloadBuf))})
+					pool.Put(w.ps.payloadBuf)
+					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
 				}
 			} else {
-				w.ps.payloadBuf = pool.Get(int(w.ps.wma.errLen))
+				w.ps.payloadBuf = pool.Get(int(w.ps.ea.errLen))
 				w.ps.payloadBuf = append(w.ps.payloadBuf, b)
 
-				if len(w.ps.payloadBuf) >= int(w.ps.wma.errLen) {
-					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), errors.New(string(w.ps.payloadBuf)))
-					w.ps.ca.cID, w.ps.payloadBuf, w.ps.wma, w.ps.state = nil, nil, writeMessageArg{}, OP_START
+				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
+					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{err: errors.New(string(w.ps.payloadBuf))})
+					pool.Put(w.ps.payloadBuf)
+					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
 				}
 			}
 		case OP_TX_BEGIN:
@@ -337,9 +335,9 @@ func (w *Writer) parse(buf []byte) error {
 	return nil
 }
 
-func (w *Writer) parseWriteErrLenArg() error {
-	w.ps.wma.errLen = binary.BigEndian.Uint32(w.ps.argBuf[0:fujin.Uint32Len])
-	if w.ps.wma.errLen == 0 {
+func (w *Writer) parseErrLenArg() error {
+	w.ps.ea.errLen = binary.BigEndian.Uint32(w.ps.argBuf[0:fujin.Uint32Len])
+	if w.ps.ea.errLen == 0 {
 		return ErrParseProto
 	}
 

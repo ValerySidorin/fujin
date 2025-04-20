@@ -38,11 +38,9 @@ func TestConnectWriter(t *testing.T) {
 		t.Fatalf("failed to connect writer: %v", err)
 	}
 	defer writer.Close()
-
-	time.Sleep(5 * time.Second)
 }
 
-func TestWrite(t *testing.T) {
+func TestWriter(t *testing.T) {
 	t.Run("success with id", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

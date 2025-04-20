@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-func TestDefaultCorrelationManager_Next(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error)
+func TestCorrelator_Next(t *testing.T) {
+	manager := newCorrelator()
+	ch := make(chan model)
 
 	id := manager.next(ch)
 
@@ -19,9 +19,9 @@ func TestDefaultCorrelationManager_Next(t *testing.T) {
 	}
 }
 
-func TestDefaultCorrelationManager_Concurrency(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error)
+func TestCorrelator_Concurrency(t *testing.T) {
+	manager := newCorrelator()
+	ch := make(chan model)
 	const goroutines = 100
 
 	done := make(chan struct{})
@@ -47,9 +47,9 @@ func TestDefaultCorrelationManager_Concurrency(t *testing.T) {
 		t.Errorf("Expected %d channels, but got %d", goroutines, len(manager.m))
 	}
 }
-func TestDefaultCorrelationManager_Uint32Max(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error)
+func TestCorrelator_Uint32Max(t *testing.T) {
+	manager := newCorrelator()
+	ch := make(chan model)
 
 	manager.n = ^uint32(0) - 1
 
@@ -76,9 +76,9 @@ func TestDefaultCorrelationManager_Uint32Max(t *testing.T) {
 	}
 }
 
-func TestDefaultCorrelationManager_Delete(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error)
+func TestCorrelator_Delete(t *testing.T) {
+	manager := newCorrelator()
+	ch := make(chan model)
 
 	id := manager.next(ch)
 	manager.delete(id)
@@ -91,8 +91,8 @@ func TestDefaultCorrelationManager_Delete(t *testing.T) {
 	}
 }
 
-func TestDefaultCorrelationManager_DeleteNonExistent(t *testing.T) {
-	manager := newDefaultCorrelationManager()
+func TestCorrelator_DeleteNonExistent(t *testing.T) {
+	manager := newCorrelator()
 
 	manager.delete(12345)
 
@@ -101,21 +101,21 @@ func TestDefaultCorrelationManager_DeleteNonExistent(t *testing.T) {
 	}
 }
 
-func TestDefaultCorrelationManager_EmptyMap(t *testing.T) {
-	manager := newDefaultCorrelationManager()
+func TestCorrelator_EmptyMap(t *testing.T) {
+	manager := newCorrelator()
 
 	if len(manager.m) != 0 {
 		t.Errorf("Expected map to be empty, but it has %d entries", len(manager.m))
 	}
 }
 
-func TestDefaultCorrelationManager_ConcurrentSend(t *testing.T) {
-	manager := newDefaultCorrelationManager()
-	ch := make(chan error, 100)
+func TestCorrelator_ConcurrentSend(t *testing.T) {
+	manager := newCorrelator()
+	ch := make(chan model, 100)
 	id := manager.next(ch)
 
 	const goroutines = 100
-	err := &struct{ error }{}
+	err := model{}
 
 	done := make(chan struct{})
 	for i := 0; i < goroutines; i++ {
@@ -125,7 +125,7 @@ func TestDefaultCorrelationManager_ConcurrentSend(t *testing.T) {
 		}()
 	}
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		select {
 		case <-done:
 		case <-time.After(1 * time.Second):
