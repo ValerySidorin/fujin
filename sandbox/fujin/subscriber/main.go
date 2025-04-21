@@ -12,7 +12,6 @@ import (
 	"math/big"
 	"os"
 	"os/signal"
-	"time"
 
 	"github.com/ValerySidorin/fujin/client"
 )
@@ -36,26 +35,22 @@ func main() {
 
 	defer conn.Close()
 
-	w, err := conn.ConnectWriter("")
+	sub, err := conn.ConnectSubscriber(
+		client.SubscriberConfig{
+			Topic:      "sub",
+			AutoCommit: true,
+			Async:      true,
+		}, func(msg client.Msg) {
+			fmt.Println(string(msg.Payload))
+		})
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer sub.Close()
 
-	fmt.Println("writer connected")
+	fmt.Println("subscriber connected")
 
-	defer w.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if err := w.Write("pub", []byte("hello from fujin client")); err != nil {
-				log.Fatal(err)
-			}
-			time.Sleep(1 * time.Second)
-		}
-	}
+	<-ctx.Done()
 }
 
 func generateTLSConfig() *tls.Config {

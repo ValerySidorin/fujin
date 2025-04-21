@@ -1123,6 +1123,7 @@ func (h *handler) handle(buf []byte) error {
 					go func() {
 						defer h.wg.Done()
 						if err := h.connectReader(r, readerType); err != nil {
+							fmt.Println(err)
 							enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
 							h.close()
 							h.l.Error("subscribe", "err", err)
@@ -1153,8 +1154,8 @@ func (h *handler) connectReader(r reader.Reader, typ reader.ReaderType) error {
 	defer cancel()
 
 	h.disconnect = func() {
-		r.Close()
 		cancel()
+		r.Close()
 		h.out.EnqueueProto(response.DISCONNECT_RESP)
 	}
 
