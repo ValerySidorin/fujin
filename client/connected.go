@@ -12,6 +12,7 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/panjf2000/ants/v2"
 	"github.com/quic-go/quic-go"
 )
 
@@ -21,6 +22,8 @@ type connected struct {
 	ps  *parseState
 	r   quic.Stream
 	out *fujin.Outbound
+
+	pool *ants.Pool
 
 	cm *correlator
 
@@ -150,7 +153,7 @@ func (c *connected) parseConnectReader(buf []byte) (byte, error) {
 	return 0, ErrParseProto
 }
 
-func (c *connected) Close() error {
+func (c *connected) Close(poolReleaseTimeout time.Duration) error {
 	if c.closed.Load() {
 		return nil
 	}
@@ -161,6 +164,12 @@ func (c *connected) Close() error {
 	select {
 	case <-time.After(c.conn.timeout):
 	case <-c.disconnectCh:
+	}
+
+	if c.pool != nil {
+		if err := c.pool.ReleaseTimeout(poolReleaseTimeout); err != nil {
+			return fmt.Errorf("release pool: %w", err)
+		}
 	}
 
 	c.out.Close()

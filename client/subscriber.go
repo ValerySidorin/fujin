@@ -8,20 +8,26 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/panjf2000/ants/v2"
 )
 
 type Subscriber struct {
+	conf SubscriberConfig
 	*connected
 	h func(Msg)
 }
 
-func (c *Conn) ConnectSubscriber(topic string, autoCommit bool, handler func(msg Msg)) (*Subscriber, error) {
+func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (*Subscriber, error) {
 	if c == nil {
 		return nil, ErrConnClosed
 	}
 
 	if c.closed.Load() {
 		return nil, ErrConnClosed
+	}
+
+	if err := conf.ValidateAndSetDefaults(); err != nil {
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
 	stream, err := c.qconn.OpenStream()
@@ -40,24 +46,24 @@ func (c *Conn) ConnectSubscriber(topic string, autoCommit bool, handler func(msg
 		disconnectCh: make(chan struct{}),
 	}
 
-	buf := pool.Get(7 + len(topic))
+	buf := pool.Get(7 + len(conf.Topic))
 	defer pool.Put(buf)
 
 	buf = append(buf,
 		byte(request.OP_CODE_CONNECT_READER),
 		1,
-		boolToByte(autoCommit),
+		boolToByte(conf.AutoCommit),
 	)
 
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
-	buf = append(buf, topic...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(conf.Topic)))
+	buf = append(buf, conf.Topic...)
 
 	if _, err := stream.Write(buf); err != nil {
 		stream.Close()
 		return nil, fmt.Errorf("write connect reader: %w", err)
 	}
 
-	rBuf := pool.Get(512)[:512]
+	rBuf := pool.Get(ReadBufferSize)[:ReadBufferSize]
 	defer pool.Put(rBuf)
 
 	n, err := stream.Read(rBuf)
@@ -74,9 +80,29 @@ func (c *Conn) ConnectSubscriber(topic string, autoCommit bool, handler func(msg
 
 	connected.msgMetaLen = int(msgMetaLen)
 
+	h := func(msg Msg) {
+		handler(msg)
+		pool.Put(msg.Meta)
+		pool.Put(msg.Payload)
+	}
+
 	s := &Subscriber{
 		connected: connected,
-		h:         handler,
+		h:         h,
+	}
+
+	if conf.Async {
+		pool, err := ants.NewPool(conf.Pool.Size)
+		if err != nil {
+			return nil, fmt.Errorf("new pool: %w", err)
+		}
+
+		s.pool = pool
+		s.h = func(msg Msg) {
+			pool.Submit(func() {
+				h(msg)
+			})
+		}
 	}
 
 	s.wg.Add(2)
@@ -91,6 +117,10 @@ func (c *Conn) ConnectSubscriber(topic string, autoCommit bool, handler func(msg
 
 func (s *Subscriber) MsgMetaLen() int {
 	return s.msgMetaLen
+}
+
+func (s *Subscriber) Close() error {
+	return s.connected.Close(s.conf.Pool.ReleaseTimeout)
 }
 
 func (s *Subscriber) parse(buf []byte) error {
@@ -164,12 +194,7 @@ func (s *Subscriber) parse(buf []byte) error {
 						Meta:    s.ps.metaBuf,
 						Payload: s.ps.payloadBuf,
 					})
-					if s.ps.metaBuf != nil {
-						pool.Put(s.ps.metaBuf)
-						s.ps.metaBuf = nil
-					}
-					pool.Put(s.ps.payloadBuf)
-					s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, msgArg{}, OP_START
+					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}
 			} else {
 				s.ps.payloadBuf = pool.Get(int(s.ps.ma.len))
