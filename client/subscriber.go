@@ -82,7 +82,9 @@ func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (
 
 	h := func(msg Msg) {
 		handler(msg)
-		pool.Put(msg.Meta)
+		if msg.Meta != nil {
+			pool.Put(msg.Meta)
+		}
 		pool.Put(msg.Payload)
 	}
 
@@ -205,12 +207,7 @@ func (s *Subscriber) parse(buf []byte) error {
 						Meta:    s.ps.metaBuf,
 						Payload: s.ps.payloadBuf,
 					})
-					if s.ps.metaBuf != nil {
-						pool.Put(s.ps.metaBuf)
-						s.ps.metaBuf = nil
-					}
-					pool.Put(s.ps.payloadBuf)
-					s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, msgArg{}, OP_START
+					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}
 			}
 		default:
