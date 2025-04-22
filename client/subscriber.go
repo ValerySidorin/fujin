@@ -1,9 +1,9 @@
 package client
 
 import (
-	"encoding/binary"
 	"fmt"
 
+	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
@@ -12,73 +12,15 @@ import (
 )
 
 type Subscriber struct {
-	conf SubscriberConfig
-	*connected
+	*clientReader
 	h func(Msg)
 }
 
-func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (*Subscriber, error) {
-	if c == nil {
-		return nil, ErrConnClosed
-	}
-
-	if c.closed.Load() {
-		return nil, ErrConnClosed
-	}
-
-	if err := conf.ValidateAndSetDefaults(); err != nil {
-		return nil, fmt.Errorf("validate config: %w", err)
-	}
-
-	stream, err := c.qconn.OpenStream()
+func (c *Conn) ConnectSubscriber(conf ReaderConfig, handler func(msg Msg)) (*Subscriber, error) {
+	r, err := c.connectReader(conf, reader.Subscriber)
 	if err != nil {
-		return nil, fmt.Errorf("open stream: %w", err)
+		return nil, fmt.Errorf("connect reader: %w", err)
 	}
-
-	out := fujin.NewOutbound(stream, c.wdl, c.l)
-
-	connected := &connected{
-		conn:         c,
-		r:            stream,
-		ps:           &parseState{},
-		out:          out,
-		cm:           newCorrelator(),
-		disconnectCh: make(chan struct{}),
-	}
-
-	buf := pool.Get(7 + len(conf.Topic))
-	defer pool.Put(buf)
-
-	buf = append(buf,
-		byte(request.OP_CODE_CONNECT_READER),
-		1,
-		boolToByte(conf.AutoCommit),
-	)
-
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(conf.Topic)))
-	buf = append(buf, conf.Topic...)
-
-	if _, err := stream.Write(buf); err != nil {
-		stream.Close()
-		return nil, fmt.Errorf("write connect reader: %w", err)
-	}
-
-	rBuf := pool.Get(ReadBufferSize)[:ReadBufferSize]
-	defer pool.Put(rBuf)
-
-	n, err := stream.Read(rBuf)
-	if err != nil {
-		stream.Close()
-		return nil, fmt.Errorf("read connect reader: %w", err)
-	}
-
-	msgMetaLen, err := connected.parseConnectReader(rBuf[:n])
-	if err != nil {
-		stream.Close()
-		return nil, fmt.Errorf("parse connect reader: %w", err)
-	}
-
-	connected.msgMetaLen = int(msgMetaLen)
 
 	h := func(msg Msg) {
 		handler(msg)
@@ -89,8 +31,8 @@ func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (
 	}
 
 	s := &Subscriber{
-		connected: connected,
-		h:         h,
+		clientReader: r,
+		h:            h,
 	}
 
 	if conf.Async {
@@ -101,28 +43,15 @@ func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (
 
 		s.pool = pool
 		s.h = func(msg Msg) {
-			pool.Submit(func() {
+			_ = pool.Submit(func() {
 				h(msg)
 			})
 		}
 	}
 
-	s.wg.Add(2)
-	go s.readLoop(s.parse)
-	go func() {
-		defer s.wg.Done()
-		out.WriteLoop()
-	}()
+	s.start(s.parse)
 
 	return s, nil
-}
-
-func (s *Subscriber) MsgMetaLen() int {
-	return s.msgMetaLen
-}
-
-func (s *Subscriber) Close() error {
-	return s.connected.Close(s.conf.Pool.ReleaseTimeout)
 }
 
 func (s *Subscriber) parse(buf []byte) error {

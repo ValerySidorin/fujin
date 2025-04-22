@@ -12,7 +12,7 @@ import (
 
 func TestConnectSubscriber(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		conf := client.SubscriberConfig{
+		conf := client.ReaderConfig{
 			Topic:      "sub",
 			AutoCommit: true,
 		}
@@ -35,12 +35,10 @@ func TestConnectSubscriber(t *testing.T) {
 			t.Fatalf("failed to connect subscriber: %v", err)
 		}
 		defer subscriber.Close()
-
-		assert.EqualValues(t, 0, subscriber.MsgMetaLen())
 	})
 
 	t.Run("non existing topic", func(t *testing.T) {
-		conf := client.SubscriberConfig{
+		conf := client.ReaderConfig{
 			Topic:      "sub1",
 			AutoCommit: true,
 		}
@@ -63,7 +61,7 @@ func TestConnectSubscriber(t *testing.T) {
 	})
 
 	t.Run("msg sync", func(t *testing.T) {
-		conf := client.SubscriberConfig{
+		conf := client.ReaderConfig{
 			Topic:      "sub",
 			AutoCommit: true,
 		}
@@ -83,13 +81,13 @@ func TestConnectSubscriber(t *testing.T) {
 
 		received := make([]client.Msg, 0)
 
-		_, err = conn.ConnectSubscriber(conf, func(msg client.Msg) {
+		_, _ = conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			received = append(received, msg)
 		})
 
-		nc, err := nats.Connect("localhost:4222")
-		nc.Publish("my_subject", []byte("test message"))
-		nc.Publish("my_subject", []byte("test message"))
+		nc, _ := nats.Connect("localhost:4222")
+		_ = nc.Publish("my_subject", []byte("test message"))
+		_ = nc.Publish("my_subject", []byte("test message"))
 		nc.Flush()
 
 		time.Sleep(1 * time.Second)
@@ -99,7 +97,7 @@ func TestConnectSubscriber(t *testing.T) {
 	})
 
 	t.Run("msg async", func(t *testing.T) {
-		conf := client.SubscriberConfig{
+		conf := client.ReaderConfig{
 			Topic:      "sub",
 			AutoCommit: true,
 			Async:      true,
@@ -120,13 +118,13 @@ func TestConnectSubscriber(t *testing.T) {
 
 		received := make([]client.Msg, 0)
 
-		_, err = conn.ConnectSubscriber(conf, func(msg client.Msg) {
+		_, _ = conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			received = append(received, msg)
 		})
 
-		nc, err := nats.Connect("localhost:4222")
-		nc.Publish("my_subject", []byte("test message"))
-		nc.Publish("my_subject", []byte("test message"))
+		nc, _ := nats.Connect("localhost:4222")
+		_ = nc.Publish("my_subject", []byte("test message"))
+		_ = nc.Publish("my_subject", []byte("test message"))
 		nc.Flush()
 
 		time.Sleep(1 * time.Second)

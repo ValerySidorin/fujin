@@ -36,7 +36,7 @@ func main() {
 	defer conn.Close()
 
 	sub, err := conn.ConnectSubscriber(
-		client.SubscriberConfig{
+		client.ReaderConfig{
 			Topic:      "sub",
 			AutoCommit: true,
 			Async:      true,

@@ -5,9 +5,9 @@ import (
 )
 
 type model struct {
-	msgMetaLen     byte
-	numMsgsInBatch uint32
-	err            error
+	msgMetaLen byte
+	msgs       chan Msg
+	err        error
 }
 
 type correlator struct {

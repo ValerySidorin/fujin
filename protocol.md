@@ -260,7 +260,7 @@ where:
 ### Direction
 Client -> Server
 ## Description
-When connected as a consumer, the client must send a FETCH command to the server to retrieve messages from the current reader stream. The server will respond with a FETCH reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received, while others may return immediately, even if the batch contains zero messages.
+When connected as a consumer, the client must send a `FETCH` command to the server to retrieve messages from the current reader stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
 
 ## Syntax
 ##### Request
@@ -268,16 +268,16 @@ When connected as a consumer, the client must send a FETCH command to the server
 where:
 | name                     | description                                                          | type    | required |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | always   |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | true     |
 | `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
 
 ##### Response
 `[6, <correlation id>, <num messages in batch>, <error code>, <error payload>, <batch of messages>]`  
 where:
-| name                     | description                                                          | type    | required |
+| name                     | description                                                          | type    | presence |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
 | `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
+| `num messages in batch`  | The number of messages the server should send in response.           | uint32  | always   |
 | `error code`             | Error code. 0 is no error. 1 is error.                               | byte    | always   |
 | `error payload`          | Error payload text.                                                  | string  | optional |
 | `batch of messages`      | Just an array of `MSG`s.                                             | string  | optional |

@@ -8,19 +8,19 @@ type PoolConfig struct {
 	ReleaseTimeout time.Duration
 }
 
-type SubscriberConfig struct {
+type ReaderConfig struct {
 	Topic      string
 	AutoCommit bool
 	Async      bool
 	Pool       PoolConfig
 }
 
-func (c *SubscriberConfig) ValidateAndSetDefaults() error {
+func (c *ReaderConfig) ValidateAndSetDefaults() error {
 	if c.Topic == "" {
 		return ErrEmptyTopic
 	}
 
-	if c.Async == true {
+	if c.Async {
 		if c.Pool.Size == 0 {
 			c.Pool.Size = 1000
 		}
