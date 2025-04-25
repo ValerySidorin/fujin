@@ -105,8 +105,8 @@ func TestSubscriber(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		assert.Equal(t, 2, len(received))
-		assert.Equal(t, "test message", string(received[0].Payload))
-		assert.Equal(t, "test message", string(received[1].Payload))
+		assert.Equal(t, "test message", string(received[0].Value))
+		assert.Equal(t, "test message", string(received[1].Value))
 	})
 
 	t.Run("msg async", func(t *testing.T) {
@@ -146,8 +146,8 @@ func TestSubscriber(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		assert.Equal(t, 2, len(received))
-		assert.Equal(t, "test message", string(received[0].Payload))
-		assert.Equal(t, "test message", string(received[1].Payload))
+		assert.Equal(t, "test message", string(received[0].Value))
+		assert.Equal(t, "test message", string(received[1].Value))
 	})
 }
 
@@ -191,8 +191,8 @@ func TestSubscriberKafka(t *testing.T) {
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message", string(received[0].Payload))
-		assert.Equal(t, "test message", string(received[1].Payload))
+		assert.Equal(t, "test message", string(received[0].Value))
+		assert.Equal(t, "test message", string(received[1].Value))
 	})
 
 	t.Run("msg async", func(t *testing.T) {
@@ -235,7 +235,7 @@ func TestSubscriberKafka(t *testing.T) {
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message", string(received[0].Payload))
-		assert.Equal(t, "test message", string(received[1].Payload))
+		assert.Equal(t, "test message", string(received[0].Value))
+		assert.Equal(t, "test message", string(received[1].Value))
 	})
 }

@@ -52,7 +52,6 @@ func (c *Consumer) Fetch(n uint32, handler func(msg Msg)) error {
 	buf = binary.BigEndian.AppendUint32(buf, id)
 	buf = binary.BigEndian.AppendUint32(buf, n)
 
-	fmt.Println("write:", buf)
 	c.out.EnqueueProto(buf)
 
 	select {
@@ -66,10 +65,10 @@ func (c *Consumer) Fetch(n uint32, handler func(msg Msg)) error {
 
 	for msg := range mCh {
 		handler(msg)
-		if msg.Meta != nil {
-			pool.Put(msg.Meta)
+		if msg.meta != nil {
+			pool.Put(msg.meta)
 		}
-		pool.Put(msg.Payload)
+		pool.Put(msg.Value)
 	}
 
 	return nil
@@ -168,9 +167,10 @@ func (c *Consumer) parse(buf []byte) error {
 					pool.Put(c.ps.argBuf)
 					pool.Put(c.ps.ca.cID)
 					c.r.Close()
-					c.ps.fa.err <- fmt.Errorf("parse write err len arg: %w", err)
+					err = fmt.Errorf("parse write err len arg: %w", err)
+					c.ps.fa.err <- err
 					close(c.ps.fa.err)
-					return fmt.Errorf("parse write err len arg: %w", err)
+					return err
 				}
 				pool.Put(c.ps.argBuf)
 				c.ps.argBuf, c.ps.state = nil, OP_ERROR_PAYLOAD
@@ -231,10 +231,11 @@ func (c *Consumer) parse(buf []byte) error {
 				if err := c.parseMsgLenArg(); err != nil {
 					pool.Put(c.ps.argBuf)
 					c.r.Close()
-					c.ps.fa.err <- fmt.Errorf("parse msg len arg: %w", err)
+					err = fmt.Errorf("parse msg len arg: %w", err)
+					c.ps.fa.err <- err
 					close(c.ps.fa.err)
 					close(c.ps.fa.msgs)
-					return fmt.Errorf("parse msg len arg: %w", err)
+					return err
 				}
 				close(c.ps.fa.err)
 				pool.Put(c.ps.argBuf)
@@ -260,8 +261,9 @@ func (c *Consumer) parse(buf []byte) error {
 
 				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
 					c.ps.fa.msgs <- Msg{
-						Meta:    c.ps.metaBuf,
-						Payload: c.ps.payloadBuf,
+						Value: c.ps.payloadBuf,
+						meta:  c.ps.metaBuf,
+						r:     c.clientReader,
 					}
 					c.ps.fa.handled++
 					if c.ps.fa.handled >= c.ps.fa.n {
@@ -276,8 +278,9 @@ func (c *Consumer) parse(buf []byte) error {
 
 				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
 					c.ps.fa.msgs <- Msg{
-						Meta:    c.ps.metaBuf,
-						Payload: c.ps.payloadBuf,
+						Value: c.ps.payloadBuf,
+						meta:  c.ps.metaBuf,
+						r:     c.clientReader,
 					}
 					c.ps.fa.handled++
 					if c.ps.fa.handled >= c.ps.fa.n {

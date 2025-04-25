@@ -11,36 +11,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConnectWriter(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	_, shutdown := RunTestServer(ctx)
-	defer shutdown()
-
-	addr := "localhost:4848"
-	conn, err := client.Connect(ctx, addr, generateTLSConfig(),
-		client.WithLogger(
-			slog.New(
-				slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-					AddSource: true,
-					Level:     slog.LevelDebug,
-				}),
-			),
-		))
-	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
-	}
-	defer conn.Close()
-
-	writer, err := conn.ConnectWriter("id")
-	if err != nil {
-		t.Fatalf("failed to connect writer: %v", err)
-	}
-	defer writer.Close()
-}
-
 func TestWriter(t *testing.T) {
+	t.Run("connect", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		fs, shutdown := RunTestServer(ctx)
+		defer func() {
+			cancel()
+			shutdown()
+			<-fs.Done()
+		}()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(),
+			client.WithLogger(
+				slog.New(
+					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+						AddSource: true,
+						Level:     slog.LevelDebug,
+					}),
+				),
+			))
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		writer, err := conn.ConnectWriter("id")
+		if err != nil {
+			t.Fatalf("failed to connect writer: %v", err)
+		}
+		defer writer.Close()
+	})
+
 	t.Run("success with id", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

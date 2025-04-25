@@ -54,7 +54,7 @@ func main() {
 			return
 		default:
 			if err := c.Fetch(1, func(msg client.Msg) {
-				fmt.Println(string(msg.Payload))
+				fmt.Println(string(msg.Value))
 			}); err != nil {
 				log.Fatal(err)
 			}

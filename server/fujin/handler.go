@@ -1234,6 +1234,8 @@ func (h *handler) fetch(val uint32) {
 			return
 		}
 
+		buf[9] = 0
+
 		if err := h.sessionReader.Fetch(h.ctx, val,
 			func(n uint32) {
 				replaceUnsafe(buf, 5, binary.BigEndian.AppendUint32(nil, n))

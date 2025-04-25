@@ -24,10 +24,10 @@ func (c *Conn) ConnectSubscriber(conf ReaderConfig, handler func(msg Msg)) (*Sub
 
 	h := func(msg Msg) {
 		handler(msg)
-		if msg.Meta != nil {
-			pool.Put(msg.Meta)
+		if msg.meta != nil {
+			pool.Put(msg.meta)
 		}
-		pool.Put(msg.Payload)
+		pool.Put(msg.Value)
 	}
 
 	s := &Subscriber{
@@ -122,8 +122,9 @@ func (s *Subscriber) parse(buf []byte) error {
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ma.len) {
 					s.h(Msg{
-						Meta:    s.ps.metaBuf,
-						Payload: s.ps.payloadBuf,
+						Value: s.ps.payloadBuf,
+						meta:  s.ps.metaBuf,
+						r:     s.clientReader,
 					})
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}
@@ -133,8 +134,9 @@ func (s *Subscriber) parse(buf []byte) error {
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ma.len) {
 					s.h(Msg{
-						Meta:    s.ps.metaBuf,
-						Payload: s.ps.payloadBuf,
+						Value: s.ps.payloadBuf,
+						meta:  s.ps.metaBuf,
+						r:     s.clientReader,
 					})
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}

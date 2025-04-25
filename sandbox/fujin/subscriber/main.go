@@ -41,7 +41,7 @@ func main() {
 			AutoCommit: true,
 			Async:      true,
 		}, func(msg client.Msg) {
-			fmt.Println(string(msg.Payload))
+			fmt.Println(string(msg.Value))
 		})
 	if err != nil {
 		log.Fatal(err)

@@ -29,13 +29,48 @@ type clientReader struct {
 
 	pool *ants.Pool
 
-	cm *correlator
-
 	msgMetaLen int
+	cm         *correlator
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
 	wg           sync.WaitGroup
+}
+
+func (c *clientReader) ack(meta []byte) error {
+	return c.sendAckNAckCmd(byte(request.OP_CODE_ACK), meta)
+}
+
+func (c *clientReader) nAck(meta []byte) error {
+	return c.sendAckNAckCmd(byte(request.OP_CODE_NACK), meta)
+}
+
+func (c *clientReader) sendAckNAckCmd(cmd byte, meta []byte) error {
+	if c.closed.Load() {
+		return ErrWriterClosed
+	}
+
+	buf := pool.Get(5 + c.msgMetaLen)
+	defer pool.Put(buf)
+
+	ch := make(chan error, 1)
+	defer close(ch)
+
+	id := c.cm.next(ch)
+	defer c.cm.delete(id)
+
+	buf = append(buf, cmd)
+	buf = binary.BigEndian.AppendUint32(buf, id)
+	buf = append(buf, meta...)
+
+	c.out.EnqueueProto(buf)
+
+	select {
+	case <-time.After(c.conn.timeout):
+		return ErrTimeout
+	case err := <-ch:
+		return err
+	}
 }
 
 func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientReader, error) {
@@ -133,7 +168,6 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
-					fmt.Println("read:", buf[:n])
 					err = parse(buf[:n])
 					if err != nil {
 						c.conn.l.Error("read loop", "err", err)
@@ -148,7 +182,6 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 			continue
 		}
 
-		fmt.Println("read:", buf[:n])
 		err = parse(buf[:n])
 		if err != nil {
 			c.conn.l.Error("read loop", "err", err)
