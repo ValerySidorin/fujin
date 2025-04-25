@@ -55,7 +55,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		l:          l.With("reader_type", "kafka"),
 	}
 
-	if !autoCommit {
+	if autoCommit {
 		reader.handler = func(r *kgo.Record, h func(message []byte, args ...any)) {
 			h(r.Value)
 		}

@@ -184,8 +184,9 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 			"sub": {
 				Protocol: "redis_pubsub",
 				RedisPubSub: pubsub.ReaderConfig{
-					InitAddress: []string{"localhost:6379"},
-					Channel:     "channel",
+					InitAddress:  []string{"localhost:6379"},
+					Channel:      "channel",
+					DisableCache: true,
 				},
 			},
 		},
@@ -193,10 +194,11 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 			"pub": {
 				Protocol: "redis_pubsub",
 				RedisPubSub: pubsub.WriterConfig{
-					InitAddress: []string{"localhost:6379"},
-					Channel:     "channel",
-					BatchSize:   10000,
-					Linger:      5 * time.Millisecond,
+					InitAddress:  []string{"localhost:6379"},
+					Channel:      "channel",
+					DisableCache: true,
+					BatchSize:    1000,
+					Linger:       5 * time.Millisecond,
 				},
 			},
 		},

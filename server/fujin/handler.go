@@ -75,6 +75,7 @@ var (
 	ErrParseProto               = errors.New("parse proto")
 	ErrWriterCanNotBeReusedInTx = errors.New("writer can not be reuse in tx")
 	ErrFetchArgNotProvided      = errors.New("fetch arg not provided")
+	ErrInvalidReaderType        = errors.New("invalid reader type")
 
 	ErrConnectReaderIsAutoCommitArgInvalid = errors.New("connect reader is auto commit arg invalid")
 
@@ -143,10 +144,10 @@ type handler struct {
 	currentTxWriterTopic string
 
 	// consumer/subscriber
+	readerType              reader.ReaderType
 	sessionReader           reader.Reader
 	sessionReaderMsgMetaLen int
 	msgHandler              func(message []byte, args ...any)
-	consumeTrigger          func()
 
 	ackSuccessRespTemplate []byte
 	ackErrRespTemplate     []byte
@@ -220,7 +221,7 @@ func (h *handler) handle(buf []byte) error {
 							h.cman.PutWriter(w, pub, "")
 						}
 						if h.currentTxWriter != nil {
-							h.currentTxWriter.RollbackTx(h.ctx)
+							_ = h.currentTxWriter.RollbackTx(h.ctx)
 							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 							h.currentTxWriter = nil
 						}
@@ -480,7 +481,6 @@ func (h *handler) handle(buf []byte) error {
 				val := binary.BigEndian.Uint32(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
 				h.ps.argBuf = nil
-
 				h.fetch(val)
 				pool.Put(h.ps.ca.cID)
 				h.ps.ca.cID, h.ps.state = nil, OP_START
@@ -1114,7 +1114,7 @@ func (h *handler) handle(buf []byte) error {
 					}
 
 					h.sessionReaderMsgMetaLen = int(r.MessageMetaLen())
-					readerType := reader.ReaderType(h.ps.cra.typ)
+					h.readerType = reader.ReaderType(h.ps.cra.typ)
 
 					enqueueConnectReaderSuccess(h.out, r)
 					h.sessionReader = r
@@ -1122,7 +1122,7 @@ func (h *handler) handle(buf []byte) error {
 					h.wg.Add(1)
 					go func() {
 						defer h.wg.Done()
-						if err := h.connectReader(r, readerType); err != nil {
+						if err := h.connectReader(r, h.readerType); err != nil {
 							fmt.Println(err)
 							enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
 							h.close()
@@ -1220,6 +1220,13 @@ func (h *handler) fetch(val uint32) {
 	replaceUnsafe(buf, 1, h.ps.ca.cID)
 
 	go func() {
+		if h.readerType != reader.Consumer {
+			buf[9] = 1
+			h.out.EnqueueProtoMulti(buf, errProtoBuf(ErrInvalidReaderType))
+			pool.Put(buf)
+			return
+		}
+
 		if val == 0 {
 			buf[9] = 1
 			h.out.EnqueueProtoMulti(buf, errProtoBuf(ErrFetchArgNotProvided))

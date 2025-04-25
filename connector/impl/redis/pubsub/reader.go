@@ -19,9 +19,10 @@ type Reader struct {
 
 func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	client, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: conf.InitAddress,
-		Username:    conf.Username,
-		Password:    conf.Password,
+		InitAddress:  conf.InitAddress,
+		Username:     conf.Username,
+		Password:     conf.Password,
+		DisableCache: conf.DisableCache,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("redis: new client: %w", err)

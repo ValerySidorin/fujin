@@ -35,6 +35,7 @@ type Server struct {
 	cman *connector.Manager
 
 	ready chan struct{}
+	done  chan struct{}
 
 	l *slog.Logger
 }
@@ -44,6 +45,7 @@ func NewServer(conf ServerConfig, cman *connector.Manager, l *slog.Logger) *Serv
 		conf:  conf,
 		cman:  cman,
 		ready: make(chan struct{}),
+		done:  make(chan struct{}),
 		l:     l,
 	}
 }
@@ -96,6 +98,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			s.l.Error("close udp listener", "err", err)
 		}
 
+		close(s.done)
 		s.l.Info("fujin server stopped")
 	}()
 
@@ -198,4 +201,8 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 	case <-s.ready:
 		return true
 	}
+}
+
+func (s *Server) Done() <-chan struct{} {
+	return s.done
 }

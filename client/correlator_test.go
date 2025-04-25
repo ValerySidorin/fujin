@@ -7,7 +7,7 @@ import (
 
 func TestCorrelator_Next(t *testing.T) {
 	manager := newCorrelator()
-	ch := make(chan model)
+	ch := make(chan error)
 
 	id := manager.next(ch)
 
@@ -21,7 +21,7 @@ func TestCorrelator_Next(t *testing.T) {
 
 func TestCorrelator_Concurrency(t *testing.T) {
 	manager := newCorrelator()
-	ch := make(chan model)
+	ch := make(chan error)
 	const goroutines = 100
 
 	done := make(chan struct{})
@@ -49,7 +49,7 @@ func TestCorrelator_Concurrency(t *testing.T) {
 }
 func TestCorrelator_Uint32Max(t *testing.T) {
 	manager := newCorrelator()
-	ch := make(chan model)
+	ch := make(chan error)
 
 	manager.n = ^uint32(0) - 1
 
@@ -78,7 +78,7 @@ func TestCorrelator_Uint32Max(t *testing.T) {
 
 func TestCorrelator_Delete(t *testing.T) {
 	manager := newCorrelator()
-	ch := make(chan model)
+	ch := make(chan error)
 
 	id := manager.next(ch)
 	manager.delete(id)
@@ -111,11 +111,11 @@ func TestCorrelator_EmptyMap(t *testing.T) {
 
 func TestCorrelator_ConcurrentSend(t *testing.T) {
 	manager := newCorrelator()
-	ch := make(chan model, 100)
+	ch := make(chan error, 100)
 	id := manager.next(ch)
 
 	const goroutines = 100
-	err := model{}
+	var err error
 
 	done := make(chan struct{})
 	for i := 0; i < goroutines; i++ {

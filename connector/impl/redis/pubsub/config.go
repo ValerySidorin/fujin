@@ -7,17 +7,19 @@ import (
 )
 
 type ReaderConfig struct {
-	InitAddress []string `yaml:"init_address"`
-	Username    string   `yaml:"username"`
-	Password    string   `yaml:"password"`
-	Channel     string   `yaml:"channel"`
+	InitAddress  []string `yaml:"init_address"`
+	Username     string   `yaml:"username"`
+	Password     string   `yaml:"password"`
+	Channel      string   `yaml:"channel"`
+	DisableCache bool     `yaml:"disable_cache"`
 }
 
 type WriterConfig struct {
-	InitAddress []string `yaml:"init_address"`
-	Username    string   `yaml:"username"`
-	Password    string   `yaml:"password"`
-	Channel     string   `yaml:"channel"`
+	InitAddress  []string `yaml:"init_address"`
+	Username     string   `yaml:"username"`
+	Password     string   `yaml:"password"`
+	Channel      string   `yaml:"channel"`
+	DisableCache bool     `yaml:"disable_cache"`
 
 	BatchSize int           `yaml:"batch_size"`
 	Linger    time.Duration `yaml:"linger"`

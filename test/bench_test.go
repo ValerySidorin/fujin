@@ -9,148 +9,157 @@ import (
 	"testing"
 
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/server"
 )
 
 const (
 	PERF_ADDR = "localhost:4848"
 )
 
-// Kafka benchmarks
-func Benchmark_Produce_1BPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(1))
-}
+// // Kafka benchmarks
+// func Benchmark_Produce_1BPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(1))
+// }
 
-func Benchmark_Produce_32BPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(32))
-}
+// func Benchmark_Produce_32BPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(32))
+// }
 
-func Benchmark_Produce_128BPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(128))
-}
+// func Benchmark_Produce_128BPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(128))
+// }
 
-func Benchmark_Produce_256BPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(256))
-}
+// func Benchmark_Produce_256BPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(256))
+// }
 
-func Benchmark_Produce_1KBPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(1024))
-}
+// func Benchmark_Produce_1KBPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(1024))
+// }
 
-func Benchmark_Produce_4KBPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(4*1024))
-}
+// func Benchmark_Produce_4KBPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(4*1024))
+// }
 
-func Benchmark_Produce_8KBPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(8*1024))
-}
+// func Benchmark_Produce_8KBPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(8*1024))
+// }
 
-func Benchmark_Produce_32KBPayload_Kafka_3Brokers(b *testing.B) {
-	benchProduce(b, "kafka3", "pub", sizedString(32*1024))
-}
+// func Benchmark_Produce_32KBPayload_Kafka_3Brokers(b *testing.B) {
+// 	benchProduce(b, "kafka3", "pub", sizedString(32*1024))
+// }
 
-// Nats benchmarks
-func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(1))
-}
+// // Nats benchmarks
+// func Benchmark_Produce_1BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(1))
+// }
 
-func Benchmark_Produce_32BPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(32))
-}
+// func Benchmark_Produce_32BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(32))
+// }
 
-func Benchmark_Produce_128BPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(128))
-}
+// func Benchmark_Produce_128BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(128))
+// }
 
-func Benchmark_Produce_256BPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(256))
-}
+// func Benchmark_Produce_256BPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(256))
+// }
 
-func Benchmark_Produce_1KBPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(1024))
-}
+// func Benchmark_Produce_1KBPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(1024))
+// }
 
-func Benchmark_Produce_4KBPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(4*1024))
-}
+// func Benchmark_Produce_4KBPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(4*1024))
+// }
 
-func Benchmark_Produce_8KBPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(8*1024))
-}
+// func Benchmark_Produce_8KBPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(8*1024))
+// }
 
-func Benchmark_Produce_32KBPayload_Nats(b *testing.B) {
-	benchProduce(b, "nats", "pub", sizedString(32*1024))
-}
+// func Benchmark_Produce_32KBPayload_Nats(b *testing.B) {
+// 	benchProduce(b, "nats", "pub", sizedString(32*1024))
+// }
 
-// RabbitMQ benchmarks
-func Benchmark_Produce_1BPayload_RabbitMQ(b *testing.B) {
-	benchProduce(b, "rabbitmq", "pub", sizedString(1))
-}
+// // RabbitMQ benchmarks
+// func Benchmark_Produce_1BPayload_RabbitMQ(b *testing.B) {
+// 	benchProduce(b, "rabbitmq", "pub", sizedString(1))
+// }
 
-func Benchmark_Produce_32KBPayload_RabbitMQ(b *testing.B) {
-	benchProduce(b, "rabbitmq", "pub", sizedString(32*1024))
-}
+// func Benchmark_Produce_32KBPayload_RabbitMQ(b *testing.B) {
+// 	benchProduce(b, "rabbitmq", "pub", sizedString(32*1024))
+// }
 
-// ArtemisMQ benchmarks
-func Benchmark_Produce_1BPayload_ArtemisMQ(b *testing.B) {
-	benchProduce(b, "artemismq", "pub", sizedString(1))
-}
+// // ArtemisMQ benchmarks
+// func Benchmark_Produce_1BPayload_ArtemisMQ(b *testing.B) {
+// 	benchProduce(b, "artemismq", "pub", sizedString(1))
+// }
 
-func Benchmark_Produce_32KBPayload_ArtemisMQ(b *testing.B) {
-	benchProduce(b, "artemismq", "pub", sizedString(32*1024))
-}
+// func Benchmark_Produce_32KBPayload_ArtemisMQ(b *testing.B) {
+// 	benchProduce(b, "artemismq", "pub", sizedString(32*1024))
+// }
 
 // Redis Pub/Sub benchmarks
 func Benchmark_Produce_1BPayload_RedisPubSub(b *testing.B) {
 	benchProduce(b, "redis_pubsub", "pub", sizedString(1))
 }
 
-func Benchmark_Produce_32BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(32))
-}
+// func Benchmark_Produce_32BPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(32))
+// }
 
-func Benchmark_Produce_128BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(128))
-}
+// func Benchmark_Produce_128BPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(128))
+// }
 
-func Benchmark_Produce_256BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(256))
-}
+// func Benchmark_Produce_256BPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(256))
+// }
 
-func Benchmark_Produce_1KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(1024))
-}
+// func Benchmark_Produce_1KBPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(1024))
+// }
 
-func Benchmark_Produce_4KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(4*1024))
-}
+// func Benchmark_Produce_4KBPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(4*1024))
+// }
 
-func Benchmark_Produce_8KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(8*1024))
-}
+// func Benchmark_Produce_8KBPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(8*1024))
+// }
 
-func Benchmark_Produce_32KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(32*1024))
-}
+// func Benchmark_Produce_32KBPayload_RedisPubSub(b *testing.B) {
+// 	benchProduce(b, "redis_pubsub", "pub", sizedString(32*1024))
+// }
 
 func benchProduce(b *testing.B, typ, pub, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
+	var s *server.Server
+
 	b.StopTimer()
 	switch typ {
 	case "kafka3":
-		RunDefaultServerWithKafka3Brokers(ctx)
+		s = RunDefaultServerWithKafka3Brokers(ctx)
 	case "nats":
-		RunDefaultServerWithNats(ctx)
+		s = RunDefaultServerWithNats(ctx)
 	case "rabbitmq":
-		RunDefaultServerWithAMQP091(ctx)
+		s = RunDefaultServerWithAMQP091(ctx)
 	case "artemismq":
-		RunDefaultServerWithAMQP10(ctx)
+		s = RunDefaultServerWithAMQP10(ctx)
 	case "redis_pubsub":
-		RunDefaultServerWithRedisPubSub(ctx)
+		s = RunDefaultServerWithRedisPubSub(ctx)
 	default:
 		panic("invalid typ")
 	}
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
 	c := createClientConn(ctx, PERF_ADDR)
 	p := doDefaultConnectProducer(c)
 

@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/client"
+	"github.com/ValerySidorin/fujin/test"
 	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConnectSubscriber(t *testing.T) {
+func TestSubscriber(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		conf := client.ReaderConfig{
 			Topic:      "sub",
@@ -20,8 +21,12 @@ func TestConnectSubscriber(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		_, shutdown := RunTestServer(ctx)
-		defer shutdown()
+		fs, shutdown := RunTestServer(ctx)
+		defer func() {
+			cancel()
+			shutdown()
+			<-fs.Done()
+		}()
 
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
@@ -46,8 +51,12 @@ func TestConnectSubscriber(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		_, shutdown := RunTestServer(ctx)
-		defer shutdown()
+		fs, shutdown := RunTestServer(ctx)
+		defer func() {
+			cancel()
+			shutdown()
+			<-fs.Done()
+		}()
 
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
@@ -69,8 +78,12 @@ func TestConnectSubscriber(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		_, shutdown := RunTestServer(ctx)
-		defer shutdown()
+		fs, shutdown := RunTestServer(ctx)
+		defer func() {
+			cancel()
+			shutdown()
+			<-fs.Done()
+		}()
 
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
@@ -106,8 +119,12 @@ func TestConnectSubscriber(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		_, shutdown := RunTestServer(ctx)
-		defer shutdown()
+		fs, shutdown := RunTestServer(ctx)
+		defer func() {
+			cancel()
+			shutdown()
+			<-fs.Done()
+		}()
 
 		addr := "localhost:4848"
 		conn, err := client.Connect(ctx, addr, generateTLSConfig())
@@ -129,6 +146,95 @@ func TestConnectSubscriber(t *testing.T) {
 
 		time.Sleep(1 * time.Second)
 		assert.Equal(t, 2, len(received))
+		assert.Equal(t, "test message", string(received[0].Payload))
+		assert.Equal(t, "test message", string(received[1].Payload))
+	})
+}
+
+func TestSubscriberKafka(t *testing.T) {
+	t.Run("msg sync", func(t *testing.T) {
+		conf := client.ReaderConfig{
+			Topic:      "sub",
+			AutoCommit: true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		fs := test.RunDefaultServerWithKafka3Brokers(ctx)
+		defer func() {
+			cancel()
+			<-fs.Done()
+		}()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		received := make([]client.Msg, 0)
+
+		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
+			received = append(received, msg)
+		})
+		assert.NoError(t, err)
+		defer sub.Close()
+
+		err = produce(ctx, "my_pub_topic", "test message")
+		assert.NoError(t, err)
+		err = produce(ctx, "my_pub_topic", "test message")
+		assert.NoError(t, err)
+
+		time.Sleep(5 * time.Second)
+		if len(received) != 2 {
+			t.Fatal("invalid number of received messages")
+		}
+		assert.Equal(t, "test message", string(received[0].Payload))
+		assert.Equal(t, "test message", string(received[1].Payload))
+	})
+
+	t.Run("msg async", func(t *testing.T) {
+		conf := client.ReaderConfig{
+			Topic:      "sub",
+			AutoCommit: true,
+			Async:      true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		fs := test.RunDefaultServerWithKafka3Brokers(ctx)
+		defer func() {
+			cancel()
+			<-fs.Done()
+		}()
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		received := make([]client.Msg, 0)
+
+		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
+			received = append(received, msg)
+		})
+		assert.NoError(t, err)
+		defer sub.Close()
+
+		err = produce(ctx, "my_pub_topic", "test message")
+		assert.NoError(t, err)
+		err = produce(ctx, "my_pub_topic", "test message")
+		assert.NoError(t, err)
+
+		time.Sleep(5 * time.Second)
+		if len(received) != 2 {
+			t.Fatal("invalid number of received messages")
+		}
 		assert.Equal(t, "test message", string(received[0].Payload))
 		assert.Equal(t, "test message", string(received[1].Payload))
 	})

@@ -18,6 +18,9 @@ const (
 	OP_MSG_ARG
 	OP_MSG_PAYLOAD
 
+	OP_FETCH
+	OP_FETCH_BATCH_NUM_ARG
+
 	// Common
 	OP_ERROR_CODE_ARG
 	OP_ERROR_PAYLOAD_ARG
@@ -35,11 +38,13 @@ type parseState struct {
 	ea  errArg
 	cra connectReaderArg
 	ma  msgArg
+	fa  fetchArg
 	ca  correlationIDArg
 }
 
 type correlationIDArg struct {
-	cID []byte
+	cID       []byte
+	cIDUint32 uint32
 }
 
 type connectReaderArg struct {
@@ -48,6 +53,13 @@ type connectReaderArg struct {
 
 type msgArg struct {
 	len uint32
+}
+
+type fetchArg struct {
+	n       uint32
+	handled uint32
+	msgs    chan Msg
+	err     chan error
 }
 
 type errArg struct {

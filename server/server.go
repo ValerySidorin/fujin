@@ -67,3 +67,7 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 		return true
 	}
 }
+
+func (s *Server) Done() <-chan struct{} {
+	return s.fujinServer.Done()
+}

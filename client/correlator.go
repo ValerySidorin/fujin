@@ -4,26 +4,20 @@ import (
 	"sync"
 )
 
-type model struct {
-	msgMetaLen byte
-	msgs       chan Msg
-	err        error
-}
-
 type correlator struct {
 	n uint32
-	m map[uint32]chan model
+	m map[uint32]chan error
 
 	mu sync.RWMutex
 }
 
 func newCorrelator() *correlator {
 	return &correlator{
-		m: make(map[uint32]chan model),
+		m: make(map[uint32]chan error),
 	}
 }
 
-func (m *correlator) next(c chan model) uint32 {
+func (m *correlator) next(c chan error) uint32 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -32,13 +26,13 @@ func (m *correlator) next(c chan model) uint32 {
 	return m.n
 }
 
-func (m *correlator) send(id uint32, model model) {
+func (m *correlator) send(id uint32, err error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	c, ok := m.m[id]
 	if ok {
-		c <- model
+		c <- err
 	}
 }
 

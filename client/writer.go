@@ -89,7 +89,7 @@ func (w *Writer) Write(topic string, p []byte) error {
 	buf := pool.Get(len(topic) + len(p) + 13)
 	defer pool.Put(buf)
 
-	ch := make(chan model, 1)
+	ch := make(chan error, 1)
 	defer close(ch)
 
 	id := w.cm.next(ch)
@@ -107,8 +107,8 @@ func (w *Writer) Write(topic string, p []byte) error {
 	select {
 	case <-time.After(w.conn.timeout):
 		return ErrTimeout
-	case m := <-ch:
-		return m.err
+	case err := <-ch:
+		return err
 	}
 }
 
@@ -152,7 +152,7 @@ func (w *Writer) sendTxCmd(cmd byte) error {
 	buf := pool.Get(5)
 	defer pool.Put(buf)
 
-	ch := make(chan model, 1)
+	ch := make(chan error, 1)
 	defer close(ch)
 
 	id := w.cm.next(ch)
@@ -166,8 +166,8 @@ func (w *Writer) sendTxCmd(cmd byte) error {
 	select {
 	case <-time.After(w.conn.timeout):
 		return ErrTimeout
-	case m := <-ch:
-		return m.err
+	case err := <-ch:
+		return err
 	}
 }
 
@@ -253,12 +253,13 @@ func (w *Writer) parse(buf []byte) error {
 			}
 
 			if len(w.ps.ca.cID) >= fujin.Uint32Len {
+				w.ps.ca.cIDUint32 = binary.BigEndian.Uint32(w.ps.ca.cID)
 				w.ps.state = OP_ERROR_CODE_ARG
 			}
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
-				w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{})
+				w.cm.send(w.ps.ca.cIDUint32, nil)
 				pool.Put(w.ps.ca.cID)
 				w.ps.ca, w.ps.state = correlationIDArg{}, OP_START
 				continue
@@ -300,7 +301,7 @@ func (w *Writer) parse(buf []byte) error {
 				}
 
 				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
-					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{err: errors.New(string(w.ps.payloadBuf))})
+					w.cm.send(w.ps.ca.cIDUint32, errors.New(string(w.ps.payloadBuf)))
 					pool.Put(w.ps.payloadBuf)
 					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
 				}
@@ -309,7 +310,7 @@ func (w *Writer) parse(buf []byte) error {
 				w.ps.payloadBuf = append(w.ps.payloadBuf, b)
 
 				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
-					w.cm.send(binary.BigEndian.Uint32(w.ps.ca.cID), model{err: errors.New(string(w.ps.payloadBuf))})
+					w.cm.send(w.ps.ca.cIDUint32, errors.New(string(w.ps.payloadBuf)))
 					pool.Put(w.ps.payloadBuf)
 					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
 				}
