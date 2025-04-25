@@ -16,7 +16,7 @@ Before describing the commands, let's explore the data types used in the Fujin p
 
 | Type   | Length (bytes)        | Example                                 | Representation              |
 |--------|-----------------------|-----------------------------------------| --------------------------- |
-| byte   | 1                     | `[12]`                                  | `0x0C`                      |
+| byte   | 1                     | `[12]`                                  | `0x0B`                      |
 | uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
 | string | dynamic (len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]` | `hello`                     |
 | bool   | 1                     | `[0]`                                   | `false`                     |  
@@ -31,11 +31,11 @@ Server -> Client
 Since the QUIC protocol supports multiplexing, `PING` messages are sent over a dedicated control streams, separated from messaging ones.
 ### Syntax
 ##### Request
-`[12]`
+`[11]`
 ##### Response
-`[12]`
+`[11]`
 ### Examples
-- `[12]` -> `[12]`
+- `[11]` -> `[11]`
 
 ## CONNECT WRITER
 
@@ -64,7 +64,7 @@ Client -> Server
 Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT WRITER` command was previously issued.
 ### Syntax
 ##### Request
-`[4, <correlation id>, <topic>, <message>]`  
+`[3, <correlation id>, <topic>, <message>]`  
 where:
 | name             | description                                                               | type   | required |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
@@ -80,7 +80,7 @@ where:
 | `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
 | `error payload`  | Error message text, if applicable.                                        | string | optional |
 ### Examples
-- `[4, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
 
 ## BEGIN TX
 ### Direction
@@ -91,13 +91,13 @@ Begins transaction. Must be send in a QUIC stream, where `CONNECT WRITER` comman
 
 ### Syntax
 ##### Request
-`[5, <correlation id>]`  
+`[4, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[6, <correlation id>, <error code>, <error payload>]`  
+`[3, <correlation id>, <error code>, <error payload>]`  
 where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
@@ -106,7 +106,7 @@ where:
 | `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[5, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0]`
+- `[4, 0, 0, 0, 1]` -> `[3, 0, 0, 0, 1, 0]`
 
 ## COMMIT TX
 ### Direction
@@ -117,13 +117,13 @@ Commits transaction. Must be send in a QUIC stream, where `CONNECT WRITER` comma
 
 ### Syntax
 ##### Request
-`[6, <correlation id>]`  
+`[5, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[7, <correlation id>, <error code>, <error payload>]`  
+`[4, <correlation id>, <error code>, <error payload>]`  
 where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
@@ -132,7 +132,7 @@ where:
 | `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[6, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0]`
+- `[5, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
 
 ## ROLLBACK TX
 ### Direction
@@ -143,13 +143,13 @@ Rolls back transaction. Must be send in a QUIC stream, where `CONNECT WRITER` co
 
 ### Syntax
 ##### Request
-`[7, <correlation id>]`  
+`[6, <correlation id>]`  
 where:
 | name             | description                                                          | type   | required |
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[8, <correlation id>, <error code>, <error payload>]`  
+`[5, <correlation id>, <error code>, <error payload>]`  
 where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
@@ -158,7 +158,7 @@ where:
 | `error payload`  | Error message text, if applicable.                                        | string | optional |
 
 ### Examples
-- `[7, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
+- `[6, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
 
 ## CONNECT READER
 
@@ -193,14 +193,14 @@ Server -> Client
 ### Description
 A message propagated by the server in a client-opened reader QUIC stream. Message meta length is returned from `CONNECT READER` response.
 ### Syntax
-`[3, <message meta>, <message payload>]`  
+`[6, <message meta>, <message payload>]`  
 where:
 | name                  | description                                                     | type     | presence |
 | --------------------- | --------------------------------------------------------------- | -------- | -------- |
 | `message meta`        | Message meta. Propagated by server if auto commit is disabled.  | dynamic  | optional |
 | `message payload`     | Message payload.                                                | string   | always   |
 ### Examples
-- `-` -> `[3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `-` -> `[6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
 ## ACK
 
@@ -211,14 +211,14 @@ Must be sent in a QUIC stream, where `CONNECT READER` command was sent previousl
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[9, <correlation id>, <message meta>]`  
+`[8, <correlation id>, <message meta>]`  
 where:
 | name                  | description                                                      | type    | required |
 | ----------------- | ---------------------------------------------------------------------| ------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
 | `message meta`    | Message meta.                                                        | dynamic | always   |
 ##### Response
-`[4, <correlation id>, <error code>, <error payload>]`  
+`[8, <correlation id>, <error code>, <error payload>]`  
 where:
 | name               | description                                                          | type   | presence |
 | ------------------ | -------------------------------------------------------------------- | ------ | -------- |
@@ -227,7 +227,7 @@ where:
 | `error payload`    | Error payload text.                                                  | string | optional |
 
 ### Examples
-- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
 
 ## NACK
 
@@ -237,14 +237,14 @@ Client -> Server
 Works similarly to `ACK`.
 ### Syntax
 ##### Request
-`[10, <correlation id>, <message meta>]`  
+`[9, <correlation id>, <message meta>]`  
 where:
 | name                  | description                                                      | type    | required |
 | ----------------- | ---------------------------------------------------------------------| ------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
 | `message meta`    | Message meta.                                                        | dynamic | always   |
 ##### Response
-`[5, <correlation id>, <error code>, <error payload>]`  
+`[9, <correlation id>, <error code>, <error payload>]`  
 where:
 | name                  | description                                                      | type    | presence |
 | ----------------- | -------------------------------------------------------------------- | ------- | -------- |
@@ -253,7 +253,7 @@ where:
 | `error payload`   | Error payload text.                                                  | string  | optional |
 
 ### Examples
-- `[10, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
+- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[9, 0, 0, 0, 1, 0]`
 
 ## FETCH
 
@@ -264,7 +264,7 @@ When connected as a consumer, the client must send a `FETCH` command to the serv
 
 ## Syntax
 ##### Request
-`[8, <correlation id>, <num messages in batch>]`  
+`[7, <correlation id>, <num messages in batch>]`  
 where:
 | name                     | description                                                          | type    | required |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
@@ -272,7 +272,7 @@ where:
 | `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
 
 ##### Response
-`[6, <correlation id>, <num messages in batch>, <error code>, <error payload>, <batch of messages>]`  
+`[7, <correlation id>, <num messages in batch>, <error code>, <error payload>, <batch of messages>]`  
 where:
 | name                     | description                                                          | type    | presence |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
@@ -284,9 +284,9 @@ where:
 
 
 ### Examples
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[6, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
+- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
+- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
 ## DISCONNECT
 
 ### Direction
@@ -295,11 +295,11 @@ Client -> Server
 The client should send `DISCONNECT` request to the server and receive response before closing QUIC streams and connection. `DISCONNECT` should be sent both in writer and reader streams. Server will close QUIC stream after receiving `DISCONNECT` response.
 ### Syntax
 ##### Request
-`[11]`
+`[10]`
 ##### Response
-`[9]`
+`[10]`
 ### Examples
-- `[11]` -> `[9]`
+- `[10]` -> `[10]`
 
 ## STOP
 
@@ -309,8 +309,8 @@ Server -> Client
 The server can sometimes send `STOP` command to the client, when trying to shutdown gracefully. If the client does not disconnect within the configured response interval, the server will terminate its connection.
 ### Syntax
 ##### Request
-`[13]`
+`[12]`
 ##### Response
 `-`
 ### Examples
-- `[13]` -> `-`
+- `[12]` -> `-`
