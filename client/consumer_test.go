@@ -128,19 +128,20 @@ func TestFetch(t *testing.T) {
 		}
 		defer consumer.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message")
+		err = produce(ctx, "my_pub_topic", "test message consumer1")
 		assert.NoError(t, err)
 
 		received := make([]client.Msg, 0)
 
 		err = consumer.Fetch(1, func(msg client.Msg) {
+			fmt.Println(msg)
 			received = append(received, msg)
 		})
 		assert.NoError(t, err)
 		if len(received) != 1 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message", string(received[0].Value))
+		assert.Equal(t, "test message consumer1", string(received[0].Value))
 	})
 }
 

@@ -22,8 +22,12 @@ func TestConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	_, shutdown := RunTestServer(ctx)
-	defer shutdown()
+	fs, shutdown := RunTestServer(ctx)
+	defer func() {
+		cancel()
+		shutdown()
+		<-fs.Done()
+	}()
 
 	time.Sleep(1 * time.Second)
 
@@ -33,8 +37,6 @@ func TestConnect(t *testing.T) {
 		t.Fatalf("failed to connect: %v", err)
 	}
 	defer conn.Close()
-
-	time.Sleep(5 * time.Second)
 }
 
 func generateTLSConfig() *tls.Config {

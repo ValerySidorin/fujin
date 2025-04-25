@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -177,22 +178,23 @@ func TestSubscriberKafka(t *testing.T) {
 		received := make([]client.Msg, 0)
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
+			fmt.Println(msg)
 			received = append(received, msg)
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message")
+		err = produce(ctx, "my_pub_topic", "test message sub")
 		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message")
+		err = produce(ctx, "my_pub_topic", "test message sub")
 		assert.NoError(t, err)
 
 		time.Sleep(5 * time.Second)
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message", string(received[0].Value))
-		assert.Equal(t, "test message", string(received[1].Value))
+		assert.Equal(t, "test message sub", string(received[0].Value))
+		assert.Equal(t, "test message sub", string(received[1].Value))
 	})
 
 	t.Run("msg async", func(t *testing.T) {
@@ -221,21 +223,22 @@ func TestSubscriberKafka(t *testing.T) {
 		received := make([]client.Msg, 0)
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
+			fmt.Println(msg)
 			received = append(received, msg)
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message")
+		err = produce(ctx, "my_pub_topic", "test message sub")
 		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message")
+		err = produce(ctx, "my_pub_topic", "test message sub")
 		assert.NoError(t, err)
 
 		time.Sleep(5 * time.Second)
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message", string(received[0].Value))
-		assert.Equal(t, "test message", string(received[1].Value))
+		assert.Equal(t, "test message sub", string(received[0].Value))
+		assert.Equal(t, "test message sub", string(received[1].Value))
 	})
 }

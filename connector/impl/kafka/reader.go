@@ -108,6 +108,9 @@ func (r *Reader) Fetch(
 	defer r.fetching.Store(false)
 
 	fetches := r.cl.PollRecords(ctx, int(n))
+	if ctx.Err() != nil {
+		return nil
+	}
 	if errs := fetches.Errors(); len(errs) > 0 {
 		return fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs))
 	}
@@ -115,9 +118,19 @@ func (r *Reader) Fetch(
 	fetchResponseHandler(uint32(fetches.NumRecords()))
 
 	iter := fetches.RecordIter()
+	var rec *kgo.Record
 	for !iter.Done() {
-		r.handler(iter.Next(), msgHandler)
+		rec = iter.Next()
+		r.handler(rec, msgHandler)
 	}
+
+	// We need to commit messages manually for some reason, even if auto commit is enabled
+	if r.autoCommit {
+		if err := r.cl.CommitRecords(ctx, rec); err != nil {
+			return fmt.Errorf("kafka: commit record: %w", err)
+		}
+	}
+
 	return nil
 }
 
