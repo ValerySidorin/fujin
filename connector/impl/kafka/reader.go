@@ -138,16 +138,12 @@ func (r *Reader) Ack(ctx context.Context, meta []byte) error {
 		r.conf.Topic: {
 			int32(binary.BigEndian.Uint16(meta[:2])): {
 				Epoch:  int32(binary.BigEndian.Uint16(meta[2:4])),
-				Offset: int64(binary.BigEndian.Uint32(meta[4:8])),
+				Offset: int64(binary.BigEndian.Uint32(meta[4:8])) + 1,
 			},
 		},
 	}
 
-	fmt.Println(offsets)
-
 	var rerr error
-
-	return rerr
 
 	r.cl.CommitOffsetsSync(ctx, offsets, func(_ *kgo.Client, _ *kmsg.OffsetCommitRequest, resp *kmsg.OffsetCommitResponse, err error) {
 		if err != nil {

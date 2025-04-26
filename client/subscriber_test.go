@@ -14,9 +14,11 @@ import (
 
 func TestSubscriber(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -44,9 +46,11 @@ func TestSubscriber(t *testing.T) {
 	})
 
 	t.Run("non existing topic", func(t *testing.T) {
-		conf := client.ReaderConfig{
-			Topic:      "sub1",
-			AutoCommit: true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub1",
+				AutoCommit: true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -71,9 +75,11 @@ func TestSubscriber(t *testing.T) {
 	})
 
 	t.Run("msg sync", func(t *testing.T) {
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -111,10 +117,12 @@ func TestSubscriber(t *testing.T) {
 	})
 
 	t.Run("msg async", func(t *testing.T) {
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
-			Async:      true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+				Async:      true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -154,11 +162,11 @@ func TestSubscriber(t *testing.T) {
 
 func TestSubscriberKafka(t *testing.T) {
 	t.Run("msg sync", func(t *testing.T) {
-		t.Skip()
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: false,
-			Async:      true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -186,24 +194,25 @@ func TestSubscriberKafka(t *testing.T) {
 		assert.NoError(t, err)
 		defer sub.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message sub")
+		err = produce(ctx, "my_pub_topic", "test message sub sync 1")
 		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message sub")
+		err = produce(ctx, "my_pub_topic", "test message sub sync 2")
 		assert.NoError(t, err)
 
 		time.Sleep(5 * time.Second)
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message sub", string(received[0].Value))
-		assert.Equal(t, "test message sub", string(received[1].Value))
+		assert.Equal(t, "test message sub sync 1", string(received[0].Value))
+		assert.Equal(t, "test message sub sync 2", string(received[1].Value))
 	})
 
 	t.Run("msg async", func(t *testing.T) {
-		t.Skip()
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -231,23 +240,24 @@ func TestSubscriberKafka(t *testing.T) {
 		assert.NoError(t, err)
 		defer sub.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message sub")
+		err = produce(ctx, "my_pub_topic", "test message sub async 1")
 		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message sub")
+		err = produce(ctx, "my_pub_topic", "test message sub async 2")
 		assert.NoError(t, err)
 
 		time.Sleep(5 * time.Second)
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message sub", string(received[0].Value))
-		assert.Equal(t, "test message sub", string(received[1].Value))
+		assert.Equal(t, "test message sub async 1", string(received[0].Value))
+		assert.Equal(t, "test message sub async 2", string(received[1].Value))
 	})
 
 	t.Run("manual ack", func(t *testing.T) {
-		conf := client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: false,
+		conf := client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic: "sub",
+			},
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -266,29 +276,30 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		defer conn.Close()
 
-		received := make([]client.Msg, 0)
+		received := make([][]byte, 0)
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			fmt.Println(msg)
+			buf := make([]byte, len(msg.Value))
+			copy(buf, msg.Value)
+			received = append(received, buf)
 			if err := msg.Ack(); err != nil {
 				t.Fatal(err)
 			}
-			fmt.Println("acked")
-			received = append(received, msg)
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
 
-		// err = produce(ctx, "my_pub_topic", "test message sub")
-		// assert.NoError(t, err)
-		// err = produce(ctx, "my_pub_topic", "test message sub")
-		// assert.NoError(t, err)
+		err = produce(ctx, "my_pub_topic", "test message sub manual 1")
+		assert.NoError(t, err)
+		err = produce(ctx, "my_pub_topic", "test message sub manual 2")
+		assert.NoError(t, err)
 
 		time.Sleep(5 * time.Second)
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message sub", string(received[0].Value))
-		assert.Equal(t, "test message sub", string(received[1].Value))
+		assert.Equal(t, "test message sub manual 1", string(received[0]))
+		assert.Equal(t, "test message sub manual 2", string(received[1]))
 	})
 }

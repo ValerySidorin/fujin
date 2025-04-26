@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/internal/fujin"
@@ -13,15 +14,42 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+type SubscriberConfig struct {
+	ReaderConfig
+	MsgBufSize int
+	Pool       PoolConfig
+}
+
 type Subscriber struct {
+	conf SubscriberConfig
 	*clientReader
+
+	pool *ants.Pool
+
 	h       func(Msg)
 	msgs    chan Msg
 	handled chan struct{}
 }
 
-func (c *Conn) ConnectSubscriber(conf ReaderConfig, handler func(msg Msg)) (*Subscriber, error) {
-	r, err := c.connectReader(conf, reader.Subscriber)
+func (c *SubscriberConfig) SetDefaults() {
+	if c.MsgBufSize <= 0 {
+		c.MsgBufSize = 1000
+	}
+
+	if c.Async {
+		if c.Pool.Size == 0 {
+			c.Pool.Size = 1000
+		}
+		if c.Pool.ReleaseTimeout == 0 {
+			c.Pool.ReleaseTimeout = 5 * time.Second
+		}
+	}
+}
+
+func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (*Subscriber, error) {
+	conf.SetDefaults()
+
+	r, err := c.connectReader(conf.ReaderConfig, reader.Subscriber)
 	if err != nil {
 		return nil, fmt.Errorf("connect reader: %w", err)
 	}
@@ -35,9 +63,10 @@ func (c *Conn) ConnectSubscriber(conf ReaderConfig, handler func(msg Msg)) (*Sub
 	}
 
 	s := &Subscriber{
+		conf:         conf,
 		clientReader: r,
 		h:            h,
-		msgs:         make(chan Msg, 1),
+		msgs:         make(chan Msg, conf.MsgBufSize),
 		handled:      make(chan struct{}),
 	}
 
@@ -62,9 +91,32 @@ func (c *Conn) ConnectSubscriber(conf ReaderConfig, handler func(msg Msg)) (*Sub
 }
 
 func (s *Subscriber) Close() error {
-	if err := s.clientReader.Close(); err != nil {
-		return err
+	if s.closed.Load() {
+		return nil
 	}
+
+	s.closed.Store(true)
+
+	s.out.EnqueueProto(DISCONNECT_REQ)
+	select {
+	case <-time.After(s.conn.timeout):
+	case <-s.disconnectCh:
+	}
+
+	s.r.Close()
+
+	if s.pool != nil {
+		if s.conf.Pool.ReleaseTimeout != 0 {
+			if err := s.pool.ReleaseTimeout(s.conf.Pool.ReleaseTimeout); err != nil {
+				return fmt.Errorf("release pool: %w", err)
+			}
+		} else {
+			s.pool.Release()
+		}
+	}
+
+	s.out.Close()
+	s.wg.Wait()
 
 	close(s.msgs)
 	<-s.handled
@@ -257,7 +309,6 @@ func (s *Subscriber) parse(buf []byte) error {
 		}
 	}
 
-	fmt.Println("parsed")
 	return nil
 }
 

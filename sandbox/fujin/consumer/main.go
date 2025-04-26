@@ -53,10 +53,12 @@ func main() {
 		case <-ctx.Done():
 			return
 		default:
-			if err := c.Fetch(1, func(msg client.Msg) {
-				fmt.Println(string(msg.Value))
-			}); err != nil {
+			msgs, err := c.Fetch(ctx, 1)
+			if err != nil {
 				log.Fatal(err)
+			}
+			for _, msg := range msgs {
+				fmt.Println(msg)
 			}
 		}
 	}

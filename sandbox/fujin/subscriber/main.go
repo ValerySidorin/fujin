@@ -36,11 +36,14 @@ func main() {
 	defer conn.Close()
 
 	sub, err := conn.ConnectSubscriber(
-		client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
-			Async:      true,
-		}, func(msg client.Msg) {
+		client.SubscriberConfig{
+			ReaderConfig: client.ReaderConfig{
+				Topic:      "sub",
+				AutoCommit: true,
+				Async:      true,
+			},
+		},
+		func(msg client.Msg) {
 			fmt.Println(string(msg.Value))
 		})
 	if err != nil {

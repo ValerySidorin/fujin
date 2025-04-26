@@ -14,20 +14,15 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
-	"github.com/panjf2000/ants/v2"
 	"github.com/quic-go/quic-go"
 )
 
 type clientReader struct {
-	conf ReaderConfig
-
 	conn *Conn
 
 	ps  *parseState
 	r   quic.Stream
 	out *fujin.Outbound
-
-	pool *ants.Pool
 
 	msgMetaLen int
 	cm         *correlator
@@ -82,7 +77,7 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 		return nil, ErrConnClosed
 	}
 
-	if err := conf.ValidateAndSetDefaults(); err != nil {
+	if err := conf.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
@@ -136,15 +131,6 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 
 	r.msgMetaLen = int(msgMetaLen)
 
-	if conf.Async {
-		pool, err := ants.NewPool(conf.Pool.Size)
-		if err != nil {
-			return nil, fmt.Errorf("new pool: %w", err)
-		}
-
-		r.pool = pool
-	}
-
 	return r, nil
 }
 
@@ -168,7 +154,6 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
-					fmt.Println("read:", buf[:n])
 					err = parse(buf[:n])
 					if err != nil {
 						c.conn.l.Error("read loop", "err", err)
@@ -183,7 +168,6 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 			continue
 		}
 
-		fmt.Println("read:", buf[:n])
 		err = parse(buf[:n])
 		if err != nil {
 			c.conn.l.Error("read loop", "err", err)
@@ -276,36 +260,6 @@ func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
 	}
 
 	return 0, ErrParseProto
-}
-
-func (c *clientReader) Close() error {
-	if c.closed.Load() {
-		return nil
-	}
-
-	c.closed.Store(true)
-
-	c.out.EnqueueProto(DISCONNECT_REQ)
-	select {
-	case <-time.After(c.conn.timeout):
-	case <-c.disconnectCh:
-	}
-
-	c.r.Close()
-
-	if c.pool != nil {
-		if c.conf.Pool.ReleaseTimeout != 0 {
-			if err := c.pool.ReleaseTimeout(c.conf.Pool.ReleaseTimeout); err != nil {
-				return fmt.Errorf("release pool: %w", err)
-			}
-		} else {
-			c.pool.Release()
-		}
-	}
-
-	c.out.Close()
-	c.wg.Wait()
-	return nil
 }
 
 func (c *clientReader) parseErrLenArg() error {

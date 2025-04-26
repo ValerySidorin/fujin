@@ -88,7 +88,7 @@ func TestFetch(t *testing.T) {
 		}
 		defer consumer.Close()
 
-		err = consumer.Fetch(1, func(msg client.Msg) {})
+		_, err = consumer.Fetch(ctx, 1)
 		assert.Error(t, err)
 	})
 
@@ -128,20 +128,83 @@ func TestFetch(t *testing.T) {
 		}
 		defer consumer.Close()
 
-		err = produce(ctx, "my_pub_topic", "test message consumer1")
+		err = produce(ctx, "my_pub_topic", "test message consumer")
 		assert.NoError(t, err)
 
 		received := make([]client.Msg, 0)
 
-		err = consumer.Fetch(1, func(msg client.Msg) {
+		msgs, err := consumer.Fetch(ctx, 1)
+		assert.NoError(t, err)
+
+		for _, msg := range msgs {
 			fmt.Println(msg)
 			received = append(received, msg)
-		})
+		}
+
 		assert.NoError(t, err)
 		if len(received) != 1 {
 			t.Fatal("invalid number of received messages")
 		}
-		assert.Equal(t, "test message consumer1", string(received[0].Value))
+		assert.Equal(t, "test message consumer", string(received[0].Value))
+	})
+
+	t.Run("manual ack", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		fs := test.RunDefaultServerWithKafka3Brokers(ctx)
+		defer func() {
+			cancel()
+			<-fs.Done()
+		}()
+
+		conf := client.ReaderConfig{
+			Topic: "sub",
+		}
+
+		addr := "localhost:4848"
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(),
+			client.WithLogger(
+				slog.New(
+					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+						AddSource: true,
+						Level:     slog.LevelDebug,
+					}),
+				),
+			))
+		if err != nil {
+			t.Fatalf("failed to connect: %v", err)
+		}
+		defer conn.Close()
+
+		consumer, err := conn.ConnectConsumer(conf)
+		if err != nil {
+			t.Fatalf("failed to connect consumer: %v", err)
+		}
+		defer consumer.Close()
+
+		err = produce(ctx, "my_pub_topic", "test message consumer manual")
+		assert.NoError(t, err)
+
+		received := make([][]byte, 0)
+
+		msgs, err := consumer.Fetch(ctx, 1)
+		assert.NoError(t, err)
+
+		for _, msg := range msgs {
+			fmt.Println(string(msg.Value))
+			buf := make([]byte, len(msg.Value))
+			copy(buf, msg.Value)
+			received = append(received, buf)
+			if err := msg.Ack(); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if len(received) != 1 {
+			t.Fatal("invalid number of received messages")
+		}
+		assert.Equal(t, "test message consumer manual", string(received[0]))
 	})
 }
 

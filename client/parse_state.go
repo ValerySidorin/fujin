@@ -5,7 +5,6 @@ const (
 
 	// Writer
 	OP_WRITE
-	OP_CORRELATION_ID_ARG
 
 	OP_TX_BEGIN
 	OP_TX_COMMIT
@@ -24,7 +23,13 @@ const (
 	OP_FETCH
 	OP_FETCH_BATCH_NUM_ARG
 
+	OP_FETCH_CORRELATION_ID_ARG
+	OP_FETCH_ERROR_CODE_ARG
+	OP_FETCH_ERROR_PAYLOAD_ARG
+	OP_FETCH_ERROR_PAYLOAD
+
 	// Common
+	OP_CORRELATION_ID_ARG
 	OP_ERROR_CODE_ARG
 	OP_ERROR_PAYLOAD_ARG
 	OP_ERROR_PAYLOAD
@@ -61,7 +66,7 @@ type msgArg struct {
 type fetchArg struct {
 	n       uint32
 	handled uint32
-	msgs    chan Msg
+	msgs    []Msg
 	err     chan error
 }
 

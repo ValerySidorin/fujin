@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -34,18 +35,17 @@ func (c *Conn) ConnectConsumer(conf ReaderConfig) (*Consumer, error) {
 	return cm, nil
 }
 
-func (c *Consumer) Fetch(n uint32, handler func(msg Msg)) error {
+func (c *Consumer) Fetch(ctx context.Context, n uint32) ([]Msg, error) {
 	if c.closed.Load() {
-		return ErrWriterClosed
+		return nil, ErrWriterClosed
 	}
 
 	buf := pool.Get(9)
 	defer pool.Put(buf)
 
-	mCh := make(chan Msg, 1)
 	eCh := make(chan error, 1)
 
-	id := c.fcm.next(mCh, eCh)
+	id := c.fcm.next(eCh)
 	defer c.fcm.delete(id)
 
 	buf = append(buf, byte(request.OP_CODE_FETCH))
@@ -54,23 +54,38 @@ func (c *Consumer) Fetch(n uint32, handler func(msg Msg)) error {
 
 	c.out.EnqueueProto(buf)
 
+	ctx, cancel := context.WithTimeout(ctx, c.conn.timeout)
+	defer cancel()
+
 	select {
-	case <-time.After(c.conn.timeout):
-		return ErrTimeout
+	case <-ctx.Done():
+		return nil, ErrTimeout
 	case err := <-eCh:
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		return c.fcm.getMsgs(id), nil
+	}
+}
+
+func (c *Consumer) Close() error {
+	if c.closed.Load() {
+		return nil
 	}
 
-	for msg := range mCh {
-		handler(msg)
-		if msg.meta != nil {
-			pool.Put(msg.meta)
-		}
-		pool.Put(msg.Value)
+	c.closed.Store(true)
+
+	c.out.EnqueueProto(DISCONNECT_REQ)
+	select {
+	case <-time.After(c.conn.timeout):
+	case <-c.disconnectCh:
 	}
 
+	c.r.Close()
+
+	c.out.Close()
+	c.wg.Wait()
 	return nil
 }
 
@@ -90,6 +105,10 @@ func (c *Consumer) parse(buf []byte) error {
 				c.ps.state = OP_FETCH
 			case byte(response.RESP_CODE_MSG):
 				c.ps.state = OP_MSG
+			case byte(response.RESP_CODE_ACK):
+				c.ps.state = OP_ACK
+			case byte(response.RESP_CODE_NACK):
+				c.ps.state = OP_NACK
 			case byte(response.RESP_CODE_DISCONNECT):
 				close(c.disconnectCh)
 				return nil
@@ -100,8 +119,8 @@ func (c *Consumer) parse(buf []byte) error {
 		case OP_FETCH:
 			c.ps.ca.cID = pool.Get(fujin.Uint32Len)
 			c.ps.ca.cID = append(c.ps.ca.cID, b)
-			c.ps.state = OP_CORRELATION_ID_ARG
-		case OP_CORRELATION_ID_ARG:
+			c.ps.state = OP_FETCH_CORRELATION_ID_ARG
+		case OP_FETCH_CORRELATION_ID_ARG:
 			toCopy := fujin.Uint32Len - len(c.ps.ca.cID)
 			avail := len(buf) - i
 
@@ -144,16 +163,180 @@ func (c *Consumer) parse(buf []byte) error {
 			if len(c.ps.argBuf) >= fujin.Uint32Len {
 				c.ps.fa.n = binary.BigEndian.Uint32(c.ps.argBuf)
 				pool.Put(c.ps.argBuf)
-				c.ps.argBuf, c.ps.state = nil, OP_ERROR_CODE_ARG
+				c.ps.argBuf, c.ps.state = nil, OP_FETCH_ERROR_CODE_ARG
 			}
-		case OP_ERROR_CODE_ARG:
+		case OP_FETCH_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
 				pool.Put(c.ps.ca.cID)
 				c.ps.state = OP_START
 				continue
 			case byte(response.ERR_CODE_YES):
-				close(c.ps.fa.msgs)
+				c.ps.argBuf = pool.Get(fujin.Uint32Len)
+				c.ps.state = OP_FETCH_ERROR_PAYLOAD_ARG
+			default:
+				c.r.Close()
+				return ErrParseProto
+			}
+		case OP_FETCH_ERROR_PAYLOAD_ARG:
+			c.ps.argBuf = append(c.ps.argBuf, b)
+			if len(c.ps.argBuf) >= fujin.Uint32Len {
+				if err := c.parseErrLenArg(); err != nil {
+					pool.Put(c.ps.argBuf)
+					pool.Put(c.ps.ca.cID)
+					c.r.Close()
+					err = fmt.Errorf("parse write err len arg: %w", err)
+					c.ps.fa.err <- err
+					close(c.ps.fa.err)
+					return err
+				}
+				pool.Put(c.ps.argBuf)
+				c.ps.argBuf, c.ps.state = nil, OP_FETCH_ERROR_PAYLOAD
+			}
+		case OP_FETCH_ERROR_PAYLOAD:
+			if c.ps.payloadBuf != nil {
+				toCopy := int(c.ps.ea.errLen) - len(c.ps.payloadBuf)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(c.ps.payloadBuf)
+					c.ps.payloadBuf = c.ps.payloadBuf[:start+toCopy]
+					copy(c.ps.payloadBuf[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					c.ps.payloadBuf = append(c.ps.payloadBuf, b)
+				}
+
+				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
+					c.ps.fa.err <- errors.New(string(c.ps.payloadBuf))
+					close(c.ps.fa.err)
+					c.ps.ca, c.ps.payloadBuf, c.ps.ea, c.ps.state = correlationIDArg{}, nil, errArg{}, OP_START
+				}
+			} else {
+				c.ps.payloadBuf = make([]byte, 0, c.ps.ea.errLen)
+				c.ps.payloadBuf = append(c.ps.payloadBuf, b)
+
+				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
+					c.ps.fa.err <- errors.New(string(c.ps.payloadBuf))
+					close(c.ps.fa.err)
+					c.ps.ca, c.ps.payloadBuf, c.ps.ea, c.ps.state = correlationIDArg{}, nil, errArg{}, OP_START
+				}
+			}
+		case OP_MSG:
+			if c.msgMetaLen == 0 {
+				c.ps.argBuf = pool.Get(fujin.Uint32Len)
+				c.ps.argBuf = append(c.ps.argBuf, b)
+				c.ps.state = OP_MSG_ARG
+				continue
+			}
+			c.ps.metaBuf = make([]byte, 0, c.msgMetaLen)
+			c.ps.metaBuf = append(c.ps.metaBuf, b)
+			c.ps.state = OP_MSG_META_ARG
+		case OP_MSG_META_ARG:
+			c.ps.metaBuf = append(c.ps.metaBuf, b)
+			if len(c.ps.metaBuf) >= int(c.msgMetaLen) {
+				c.ps.argBuf = pool.Get(fujin.Uint32Len)
+				c.ps.state = OP_MSG_ARG
+				continue
+			}
+		case OP_MSG_ARG:
+			c.ps.argBuf = append(c.ps.argBuf, b)
+			if len(c.ps.argBuf) >= fujin.Uint32Len {
+				if err := c.parseMsgLenArg(); err != nil {
+					pool.Put(c.ps.argBuf)
+					c.r.Close()
+					err = fmt.Errorf("parse msg len arg: %w", err)
+					c.ps.fa.err <- err
+					close(c.ps.fa.err)
+					return err
+				}
+				pool.Put(c.ps.argBuf)
+				c.ps.argBuf, c.ps.state = nil, OP_MSG_PAYLOAD
+			}
+		case OP_MSG_PAYLOAD:
+			if c.ps.payloadBuf != nil {
+				toCopy := int(c.ps.ma.len) - len(c.ps.payloadBuf)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(c.ps.payloadBuf)
+					c.ps.payloadBuf = c.ps.payloadBuf[:start+toCopy]
+					copy(c.ps.payloadBuf[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					c.ps.payloadBuf = append(c.ps.payloadBuf, b)
+				}
+
+				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
+					c.ps.fa.msgs = append(c.ps.fa.msgs, Msg{
+						Value: c.ps.payloadBuf,
+						meta:  c.ps.metaBuf,
+						r:     c.clientReader,
+					})
+					c.ps.fa.handled++
+					if c.ps.fa.handled >= c.ps.fa.n {
+						c.fcm.setMsgs(c.ps.ca.cIDUint32, c.ps.fa.msgs)
+						close(c.ps.fa.err)
+						c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+					}
+					c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+				}
+			} else {
+				c.ps.payloadBuf = make([]byte, 0, c.ps.ma.len)
+				c.ps.payloadBuf = append(c.ps.payloadBuf, b)
+
+				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
+					c.ps.fa.msgs = append(c.ps.fa.msgs, Msg{
+						Value: c.ps.payloadBuf,
+						meta:  c.ps.metaBuf,
+						r:     c.clientReader,
+					})
+					c.ps.fa.handled++
+					if c.ps.fa.handled >= c.ps.fa.n {
+						c.fcm.setMsgs(c.ps.ca.cIDUint32, c.ps.fa.msgs)
+						close(c.ps.fa.err)
+						c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+					}
+					c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+				}
+			}
+		case OP_CORRELATION_ID_ARG:
+			toCopy := fujin.Uint32Len - len(c.ps.ca.cID)
+			avail := len(buf) - i
+
+			if avail < toCopy {
+				toCopy = avail
+			}
+
+			if toCopy > 0 {
+				start := len(c.ps.ca.cID)
+				c.ps.ca.cID = c.ps.ca.cID[:start+toCopy]
+				copy(c.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
+			} else {
+				c.ps.ca.cID = append(c.ps.ca.cID, b)
+			}
+
+			if len(c.ps.ca.cID) >= fujin.Uint32Len {
+				c.ps.ca.cIDUint32 = binary.BigEndian.Uint32(c.ps.ca.cID)
+				c.ps.state = OP_ERROR_CODE_ARG
+			}
+		case OP_ERROR_CODE_ARG:
+			switch b {
+			case byte(response.ERR_CODE_NO):
+				c.cm.send(c.ps.ca.cIDUint32, nil)
+				pool.Put(c.ps.ca.cID)
+				c.ps.ca, c.ps.state = correlationIDArg{}, OP_START
+				continue
+			case byte(response.ERR_CODE_YES):
 				c.ps.argBuf = pool.Get(fujin.Uint32Len)
 				c.ps.state = OP_ERROR_PAYLOAD_ARG
 			default:
@@ -167,10 +350,7 @@ func (c *Consumer) parse(buf []byte) error {
 					pool.Put(c.ps.argBuf)
 					pool.Put(c.ps.ca.cID)
 					c.r.Close()
-					err = fmt.Errorf("parse write err len arg: %w", err)
-					c.ps.fa.err <- err
-					close(c.ps.fa.err)
-					return err
+					return fmt.Errorf("parse write err len arg: %w", err)
 				}
 				pool.Put(c.ps.argBuf)
 				c.ps.argBuf, c.ps.state = nil, OP_ERROR_PAYLOAD
@@ -194,102 +374,26 @@ func (c *Consumer) parse(buf []byte) error {
 				}
 
 				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
-					c.ps.fa.err <- errors.New(string(c.ps.payloadBuf))
-					close(c.ps.fa.err)
-					pool.Put(c.ps.payloadBuf)
-					c.ps.ca, c.ps.payloadBuf, c.ps.ea, c.ps.state = correlationIDArg{}, nil, errArg{}, OP_START
+					c.cm.send(c.ps.ca.cIDUint32, errors.New(string(c.ps.payloadBuf)))
+					c.ps.ca.cID, c.ps.payloadBuf, c.ps.ea, c.ps.state = nil, nil, errArg{}, OP_START
 				}
 			} else {
 				c.ps.payloadBuf = pool.Get(int(c.ps.ea.errLen))
 				c.ps.payloadBuf = append(c.ps.payloadBuf, b)
 
 				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
-					c.ps.fa.err <- errors.New(string(c.ps.payloadBuf))
-					close(c.ps.fa.err)
-					c.ps.ca, c.ps.payloadBuf, c.ps.ea, c.ps.state = correlationIDArg{}, nil, errArg{}, OP_START
+					c.cm.send(c.ps.ca.cIDUint32, errors.New(string(c.ps.payloadBuf)))
+					c.ps.ca.cID, c.ps.payloadBuf, c.ps.ea, c.ps.state = nil, nil, errArg{}, OP_START
 				}
 			}
-		case OP_MSG:
-			if c.msgMetaLen == 0 {
-				c.ps.argBuf = pool.Get(fujin.Uint32Len)
-				c.ps.argBuf = append(c.ps.argBuf, b)
-				c.ps.state = OP_MSG_ARG
-				continue
-			}
-			c.ps.metaBuf = pool.Get(int(c.msgMetaLen))
-		case OP_MSG_META_ARG:
-			if len(c.ps.metaBuf) >= int(c.msgMetaLen) {
-				c.ps.argBuf = pool.Get(fujin.Uint32Len)
-				c.ps.argBuf = append(c.ps.argBuf, b)
-				c.ps.state = OP_MSG_ARG
-				continue
-			}
-			c.ps.metaBuf = append(c.ps.metaBuf, b)
-		case OP_MSG_ARG:
-			c.ps.argBuf = append(c.ps.argBuf, b)
-			if len(c.ps.argBuf) >= fujin.Uint32Len {
-				if err := c.parseMsgLenArg(); err != nil {
-					pool.Put(c.ps.argBuf)
-					c.r.Close()
-					err = fmt.Errorf("parse msg len arg: %w", err)
-					c.ps.fa.err <- err
-					close(c.ps.fa.err)
-					close(c.ps.fa.msgs)
-					return err
-				}
-				close(c.ps.fa.err)
-				pool.Put(c.ps.argBuf)
-				c.ps.argBuf, c.ps.state = nil, OP_MSG_PAYLOAD
-			}
-		case OP_MSG_PAYLOAD:
-			if c.ps.payloadBuf != nil {
-				toCopy := int(c.ps.ma.len) - len(c.ps.payloadBuf)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(c.ps.payloadBuf)
-					c.ps.payloadBuf = c.ps.payloadBuf[:start+toCopy]
-					copy(c.ps.payloadBuf[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					c.ps.payloadBuf = append(c.ps.payloadBuf, b)
-				}
-
-				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
-					c.ps.fa.msgs <- Msg{
-						Value: c.ps.payloadBuf,
-						meta:  c.ps.metaBuf,
-						r:     c.clientReader,
-					}
-					c.ps.fa.handled++
-					if c.ps.fa.handled >= c.ps.fa.n {
-						close(c.ps.fa.msgs)
-						c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
-					}
-					c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
-				}
-			} else {
-				c.ps.payloadBuf = pool.Get(int(c.ps.ma.len))
-				c.ps.payloadBuf = append(c.ps.payloadBuf, b)
-
-				if len(c.ps.payloadBuf) >= int(c.ps.ma.len) {
-					c.ps.fa.msgs <- Msg{
-						Value: c.ps.payloadBuf,
-						meta:  c.ps.metaBuf,
-						r:     c.clientReader,
-					}
-					c.ps.fa.handled++
-					if c.ps.fa.handled >= c.ps.fa.n {
-						close(c.ps.fa.msgs)
-						c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
-					}
-					c.ps.metaBuf, c.ps.payloadBuf, c.ps.ma, c.ps.fa, c.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
-				}
-			}
+		case OP_ACK:
+			c.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			c.ps.ca.cID = append(c.ps.ca.cID, b)
+			c.ps.state = OP_CORRELATION_ID_ARG
+		case OP_NACK:
+			c.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			c.ps.ca.cID = append(c.ps.ca.cID, b)
+			c.ps.state = OP_CORRELATION_ID_ARG
 		default:
 			c.r.Close()
 			return ErrParseProto
