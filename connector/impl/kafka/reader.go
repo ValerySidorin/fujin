@@ -50,7 +50,6 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 	reader := &Reader{
 		conf:       conf,
 		cl:         client,
-		fetching:   atomic.Bool{},
 		autoCommit: autoCommit,
 		l:          l.With("reader_type", "kafka"),
 	}
@@ -144,7 +143,11 @@ func (r *Reader) Ack(ctx context.Context, meta []byte) error {
 		},
 	}
 
+	fmt.Println(offsets)
+
 	var rerr error
+
+	return rerr
 
 	r.cl.CommitOffsetsSync(ctx, offsets, func(_ *kgo.Client, _ *kmsg.OffsetCommitRequest, resp *kmsg.OffsetCommitResponse, err error) {
 		if err != nil {

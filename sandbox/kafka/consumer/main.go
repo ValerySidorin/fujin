@@ -21,6 +21,7 @@ func main() {
 		kgo.ConsumeTopics("my_pub_topic"),
 		kgo.ConsumerGroup("fujin1"),
 		kgo.FetchIsolationLevel(kgo.ReadCommitted()),
+		kgo.DisableAutoCommit(),
 	}
 
 	client, err := kgo.NewClient(opts...)
@@ -58,6 +59,9 @@ func main() {
 				n.Add(1)
 				record := iter.Next()
 				fmt.Println(time.Now(), string(record.Value), n.Load())
+				if err := client.CommitRecords(ctx, record); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}

@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -16,9 +15,6 @@ import (
 )
 
 var (
-	ErrConnClosed = errors.New("connection closed")
-	ErrTimeout    = errors.New("timeout")
-
 	ReadBufferSize = 512
 
 	DISCONNECT_REQ = []byte{byte(request.OP_CODE_DISCONNECT)}

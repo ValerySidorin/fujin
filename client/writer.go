@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -87,13 +88,8 @@ func (w *Writer) Write(topic string, p []byte) error {
 	}
 
 	buf := pool.Get(len(topic) + len(p) + 13)
-	defer pool.Put(buf)
-
 	ch := make(chan error, 1)
-	defer close(ch)
-
 	id := w.cm.next(ch)
-	defer w.cm.delete(id)
 
 	buf = append(buf, byte(request.OP_CODE_WRITE))
 	buf = binary.BigEndian.AppendUint32(buf, id)
@@ -104,10 +100,20 @@ func (w *Writer) Write(topic string, p []byte) error {
 
 	w.out.EnqueueProto(buf)
 
+	ctx, cancel := context.WithTimeout(context.Background(), w.conn.timeout)
+
 	select {
-	case <-time.After(w.conn.timeout):
+	case <-ctx.Done():
+		cancel()
+		w.cm.delete(id)
+		close(ch)
+		pool.Put(buf)
 		return ErrTimeout
 	case err := <-ch:
+		cancel()
+		w.cm.delete(id)
+		close(ch)
+		pool.Put(buf)
 		return err
 	}
 }

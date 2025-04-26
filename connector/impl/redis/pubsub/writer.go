@@ -76,10 +76,9 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 		defer w.wg.Done()
 		callback(err)
 	})
-	shouldFlush := len(w.buffer) >= w.batchSize
 	w.mu.Unlock()
 
-	if shouldFlush {
+	if len(w.buffer) >= w.batchSize {
 		select {
 		case w.flushCh <- struct{}{}:
 		default:
@@ -123,7 +122,7 @@ func (w *Writer) flush() {
 		cbs[i](r.Error())
 	}
 
-	w.bufPool.Put(cmds[:0])
+	w.bufPool.Put(cmds)
 }
 
 func (w *Writer) Flush(_ context.Context) error {

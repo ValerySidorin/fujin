@@ -100,15 +100,15 @@ services:
       - "61616:61616"
       - "8161:8161"
     restart: always
-  # valkey:
-  #   image: valkey/valkey:latest
-  #   container_name: valkey
-  #   ports:
-  #     - "6379:6379"
-  #   restart: always
-  garnet:
-    image: ghcr.io/microsoft/garnet
-    container_name: garnet
+  valkey:
+    image: valkey/valkey:latest
+    container_name: valkey
     ports:
       - "6379:6379"
     restart: always
+  # garnet:
+  #   image: ghcr.io/microsoft/garnet
+  #   container_name: garnet
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always
