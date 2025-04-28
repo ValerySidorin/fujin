@@ -53,6 +53,7 @@ func main() {
 			if err := w.Write("pub", []byte("hello from fujin client")); err != nil {
 				log.Fatal(err)
 			}
+			fmt.Println("message sent")
 			time.Sleep(1 * time.Second)
 		}
 	}

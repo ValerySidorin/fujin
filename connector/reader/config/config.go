@@ -6,6 +6,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
+	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
 )
 
@@ -16,5 +17,6 @@ type Config struct {
 	AMQP091       amqp091.ReaderConfig        `yaml:"amqp091"`
 	AMQP10        amqp10.ReaderConfig         `yaml:"amqp10"`
 	RedisPubSub   redis_pubsub.ReaderConfig   `yaml:"redis_pubsub"`
+	RedisStreams  redis_streams.ReaderConfig  `yaml:"redis_streams"`
 	Reusable      bool                        `yaml:"-"`
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
+	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
 	"github.com/ValerySidorin/fujin/connector/writer/config"
 )
@@ -36,6 +37,8 @@ func NewWriter(conf config.Config, writerID string, l *slog.Logger) (Writer, err
 		return amqp10.NewWriter(conf.AMQP10, l)
 	case protocol.RedisPubSub:
 		return redis_pubsub.NewWriter(conf.RedisPubSub, l)
+	case protocol.RedisStreams:
+		return redis_streams.NewWriter(conf.RedisStreams, l)
 	}
 
 	return nil, fmt.Errorf("invalid writer protocol: %s", conf.Protocol)

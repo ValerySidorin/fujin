@@ -49,6 +49,14 @@ connectors:
     #       addr: amqp://artemis:artemis@localhost:61616
     #     sender:
     #       target: exchange
+    pub:
+      protocol: redis_streams
+      redis_streams:
+        init_address: ["localhost:6379"]
+        stream: stream
+        batch_size: 1000
+        linger: 10ms
+        # parse_msg_protocol: json
   readers:
     # sub:
     #   protocol: kafka
@@ -97,4 +105,16 @@ connectors:
     #   redis_pubsub:
     #     init_address: ["localhost:6379"]
     #     channel: example-channel
+    sub:
+      protocol: redis_streams
+      redis_streams:
+        init_address: ["localhost:6379"]
+        group:
+          name: fujin
+          consumer: fujin
+          create_id: "$"
+        stream: stream
+        start_id: ">"
+        block: 3s
+        # parse_msg_protocol: json
 
