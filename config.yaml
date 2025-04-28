@@ -20,6 +20,9 @@ connectors:
     #     topic: my_pub_topic
     #     allow_auto_topic_creation: true
     #     linger: 10ms
+    #     max_buffered_records: 10000
+    #     disable_idempotent_write: false
+
     # pub:
     #   protocol: nats
     #   nats:
@@ -54,8 +57,13 @@ connectors:
     #     topic: my_pub_topic
     #     group: fujin
     #     allow_auto_topic_creation: true
-    #     max_poll_records: 0
-    #     fetch_isolation_level: read_commited # read_uncommited/read_uncommited
+    #     max_poll_records: 10000
+    #     auto_commit_interval: 5s
+    #     auto_commit_marks: false
+    #     block_rebalance_on_poll: false
+    #     balancers:
+    #       - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
+    #     fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
     # sub:
     #   protocol: nats
     #   nats:

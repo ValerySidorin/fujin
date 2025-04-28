@@ -38,9 +38,23 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		opts = append(opts, kgo.DisableAutoCommit())
 	}
 
+	if conf.AutoCommitInterval != 0 {
+		opts = append(opts, kgo.AutoCommitInterval(conf.AutoCommitInterval))
+	}
+
+	if conf.AutoCommitMarks {
+		opts = append(opts, kgo.AutoCommitMarks())
+	}
+
+	if conf.BlockRebalanceOnPoll {
+		opts = append(opts, kgo.BlockRebalanceOnPoll())
+	}
+
 	if conf.FetchIsolationLevel == IsolationLevelReadCommited {
 		opts = append(opts, kgo.FetchIsolationLevel(kgo.ReadCommitted()))
 	}
+
+	appendBalancersToKgoOpts(opts, conf.Balancers)
 
 	client, err := kgo.NewClient(opts...)
 	if err != nil {

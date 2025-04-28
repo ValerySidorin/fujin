@@ -6,6 +6,16 @@ import (
 	"github.com/ValerySidorin/fujin/connector/cerr"
 )
 
+type Balancer string
+
+const (
+	BalancerUnknown           Balancer = ""
+	BalancerSticky            Balancer = "sticky"
+	BalancerCooperativeSticky Balancer = "cooperative_sticky"
+	BalancerRange             Balancer = "range"
+	BalancerRoundRobin        Balancer = "round_robin"
+)
+
 type IsolationLevel string
 
 const (
@@ -21,6 +31,10 @@ type ReaderConfig struct {
 	AllowAutoTopicCreation bool           `yaml:"allow_auto_topic_creation"`
 	MaxPollRecords         int            `yaml:"max_poll_records"`
 	FetchIsolationLevel    IsolationLevel `yaml:"fetch_isolation_level"`
+	AutoCommitInterval     time.Duration  `yaml:"auto_commit_interval"`
+	AutoCommitMarks        bool           `yaml:"auto_commit_marks"`
+	Balancers              []Balancer     `yaml:"balancers"`
+	BlockRebalanceOnPoll   bool           `yaml:"block_rebalance_on_poll"`
 }
 
 type WriterConfig struct {
@@ -28,6 +42,8 @@ type WriterConfig struct {
 	Topic                  string        `yaml:"topic"`
 	Linger                 time.Duration `yaml:"linger"`
 	AllowAutoTopicCreation bool          `yaml:"allow_auto_topic_creation"`
+	MaxBufferedRecords     int           `yaml:"max_buffered_records"`
+	DisableIdempotentWrite bool          `yaml:"disable_idempotent_write"`
 
 	Endpoint string `yaml:"-"` // Used to compare writers that can be shared in tx
 }
