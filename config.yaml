@@ -109,7 +109,7 @@ connectors:
       protocol: redis_streams
       redis_streams:
         init_address: ["localhost:6379"]
-        group:
+        group: # optional, if not present - uses simple xread
           name: fujin
           consumer: fujin
           create_id: "$"

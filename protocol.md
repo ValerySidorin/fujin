@@ -1,6 +1,6 @@
 # Fujin protocol
 
-This document provides a brief description of the native Fujin protocol, used for communication between the Fujin server and client. It is a byte-based publish/subscribe protocol. The Fujin server operates as a QUIC server.
+This document provides a brief description of the native Fujin protocol, used for communication between the Fujin server and client. It is a byte-based protocol that supports pub/sub, message queue and request/reply (TODO) patterns. The Fujin server operates as a QUIC server.
 
 The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylRKac5kSOk?t=10m46s), inspired by the NATS server, ensuring high speed and efficiency.
 
@@ -16,7 +16,7 @@ Before describing the commands, let's explore the data types used in the Fujin p
 
 | Type   | Length (bytes)        | Example                                 | Representation              |
 |--------|-----------------------|-----------------------------------------| --------------------------- |
-| byte   | 1                     | `[12]`                                  | `0x0B`                      |
+| byte   | 1                     | `[11]`                                  | `0x0B`                      |
 | uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
 | string | dynamic (len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]` | `hello`                     |
 | bool   | 1                     | `[0]`                                   | `false`                     |  

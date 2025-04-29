@@ -22,6 +22,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
 	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
+	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
 	writer_config "github.com/ValerySidorin/fujin/connector/writer/config"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
@@ -205,6 +206,44 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 	},
 }
 
+var DefaultTestConfigWithRedisStreams = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	Connectors: connector.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "redis_streams",
+				RedisStreams: redis_streams.ReaderConfig{
+					InitAddress: []string{"localhost:6379"},
+					Stream:      "stream",
+					Group: struct {
+						Name     string "yaml:\"name\""
+						Consumer string "yaml:\"consumer\""
+						CreateId string "yaml:\"create_id\""
+					}{
+						Name:     "fujin",
+						Consumer: "fujin",
+						CreateId: "$",
+					},
+					StartId:      ">",
+					DisableCache: true,
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "redis_streams",
+				RedisStreams: redis_streams.WriterConfig{
+					InitAddress:  []string{"localhost:6379"},
+					Stream:       "stream",
+					DisableCache: true,
+					BatchSize:    1000,
+					Linger:       5 * time.Millisecond,
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
@@ -223,6 +262,10 @@ func RunDefaultServerWithAMQP10(ctx context.Context) *server.Server {
 
 func RunDefaultServerWithRedisPubSub(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithRedisPubSub)
+}
+
+func RunDefaultServerWithRedisStreams(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithRedisStreams)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {
