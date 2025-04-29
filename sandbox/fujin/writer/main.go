@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/client"
+	"github.com/ValerySidorin/fujin/sandbox/fujin"
 )
 
 func main() {
@@ -45,12 +47,22 @@ func main() {
 
 	defer w.Close()
 
+	msg := fujin.TestMsg{
+		Field: "test",
+	}
+
+	data, err := json.Marshal(&msg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if err := w.Write("pub", []byte("hello from fujin client")); err != nil {
+
+			if err := w.Write("pub", data); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Println("message sent")

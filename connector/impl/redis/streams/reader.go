@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unsafe"
 
@@ -17,14 +16,13 @@ import (
 )
 
 type Reader struct {
-	conf         ReaderConfig
-	client       rueidis.Client
-	handler      func(resp map[string][]rueidis.XRangeEntry, h func(message []byte, args ...any))
-	marshal      func(v any) ([]byte, error)
-	id           string
-	autoCommit   bool
-	strSlicePool sync.Pool
-	l            *slog.Logger
+	conf       ReaderConfig
+	client     rueidis.Client
+	handler    func(resp map[string][]rueidis.XRangeEntry, h func(message []byte, args ...any))
+	marshal    func(v any) ([]byte, error)
+	id         string
+	autoCommit bool
+	l          *slog.Logger
 }
 
 func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
@@ -275,14 +273,11 @@ func marshalFunc(proto ParseMsgProtocol) func(v any) ([]byte, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid type: %T", v)
 			}
-
 			val, ok := m["msg"]
 			if !ok {
 				return nil, fmt.Errorf("msg not found in map")
 			}
-
 			data := unsafe.Slice((*byte)(unsafe.StringData(val)), len(val))
-
 			return data, nil
 		}
 	}

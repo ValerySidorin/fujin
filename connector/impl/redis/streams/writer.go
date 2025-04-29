@@ -21,8 +21,8 @@ type Writer struct {
 	mu     sync.Mutex
 	buffer []rueidis.Completed
 
-	parse    func(data []byte, v any) error
-	callback []func(err error)
+	unmarshal func(data []byte, v any) error
+	callback  []func(err error)
 
 	batchSize int
 	linger    time.Duration
@@ -64,7 +64,7 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 				return make(map[string]string)
 			},
 		},
-		parse: unmarshalFunc(conf.ParseMsgProtocol),
+		unmarshal: unmarshalFunc(conf.ParseMsgProtocol),
 	}
 
 	go w.flusher()
@@ -77,7 +77,7 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 
 	m := w.mPool.Get().(map[string]string)
 
-	if err := w.parse(msg, m); err != nil {
+	if err := w.unmarshal(msg, &m); err != nil {
 		callback(err)
 		w.mPool.Put(m)
 		w.mu.Unlock()
@@ -183,10 +183,7 @@ func unmarshalFunc(proto ParseMsgProtocol) func(data []byte, v any) error {
 		return json.Unmarshal
 	default:
 		return func(data []byte, v any) error {
-			m, ok := v.(map[string]string)
-			if !ok {
-				return fmt.Errorf("invalid type: %T", v)
-			}
+			m := *(v.(*map[string]string))
 			m["msg"] = unsafe.String((*byte)(unsafe.SliceData(data)), len(data))
 			return nil
 		}
