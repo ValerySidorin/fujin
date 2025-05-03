@@ -7,9 +7,14 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/common/assert"
 	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/quic-go/quic-go"
+)
+
+var (
+	ErrNilHandler = errors.New("handler is nil")
 )
 
 const (
@@ -26,6 +31,9 @@ type inbound struct {
 }
 
 func newInbound(str quic.Stream, ftt time.Duration, h *handler, l *slog.Logger) *inbound {
+	assert.NotNil(h)
+	assert.NotNil(l)
+
 	return &inbound{
 		str: str,
 		h:   h,

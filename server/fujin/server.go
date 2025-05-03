@@ -178,15 +178,13 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 					connWg.Add(1)
 					go func() {
-						defer connWg.Done()
-
 						out := fujin.NewOutbound(str, s.conf.WriteDeadline, s.l)
 						h := newHandler(ctx, s.cman, out, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
-
 						go in.readLoop(ctx)
 						out.WriteLoop()
 						str.Close()
+						connWg.Done()
 					}()
 				}
 			}()

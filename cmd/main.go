@@ -25,6 +25,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	ErrNilConfig                     = errors.New("nil config")
+	ErrTLSClientCertsDirNotSpecified = errors.New("client certs dir not specified, while mTLS enabled")
+	ErrTLSServerCertPathNotSpecified = errors.New("server cert path not specified")
+	ErrTLSServerKeyPathNotSpecified  = errors.New("server cert path not specified")
+
+	NextProtos = []string{"fujin"}
+)
+
 type Config struct {
 	Fujin      FujinConfig      `yaml:"fujin"`
 	Connectors connector.Config `yaml:"connectors"`
@@ -79,6 +88,10 @@ func (c *Config) parse() (config.Config, error) {
 }
 
 func (c *Config) parseFujinServerConfig() (fujin.ServerConfig, error) {
+	if c == nil {
+		return fujin.ServerConfig{}, ErrNilConfig
+	}
+
 	tlsConf, err := c.Fujin.TLS.parse()
 	if err != nil {
 		return fujin.ServerConfig{}, fmt.Errorf("parse TLS conf: %w", err)
@@ -107,15 +120,15 @@ func (c *QUICConfig) parse() *quic.Config {
 
 func (c *TLSConfig) validate() error {
 	if c.ClientCertsDir == "" && c.MTLSEnabled {
-		return errors.New("client certs dir not specified, while mTLS enabled")
+		return ErrTLSClientCertsDirNotSpecified
 	}
 
 	if c.ServerCertPEMPath == "" {
-		return errors.New("server cert path not specified")
+		return ErrTLSServerCertPathNotSpecified
 	}
 
 	if c.ServerKeyPEMPath == "" {
-		return errors.New("server key path not specified")
+		return ErrTLSServerKeyPathNotSpecified
 	}
 
 	return nil
@@ -155,13 +168,11 @@ func (c *TLSConfig) parse() (*tls.Config, error) {
 		clientAuth = tls.RequireAndVerifyClientCert
 	}
 
-	nextProtos := []string{"fujin"}
-
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    caCertPool,
 		ClientAuth:   clientAuth,
-		NextProtos:   nextProtos,
+		NextProtos:   NextProtos,
 	}, nil
 }
 
@@ -247,9 +258,9 @@ func loadConfig(filePath string, cfg *Config) error {
 	for _, p := range paths {
 		f, err := os.Open(p)
 		if err == nil {
-			defer f.Close()
 			log.Printf("reading config from: %s\n", p)
 			data, err := io.ReadAll(f)
+			f.Close()
 			if err != nil {
 				return fmt.Errorf("read config: %w", err)
 			}

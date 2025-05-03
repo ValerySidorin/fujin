@@ -32,14 +32,4 @@ func (c *Config) SetDefaults() {
 	if c.Fujin.ForceTerminateTimeout == 0 {
 		c.Fujin.ForceTerminateTimeout = 15 * time.Second
 	}
-
-	for _, c := range c.Connectors.Readers {
-		switch c.Protocol {
-		// no reusable readers for now
-		case "kafka":
-			c.Reusable = false
-		default:
-			c.Reusable = false
-		}
-	}
 }

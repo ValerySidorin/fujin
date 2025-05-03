@@ -76,10 +76,14 @@ const (
 )
 
 var (
-	ErrParseProto               = errors.New("parse proto")
-	ErrWriterCanNotBeReusedInTx = errors.New("writer can not be reuse in tx")
-	ErrFetchArgNotProvided      = errors.New("fetch arg not provided")
-	ErrInvalidReaderType        = errors.New("invalid reader type")
+	ErrParseProto                   = errors.New("parse proto")
+	ErrWriterCanNotBeReusedInTx     = errors.New("writer can not be reuse in tx")
+	ErrFetchArgNotProvided          = errors.New("fetch arg not provided")
+	ErrInvalidReaderType            = errors.New("invalid reader type")
+	ErrReaderNameSizeArgNotProvided = errors.New("reader name size arg not provided")
+
+	ErrWriteTopicArgEmpty   = errors.New("write topic arg is empty")
+	ErrWriteMsgSizeArgEmpty = errors.New("write size arg not provided")
 
 	ErrConnectReaderIsAutoCommitArgInvalid = errors.New("connect reader is auto commit arg invalid")
 
@@ -130,9 +134,9 @@ type writeMsgArgs struct {
 }
 
 type connectReaderArgs struct {
-	size       uint32
-	typ        byte
-	autoCommit bool
+	readerNameLen uint32
+	typ           byte
+	autoCommit    bool
 }
 
 type connectWriterArgs struct {
@@ -1175,7 +1179,7 @@ func (h *handler) handle(buf []byte) error {
 		case OP_CONNECT_READER_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
-				if err := h.parseReaderSizeArg(); err != nil {
+				if err := h.parseReaderNameSizeArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.cra, h.ps.state = nil, connectReaderArgs{}, OP_START
 					enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
@@ -1187,7 +1191,7 @@ func (h *handler) handle(buf []byte) error {
 			}
 		case OP_CONNECT_READER_PAYLOAD:
 			if h.ps.payloadBuf != nil {
-				toCopy := int(h.ps.cra.size) - len(h.ps.payloadBuf)
+				toCopy := int(h.ps.cra.readerNameLen) - len(h.ps.payloadBuf)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -1203,14 +1207,13 @@ func (h *handler) handle(buf []byte) error {
 					h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				}
 
-				if len(h.ps.payloadBuf) >= int(h.ps.cra.size) {
+				if len(h.ps.payloadBuf) >= int(h.ps.cra.readerNameLen) {
 					h.ps.state = OP_START
-					sub := string(h.ps.payloadBuf)
 					pool.Put(h.ps.payloadBuf)
 
 					h.sessionState = SESSION_STATE_READER
 
-					r, err := h.cman.GetReader(sub, h.ps.cra.autoCommit)
+					r, err := h.cman.GetReader(string(h.ps.payloadBuf), h.ps.cra.autoCommit)
 					if err != nil {
 						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
 						h.close()
@@ -1244,7 +1247,7 @@ func (h *handler) handle(buf []byte) error {
 					continue
 				}
 			} else {
-				h.ps.payloadBuf = pool.Get(int(h.ps.cra.size))
+				h.ps.payloadBuf = pool.Get(int(h.ps.cra.readerNameLen))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 			}
 		default:
@@ -1414,7 +1417,7 @@ func (h *handler) parseWriteTopicLenArg() error {
 func (h *handler) parseWriteTopicArg() error {
 	h.ps.wa.topic = string(h.ps.argBuf)
 	if h.ps.wa.topic == "" {
-		return errors.New("publish cmd pub arg is empty")
+		return ErrWriteTopicArgEmpty
 	}
 
 	return nil
@@ -1423,16 +1426,16 @@ func (h *handler) parseWriteTopicArg() error {
 func (h *handler) parseWriteMsgSizeArg() error {
 	h.ps.wma.size = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
 	if h.ps.wma.size == 0 {
-		return errors.New("write msg cmd size arg not provided")
+		return ErrWriteMsgSizeArgEmpty
 	}
 
 	return nil
 }
 
-func (h *handler) parseReaderSizeArg() error {
-	h.ps.cra.size = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
-	if h.ps.cra.size == 0 {
-		return errors.New("reader size arg not provided")
+func (h *handler) parseReaderNameSizeArg() error {
+	h.ps.cra.readerNameLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
+	if h.ps.cra.readerNameLen == 0 {
+		return ErrReaderNameSizeArgNotProvided
 	}
 
 	return nil
@@ -1440,7 +1443,7 @@ func (h *handler) parseReaderSizeArg() error {
 
 func (h *handler) parseReaderTypeArg(b byte) error {
 	if b != 1 && b != 2 {
-		return errors.New("invalid reader type")
+		return ErrInvalidReaderType
 	}
 	h.ps.cra.typ = b
 	return nil
