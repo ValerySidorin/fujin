@@ -1535,7 +1535,7 @@ func (h *handler) enqueueNackSuccess(cID []byte) {
 	replaceUnsafe(h.nackSuccessRespTemplate, 1, cID)
 	buf := pool.Get(fujin.Uint32Len)
 	buf = binary.BigEndian.AppendUint32(buf, h.ps.aa.msgIDsLen)
-	h.out.EnqueueProtoMulti(h.ackSuccessRespTemplate, buf)
+	h.out.EnqueueProtoMulti(h.nackSuccessRespTemplate, buf)
 	pool.Put(buf)
 }
 
@@ -1550,8 +1550,8 @@ func (h *handler) enqueueNackSuccessNoLock(cID []byte) {
 }
 
 func (h *handler) enqueueNackErrNoLock(cID []byte, err error) {
-	replaceUnsafe(h.nackSuccessRespTemplate, 1, cID)
-	h.out.QueueOutboundNoLock(h.nackSuccessRespTemplate)
+	replaceUnsafe(h.nackErrRespTemplate, 1, cID)
+	h.out.QueueOutboundNoLock(h.nackErrRespTemplate)
 	h.out.QueueOutboundNoLock(errProtoBuf(err))
 	h.out.SignalFlush()
 }
@@ -1572,8 +1572,8 @@ func (h *handler) enqueueTxCommitSuccess(cID []byte) {
 }
 
 func (h *handler) enqueueTxCommitErr(cID []byte, err error) {
-	replaceUnsafe(h.txBeginErrRespTemplate, 1, cID)
-	h.out.EnqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
+	replaceUnsafe(h.txCommitErrRespTemplate, 1, cID)
+	h.out.EnqueueProtoMulti(h.txCommitErrRespTemplate, errProtoBuf(err))
 }
 
 func (h *handler) enqueueTxRollbackSuccess(cID []byte) {
