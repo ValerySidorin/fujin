@@ -1,6 +1,11 @@
 package streams
 
-import "time"
+import (
+	"time"
+
+	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/connector/impl/redis/config"
+)
 
 type ParseMsgProtocol string
 
@@ -8,35 +13,52 @@ const (
 	ParseMsgProtocolJSON ParseMsgProtocol = "json"
 )
 
+type StreamConf struct {
+	StartID       string `yaml:"start_id"`
+	GroupCreateID string `yaml:"group_create_id"`
+}
+
+type GroupConf struct {
+	Name     string `yaml:"name"`
+	Consumer string `yaml:"consumer"`
+}
+
 type ReaderConfig struct {
-	InitAddress  []string      `yaml:"init_address"`
-	Username     string        `yaml:"username"`
-	Password     string        `yaml:"password"`
-	Stream       string        `yaml:"stream"`
-	StartId      string        `yaml:"start_id"`
-	Block        time.Duration `yaml:"block"`
-	Count        int64         `yaml:"count"`
-	DisableCache bool          `yaml:"disable_cache"`
-	Group        struct {
-		Name     string `yaml:"name"`
-		Consumer string `yaml:"consumer"`
-		CreateId string `yaml:"create_id"`
-	} `yaml:"group"`
+	config.ReaderConfig `yaml:",inline"`
+	Streams             map[string]StreamConf `yaml:"streams"`
+	Block               time.Duration         `yaml:"block"`
+	Count               int64                 `yaml:"count"`
+	Group               GroupConf             `yaml:"group"`
 
 	ParseMsgProtocol ParseMsgProtocol `yaml:"parse_msg_protocol"`
 }
 
 type WriterConfig struct {
-	InitAddress  []string `yaml:"init_address"`
-	Username     string   `yaml:"username"`
-	Password     string   `yaml:"password"`
-	DisableCache bool     `yaml:"disable_cache"`
+	config.WriterConfig `yaml:",inline"`
+	Stream              string           `yaml:"stream"`
+	ParseMsgProtocol    ParseMsgProtocol `yaml:"parse_msg_protocol"`
+}
 
-	BatchSize int           `yaml:"batch_size"`
-	Linger    time.Duration `yaml:"linger"`
+func (c ReaderConfig) Validate() error {
+	if err := c.ReaderConfig.Validate(); err != nil {
+		return err
+	}
 
-	Stream           string           `yaml:"stream"`
-	ParseMsgProtocol ParseMsgProtocol `yaml:"parse_msg_protocol"`
+	if len(c.Streams) <= 0 {
+		return cerr.ValidationErr("one or more streams required")
+	}
 
-	Endpoint string `yaml:"-"` // Used to compare writers that can be shared in tx
+	return nil
+}
+
+func (c WriterConfig) Validate() error {
+	if err := c.WriterConfig.Validate(); err != nil {
+		return err
+	}
+
+	if c.Stream == "" {
+		return cerr.ValidationErr("stream is required")
+	}
+
+	return nil
 }

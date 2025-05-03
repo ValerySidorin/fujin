@@ -41,7 +41,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
 	r.mu.Lock()
 	if r.channel != nil {
 		return fmt.Errorf("amqp091: reader busy")
@@ -115,11 +115,11 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	var handler func(d amqp.Delivery)
 	if r.IsAutoCommit() {
 		handler = func(d amqp.Delivery) {
-			h(d.Body)
+			h(d.Body, d.Exchange)
 		}
 	} else {
 		handler = func(d amqp.Delivery) {
-			h(d.Body, d.DeliveryTag)
+			h(d.Body, d.Exchange, d.DeliveryTag)
 		}
 	}
 
@@ -142,29 +142,40 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
-	fetchResponseHandler func(n uint32),
-	msgHandler func(message []byte, args ...any),
-) error {
-	return cerr.ErrNotSupported
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) Ack(ctx context.Context, meta []byte) error {
-	return r.channel.Ack(binary.BigEndian.Uint64(meta), r.conf.Ack.Multiple)
-}
-
-func (r *Reader) Nack(ctx context.Context, meta []byte) error {
-	return r.channel.Nack(binary.BigEndian.Uint64(meta), r.conf.Nack.Multiple, r.conf.Nack.Requeue)
-}
-
-func (r *Reader) MessageMetaLen() byte {
-	if r.IsAutoCommit() {
-		return 0
+func (r *Reader) Ack(
+	ctx context.Context, msgIDs [][]byte,
+	ackHandler func(error),
+	ackMsgHandler func([]byte, error),
+) {
+	ackHandler(nil)
+	for _, msgID := range msgIDs {
+		ackMsgHandler(msgID, r.channel.Ack(binary.BigEndian.Uint64(msgID), r.conf.Ack.Multiple))
 	}
-	return 8
 }
 
-func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
+func (r *Reader) Nack(
+	ctx context.Context, msgIDs [][]byte,
+	nackHandler func(error),
+	nackMsgHandler func([]byte, error),
+) {
+	nackHandler(nil)
+	for _, msgID := range msgIDs {
+		nackMsgHandler(msgID, r.channel.Nack(binary.BigEndian.Uint64(msgID), r.conf.Nack.Multiple, r.conf.Nack.Requeue))
+	}
+}
+
+func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
 	return binary.BigEndian.AppendUint32(buf, uint32(args[0].(int64)))
+}
+
+func (r *Reader) MsgIDStaticArgsLen() int {
+	return 8
 }
 
 func (r *Reader) IsAutoCommit() bool {

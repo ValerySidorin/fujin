@@ -2,7 +2,6 @@ package streams
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/bytedance/sonic"
 	"github.com/redis/rueidis"
 )
 
@@ -36,7 +36,13 @@ type Writer struct {
 }
 
 func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
+	tlsConf, err := conf.TLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("redis: get tls config: %w", err)
+	}
+
 	client, err := rueidis.NewClient(rueidis.ClientOption{
+		TLSConfig:    tlsConf,
 		InitAddress:  conf.InitAddress,
 		Username:     conf.Username,
 		Password:     conf.Password,
@@ -180,7 +186,7 @@ func (w *Writer) Close() error {
 func unmarshalFunc(proto ParseMsgProtocol) func(data []byte, v any) error {
 	switch proto {
 	case ParseMsgProtocolJSON:
-		return json.Unmarshal
+		return sonic.Unmarshal
 	default:
 		return func(data []byte, v any) error {
 			m := *(v.(*map[string]string))

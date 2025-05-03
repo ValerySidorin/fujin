@@ -1,57 +1,39 @@
 package pubsub
 
 import (
-	"time"
-
 	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/connector/impl/redis/config"
 )
 
 type ReaderConfig struct {
-	InitAddress  []string `yaml:"init_address"`
-	Username     string   `yaml:"username"`
-	Password     string   `yaml:"password"`
-	Channel      string   `yaml:"channel"`
-	DisableCache bool     `yaml:"disable_cache"`
+	config.ReaderConfig
+	Channels []string `yaml:"channels"`
 }
 
 type WriterConfig struct {
-	InitAddress  []string `yaml:"init_address"`
-	Username     string   `yaml:"username"`
-	Password     string   `yaml:"password"`
-	Channel      string   `yaml:"channel"`
-	DisableCache bool     `yaml:"disable_cache"`
-
-	BatchSize int           `yaml:"batch_size"`
-	Linger    time.Duration `yaml:"linger"`
-
-	Endpoint string `yaml:"-"` // Used to compare writers that can be shared in tx
+	config.WriterConfig
+	Channel string `yaml:"channel"`
 }
 
 func (c ReaderConfig) Validate() error {
-	if len(c.InitAddress) == 0 {
-		return cerr.ValidationErr("init_address is required")
+	if err := c.ReaderConfig.Validate(); err != nil {
+		return err
 	}
-	if c.Channel == "" {
-		return cerr.ValidationErr("channel is required")
+
+	if len(c.Channels) <= 0 {
+		return cerr.ValidationErr("at least one channel is required")
 	}
 
 	return nil
 }
 
 func (c WriterConfig) Validate() error {
-	if len(c.InitAddress) == 0 {
-		return cerr.ValidationErr("init_address is required")
+	if err := c.WriterConfig.Validate(); err != nil {
+		return err
 	}
+
 	if c.Channel == "" {
 		return cerr.ValidationErr("channel is required")
-	}
-
-	if c.BatchSize <= 0 {
-		return cerr.ValidationErr("batch_size must be greater than 0")
-	}
-
-	if c.Linger <= 0 {
-		return cerr.ValidationErr("linger must be greater than 0")
 	}
 
 	return nil

@@ -17,12 +17,12 @@ const (
 )
 
 type Outbound struct {
+	sync.Mutex
 	v      net.Buffers   // vector
 	wv     net.Buffers   // working vector
 	wdl    time.Duration // write deadline
 	c      *sync.Cond
-	pb     int64 // pending bytes
-	mu     sync.Mutex
+	pb     int64           // pending bytes
 	str    quic.SendStream // current quic stream
 	closed atomic.Bool
 	l      *slog.Logger
@@ -36,7 +36,7 @@ func NewOutbound(
 		wdl: wdl,
 		l:   l,
 	}
-	o.c = sync.NewCond(&(o.mu))
+	o.c = sync.NewCond(&(o.Mutex))
 
 	return o
 }
@@ -46,50 +46,50 @@ func (o *Outbound) WriteLoop() {
 	var closed bool
 
 	for {
-		o.mu.Lock()
-		if closed = o.isClosed(); !closed {
+		o.Lock()
+		if closed = o.IsClosed(); !closed {
 			if waitOK && (o.pb == 0 || o.pb < maxBufSize) {
 				o.c.Wait()
-				closed = o.isClosed()
+				closed = o.IsClosed()
 			}
 		}
 
 		if closed {
 			o.flushOutbound()
-			o.mu.Unlock()
+			o.Unlock()
 			return
 		}
 
 		waitOK = o.flushOutbound()
-		o.mu.Unlock()
+		o.Unlock()
 	}
 }
 
 func (o *Outbound) EnqueueProto(proto []byte) {
-	if o.isClosed() {
+	if o.IsClosed() {
 		return
 	}
 
 	o.queueOutbound(proto)
-	o.signalFlush()
+	o.SignalFlush()
 }
 
 func (o *Outbound) EnqueueProtoMulti(protos ...[]byte) {
-	if o.isClosed() {
+	if o.IsClosed() {
 		return
 	}
 
-	o.mu.Lock()
+	o.Lock()
 	for _, proto := range protos {
-		o.queueOutboundNoLock(proto)
+		o.QueueOutboundNoLock(proto)
 	}
-	o.mu.Unlock()
-	o.signalFlush()
+	o.Unlock()
+	o.SignalFlush()
 }
 
 func (o *Outbound) flushOutbound() bool {
 	defer func() {
-		if o.isClosed() {
+		if o.IsClosed() {
 			for i := range o.wv {
 				pool.Put(o.wv[i])
 			}
@@ -143,7 +143,7 @@ func (o *Outbound) flushOutbound() bool {
 
 	o.pb -= n
 	if o.pb > 0 {
-		o.signalFlush()
+		o.SignalFlush()
 	}
 
 	return true
@@ -153,17 +153,17 @@ func (o *Outbound) getV() (net.Buffers, int64) {
 	return o.v, o.pb
 }
 
-func (o *Outbound) signalFlush() {
+func (o *Outbound) SignalFlush() {
 	o.c.Signal()
 }
 
 func (o *Outbound) queueOutbound(data []byte) {
-	if o.isClosed() {
+	if o.IsClosed() {
 		return
 	}
 
-	o.mu.Lock()
-	defer o.mu.Unlock()
+	o.Lock()
+	defer o.Unlock()
 	o.pb += int64(len(data))
 	toBuffer := data
 	if len(o.v) > 0 {
@@ -185,7 +185,7 @@ func (o *Outbound) queueOutbound(data []byte) {
 	}
 }
 
-func (o *Outbound) queueOutboundNoLock(data []byte) {
+func (o *Outbound) QueueOutboundNoLock(data []byte) {
 	o.pb += int64(len(data))
 	toBuffer := data
 	if len(o.v) > 0 {
@@ -207,7 +207,7 @@ func (o *Outbound) queueOutboundNoLock(data []byte) {
 	}
 }
 
-func (o *Outbound) isClosed() bool {
+func (o *Outbound) IsClosed() bool {
 	return o.closed.Load()
 }
 

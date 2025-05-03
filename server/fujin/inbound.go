@@ -96,4 +96,5 @@ func (i *inbound) close() {
 	i.h.wg.Wait()
 	i.h.out.Close()
 	<-i.h.closed
+	i.h.flushBufs()
 }

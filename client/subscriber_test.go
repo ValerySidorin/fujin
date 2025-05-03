@@ -38,11 +38,12 @@ func TestSubscriber(t *testing.T) {
 		}
 		defer conn.Close()
 
-		subscriber, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {})
+		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {})
 		if err != nil {
 			t.Fatalf("failed to connect subscriber: %v", err)
 		}
-		defer subscriber.Close()
+		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("non existing topic", func(t *testing.T) {
@@ -101,9 +102,12 @@ func TestSubscriber(t *testing.T) {
 
 		received := make([]client.Msg, 0)
 
-		_, _ = conn.ConnectSubscriber(conf, func(msg client.Msg) {
+		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			received = append(received, msg)
 		})
+		assert.NoError(t, err)
+		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
 		nc, _ := nats.Connect("localhost:4222")
 		_ = nc.Publish("my_subject", []byte("test message"))
@@ -114,6 +118,7 @@ func TestSubscriber(t *testing.T) {
 		assert.Equal(t, 2, len(received))
 		assert.Equal(t, "test message", string(received[0].Value))
 		assert.Equal(t, "test message", string(received[1].Value))
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("msg async", func(t *testing.T) {
@@ -144,9 +149,12 @@ func TestSubscriber(t *testing.T) {
 
 		received := make([]client.Msg, 0)
 
-		_, _ = conn.ConnectSubscriber(conf, func(msg client.Msg) {
+		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			received = append(received, msg)
 		})
+		assert.NoError(t, err)
+		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
 		nc, _ := nats.Connect("localhost:4222")
 		_ = nc.Publish("my_subject", []byte("test message"))
@@ -157,6 +165,7 @@ func TestSubscriber(t *testing.T) {
 		assert.Equal(t, 2, len(received))
 		assert.Equal(t, "test message", string(received[0].Value))
 		assert.Equal(t, "test message", string(received[1].Value))
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 }
 
@@ -193,6 +202,7 @@ func TestSubscriberKafka(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
 		err = produce(ctx, "my_pub_topic", "test message sub sync 1")
 		assert.NoError(t, err)
@@ -203,6 +213,7 @@ func TestSubscriberKafka(t *testing.T) {
 		if len(received) != 2 {
 			t.Fatal("invalid number of received messages")
 		}
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 		assert.Equal(t, "test message sub sync 1", string(received[0].Value))
 		assert.Equal(t, "test message sub sync 2", string(received[1].Value))
 	})
@@ -239,6 +250,7 @@ func TestSubscriberKafka(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
 		err = produce(ctx, "my_pub_topic", "test message sub async 1")
 		assert.NoError(t, err)
@@ -251,6 +263,7 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		assert.Equal(t, "test message sub async 1", string(received[0].Value))
 		assert.Equal(t, "test message sub async 2", string(received[1].Value))
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("manual ack", func(t *testing.T) {
@@ -289,6 +302,7 @@ func TestSubscriberKafka(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
 		err = produce(ctx, "my_pub_topic", "test message sub manual 1")
 		assert.NoError(t, err)
@@ -301,5 +315,6 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		assert.Equal(t, "test message sub manual 1", string(received[0]))
 		assert.Equal(t, "test message sub manual 2", string(received[1]))
+		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 }

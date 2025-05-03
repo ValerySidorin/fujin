@@ -20,7 +20,8 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
+	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
+	redis_config "github.com/ValerySidorin/fujin/connector/impl/redis/config"
 	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
@@ -75,8 +76,8 @@ var DefaultTestConfigWithNats = config.Config{
 	Connectors: connector.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
-				Protocol: "nats_streaming",
-				NatsStreaming: nats_streaming.ReaderConfig{
+				Protocol: "nats_core",
+				NatsCore: nats_core.ReaderConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -84,8 +85,8 @@ var DefaultTestConfigWithNats = config.Config{
 		},
 		Writers: map[string]writer_config.Config{
 			"pub": {
-				Protocol: "nats_streaming",
-				NatsStreaming: nats_streaming.WriterConfig{
+				Protocol: "nats_core",
+				NatsCore: nats_core.WriterConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -185,9 +186,13 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 			"sub": {
 				Protocol: "redis_pubsub",
 				RedisPubSub: pubsub.ReaderConfig{
-					InitAddress:  []string{"localhost:6379"},
-					Channel:      "channel",
-					DisableCache: true,
+					ReaderConfig: redis_config.ReaderConfig{
+						RedisConfig: redis_config.RedisConfig{
+							InitAddress:  []string{"localhost:6379"},
+							DisableCache: true,
+						},
+					},
+					Channels: []string{"channel"},
 				},
 			},
 		},
@@ -195,11 +200,15 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 			"pub": {
 				Protocol: "redis_pubsub",
 				RedisPubSub: pubsub.WriterConfig{
-					InitAddress:  []string{"localhost:6379"},
-					Channel:      "channel",
-					DisableCache: true,
-					BatchSize:    1000,
-					Linger:       5 * time.Millisecond,
+					WriterConfig: redis_config.WriterConfig{
+						RedisConfig: redis_config.RedisConfig{
+							InitAddress:  []string{"localhost:6379"},
+							DisableCache: true,
+						},
+						BatchSize: 1000,
+						Linger:    5 * time.Millisecond,
+					},
+					Channel: "channel",
 				},
 			},
 		},
@@ -213,19 +222,22 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 			"sub": {
 				Protocol: "redis_streams",
 				RedisStreams: redis_streams.ReaderConfig{
-					InitAddress: []string{"localhost:6379"},
-					Stream:      "stream",
-					Group: struct {
-						Name     string "yaml:\"name\""
-						Consumer string "yaml:\"consumer\""
-						CreateId string "yaml:\"create_id\""
-					}{
+					ReaderConfig: redis_config.ReaderConfig{
+						RedisConfig: redis_config.RedisConfig{
+							InitAddress:  []string{"localhost:6379"},
+							DisableCache: true,
+						},
+					},
+					Streams: map[string]redis_streams.StreamConf{
+						"stream": {
+							StartID:       ">",
+							GroupCreateID: "$",
+						},
+					},
+					Group: redis_streams.GroupConf{
 						Name:     "fujin",
 						Consumer: "fujin",
-						CreateId: "$",
 					},
-					StartId:      ">",
-					DisableCache: true,
 				},
 			},
 		},
@@ -233,11 +245,15 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 			"pub": {
 				Protocol: "redis_streams",
 				RedisStreams: redis_streams.WriterConfig{
-					InitAddress:  []string{"localhost:6379"},
-					Stream:       "stream",
-					DisableCache: true,
-					BatchSize:    1000,
-					Linger:       5 * time.Millisecond,
+					WriterConfig: redis_config.WriterConfig{
+						RedisConfig: redis_config.RedisConfig{
+							InitAddress:  []string{"localhost:6379"},
+							DisableCache: true,
+						},
+						BatchSize: 1000,
+						Linger:    5 * time.Millisecond,
+					},
+					Stream: "stream",
 				},
 			},
 		},

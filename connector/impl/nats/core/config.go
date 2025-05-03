@@ -1,4 +1,4 @@
-package streaming
+package core
 
 import (
 	"github.com/ValerySidorin/fujin/connector/cerr"

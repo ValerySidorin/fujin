@@ -17,6 +17,16 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+type AckResponse struct {
+	Err             error
+	AckMsgResponses []AckMsgResponse
+}
+
+type AckMsgResponse struct {
+	MsgID []byte
+	Err   error
+}
+
 type clientReader struct {
 	conn *Conn
 
@@ -24,47 +34,88 @@ type clientReader struct {
 	r   quic.Stream
 	out *fujin.Outbound
 
-	msgMetaLen int
-	cm         *correlator
+	cm *correlator
+	ac *ackCorrelator
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
 	wg           sync.WaitGroup
 }
 
-func (c *clientReader) ack(meta []byte) error {
-	return c.sendAckNAckCmd(byte(request.OP_CODE_ACK), meta)
-}
-
-func (c *clientReader) nAck(meta []byte) error {
-	return c.sendAckNAckCmd(byte(request.OP_CODE_NACK), meta)
-}
-
-func (c *clientReader) sendAckNAckCmd(cmd byte, meta []byte) error {
-	if c.closed.Load() {
-		return ErrWriterClosed
+func (c *clientReader) CheckParseStateAfterOpForTests() error {
+	if c.ps.state != OP_START {
+		return fmt.Errorf("invalid state: %d", c.ps.state)
 	}
 
-	buf := pool.Get(5 + c.msgMetaLen)
+	if c.ps.argBuf != nil {
+		return errors.New("arg buf is not nil")
+	}
+	if c.ps.metaBuf != nil {
+		return errors.New("meta buf is not nil")
+	}
+	if c.ps.payloadBuf != nil {
+		return errors.New("payload buf is not nil")
+	}
+
+	ea := errArg{}
+	if c.ps.ea != ea {
+		return errors.New("err arg is not empty")
+	}
+
+	ma := msgArg{}
+	if c.ps.ma != ma {
+		return errors.New("msg arg is not empty")
+	}
+
+	if c.ps.fa.n != 0 || c.ps.fa.err != nil || c.ps.fa.handled != 0 || len(c.ps.fa.msgs) != 0 {
+		return errors.New("fetch arg is not empty")
+	}
+
+	if c.ps.aa.currMsgIDLen != 0 || c.ps.aa.n != 0 || len(c.ps.aa.resps) != 0 {
+		return errors.New("ack arg is not empty")
+	}
+
+	if c.ps.ca.cID != nil || c.ps.ca.cIDUint32 != 0 {
+		return errors.New("correlation id arg is not empty")
+	}
+
+	return nil
+}
+
+func (c *clientReader) ack(id []byte) (AckResponse, error) {
+	return c.sendAckCmd(byte(request.OP_CODE_ACK), id)
+}
+
+func (c *clientReader) nack(id []byte) (AckResponse, error) {
+	return c.sendAckCmd(byte(request.OP_CODE_NACK), id)
+}
+
+func (c *clientReader) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
+	if c.closed.Load() {
+		return AckResponse{}, ErrWriterClosed
+	}
+
+	buf := pool.Get(9)
 	defer pool.Put(buf)
 
-	ch := make(chan error, 1)
+	ch := make(chan AckResponse, 1)
 	defer close(ch)
 
-	id := c.cm.next(ch)
-	defer c.cm.delete(id)
+	correlationID := c.ac.next(ch)
+	defer c.ac.delete(correlationID)
 
 	buf = append(buf, cmd)
-	buf = binary.BigEndian.AppendUint32(buf, id)
-	buf = append(buf, meta...)
+	buf = binary.BigEndian.AppendUint32(buf, correlationID)
+	buf = binary.BigEndian.AppendUint32(buf, 1)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msgID)))
 
-	c.out.EnqueueProto(buf)
+	c.out.EnqueueProtoMulti(buf, msgID)
 
 	select {
 	case <-time.After(c.conn.timeout):
-		return ErrTimeout
-	case err := <-ch:
-		return err
+		return AckResponse{}, ErrTimeout
+	case resp := <-ch:
+		return resp, nil
 	}
 }
 
@@ -94,6 +145,7 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 		ps:           &parseState{},
 		out:          out,
 		cm:           newCorrelator(),
+		ac:           newAckCorrelator(),
 		disconnectCh: make(chan struct{}),
 	}
 
@@ -123,13 +175,10 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 		return nil, fmt.Errorf("read connect reader: %w", err)
 	}
 
-	msgMetaLen, err := r.parseConnectReader(rBuf[:n])
-	if err != nil {
+	if err := r.parseConnectReader(rBuf[:n]); err != nil {
 		stream.Close()
 		return nil, fmt.Errorf("parse connect reader: %w", err)
 	}
-
-	r.msgMetaLen = int(msgMetaLen)
 
 	return r, nil
 }
@@ -176,7 +225,7 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 	}
 }
 
-func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
+func (c *clientReader) parseConnectReader(buf []byte) error {
 	var (
 		i int
 		b byte
@@ -189,27 +238,24 @@ func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
 		case OP_START:
 			switch b {
 			case byte(response.RESP_CODE_CONNECT_READER):
-				c.ps.state = OP_CONNECT_READER
+				c.ps.state = OP_ERROR_CODE_ARG
 			default:
 				c.r.Close()
 				c.ps.state = OP_START
-				return 0, ErrParseProto
+				return ErrParseProto
 			}
-		case OP_CONNECT_READER:
-			c.ps.cra.msgMetaLen = b
-			c.ps.state = OP_ERROR_CODE_ARG
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
 				c.ps.state = OP_START
-				return c.ps.cra.msgMetaLen, nil
+				return nil
 			case byte(response.ERR_CODE_YES):
 				c.ps.argBuf = pool.Get(fujin.Uint32Len)
 				c.ps.state = OP_ERROR_PAYLOAD_ARG
 			default:
 				c.r.Close()
 				c.ps.state = OP_START
-				return 0, ErrParseProto
+				return ErrParseProto
 			}
 		case OP_ERROR_PAYLOAD_ARG:
 			c.ps.argBuf = append(c.ps.argBuf, b)
@@ -218,7 +264,7 @@ func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
 					pool.Put(c.ps.argBuf)
 					c.r.Close()
 					c.ps.state = OP_START
-					return 0, fmt.Errorf("parse err len arg: %w", err)
+					return fmt.Errorf("parse err len arg: %w", err)
 				}
 				pool.Put(c.ps.argBuf)
 				c.ps.argBuf, c.ps.state = nil, OP_ERROR_PAYLOAD
@@ -244,7 +290,7 @@ func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
 				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
 					defer pool.Put(c.ps.payloadBuf)
 					c.ps.state = OP_START
-					return 0, errors.New(string(c.ps.payloadBuf))
+					return errors.New(string(c.ps.payloadBuf))
 				}
 			} else {
 				c.ps.payloadBuf = pool.Get(int(c.ps.ea.errLen))
@@ -253,13 +299,13 @@ func (c *clientReader) parseConnectReader(buf []byte) (byte, error) {
 				if len(c.ps.payloadBuf) >= int(c.ps.ea.errLen) {
 					defer pool.Put(c.ps.payloadBuf)
 					c.ps.state = OP_START
-					return 0, errors.New(string(c.ps.payloadBuf))
+					return errors.New(string(c.ps.payloadBuf))
 				}
 			}
 		}
 	}
 
-	return 0, ErrParseProto
+	return ErrParseProto
 }
 
 func (c *clientReader) parseErrLenArg() error {

@@ -1,4 +1,4 @@
-package streaming
+package core
 
 import (
 	"context"
@@ -28,9 +28,9 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
 	sub, err := r.nc.Subscribe(r.conf.Subject, func(msg *nats.Msg) {
-		h(msg.Data)
+		h(msg.Data, msg.Subject)
 	})
 	if err != nil {
 		return fmt.Errorf("nats: subscribe: %w", err)
@@ -43,31 +43,38 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 	}()
 
 	<-ctx.Done()
-
 	return nil
 }
 
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
-	fetchResponseHandler func(n uint32),
-	msgHandler func(message []byte, args ...any),
-) error {
-	return cerr.ErrNotSupported
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) Ack(ctx context.Context, meta []byte) error {
+func (r *Reader) Ack(
+	ctx context.Context, msgIDs [][]byte,
+	ackHandler func(error),
+	ackMsgHandler func([]byte, error),
+) {
+	ackHandler(cerr.ErrNotSupported)
+}
+
+func (r *Reader) Nack(
+	ctx context.Context, msgIDs [][]byte,
+	nackHandler func(error),
+	nackMsgHandler func([]byte, error),
+) {
+	nackHandler(cerr.ErrNotSupported)
+}
+
+func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
 	return nil
 }
 
-func (r *Reader) Nack(ctx context.Context, meta []byte) error {
-	return nil
-}
-
-func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
-	return nil
-}
-
-func (r *Reader) MessageMetaLen() byte {
+func (r *Reader) MsgIDStaticArgsLen() int {
 	return 0
 }
 

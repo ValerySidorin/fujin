@@ -150,6 +150,46 @@ func (w *Writer) Close() error {
 	return nil
 }
 
+func (w *Writer) CheckParseStateAfterOpForTests() error {
+	if w.ps.state != OP_START {
+		return fmt.Errorf("invalid state: %d", w.ps.state)
+	}
+
+	if w.ps.argBuf != nil {
+		return errors.New("arg buf is not nil")
+	}
+	if w.ps.metaBuf != nil {
+		return errors.New("meta buf is not nil")
+	}
+	if w.ps.payloadBuf != nil {
+		return errors.New("payload buf is not nil")
+	}
+
+	ea := errArg{}
+	if w.ps.ea != ea {
+		return errors.New("err arg is not empty")
+	}
+
+	ma := msgArg{}
+	if w.ps.ma != ma {
+		return errors.New("msg arg is not empty")
+	}
+
+	if w.ps.fa.n != 0 || w.ps.fa.err != nil || w.ps.fa.handled != 0 || len(w.ps.fa.msgs) != 0 {
+		return errors.New("fetch arg is not empty")
+	}
+
+	if w.ps.aa.currMsgIDLen != 0 || w.ps.aa.n != 0 || len(w.ps.aa.resps) != 0 {
+		return errors.New("ack arg is not empty")
+	}
+
+	if w.ps.ca.cID != nil || w.ps.ca.cIDUint32 != 0 {
+		return errors.New("correlation id arg is not empty")
+	}
+
+	return nil
+}
+
 func (w *Writer) sendTxCmd(cmd byte) error {
 	if w.closed.Load() {
 		return ErrWriterClosed
@@ -261,12 +301,12 @@ func (w *Writer) parse(buf []byte) error {
 			if len(w.ps.ca.cID) >= fujin.Uint32Len {
 				w.ps.ca.cIDUint32 = binary.BigEndian.Uint32(w.ps.ca.cID)
 				w.ps.state = OP_ERROR_CODE_ARG
+				pool.Put(w.ps.ca.cID)
 			}
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
 				w.cm.send(w.ps.ca.cIDUint32, nil)
-				pool.Put(w.ps.ca.cID)
 				w.ps.ca, w.ps.state = correlationIDArg{}, OP_START
 				continue
 			case byte(response.ERR_CODE_YES):
@@ -281,7 +321,6 @@ func (w *Writer) parse(buf []byte) error {
 			if len(w.ps.argBuf) >= fujin.Uint32Len {
 				if err := w.parseErrLenArg(); err != nil {
 					pool.Put(w.ps.argBuf)
-					pool.Put(w.ps.ca.cID)
 					w.r.Close()
 					return fmt.Errorf("parse write err len arg: %w", err)
 				}
@@ -309,7 +348,7 @@ func (w *Writer) parse(buf []byte) error {
 				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
 					w.cm.send(w.ps.ca.cIDUint32, errors.New(string(w.ps.payloadBuf)))
 					pool.Put(w.ps.payloadBuf)
-					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
+					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ca, w.ps.ea, w.ps.state = nil, nil, correlationIDArg{}, errArg{}, OP_START
 				}
 			} else {
 				w.ps.payloadBuf = pool.Get(int(w.ps.ea.errLen))
@@ -318,7 +357,7 @@ func (w *Writer) parse(buf []byte) error {
 				if len(w.ps.payloadBuf) >= int(w.ps.ea.errLen) {
 					w.cm.send(w.ps.ca.cIDUint32, errors.New(string(w.ps.payloadBuf)))
 					pool.Put(w.ps.payloadBuf)
-					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ea, w.ps.state = nil, nil, errArg{}, OP_START
+					w.ps.ca.cID, w.ps.payloadBuf, w.ps.ca, w.ps.ea, w.ps.state = nil, nil, correlationIDArg{}, errArg{}, OP_START
 				}
 			}
 		case OP_TX_BEGIN:

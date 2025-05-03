@@ -43,6 +43,7 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("success with id", func(t *testing.T) {
@@ -64,9 +65,11 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.Write("pub", []byte("test data"))
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("success empty id", func(t *testing.T) {
@@ -88,9 +91,11 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.Write("pub", []byte("test data"))
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("non existent topic", func(t *testing.T) {
@@ -112,9 +117,11 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.Write("non_existent_topic", []byte("test data"))
 		assert.Error(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("write after close", func(t *testing.T) {
@@ -135,10 +142,13 @@ func TestWriter(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 		writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.Write("pub", []byte("test data"))
 		assert.Error(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	// Begin transaction will not open transaction in underlying broker straight away.
@@ -162,9 +172,11 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.BeginTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	// Commit transaction will do nothing, if no messages are written in it.
@@ -188,12 +200,15 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.BeginTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.CommitTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	// Rollback transaction will do nothing, if no messages are written in it.
@@ -217,12 +232,15 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.BeginTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.RollbackTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	// Write to NATS in transaction will return 'begin tx' error, because is is not supported.
@@ -245,12 +263,15 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.BeginTx()
 		assert.NoError(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.Write("pub", []byte("test data1"))
 		assert.Error(t, err)
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("commit tx invalid tx state", func(t *testing.T) {
@@ -272,10 +293,12 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.CommitTx()
 		assert.Error(t, err)
 		assert.Equal(t, "invalid tx state", err.Error())
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("rollback tx invalid state", func(t *testing.T) {
@@ -297,9 +320,11 @@ func TestWriter(t *testing.T) {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
 		defer writer.Close()
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 
 		err = writer.RollbackTx()
 		assert.Error(t, err)
 		assert.Equal(t, "invalid tx state", err.Error())
+		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
 	})
 }

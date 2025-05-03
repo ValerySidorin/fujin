@@ -19,8 +19,7 @@ Before describing the commands, let's explore the data types used in the Fujin p
 | byte   | 1                     | `[11]`                                  | `0x0B`                      |
 | uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
 | string | dynamic (len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]` | `hello`                     |
-| bool   | 1                     | `[0]`                                   | `false`                     |  
-| dynamic| dynamic               | `[1, 1, 1, 1]`                          | `[1, 1, 1, 1]`              |
+| bool   | 1                     | `[0]`                                   | `false`                     |
 
 ## PING
 ### Direction
@@ -177,15 +176,14 @@ where:
 | `auto commit`    | Connect with auto commit.                                       | bool   | true     |
 | `topic`          | Topic to read from.                                             | string | true     |
 ##### Response
-`[1, <message meta length>, <error code>, <error payload>]`  
+`[1, <error code>, <error payload>]`  
 where:
-| name                  | description                                          |  type  | presence |
-| --------------------- | ---------------------------------------------------- | ------ | -------- |
-| `message meta length` | Message meta length. Used to pass in commit request. | byte   | always   |
-| `error code`          | Error code. 0 is no error. 1 is error.               | byte   | always   |
-| `error payload`       | Error payload text.                                  | string | optional |
+| name                  | description                            |  type  | presence |
+| --------------------- | -------------------------------------- | ------ | -------- |
+| `error code`          | Error code. 0 is no error. 1 is error. | byte   | always   |
+| `error payload`       | Error payload text.                    | string | optional |
 ### Examples
-- `[2, 1, 0, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0]`
+- `[2, 1, 0, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0]`
 ## MSG
 
 ### Direction
@@ -193,12 +191,12 @@ Server -> Client
 ### Description
 A message propagated by the server in a client-opened reader QUIC stream. Message meta length is returned from `CONNECT READER` response.
 ### Syntax
-`[6, <message meta>, <message payload>]`  
+`[6, <message id>, <message value>]`  
 where:
-| name                  | description                                                     | type     | presence |
-| --------------------- | --------------------------------------------------------------- | -------- | -------- |
-| `message meta`        | Message meta. Propagated by server if auto commit is disabled.  | dynamic  | optional |
-| `message payload`     | Message payload.                                                | string   | always   |
+| name                  | description                                                  | type     | presence |
+| --------------------- | ------------------------------------------------------------ | -------- | -------- |
+| `message id`          | Message ID. Propagated by server if auto commit is disabled. | string   | optional |
+| `message value`       | Message value.                                               | string   | always   |
 ### Examples
 - `-` -> `[6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
@@ -211,20 +209,21 @@ Must be sent in a QUIC stream, where `CONNECT READER` command was sent previousl
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[8, <correlation id>, <message meta>]`  
+`[8, <correlation id>, <msg id batch len>, <msg id batch>]`  
 where:
 | name                  | description                                                      | type    | required |
 | ----------------- | ---------------------------------------------------------------------| ------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `message meta`    | Message meta.                                                        | dynamic | always   |
+| `message meta`    | Message meta.                                                        | dynamic | always   | // TODO
 ##### Response
-`[8, <correlation id>, <error code>, <error payload>]`  
+`[8, <correlation id>, <error code>, <error payload>, <ack msg batch len>, <ack msg batch>]`  
 where:
 | name               | description                                                          | type   | presence |
 | ------------------ | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id`   | Correlation ID is used to match client request with server response. | uint32 | always   |
 | `error code`       | Error code. 0 is no error. 1 is error.                               | byte   | always   |
 | `error payload`    | Error payload text.                                                  | string | optional |
+// TODO
 
 ### Examples
 - `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
@@ -264,27 +263,27 @@ When connected as a consumer, the client must send a `FETCH` command to the serv
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <num messages in batch>]`  
+`[7, <correlation id>, <msg batch len>]`  
 where:
 | name                     | description                                                          | type    | required |
 | ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
 | `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | true     |
-| `num messages in batch`  | The number of messages the server should send in response.           | uint32  | true     |
+| `msg response batch len` | The number of messages the server should send in response.           | uint32  | true     |
 
 ##### Response
-`[7, <correlation id>, <num messages in batch>, <error code>, <error payload>, <batch of messages>]`  
+`[7, <correlation id>, <error code>, <error payload>, <msg batch len>, <msg batch>]`  
 where:
-| name                     | description                                                          | type    | presence |
-| ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `num messages in batch`  | The number of messages the server should send in response.           | uint32  | always   |
-| `error code`             | Error code. 0 is no error. 1 is error.                               | byte    | always   |
-| `error payload`          | Error payload text.                                                  | string  | optional |
-| `batch of messages`      | Just an array of `MSG`s.                                             | string  | optional |
+| name                 | description                                                          | type    | presence |
+| -------------------- | -------------------------------------------------------------------- | ------- | -------- |
+| `correlation id`     | Correlation ID is used to match client request with server response. | uint32  | always   |
+| `error code`         | Error code. 0 is no error. 1 is error.                               | byte    | always   |
+| `error payload`      | Error payload text.                                                  | string  | optional |
+| `msg batch len`      | The number of msg payloads the server should send in response.       | uint32  | optional |
+| `msg response batch` | A batch of msg payloads.                                             | string  | optional |
 
 
 ### Examples
-- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 - `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
 - `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
 ## DISCONNECT

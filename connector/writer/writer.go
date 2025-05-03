@@ -8,7 +8,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	nats_streaming "github.com/ValerySidorin/fujin/connector/impl/nats/streaming"
+	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
@@ -29,8 +29,8 @@ func NewWriter(conf config.Config, writerID string, l *slog.Logger) (Writer, err
 	switch conf.Protocol {
 	case protocol.Kafka:
 		return kafka.NewWriter(conf.Kafka, writerID, l)
-	case protocol.NatsStreaming:
-		return nats_streaming.NewWriter(conf.NatsStreaming, l)
+	case protocol.NatsCore:
+		return nats_core.NewWriter(conf.NatsCore, l)
 	case protocol.AMQP091:
 		return amqp091.NewWriter(conf.AMQP091, l)
 	case protocol.AMQP10:

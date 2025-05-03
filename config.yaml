@@ -109,12 +109,13 @@ connectors:
       protocol: redis_streams
       redis_streams:
         init_address: ["localhost:6379"]
-        group: # optional, if not present - uses simple xread
+        group:
           name: fujin
           consumer: fujin
-          create_id: "$"
-        stream: stream
-        start_id: ">"
+        streams:
+          stream:
+            group_create_id: $
+            start_id: ">"
         block: 3s
         # parse_msg_protocol: json
 

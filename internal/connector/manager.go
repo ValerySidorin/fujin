@@ -57,7 +57,7 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 	for name, c := range conf.Writers {
 		rewriteConf := c
 		rewriteConf.Kafka.Endpoint = strings.Join(rewriteConf.Kafka.Brokers, ",")
-		rewriteConf.RedisPubSub.Endpoint = strings.Join(rewriteConf.RedisPubSub.InitAddress, ",")
+		rewriteConf.RedisPubSub.WriterConfig.Endpoint = strings.Join(rewriteConf.RedisPubSub.WriterConfig.InitAddress, ",")
 		conf.Writers[name] = rewriteConf
 	}
 

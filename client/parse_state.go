@@ -13,12 +13,10 @@ const (
 	// Reader
 	OP_CONNECT_READER
 	OP_MSG
-	OP_MSG_META_ARG
+	OP_MSG_ID_ARG
+	OP_MSG_ID_PAYLOAD
 	OP_MSG_ARG
 	OP_MSG_PAYLOAD
-
-	OP_ACK
-	OP_NACK
 
 	OP_FETCH
 	OP_FETCH_BATCH_NUM_ARG
@@ -27,6 +25,30 @@ const (
 	OP_FETCH_ERROR_CODE_ARG
 	OP_FETCH_ERROR_PAYLOAD_ARG
 	OP_FETCH_ERROR_PAYLOAD
+
+	OP_ACK
+	OP_ACK_CORRELATION_ID_ARG
+	OP_ACK_ERROR_CODE_ARG
+	OP_ACK_ERROR_PAYLOAD_ARG
+	OP_ACK_ERROR_PAYLOAD
+	OP_ACK_MSG_BATCH_LEN_ARG
+	OP_ACK_MSG_ID_ARG
+	OP_ACK_MSG_ID_PAYLOAD
+	OP_ACK_MSG_ERROR_CODE_ARG
+	OP_ACK_MSG_ERROR_PAYLOAD_ARG
+	OP_ACK_MSG_ERROR_PAYLOAD
+
+	OP_NACK
+	OP_NACK_CORRELATION_ID_ARG
+	OP_NACK_ERROR_CODE_ARG
+	OP_NACK_ERROR_PAYLOAD_ARG
+	OP_NACK_ERROR_PAYLOAD
+	OP_NACK_MSG_BATCH_LEN_ARG
+	OP_NACK_MSG_ID_ARG
+	OP_NACK_MSG_ID_PAYLOAD
+	OP_NACK_MSG_ERROR_CODE_ARG
+	OP_NACK_MSG_ERROR_PAYLOAD_ARG
+	OP_NACK_MSG_ERROR_PAYLOAD
 
 	// Common
 	OP_CORRELATION_ID_ARG
@@ -43,11 +65,11 @@ type parseState struct {
 	metaBuf    []byte
 	payloadBuf []byte
 
-	ea  errArg
-	cra connectReaderArg
-	ma  msgArg
-	fa  fetchArg
-	ca  correlationIDArg
+	ea errArg
+	ma msgArg
+	fa fetchArg
+	aa ackArg
+	ca correlationIDArg
 }
 
 type correlationIDArg struct {
@@ -55,12 +77,9 @@ type correlationIDArg struct {
 	cIDUint32 uint32
 }
 
-type connectReaderArg struct {
-	msgMetaLen byte
-}
-
 type msgArg struct {
-	len uint32
+	idLen uint32
+	len   uint32
 }
 
 type fetchArg struct {
@@ -68,6 +87,12 @@ type fetchArg struct {
 	handled uint32
 	msgs    []Msg
 	err     chan error
+}
+
+type ackArg struct {
+	n            uint32
+	currMsgIDLen uint32
+	resps        []AckMsgResponse
 }
 
 type errArg struct {

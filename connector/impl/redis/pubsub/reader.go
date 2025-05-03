@@ -18,7 +18,13 @@ type Reader struct {
 }
 
 func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
+	tlsConf, err := conf.TLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("redis: get tls config: %w", err)
+	}
+
 	client, err := rueidis.NewClient(rueidis.ClientOption{
+		TLSConfig:    tlsConf,
 		InitAddress:  conf.InitAddress,
 		Username:     conf.Username,
 		Password:     conf.Password,
@@ -31,19 +37,19 @@ func NewReader(conf ReaderConfig, l *slog.Logger) (*Reader, error) {
 	return &Reader{
 		conf:      conf,
 		client:    client,
-		subscribe: client.B().Subscribe().Channel(conf.Channel).Build(),
+		subscribe: client.B().Subscribe().Channel(conf.Channels...).Build(),
 		l:         l.With("reader_type", "redis"),
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
 			if err := r.client.Receive(ctx, r.subscribe, func(msg rueidis.PubSubMessage) {
-				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)))
+				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel)
 			}); err != nil {
 				return fmt.Errorf("redis: receive: %w", err)
 			}
@@ -53,25 +59,33 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
-	fetchResponseHandler func(n uint32),
-	msgHandler func(message []byte, args ...any),
-) error {
-	return cerr.ErrNotSupported
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) Ack(ctx context.Context, meta []byte) error {
+func (r *Reader) Ack(
+	ctx context.Context, msgIDs [][]byte,
+	ackHandler func(error),
+	ackMsgHandler func([]byte, error),
+) {
+	ackHandler(cerr.ErrNotSupported)
+}
+
+func (r *Reader) Nack(
+	ctx context.Context, msgIDs [][]byte,
+	nackHandler func(error),
+	nackMsgHandler func([]byte, error),
+) {
+	nackHandler(cerr.ErrNotSupported)
+}
+
+func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
 	return nil
 }
 
-func (r *Reader) Nack(ctx context.Context, meta []byte) error {
-	return nil
-}
-
-func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
-	return nil
-}
-
-func (r *Reader) MessageMetaLen() byte {
+func (r *Reader) MsgIDStaticArgsLen() int {
 	return 0
 }
 

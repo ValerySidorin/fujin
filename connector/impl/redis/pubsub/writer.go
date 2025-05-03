@@ -32,7 +32,13 @@ type Writer struct {
 }
 
 func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
+	tlsConf, err := conf.TLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("redis: get tls config: %w", err)
+	}
+
 	client, err := rueidis.NewClient(rueidis.ClientOption{
+		TLSConfig:    tlsConf,
 		InitAddress:  conf.InitAddress,
 		Username:     conf.Username,
 		Password:     conf.Password,

@@ -48,6 +48,7 @@ func TestConnectConsumer(t *testing.T) {
 		t.Fatalf("failed to connect consumer: %v", err)
 	}
 	defer consumer.Close()
+	assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 }
 
 func TestFetch(t *testing.T) {
@@ -78,7 +79,7 @@ func TestFetch(t *testing.T) {
 				),
 			))
 		if err != nil {
-			t.Fatalf("failed to connect: %v", err)
+			t.Fatalf("failed to connectd: %v", err)
 		}
 		defer conn.Close()
 
@@ -87,8 +88,10 @@ func TestFetch(t *testing.T) {
 			t.Fatalf("failed to connect consumer: %v", err)
 		}
 		defer consumer.Close()
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 
 		_, err = consumer.Fetch(ctx, 1)
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 		assert.Error(t, err)
 	})
 
@@ -127,6 +130,7 @@ func TestFetch(t *testing.T) {
 			t.Fatalf("failed to connect consumer: %v", err)
 		}
 		defer consumer.Close()
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 
 		err = produce(ctx, "my_pub_topic", "test message consumer")
 		assert.NoError(t, err)
@@ -134,6 +138,7 @@ func TestFetch(t *testing.T) {
 		received := make([]client.Msg, 0)
 
 		msgs, err := consumer.Fetch(ctx, 1)
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 		assert.NoError(t, err)
 
 		for _, msg := range msgs {
@@ -159,7 +164,8 @@ func TestFetch(t *testing.T) {
 		}()
 
 		conf := client.ReaderConfig{
-			Topic: "sub",
+			Topic:      "sub",
+			AutoCommit: false,
 		}
 
 		addr := "localhost:4848"
@@ -182,6 +188,7 @@ func TestFetch(t *testing.T) {
 			t.Fatalf("failed to connect consumer: %v", err)
 		}
 		defer consumer.Close()
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 
 		err = produce(ctx, "my_pub_topic", "test message consumer manual")
 		assert.NoError(t, err)
@@ -189,16 +196,16 @@ func TestFetch(t *testing.T) {
 		received := make([][]byte, 0)
 
 		msgs, err := consumer.Fetch(ctx, 1)
+		assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 		assert.NoError(t, err)
 
 		for _, msg := range msgs {
 			fmt.Println(string(msg.Value))
-			buf := make([]byte, len(msg.Value))
-			copy(buf, msg.Value)
-			received = append(received, buf)
+			received = append(received, msg.Value)
 			if err := msg.Ack(); err != nil {
 				t.Fatal(err)
 			}
+			assert.NoError(t, consumer.CheckParseStateAfterOpForTests())
 		}
 
 		if len(received) != 1 {

@@ -20,9 +20,9 @@ func (c *Config) Validate() error {
 			if err := r.Kafka.Validate(); err != nil {
 				return fmt.Errorf("validate reader config: kafka: %w", err)
 			}
-		case protocol.NatsStreaming:
-			if err := r.NatsStreaming.Validate(); err != nil {
-				return fmt.Errorf("validate reader config: nats_streaming: %w", err)
+		case protocol.NatsCore:
+			if err := r.NatsCore.Validate(); err != nil {
+				return fmt.Errorf("validate reader config: nats_core: %w", err)
 			}
 		case protocol.AMQP091:
 			if err := r.AMQP091.Validate(); err != nil {
@@ -45,9 +45,9 @@ func (c *Config) Validate() error {
 			if err := r.Kafka.Validate(); err != nil {
 				return fmt.Errorf("validate reader config: kafka: %w", err)
 			}
-		case protocol.NatsStreaming:
-			if err := r.NatsStreaming.Validate(); err != nil {
-				return fmt.Errorf("validate reader config: nats_streaming: %w", err)
+		case protocol.NatsCore:
+			if err := r.NatsCore.Validate(); err != nil {
+				return fmt.Errorf("validate reader config: nats_core: %w", err)
 			}
 		case protocol.AMQP091:
 			if err := r.AMQP091.Validate(); err != nil {

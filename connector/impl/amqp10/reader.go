@@ -74,17 +74,16 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
 	var handler func(msg *amqp.Message) error
-	fmt.Println(r.IsAutoCommit())
 	if r.IsAutoCommit() {
 		handler = func(msg *amqp.Message) error {
-			h(msg.GetData())
+			h(msg.GetData(), r.conf.Receiver.Source)
 			return r.receiver.AcceptMessage(ctx, msg)
 		}
 	} else {
 		handler = func(msg *amqp.Message) error {
-			h(msg.GetData(), GetDeliveryId(msg))
+			h(msg.GetData(), r.conf.Receiver.Source, GetDeliveryId(msg))
 			return nil
 		}
 	}
@@ -105,45 +104,58 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, args ...a
 
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
-	fetchResponseHandler func(n uint32),
-	msgHandler func(message []byte, args ...any),
-) error {
-	return cerr.ErrNotSupported
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) Consume(ctx context.Context, ch <-chan struct{}, n uint32, h func(message []byte, args ...any) error) error {
-	return cerr.ErrNotSupported
-}
+func (r *Reader) Ack(
+	ctx context.Context, msgIDs [][]byte,
+	ackHandler func(error),
+	ackMsgHandler func([]byte, error),
+) {
+	ackHandler(nil)
+	if r.autoCommit {
+		for _, msgID := range msgIDs {
+			if r.autoCommit {
+				ackMsgHandler(msgID, nil)
+				continue
+			}
 
-func (r *Reader) Ack(ctx context.Context, meta []byte) error {
-	if r.IsAutoCommit() {
-		return nil
+			msg := &amqp.Message{}
+			SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
+			ackMsgHandler(msgID, r.receiver.AcceptMessage(ctx, msg))
+		}
 	}
-
-	msg := &amqp.Message{}
-	SetDeliveryId(msg, binary.BigEndian.Uint32(meta))
-	return r.receiver.AcceptMessage(ctx, msg)
 }
 
-func (r *Reader) Nack(ctx context.Context, meta []byte) error {
-	if r.IsAutoCommit() {
-		return nil
+func (r *Reader) Nack(
+	ctx context.Context, msgIDs [][]byte,
+	nackHandler func(error),
+	nackMsgHandler func([]byte, error),
+) {
+	nackHandler(nil)
+	if r.autoCommit {
+		for _, msgID := range msgIDs {
+			if r.autoCommit {
+				nackMsgHandler(msgID, nil)
+				continue
+			}
+
+			msg := &amqp.Message{}
+			SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
+			nackMsgHandler(msgID, r.receiver.ReleaseMessage(ctx, msg))
+		}
 	}
-
-	msg := &amqp.Message{}
-	SetDeliveryId(msg, binary.BigEndian.Uint32(meta))
-	return r.receiver.ReleaseMessage(ctx, msg)
 }
 
-func (r *Reader) MessageMetaLen() byte {
-	if r.IsAutoCommit() {
-		return 0
-	}
-	return 4
+func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
+	return binary.BigEndian.AppendUint32(buf, uint32(args[0].(int64)))
 }
 
-func (r *Reader) EncodeMeta(buf []byte, args ...any) []byte {
-	return binary.BigEndian.AppendUint32(buf, uint32(args[0].(uint32)))
+func (r *Reader) MsgIDStaticArgsLen() int {
+	return 8
 }
 
 func (r *Reader) IsAutoCommit() bool {
