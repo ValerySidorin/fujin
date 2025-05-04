@@ -9,4 +9,5 @@ const (
 	AMQP10       Protocol = "amqp10"
 	RedisPubSub  Protocol = "redis_pubsub"
 	RedisStreams Protocol = "redis_streams"
+	MQTT         Protocol = "mqtt"
 )

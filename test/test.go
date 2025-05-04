@@ -20,6 +20,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
+	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
 	redis_config "github.com/ValerySidorin/fujin/connector/impl/redis/config"
 	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
@@ -260,6 +261,49 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 	},
 }
 
+var DefaultTestConfigWithMQTT = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	Connectors: connector.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "mqtt",
+				MQTT: mqtt.MQTTConfig{
+					BrokerURL:         "tcp://localhost:1883",
+					ClientID:          "fujin_sub",
+					Topic:             "my_topic",
+					QoS:               0,
+					Retain:            false,
+					CleanSession:      true,
+					KeepAlive:         2 * time.Second,
+					DisconnectTimeout: 5 * time.Second,
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "mqtt",
+				MQTT: mqtt.WriterConfig{
+					MQTTConfig: mqtt.MQTTConfig{
+						BrokerURL:         "tcp://localhost:1883",
+						ClientID:          "fujin_pub",
+						Topic:             "my_topic",
+						QoS:               0,
+						Retain:            false,
+						CleanSession:      true,
+						KeepAlive:         2 * time.Second,
+						DisconnectTimeout: 5 * time.Second,
+					},
+					Pool: mqtt.PoolConfig{
+						Size:           1000000,
+						PreAlloc:       true,
+						ReleaseTimeout: 5 * time.Second,
+					},
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
@@ -282,6 +326,10 @@ func RunDefaultServerWithRedisPubSub(ctx context.Context) *server.Server {
 
 func RunDefaultServerWithRedisStreams(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithRedisStreams)
+}
+
+func RunDefaultServerWithMQTT(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithMQTT)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {

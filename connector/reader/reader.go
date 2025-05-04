@@ -8,6 +8,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
+	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
@@ -60,6 +61,8 @@ func New(conf config.Config, autoCommit bool, l *slog.Logger) (Reader, error) {
 		return redis_pubsub.NewReader(conf.RedisPubSub, l)
 	case protocol.RedisStreams:
 		return redis_streams.NewReader(conf.RedisStreams, autoCommit, l)
+	case protocol.MQTT:
+		return mqtt.NewReader(conf.MQTT, autoCommit, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)

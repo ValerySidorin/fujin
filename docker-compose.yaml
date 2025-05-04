@@ -106,9 +106,29 @@ services:
     ports:
       - "6379:6379"
     restart: always
+  emqx:
+    image: emqx:latest
+    container_name: emqx
+    ports:
+      - "1883:1883"
+    restart: always
   # garnet:
   #   image: ghcr.io/microsoft/garnet
   #   container_name: garnet
   #   ports:
   #     - "6379:6379"
+  #   restart: always
+  # dragonfly:
+  #   image: docker.dragonflydb.io/dragonflydb/dragonfly
+  #   container_name: dragonfly
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always
+  # nanomq:
+  #   image: emqx/nanomq:latest
+  #   container_name: nanomq
+  #   ports:
+  #     - "1883:1883"
+  #     - "8083:8083"
+  #     - "8883:8883"
   #   restart: always

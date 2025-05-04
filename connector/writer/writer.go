@@ -8,6 +8,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
 	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
+	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
@@ -39,6 +40,8 @@ func NewWriter(conf config.Config, writerID string, l *slog.Logger) (Writer, err
 		return redis_pubsub.NewWriter(conf.RedisPubSub, l)
 	case protocol.RedisStreams:
 		return redis_streams.NewWriter(conf.RedisStreams, l)
+	case protocol.MQTT:
+		return mqtt.NewWriter(conf.MQTT, l)
 	}
 
 	return nil, fmt.Errorf("invalid writer protocol: %s", conf.Protocol)

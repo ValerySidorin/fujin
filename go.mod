@@ -5,6 +5,7 @@ go 1.24.2
 require (
 	github.com/Azure/go-amqp v1.4.0
 	github.com/bytedance/sonic v1.13.2
+	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/nats-io/nats-server/v2 v2.11.2
 	github.com/nats-io/nats.go v1.41.2
 	github.com/panjf2000/ants/v2 v2.11.3
@@ -26,6 +27,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-tpm v0.9.4 // indirect
 	github.com/google/pprof v0.0.0-20250423184734-337e5dd93bb4 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

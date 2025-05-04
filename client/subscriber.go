@@ -71,7 +71,7 @@ func (c *Conn) ConnectSubscriber(conf SubscriberConfig, handler func(msg Msg)) (
 	}
 
 	if conf.Async {
-		pool, err := ants.NewPool(conf.Pool.Size)
+		pool, err := ants.NewPool(conf.Pool.Size, ants.WithPreAlloc(conf.Pool.PreAlloc))
 		if err != nil {
 			return nil, fmt.Errorf("new pool: %w", err)
 		}

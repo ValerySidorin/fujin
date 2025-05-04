@@ -79,8 +79,8 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	w.mu.Lock()
 	w.buffer = append(w.buffer, cmd)
 	w.callback = append(w.callback, func(err error) {
-		defer w.wg.Done()
 		callback(err)
+		w.wg.Done()
 	})
 	w.mu.Unlock()
 

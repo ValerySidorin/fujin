@@ -49,14 +49,29 @@ connectors:
     #       addr: amqp://artemis:artemis@localhost:61616
     #     sender:
     #       target: exchange
+    # pub:
+    #   protocol: redis_streams
+    #   redis_streams:
+    #     init_address: ["localhost:6379"]
+    #     stream: stream
+    #     batch_size: 1000
+    #     linger: 10ms
+    #     # parse_msg_protocol: json
     pub:
-      protocol: redis_streams
-      redis_streams:
-        init_address: ["localhost:6379"]
-        stream: stream
-        batch_size: 1000
-        linger: 10ms
-        # parse_msg_protocol: json
+      protocol: mqtt
+      mqtt:
+        broker_url: tcp://localhost:1883
+        client_id: fujin_pub
+        topic: my_topic
+        qos: 0
+        retain: false
+        clean_session: true
+        keep_alive: 2s
+        disconnect_timeout: 5s
+        pool:
+          size: 10000
+          pre_alloc: true
+          release_timeout: 5s
   readers:
     # sub:
     #   protocol: kafka
@@ -105,17 +120,27 @@ connectors:
     #   redis_pubsub:
     #     init_address: ["localhost:6379"]
     #     channel: example-channel
+    # sub:
+    #   protocol: redis_streams
+    #   redis_streams:
+    #     init_address: ["localhost:6379"]
+    #     group:
+    #       name: fujin
+    #       consumer: fujin
+    #     streams:
+    #       stream:
+    #         group_create_id: $
+    #         start_id: ">"
+    #     block: 3s
+    #     # parse_msg_protocol: json
     sub:
-      protocol: redis_streams
-      redis_streams:
-        init_address: ["localhost:6379"]
-        group:
-          name: fujin
-          consumer: fujin
-        streams:
-          stream:
-            group_create_id: $
-            start_id: ">"
-        block: 3s
-        # parse_msg_protocol: json
-
+      protocol: mqtt
+      mqtt:
+        broker_url: tcp://localhost:1883
+        client_id: fujin_sub
+        topic: my_topic
+        qos: 0
+        retain: false
+        clean_session: true
+        keep_alive: 2s
+        disconnect_timeout: 5s
