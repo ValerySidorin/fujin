@@ -22,6 +22,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
+	"github.com/ValerySidorin/fujin/connector/impl/nsq"
 	redis_config "github.com/ValerySidorin/fujin/connector/impl/redis/config"
 	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
@@ -304,6 +305,37 @@ var DefaultTestConfigWithMQTT = config.Config{
 	},
 }
 
+var DefaultTestConfigWithNSQ = config.Config{
+	Fujin: DefaultFujinServerTestConfig,
+	Connectors: connector.Config{
+		Readers: map[string]reader_config.Config{
+			"sub": {
+				Protocol: "nsq",
+				NSQ: nsq.ReaderConfig{
+					Addresses:   []string{"localhost:4150"},
+					Topic:       "my_topic",
+					Channel:     "my_channel",
+					MaxInFlight: 1000000,
+				},
+			},
+		},
+		Writers: map[string]writer_config.Config{
+			"pub": {
+				Protocol: "nsq",
+				NSQ: nsq.WriterConfig{
+					Address: "localhost:4150",
+					Topic:   "my_topic",
+					Pool: nsq.PoolConfig{
+						Size:           1000000,
+						PreAlloc:       true,
+						ReleaseTimeout: 5 * time.Second,
+					},
+				},
+			},
+		},
+	},
+}
+
 func RunDefaultServerWithKafka3Brokers(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3Brokers)
 }
@@ -330,6 +362,10 @@ func RunDefaultServerWithRedisStreams(ctx context.Context) *server.Server {
 
 func RunDefaultServerWithMQTT(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithMQTT)
+}
+
+func RunDefaultServerWithNSQ(ctx context.Context) *server.Server {
+	return RunServer(ctx, DefaultTestConfigWithNSQ)
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {

@@ -10,4 +10,5 @@ const (
 	RedisPubSub  Protocol = "redis_pubsub"
 	RedisStreams Protocol = "redis_streams"
 	MQTT         Protocol = "mqtt"
+	NSQ          Protocol = "nsq"
 )

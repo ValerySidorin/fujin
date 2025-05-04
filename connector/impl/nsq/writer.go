@@ -1,4 +1,4 @@
-package mqtt
+package nsq
 
 import (
 	"context"
@@ -7,33 +7,24 @@ import (
 	"sync"
 
 	"github.com/ValerySidorin/fujin/connector/cerr"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/nsqio/go-nsq"
 	"github.com/panjf2000/ants/v2"
 )
 
 type Writer struct {
-	conf   WriterConfig
-	client mqtt.Client
-	pool   *ants.Pool
-	l      *slog.Logger
-	wg     sync.WaitGroup
+	conf     WriterConfig
+	producer *nsq.Producer
+	pool     *ants.Pool
+	l        *slog.Logger
+	wg       sync.WaitGroup
+	chPool   sync.Pool
 }
 
 func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
-	if err := conf.Validate(); err != nil {
-		return nil, fmt.Errorf("validate config: %w", err)
-	}
-
-	opts := mqtt.NewClientOptions().
-		AddBroker(conf.BrokerURL).
-		SetClientID(conf.ClientID).
-		SetCleanSession(conf.CleanSession).
-		SetKeepAlive(conf.KeepAlive)
-
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
-	if token.Wait() && token.Error() != nil {
-		return nil, fmt.Errorf("mqtt: connect: %w", token.Error())
+	cfg := nsq.NewConfig()
+	prod, err := nsq.NewProducer(conf.Address, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("new producer: %w", err)
 	}
 
 	pool, err := ants.NewPool(conf.Pool.Size, ants.WithPreAlloc(conf.Pool.PreAlloc))
@@ -42,24 +33,43 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}
 
 	return &Writer{
-		conf:   conf,
-		client: client,
-		pool:   pool,
-		l:      l,
+		conf:     conf,
+		producer: prod,
+		pool:     pool,
+		l:        l.With("writer_type", "nsq"),
+		chPool: sync.Pool{
+			New: func() any {
+				return make(chan *nsq.ProducerTransaction, 1)
+			},
+		},
 	}, nil
 }
 
 func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
-	token := w.client.Publish(w.conf.Topic, w.conf.QoS, w.conf.Retain, msg)
-	w.wg.Add(1)
-	err := w.pool.Submit(func() {
-		token.Wait()
-		callback(token.Error())
-		w.wg.Done()
-	})
+	ch := w.chPool.Get().(chan *nsq.ProducerTransaction)
 
+	err := w.producer.PublishAsync(w.conf.Topic, msg, ch)
 	if err != nil {
 		callback(err)
+		w.chPool.Put(ch)
+		return
+	}
+
+	w.wg.Add(1)
+	err = w.pool.Submit(func() {
+		defer w.wg.Done()
+		defer w.chPool.Put(ch)
+
+		select {
+		case tx := <-ch:
+			callback(tx.Error)
+		case <-ctx.Done():
+			callback(ctx.Err())
+		}
+	})
+	if err != nil {
+		callback(err)
+		w.chPool.Put(ch)
 		w.wg.Done()
 	}
 }
@@ -82,12 +92,12 @@ func (w *Writer) RollbackTx(ctx context.Context) error {
 }
 
 func (w *Writer) Endpoint() string {
-	return w.conf.BrokerURL
+	return w.conf.Address
 }
 
 func (w *Writer) Close() error {
 	w.wg.Wait()
-	w.client.Disconnect(uint(w.conf.DisconnectTimeout.Milliseconds()))
+	w.producer.Stop()
 	if w.pool != nil {
 		if w.conf.Pool.ReleaseTimeout != 0 {
 			if err := w.pool.ReleaseTimeout(w.conf.Pool.ReleaseTimeout); err != nil {

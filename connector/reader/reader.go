@@ -10,6 +10,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
+	"github.com/ValerySidorin/fujin/connector/impl/nsq"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
@@ -63,6 +64,8 @@ func New(conf config.Config, autoCommit bool, l *slog.Logger) (Reader, error) {
 		return redis_streams.NewReader(conf.RedisStreams, autoCommit, l)
 	case protocol.MQTT:
 		return mqtt.NewReader(conf.MQTT, autoCommit, l)
+	case protocol.NSQ:
+		return nsq.NewReader(conf.NSQ, autoCommit, l)
 	}
 
 	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)

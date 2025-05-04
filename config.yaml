@@ -57,17 +57,26 @@ connectors:
     #     batch_size: 1000
     #     linger: 10ms
     #     # parse_msg_protocol: json
+    # pub:
+    #   protocol: mqtt
+    #   mqtt:
+    #     broker_url: tcp://localhost:1883
+    #     client_id: fujin_pub
+    #     topic: my_topic
+    #     qos: 0
+    #     retain: false
+    #     clean_session: true
+    #     keep_alive: 2s
+    #     disconnect_timeout: 5s
+    #     pool:
+    #       size: 10000
+    #       pre_alloc: true
+    #       release_timeout: 5s
     pub:
-      protocol: mqtt
-      mqtt:
-        broker_url: tcp://localhost:1883
-        client_id: fujin_pub
+      protocol: nsq
+      nsq:
+        address: "localhost:4150"
         topic: my_topic
-        qos: 0
-        retain: false
-        clean_session: true
-        keep_alive: 2s
-        disconnect_timeout: 5s
         pool:
           size: 10000
           pre_alloc: true
@@ -133,14 +142,22 @@ connectors:
     #         start_id: ">"
     #     block: 3s
     #     # parse_msg_protocol: json
+    # sub:
+    #   protocol: mqtt
+    #   mqtt:
+    #     broker_url: tcp://localhost:1883
+    #     client_id: fujin_sub
+    #     topic: my_topic
+    #     qos: 0
+    #     retain: false
+    #     clean_session: true
+    #     keep_alive: 2s
+    #     disconnect_timeout: 5s
     sub:
-      protocol: mqtt
-      mqtt:
-        broker_url: tcp://localhost:1883
-        client_id: fujin_sub
+      protocol: nsq
+      nsq:
+        addresses: ["localhost:4150"]
+        # lookupd_addresses: ["localhost:4161"]
         topic: my_topic
-        qos: 0
-        retain: false
-        clean_session: true
-        keep_alive: 2s
-        disconnect_timeout: 5s
+        channel: my_channel
+        max_in_flight: 1000000

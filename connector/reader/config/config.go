@@ -6,6 +6,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
+	"github.com/ValerySidorin/fujin/connector/impl/nsq"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
@@ -20,5 +21,6 @@ type Config struct {
 	RedisPubSub  redis_pubsub.ReaderConfig  `yaml:"redis_pubsub"`
 	RedisStreams redis_streams.ReaderConfig `yaml:"redis_streams"`
 	MQTT         mqtt.MQTTConfig            `yaml:"mqtt"`
+	NSQ          nsq.ReaderConfig           `yaml:"nsq"`
 	Reusable     bool                       `yaml:"-"`
 }

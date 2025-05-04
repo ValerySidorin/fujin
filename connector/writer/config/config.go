@@ -6,6 +6,7 @@ import (
 	"github.com/ValerySidorin/fujin/connector/impl/kafka"
 	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
+	"github.com/ValerySidorin/fujin/connector/impl/nsq"
 	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
 	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
@@ -20,4 +21,5 @@ type Config struct {
 	RedisPubSub  redis_pubsub.WriterConfig  `yaml:"redis_pubsub"`
 	RedisStreams redis_streams.WriterConfig `yaml:"redis_streams"`
 	MQTT         mqtt.WriterConfig          `yaml:"mqtt"`
+	NSQ          nsq.WriterConfig           `yaml:"nsq"`
 }
