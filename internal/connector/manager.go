@@ -44,8 +44,8 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 	}
 
 	getReaderFuncs := make(map[string]func(name string, autoCommit bool) (reader.Reader, error), len(conf.Readers))
-	for name, conf := range conf.Readers {
-		if conf.Reusable {
+	for name, confReader := range conf.Readers {
+		if confReader.Reusable {
 			getReaderFuncs[name] = cman.getReaderReuse
 		} else {
 			getReaderFuncs[name] = cman.getReaderNoReuse
@@ -53,13 +53,6 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 	}
 
 	cman.getReaderFuncs = getReaderFuncs
-
-	for name, c := range conf.Writers {
-		rewriteConf := c
-		rewriteConf.Kafka.Endpoint = strings.Join(rewriteConf.Kafka.Brokers, ",")
-		rewriteConf.RedisPubSub.WriterConfig.Endpoint = strings.Join(rewriteConf.RedisPubSub.WriterConfig.InitAddress, ",")
-		conf.Writers[name] = rewriteConf
-	}
 
 	return cman
 }
@@ -152,12 +145,99 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
-	conf := m.conf.Writers[pub]
-	switch conf.Protocol {
+	writerConf, ok := m.conf.Writers[pub]
+	if !ok {
+		return false
+	}
+
+	switch writerConf.Protocol {
 	case protocol.Kafka:
-		return conf.Kafka.Endpoint == w.Endpoint()
+		kafkaConfRaw, ok := writerConf.Kafka.(map[string]any)
+		if !ok {
+			return false
+		}
+		brokersRaw, ok := kafkaConfRaw["brokers"].([]any)
+		if !ok {
+			return false
+		}
+		var brokersStr []string
+		for _, b := range brokersRaw {
+			if brokerStr, sOk := b.(string); sOk {
+				brokersStr = append(brokersStr, brokerStr)
+			}
+		}
+		configuredEndpoint := strings.Join(brokersStr, ",")
+		return configuredEndpoint == w.Endpoint()
 	case protocol.AMQP091:
-		return conf.AMQP091.Conn.URL == w.Endpoint()
+		amqpConfRaw, ok := writerConf.AMQP091.(map[string]any)
+		if !ok {
+			return false
+		}
+		connConf, ok := amqpConfRaw["conn"].(map[string]any)
+		if !ok {
+			return false
+		}
+		url, ok := connConf["url"].(string)
+		if !ok {
+			return false
+		}
+		return url == w.Endpoint()
+	case protocol.AMQP10:
+		amqp10ConfRaw, ok := writerConf.AMQP10.(map[string]any)
+		if !ok {
+			return false
+		}
+		connConf, ok := amqp10ConfRaw["conn"].(map[string]any)
+		if !ok {
+			return false
+		}
+		addr, ok := connConf["addr"].(string)
+		if !ok {
+			return false
+		}
+		return addr == w.Endpoint()
+	case protocol.RedisPubSub:
+		redisConfRaw, ok := writerConf.RedisPubSub.(map[string]any)
+		if !ok {
+			return false
+		}
+		initAddressRaw, ok := redisConfRaw["init_address"].([]any)
+		if !ok {
+			redisEndpoint, endpointOk := redisConfRaw["endpoint"].(string)
+			if endpointOk {
+				return redisEndpoint == w.Endpoint()
+			}
+			return false
+		}
+		var initAddressStr []string
+		for _, ia := range initAddressRaw {
+			if addrStr, sOk := ia.(string); sOk {
+				initAddressStr = append(initAddressStr, addrStr)
+			}
+		}
+		configuredEndpoint := strings.Join(initAddressStr, ",")
+		return configuredEndpoint == w.Endpoint()
+	case protocol.RedisStreams:
+		redisConfRaw, ok := writerConf.RedisStreams.(map[string]any)
+		if !ok {
+			return false
+		}
+		initAddressRaw, ok := redisConfRaw["init_address"].([]any)
+		if !ok {
+			redisEndpoint, endpointOk := redisConfRaw["endpoint"].(string)
+			if endpointOk {
+				return redisEndpoint == w.Endpoint()
+			}
+			return false
+		}
+		var initAddressStr []string
+		for _, ia := range initAddressRaw {
+			if addrStr, sOk := ia.(string); sOk {
+				initAddressStr = append(initAddressStr, addrStr)
+			}
+		}
+		configuredEndpoint := strings.Join(initAddressStr, ",")
+		return configuredEndpoint == w.Endpoint()
 	}
 
 	return false

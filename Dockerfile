@@ -1,22 +1,21 @@
-FROM golang:1.24-alpine AS build
+ARG GO_VERSION=1.24
+
+FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod ./
-COPY go.sum ./
+COPY go.mod go.sum ./
+RUN go mod download && apk add git make
 
-RUN go mod download && \
-    apk add --no-cache git
+COPY . .
 
-COPY . ./
-
-RUN CGO_ENABLED=0 && go build -o /fujin -trimpath -ldflags "-s -w -X main.Commit=$(git rev-parse HEAD)" ./cmd
+RUN make build GO_BUILD_TAGS=kafka,nats_core,amqp091,amqp10,redis_pubsub,redis_streams,mqtt,nsq
 
 FROM scratch
 
 WORKDIR /
 
-COPY --from=build /fujin /fujin
+COPY --from=builder app/bin/fujin /fujin
 
 STOPSIGNAL SIGTERM
 

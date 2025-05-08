@@ -5,14 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
-	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
-	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
-	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
-	"github.com/ValerySidorin/fujin/connector/impl/nsq"
-	redis_pubsub "github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
-	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
 	"github.com/ValerySidorin/fujin/connector/protocol"
 	"github.com/ValerySidorin/fujin/connector/reader/config"
 )
@@ -48,25 +40,41 @@ type Reader interface {
 	Close()
 }
 
+type ReaderFactoryFunc func(brokerSpecificConfig any, autoCommit bool, l *slog.Logger) (Reader, error)
+
+var readerFactories = make(map[protocol.Protocol]ReaderFactoryFunc)
+
+func RegisterReaderFactory(p protocol.Protocol, factory ReaderFactoryFunc) {
+	readerFactories[p] = factory
+}
+
 func New(conf config.Config, autoCommit bool, l *slog.Logger) (Reader, error) {
-	switch conf.Protocol {
-	case protocol.Kafka:
-		return kafka.NewReader(conf.Kafka, autoCommit, l)
-	case protocol.NatsCore:
-		return nats_core.NewReader(conf.NatsCore, l)
-	case protocol.AMQP091:
-		return amqp091.NewReader(conf.AMQP091, autoCommit, l)
-	case protocol.AMQP10:
-		return amqp10.NewReader(conf.AMQP10, autoCommit, l)
-	case protocol.RedisPubSub:
-		return redis_pubsub.NewReader(conf.RedisPubSub, l)
-	case protocol.RedisStreams:
-		return redis_streams.NewReader(conf.RedisStreams, autoCommit, l)
-	case protocol.MQTT:
-		return mqtt.NewReader(conf.MQTT, autoCommit, l)
-	case protocol.NSQ:
-		return nsq.NewReader(conf.NSQ, autoCommit, l)
+	factory, ok := readerFactories[conf.Protocol]
+	if !ok {
+		return nil, fmt.Errorf("unsupported reader protocol: %s (is it compiled in?)", conf.Protocol)
 	}
 
-	return nil, fmt.Errorf("invalid reader protocol: %s", conf.Protocol)
+	var brokerConf any
+	switch conf.Protocol {
+	case protocol.Kafka:
+		brokerConf = conf.Kafka
+	case protocol.NatsCore:
+		brokerConf = conf.NatsCore
+	case protocol.AMQP091:
+		brokerConf = conf.AMQP091
+	case protocol.AMQP10:
+		brokerConf = conf.AMQP10
+	case protocol.RedisPubSub:
+		brokerConf = conf.RedisPubSub
+	case protocol.RedisStreams:
+		brokerConf = conf.RedisStreams
+	case protocol.MQTT:
+		brokerConf = conf.MQTT
+	case protocol.NSQ:
+		brokerConf = conf.NSQ
+	default:
+		return nil, fmt.Errorf("unknown or unhandled reader protocol in switch: %s", conf.Protocol)
+	}
+
+	return factory(brokerConf, autoCommit, l)
 }

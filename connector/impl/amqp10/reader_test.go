@@ -1,10 +1,11 @@
+//go:build amqp10
+
 package amqp10_test
 
 import (
 	"testing"
 
 	"github.com/Azure/go-amqp"
-	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
 	"github.com/stretchr/testify/assert"
 )
 

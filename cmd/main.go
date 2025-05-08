@@ -16,13 +16,16 @@ import (
 	"syscall"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/ValerySidorin/fujin/config"
 	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin"
-	"github.com/goccy/go-yaml"
 	"github.com/quic-go/quic-go"
 	_ "go.uber.org/automaxprocs"
+
+	_ "github.com/ValerySidorin/fujin/connector/imports"
 )
 
 var (
@@ -177,12 +180,12 @@ func (c *TLSConfig) parse() (*tls.Config, error) {
 }
 
 var (
-	Commit string
-	conf   Config
+	Version string
+	conf    Config
 )
 
 func main() {
-	log.Printf("commit: %s", Commit)
+	log.Printf("version: %s", Version)
 
 	if len(os.Args) > 2 {
 		log.Fatal("invalid args")
