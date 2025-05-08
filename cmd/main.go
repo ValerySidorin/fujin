@@ -20,9 +20,9 @@ import (
 	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/server"
 	"github.com/ValerySidorin/fujin/server/fujin"
+	"github.com/goccy/go-yaml"
 	"github.com/quic-go/quic-go"
 	_ "go.uber.org/automaxprocs"
-	"gopkg.in/yaml.v3"
 )
 
 var (
