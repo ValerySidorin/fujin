@@ -1,6 +1,6 @@
 # Fujin protocol
 
-This document provides a brief description of the native Fujin protocol, used for communication between the Fujin server and client. It is a byte-based protocol that supports pub/sub, message queue and request/reply (TODO) patterns. The Fujin server operates as a QUIC server.
+This document provides a brief description of the native Fujin protocol, used for communication between the Fujin server and client. It is a byte-based protocol that supports various patterns. The Fujin server operates as a QUIC server.
 
 The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylRKac5kSOk?t=10m46s), inspired by the NATS server, ensuring high speed and efficiency.
 
