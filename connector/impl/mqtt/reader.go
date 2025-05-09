@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 

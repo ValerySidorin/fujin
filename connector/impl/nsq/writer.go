@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 	"github.com/nsqio/go-nsq"
 	"github.com/panjf2000/ants/v2"
 )

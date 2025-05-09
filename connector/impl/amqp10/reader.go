@@ -10,7 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/Azure/go-amqp"
-	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 )
 
 type Reader struct {
