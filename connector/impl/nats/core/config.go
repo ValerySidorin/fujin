@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 )
 
 type ReaderConfig struct {

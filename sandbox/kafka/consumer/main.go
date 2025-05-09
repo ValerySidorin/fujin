@@ -20,8 +20,8 @@ func main() {
 		kgo.SeedBrokers("localhost:9092", "localhost:9093", "localhost:9094"),
 		kgo.ConsumeTopics("my_pub_topic"),
 		kgo.ConsumerGroup("fujin1"),
-		kgo.FetchIsolationLevel(kgo.ReadCommitted()),
-		kgo.DisableAutoCommit(),
+		// kgo.FetchIsolationLevel(kgo.ReadCommitted()),
+		// kgo.DisableAutoCommit(),
 	}
 
 	client, err := kgo.NewClient(opts...)

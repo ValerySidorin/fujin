@@ -3,8 +3,8 @@ package streams
 import (
 	"time"
 
-	"github.com/ValerySidorin/fujin/connector/cerr"
 	"github.com/ValerySidorin/fujin/connector/impl/redis/config"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 )
 
 type ParseMsgProtocol string

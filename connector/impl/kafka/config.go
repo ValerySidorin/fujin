@@ -3,7 +3,7 @@ package kafka
 import (
 	"time"
 
-	"github.com/ValerySidorin/fujin/connector/cerr"
+	"github.com/ValerySidorin/fujin/internal/connector/cerr"
 )
 
 type Balancer string

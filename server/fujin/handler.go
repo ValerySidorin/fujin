@@ -10,8 +10,9 @@ import (
 	"unsafe"
 
 	"github.com/ValerySidorin/fujin/connector/reader"
-	"github.com/ValerySidorin/fujin/connector/writer"
 	"github.com/ValerySidorin/fujin/internal/connector"
+	internal_reader "github.com/ValerySidorin/fujin/internal/connector/reader"
+	"github.com/ValerySidorin/fujin/internal/connector/writer"
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
@@ -82,8 +83,9 @@ var (
 	ErrInvalidReaderType            = errors.New("invalid reader type")
 	ErrReaderNameSizeArgNotProvided = errors.New("reader name size arg not provided")
 
-	ErrWriteTopicArgEmpty   = errors.New("write topic arg is empty")
-	ErrWriteMsgSizeArgEmpty = errors.New("write size arg not provided")
+	ErrWriteTopicArgEmpty    = errors.New("write topic arg is empty")
+	ErrWriteMsgSizeArgEmpty  = errors.New("write size arg not provided")
+	ErrWriteTopicLenArgEmpty = errors.New("writer topic len arg not provided")
 
 	ErrConnectReaderIsAutoCommitArgInvalid = errors.New("connect reader is auto commit arg invalid")
 
@@ -166,7 +168,7 @@ type handler struct {
 
 	// consumer/subscriber
 	readerType               reader.ReaderType
-	sessionReader            reader.Reader
+	sessionReader            internal_reader.Reader
 	readerMsgIDStaticArgsLen int
 	msgHandler               func(message []byte, topic string, args ...any)
 
@@ -511,30 +513,25 @@ func (h *handler) handle(buf []byte) error {
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_ACK_CORRELATION_ID_ARG
 		case OP_ACK_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
+			toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+			avail := len(buf) - i
 
-				if avail < toCopy {
-					toCopy = avail
-				}
+			if avail < toCopy {
+				toCopy = avail
+			}
 
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= fujin.Uint32Len {
-					h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
-					h.ps.state = OP_ACK_ARG
-				}
+			if toCopy > 0 {
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
 			} else {
-				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+
+			if len(h.ps.ca.cID) >= fujin.Uint32Len {
+				h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
+				h.ps.state = OP_ACK_ARG
 			}
 		case OP_ACK_ARG:
 			h.ps.aa.msgIDsBuf = append(h.ps.aa.msgIDsBuf, b)
@@ -598,32 +595,27 @@ func (h *handler) handle(buf []byte) error {
 		case OP_NACK:
 			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_ACK_CORRELATION_ID_ARG
+			h.ps.state = OP_NACK_CORRELATION_ID_ARG
 		case OP_NACK_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
+			toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+			avail := len(buf) - i
 
-				if avail < toCopy {
-					toCopy = avail
-				}
+			if avail < toCopy {
+				toCopy = avail
+			}
 
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= fujin.Uint32Len {
-					h.ps.argBuf = pool.Get(fujin.Uint32Len)
-					h.ps.state = OP_NACK_ARG
-				}
+			if toCopy > 0 {
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
 			} else {
-				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+
+			if len(h.ps.ca.cID) >= fujin.Uint32Len {
+				h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
+				h.ps.state = OP_NACK_ARG
 			}
 		case OP_NACK_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
@@ -1261,7 +1253,7 @@ func (h *handler) handle(buf []byte) error {
 
 func (h *handler) connectReader(
 	ctx context.Context, cancel context.CancelFunc,
-	r reader.Reader, typ reader.ReaderType,
+	r internal_reader.Reader, typ reader.ReaderType,
 ) error {
 	h.disconnect = func() {
 		cancel()
@@ -1408,7 +1400,7 @@ func (h *handler) close() {
 func (h *handler) parseWriteTopicLenArg() error {
 	h.ps.wa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
 	if h.ps.wa.topicLen == 0 {
-		return errors.New("publish cmd pub len arg not provided")
+		return ErrWriteTopicLenArgEmpty
 	}
 
 	return nil
@@ -1522,6 +1514,7 @@ func (h *handler) enqueueAckMsgIDSuccessNoLock(msgID []byte) {
 	h.out.QueueOutboundNoLock(msgID)
 	h.out.QueueOutboundNoLock(errNoTemplate)
 	h.out.SignalFlush()
+	pool.Put(buf)
 }
 
 func (h *handler) enqueueAckMsgIDErrNoLock(msgID []byte, err error) {
@@ -1532,6 +1525,7 @@ func (h *handler) enqueueAckMsgIDErrNoLock(msgID []byte, err error) {
 	h.out.QueueOutboundNoLock(errYesTemplate)
 	h.out.QueueOutboundNoLock(errProtoBuf(err))
 	h.out.SignalFlush()
+	pool.Put(buf)
 }
 
 func (h *handler) enqueueNackSuccess(cID []byte) {
@@ -1600,7 +1594,7 @@ func enqueueConnectReaderSuccess(out *fujin.Outbound) {
 }
 
 func (h *handler) enqueueMsgFunc(
-	out *fujin.Outbound, r reader.Reader, readerType reader.ReaderType, msgConstsLen int,
+	out *fujin.Outbound, r internal_reader.Reader, readerType reader.ReaderType, msgConstsLen int,
 ) func(message []byte, topic string, args ...any) {
 	if readerType == reader.Subscriber {
 		if r.IsAutoCommit() {

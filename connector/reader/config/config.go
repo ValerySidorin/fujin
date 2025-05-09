@@ -14,5 +14,4 @@ type Config struct {
 	RedisStreams any               `yaml:"redis_streams,omitempty"`
 	MQTT         any               `yaml:"mqtt,omitempty"`
 	NSQ          any               `yaml:"nsq,omitempty"`
-	Reusable     bool              `yaml:"-"`
 }

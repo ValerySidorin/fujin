@@ -8,7 +8,7 @@ ALL_BROKERS = kafka,nats_core,amqp091,amqp10,redis_pubsub,redis_streams,mqtt,nsq
 GO_BUILD_TAGS ?= $(ALL_BROKERS)
 
 .PHONY: all
-all: build
+all: clean build run
 
 .PHONY: build
 build:
@@ -20,6 +20,11 @@ build:
 clean:
 	@echo "==> Cleaning"
 	@rm -rf bin/
+
+.PHONY: run
+run:
+	@echo "==> Running"
+	@./bin/fujin
 
 .PHONY: help
 help:

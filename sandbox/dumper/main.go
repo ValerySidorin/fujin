@@ -35,9 +35,9 @@ func main() {
 
 	// go produceLoopTx(ctx, conn)
 
-	if err := produce(ctx, conn); err != nil {
-		log.Fatal(err)
-	}
+	// if err := produce(ctx, conn); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// if err := produceLoop(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -51,9 +51,9 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := produceTx(ctx, conn); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := produceTx(ctx, conn); err != nil {
+		log.Fatal(err)
+	}
 
 	// if err := consume(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -303,16 +303,65 @@ func produce(ctx context.Context, conn quic.Connection) error {
 		// 0, 0, 0, 1, // producer id is optional (for transactions)
 		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0, // request id
-		0, 0, 0, 5, // pub len
-		116, 111, 112, 105, 99, // pub val
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		// byte(request.OP_CODE_WRITE),
-		// 0, 0, 0, 0, // request id
-		// 0, 0, 0, 3, // pub len
-		// 112, 117, 98, // pub val
-		// 0, 0, 0, 2, // msg len
-		// 98, 98, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_WRITE),
+		0, 0, 0, 0, // request id
+		0, 0, 0, 3, // pub len
+		112, 117, 98, // pub val
+		0, 0, 0, 9, // msg len
+		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
+		byte(request.OP_CODE_DISCONNECT),
 	}
 
 	str, err := conn.OpenStreamSync(ctx)
@@ -329,14 +378,8 @@ func produce(ctx context.Context, conn quic.Connection) error {
 
 	fmt.Println("produce: write req")
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 
-	req2 := []byte{
-		byte(request.OP_CODE_DISCONNECT),
-	}
-	if _, err := str.Write(req2); err != nil {
-		return err
-	}
 	str.Close()
 
 	return nil
@@ -357,12 +400,13 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 		104, 101, 108, 108, 111, // msg
 		byte(request.OP_CODE_TX_COMMIT),
 		0, 0, 1, 1, // request id
-		byte(request.OP_CODE_WRITE),
-		1, 1, 0, 0, // request id
-		0, 0, 0, 3, // pub len
-		112, 117, 98, // pub val
-		0, 0, 0, 5, // msg len
-		104, 101, 108, 108, 111, // msg
+		// byte(request.OP_CODE_WRITE),
+		// 1, 1, 0, 0, // request id
+		// 0, 0, 0, 3, // pub len
+		// 112, 117, 98, // pub val
+		// 0, 0, 0, 5, // msg len
+		// 104, 101, 108, 108, 111, // msg
+		byte(request.OP_CODE_DISCONNECT),
 	}
 
 	str, err := conn.OpenStreamSync(ctx)
@@ -380,12 +424,6 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 	fmt.Println("produce tx: write req")
 	time.Sleep(1 * time.Second)
 
-	req2 := []byte{
-		byte(request.OP_CODE_DISCONNECT),
-	}
-	if _, err := str.Write(req2); err != nil {
-		return err
-	}
 	str.Close()
 
 	return nil
@@ -454,7 +492,7 @@ func produceLoop(ctx context.Context, conn quic.Connection) error {
 			if err := produce(ctx, conn); err != nil {
 				return err
 			}
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
 }

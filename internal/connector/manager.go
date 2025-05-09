@@ -9,9 +9,9 @@ import (
 
 	"github.com/ValerySidorin/fujin/connector"
 	"github.com/ValerySidorin/fujin/connector/protocol"
-	"github.com/ValerySidorin/fujin/connector/reader"
-	"github.com/ValerySidorin/fujin/connector/writer"
 	"github.com/ValerySidorin/fujin/internal/common/pool"
+	"github.com/ValerySidorin/fujin/internal/connector/reader"
+	"github.com/ValerySidorin/fujin/internal/connector/writer"
 )
 
 var (
@@ -25,9 +25,6 @@ type Manager struct {
 	readers map[string]reader.Reader
 	wpoolms map[string]map[string]*pool.Pool // a map of writer pools grouped by topic and writer ID
 
-	getReaderFuncs map[string]func(name string, autoCommit bool) (reader.Reader, error)
-
-	cmu sync.RWMutex
 	pmu sync.RWMutex
 
 	l *slog.Logger
@@ -43,27 +40,21 @@ func NewManager(conf connector.Config, l *slog.Logger) *Manager {
 		l: l,
 	}
 
-	getReaderFuncs := make(map[string]func(name string, autoCommit bool) (reader.Reader, error), len(conf.Readers))
-	for name, confReader := range conf.Readers {
-		if confReader.Reusable {
-			getReaderFuncs[name] = cman.getReaderReuse
-		} else {
-			getReaderFuncs[name] = cman.getReaderNoReuse
-		}
-	}
-
-	cman.getReaderFuncs = getReaderFuncs
-
 	return cman
 }
 
 func (m *Manager) GetReader(name string, autoCommit bool) (reader.Reader, error) {
-	f, ok := m.getReaderFuncs[name]
+	conf, ok := m.conf.Readers[name]
 	if !ok {
-		return nil, fmt.Errorf("reader func not found for name: %s", name)
+		return nil, ErrReaderNotFound
 	}
 
-	return f(name, autoCommit)
+	r, err := reader.New(conf, autoCommit, m.l)
+	if err != nil {
+		return nil, fmt.Errorf("new reader: %w", err)
+	}
+
+	return r, nil
 }
 
 func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
@@ -241,47 +232,4 @@ func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
 	}
 
 	return false
-}
-
-func (m *Manager) getReaderReuse(name string, autoCommit bool) (reader.Reader, error) {
-	m.cmu.RLock()
-	r, ok := m.readers[name]
-	if ok {
-		m.cmu.RUnlock()
-		return r, nil
-	}
-	m.cmu.RUnlock()
-
-	m.cmu.Lock()
-	defer m.cmu.Unlock()
-	r, ok = m.readers[name]
-	if ok {
-		return r, nil
-	}
-
-	conf, ok := m.conf.Readers[name]
-	if !ok {
-		return nil, ErrReaderNotFound
-	}
-
-	r, err := reader.New(conf, autoCommit, m.l)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	return r, nil
-}
-
-func (m *Manager) getReaderNoReuse(name string, autoCommit bool) (reader.Reader, error) {
-	conf, ok := m.conf.Readers[name]
-	if !ok {
-		return nil, ErrReaderNotFound
-	}
-
-	r, err := reader.New(conf, autoCommit, m.l)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	return r, nil
 }

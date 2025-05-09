@@ -3,6 +3,7 @@ package client_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -194,28 +195,38 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		defer conn.Close()
 
-		received := make([]client.Msg, 0)
+		numMsgs := 5
+		received := make(chan client.Msg, numMsgs)
+		cnt := 0
+		var mu sync.Mutex
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			fmt.Println(msg)
-			received = append(received, msg)
+			received <- msg
+			mu.Lock()
+			defer mu.Unlock()
+			cnt++
+			if cnt >= cap(received) {
+				close(received)
+			}
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
-		err = produce(ctx, "my_pub_topic", "test message sub sync 1")
-		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message sub sync 2")
-		assert.NoError(t, err)
-
-		time.Sleep(5 * time.Second)
-		if len(received) != 2 {
-			t.Fatal("invalid number of received messages")
+		for i := range cap(received) {
+			err = produce(ctx, "my_pub_topic", fmt.Sprintf("test message sub sync %d", i))
+			assert.NoError(t, err)
 		}
+
+		recCnt := 0
+		for msg := range received {
+			assert.Equal(t, fmt.Sprintf("test message sub sync %d", recCnt), msg.String())
+			recCnt++
+		}
+
+		assert.Equal(t, numMsgs, recCnt)
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
-		assert.Equal(t, "test message sub sync 1", string(received[0].Value))
-		assert.Equal(t, "test message sub sync 2", string(received[1].Value))
 	})
 
 	t.Run("msg async", func(t *testing.T) {
@@ -242,27 +253,37 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		defer conn.Close()
 
-		received := make([]client.Msg, 0)
+		numMsgs := 5
+		received := make(chan client.Msg, numMsgs)
+		cnt := 0
+		var mu sync.Mutex
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			fmt.Println(msg)
-			received = append(received, msg)
+			received <- msg
+			mu.Lock()
+			defer mu.Unlock()
+			cnt++
+			if cnt >= cap(received) {
+				close(received)
+			}
 		})
 		assert.NoError(t, err)
 		defer sub.Close()
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
-		err = produce(ctx, "my_pub_topic", "test message sub async 1")
-		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message sub async 2")
-		assert.NoError(t, err)
-
-		time.Sleep(5 * time.Second)
-		if len(received) != 2 {
-			t.Fatal("invalid number of received messages")
+		for i := range cap(received) {
+			err = produce(ctx, "my_pub_topic", fmt.Sprintf("test message sub async %d", i))
+			assert.NoError(t, err)
 		}
-		assert.Equal(t, "test message sub async 1", string(received[0].Value))
-		assert.Equal(t, "test message sub async 2", string(received[1].Value))
+
+		recCnt := 0
+		for msg := range received {
+			assert.Equal(t, fmt.Sprintf("test message sub async %d", recCnt), msg.String())
+			recCnt++
+		}
+
+		assert.Equal(t, numMsgs, recCnt)
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 
@@ -289,13 +310,25 @@ func TestSubscriberKafka(t *testing.T) {
 		}
 		defer conn.Close()
 
-		received := make([][]byte, 0)
+		numMsgs := 5
+		received := make(chan []byte, numMsgs)
+		cnt := 0
+		var mu sync.Mutex
 
 		sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {
 			fmt.Println(msg)
+
 			buf := make([]byte, len(msg.Value))
 			copy(buf, msg.Value)
-			received = append(received, buf)
+
+			received <- buf
+			mu.Lock()
+			defer mu.Unlock()
+			cnt++
+			if cnt >= cap(received) {
+				close(received)
+			}
+
 			if err := msg.Ack(); err != nil {
 				t.Fatal(err)
 			}
@@ -304,17 +337,18 @@ func TestSubscriberKafka(t *testing.T) {
 		defer sub.Close()
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 
-		err = produce(ctx, "my_pub_topic", "test message sub manual 1")
-		assert.NoError(t, err)
-		err = produce(ctx, "my_pub_topic", "test message sub manual 2")
-		assert.NoError(t, err)
-
-		time.Sleep(5 * time.Second)
-		if len(received) != 2 {
-			t.Fatal("invalid number of received messages")
+		for i := range cap(received) {
+			err = produce(ctx, "my_pub_topic", fmt.Sprintf("test message sub manual %d", i))
+			assert.NoError(t, err)
 		}
-		assert.Equal(t, "test message sub manual 1", string(received[0]))
-		assert.Equal(t, "test message sub manual 2", string(received[1]))
+
+		recCnt := 0
+		for msg := range received {
+			assert.Equal(t, fmt.Sprintf("test message sub manual %d", recCnt), string(msg))
+			recCnt++
+		}
+
+		assert.Equal(t, numMsgs, recCnt)
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 }
