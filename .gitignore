@@ -21,7 +21,6 @@
 go.work
 go.work.sum
 
-.env
 .vscode
 .DS_Store
 bin/
