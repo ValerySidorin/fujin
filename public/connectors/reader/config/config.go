@@ -7,8 +7,8 @@ type Config struct {
 	// NatsCore     any    `yaml:"nats_core,omitempty"`
 	// AMQP091      any    `yaml:"amqp091,omitempty"`
 	// AMQP10       any    `yaml:"amqp10,omitempty"`
-	// RedisPubSub  any    `yaml:"redis_pubsub,omitempty"`
-	// RedisStreams any    `yaml:"redis_streams,omitempty"`
+	// RedisPubSub  any    `yaml:"resp_pubsub,omitempty"`
+	// RedisStreams any    `yaml:"resp_streams,omitempty"`
 	// MQTT         any    `yaml:"mqtt,omitempty"`
 	// NSQ          any    `yaml:"nsq,omitempty"`
 }

@@ -50,8 +50,8 @@ connectors:
     #     sender:
     #       target: exchange
     # pub:
-    #   protocol: redis_streams
-    #   redis_streams:
+    #   protocol: resp_streams
+    #   resp_streams:
     #     init_address: ["localhost:6379"]
     #     stream: stream
     #     batch_size: 1000
@@ -125,13 +125,13 @@ connectors:
     #     receiver:
     #       source: exchange
     # sub:
-    #   protocol: redis_pubsub
-    #   redis_pubsub:
+    #   protocol: resp_pubsub
+    #   resp_pubsub:
     #     init_address: ["localhost:6379"]
     #     channel: example-channel
     # sub:
-    #   protocol: redis_streams
-    #   redis_streams:
+    #   protocol: resp_streams
+    #   resp_streams:
     #     init_address: ["localhost:6379"]
     #     group:
     #       name: fujin

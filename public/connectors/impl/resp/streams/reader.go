@@ -1,4 +1,4 @@
-//go:build redis_streams
+//go:build resp_streams
 
 package streams
 
@@ -32,7 +32,7 @@ type Reader struct {
 func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
 	tlsConf, err := conf.TLSConfig()
 	if err != nil {
-		return nil, fmt.Errorf("redis: get tls config: %w", err)
+		return nil, fmt.Errorf("resp: get tls config: %w", err)
 	}
 
 	client, err := rueidis.NewClient(rueidis.ClientOption{
@@ -43,7 +43,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		DisableCache: conf.DisableCache,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("redis: new client: %w", err)
+		return nil, fmt.Errorf("resp: new client: %w", err)
 	}
 
 	streams := make(map[string]string, len(conf.Streams))
@@ -62,7 +62,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 				return make([]string, 0, len(conf.Streams))
 			},
 		},
-		l: l.With("reader_type", "redis_streams"),
+		l: l.With("reader_type", "resp_streams"),
 	}
 
 	if r.conf.Group.Name != "" {
@@ -78,7 +78,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 					Build(),
 			).Error(); err != nil {
 				if !rueidis.IsRedisBusyGroup(err) {
-					return nil, fmt.Errorf("redis: xgroup create: %w", err)
+					return nil, fmt.Errorf("resp: xgroup create: %w", err)
 				}
 			}
 		}
@@ -93,7 +93,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 					for _, msg = range msgs {
 						data, err := r.marshal(msg.FieldValues)
 						if err != nil {
-							r.l.Error("redis: failed to marshal message", "error", err)
+							r.l.Error("resp: failed to marshal message", "error", err)
 							continue
 						}
 						h(data, stream)
@@ -114,7 +114,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 					for _, msg = range msgs {
 						data, err := r.marshal(msg.FieldValues)
 						if err != nil {
-							r.l.Error("redis: failed to marshal message", "error", err)
+							r.l.Error("resp: failed to marshal message", "error", err)
 							continue
 						}
 						metaParts := strings.Split(msg.ID, "-")
@@ -140,7 +140,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 				for _, msg = range msgs {
 					data, err := r.marshal(msg.FieldValues)
 					if err != nil {
-						r.l.Error("redis: failed to marshal message", "error", err)
+						r.l.Error("resp: failed to marshal message", "error", err)
 						continue
 					}
 					h(data, stream)
@@ -155,7 +155,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 				for _, msg = range msgs {
 					data, err := r.marshal(msg.FieldValues)
 					if err != nil {
-						r.l.Error("redis: failed to marshal message", "error", err)
+						r.l.Error("resp: failed to marshal message", "error", err)
 						continue
 					}
 					metaParts := strings.Split(msg.ID, "-")
@@ -186,7 +186,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(msg []byte, topic string,
 				if errors.Is(err, ctx.Err()) {
 					return nil
 				}
-				return fmt.Errorf("redis: xread: %w", err)
+				return fmt.Errorf("resp: xread: %w", err)
 			}
 
 			r.handler(resp, h)
@@ -207,7 +207,7 @@ func (r *Reader) Fetch(
 			fetchHandler(0, nil)
 			return
 		}
-		fetchHandler(0, fmt.Errorf("redis: xread: %w", err))
+		fetchHandler(0, fmt.Errorf("resp: xread: %w", err))
 		return
 	}
 

@@ -25,9 +25,9 @@ import (
 	"github.com/ValerySidorin/fujin/public/connectors/impl/mqtt"
 	nats_core "github.com/ValerySidorin/fujin/public/connectors/impl/nats/core"
 	"github.com/ValerySidorin/fujin/public/connectors/impl/nsq"
-	redis_config "github.com/ValerySidorin/fujin/public/connectors/impl/redis/config"
-	"github.com/ValerySidorin/fujin/public/connectors/impl/redis/pubsub"
-	redis_streams "github.com/ValerySidorin/fujin/public/connectors/impl/redis/streams"
+	redis_config "github.com/ValerySidorin/fujin/public/connectors/impl/resp/config"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/resp/pubsub"
+	resp_streams "github.com/ValerySidorin/fujin/public/connectors/impl/resp/streams"
 	reader_config "github.com/ValerySidorin/fujin/public/connectors/reader/config"
 	writer_config "github.com/ValerySidorin/fujin/public/connectors/writer/config"
 	"github.com/ValerySidorin/fujin/public/server"
@@ -186,7 +186,7 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
-				Protocol: "redis_pubsub",
+				Protocol: "resp_pubsub",
 				Settings: pubsub.ReaderConfig{
 					ReaderConfig: redis_config.ReaderConfig{
 						RedisConfig: redis_config.RedisConfig{
@@ -200,7 +200,7 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 		},
 		Writers: map[string]writer_config.Config{
 			"pub": {
-				Protocol: "redis_pubsub",
+				Protocol: "resp_pubsub",
 				Settings: &pubsub.WriterConfig{
 					WriterConfig: redis_config.WriterConfig{
 						RedisConfig: redis_config.RedisConfig{
@@ -222,21 +222,21 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
-				Protocol: "redis_streams",
-				Settings: redis_streams.ReaderConfig{
+				Protocol: "resp_streams",
+				Settings: resp_streams.ReaderConfig{
 					ReaderConfig: redis_config.ReaderConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},
 							DisableCache: true,
 						},
 					},
-					Streams: map[string]redis_streams.StreamConf{
+					Streams: map[string]resp_streams.StreamConf{
 						"stream": {
 							StartID:       ">",
 							GroupCreateID: "$",
 						},
 					},
-					Group: redis_streams.GroupConf{
+					Group: resp_streams.GroupConf{
 						Name:     "fujin",
 						Consumer: "fujin",
 					},
@@ -245,8 +245,8 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 		},
 		Writers: map[string]writer_config.Config{
 			"pub": {
-				Protocol: "redis_streams",
-				Settings: &redis_streams.WriterConfig{
+				Protocol: "resp_streams",
+				Settings: &resp_streams.WriterConfig{
 					WriterConfig: redis_config.WriterConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},

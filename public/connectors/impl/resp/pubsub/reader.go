@@ -1,4 +1,4 @@
-//go:build redis_pubsub
+//go:build resp_pubsub
 
 package pubsub
 
@@ -23,7 +23,7 @@ type Reader struct {
 func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
 	tlsConf, err := conf.TLSConfig()
 	if err != nil {
-		return nil, fmt.Errorf("redis: get tls config: %w", err)
+		return nil, fmt.Errorf("resp: get tls config: %w", err)
 	}
 
 	client, err := rueidis.NewClient(rueidis.ClientOption{
@@ -34,7 +34,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		DisableCache: conf.DisableCache,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("redis: new client: %w", err)
+		return nil, fmt.Errorf("resp: new client: %w", err)
 	}
 
 	return &Reader{
@@ -42,7 +42,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		client:     client,
 		subscribe:  client.B().Subscribe().Channel(conf.Channels...).Build(),
 		autoCommit: autoCommit,
-		l:          l.With("reader_type", "redis"),
+		l:          l.With("reader_type", "resp_pubsub"),
 	}, nil
 }
 
@@ -55,7 +55,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 			if err := r.client.Receive(ctx, r.subscribe, func(msg rueidis.PubSubMessage) {
 				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel)
 			}); err != nil {
-				return fmt.Errorf("redis: receive: %w", err)
+				return fmt.Errorf("resp: receive: %w", err)
 			}
 		}
 	}

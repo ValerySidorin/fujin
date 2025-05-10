@@ -102,68 +102,68 @@ func Benchmark_Produce_32KBPayload_ArtemisMQ(b *testing.B) {
 
 // Redis Pub/Sub benchmarks
 func Benchmark_Produce_1BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(1))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(1))
 }
 
 func Benchmark_Produce_32BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(32))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(32))
 }
 
 func Benchmark_Produce_128BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(128))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(128))
 }
 
 func Benchmark_Produce_256BPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(256))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(256))
 }
 
 func Benchmark_Produce_1KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(1024))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(1024))
 }
 
 func Benchmark_Produce_4KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(4*1024))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(4*1024))
 }
 
 func Benchmark_Produce_8KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(8*1024))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(8*1024))
 }
 
 func Benchmark_Produce_32KBPayload_RedisPubSub(b *testing.B) {
-	benchProduce(b, "redis_pubsub", "pub", sizedString(32*1024))
+	benchProduce(b, "resp_pubsub", "pub", sizedString(32*1024))
 }
 
 // Redis Streams benchmarks
 func Benchmark_Produce_1BPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(1))
+	benchProduce(b, "resp_streams", "pub", sizedString(1))
 }
 
 func Benchmark_Produce_32BPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(32))
+	benchProduce(b, "resp_streams", "pub", sizedString(32))
 }
 
 func Benchmark_Produce_128BPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(128))
+	benchProduce(b, "resp_streams", "pub", sizedString(128))
 }
 
 func Benchmark_Produce_256BPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(256))
+	benchProduce(b, "resp_streams", "pub", sizedString(256))
 }
 
 func Benchmark_Produce_1KBPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(1024))
+	benchProduce(b, "resp_streams", "pub", sizedString(1024))
 }
 
 func Benchmark_Produce_4KBPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(4*1024))
+	benchProduce(b, "resp_streams", "pub", sizedString(4*1024))
 }
 
 func Benchmark_Produce_8KBPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(8*1024))
+	benchProduce(b, "resp_streams", "pub", sizedString(8*1024))
 }
 
 func Benchmark_Produce_32KBPayload_RedisStreams(b *testing.B) {
-	benchProduce(b, "redis_streams", "pub", sizedString(32*1024))
+	benchProduce(b, "resp_streams", "pub", sizedString(32*1024))
 }
 
 // MQTT benchmarks
@@ -248,9 +248,9 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 		s = RunDefaultServerWithAMQP091(ctx)
 	case "artemismq":
 		s = RunDefaultServerWithAMQP10(ctx)
-	case "redis_pubsub":
+	case "resp_pubsub":
 		s = RunDefaultServerWithRedisPubSub(ctx)
-	case "redis_streams":
+	case "resp_streams":
 		s = RunDefaultServerWithRedisStreams(ctx)
 	case "mqtt":
 		s = RunDefaultServerWithMQTT(ctx)
