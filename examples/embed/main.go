@@ -56,10 +56,12 @@ var DefaultTestConfigWithNats = config.Config{
 	},
 }
 
-// This example binary shows hot to embed Fujin server into your Golang app
-// It also embeds and uses NUTS as an underlying broker,
-// so you need to import nats/core plugin, and build app with tag "nats_core" for this to work properly
-// You can run it from repo root like this: go run -tags ./examples/embed/main.go
+// This example demonstrates how to embed the Fujin server into your Go application.
+// It includes an embedded NATS broker as the underlying message broker.
+// To run this example:
+// 1. Import the nats/core plugin
+// 2. Build with the "nats_core" tag
+// 3. Run from repo root: go run -tags nats_core ./examples/embed/main.go
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer cancel()
