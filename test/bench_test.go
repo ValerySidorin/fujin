@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/server"
+	"github.com/ValerySidorin/fujin/public/server"
 )
 
 const (

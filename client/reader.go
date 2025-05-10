@@ -9,11 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/quic-go/quic-go"
 )
 

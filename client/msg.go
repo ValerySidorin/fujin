@@ -11,6 +11,10 @@ type Msg struct {
 }
 
 func (m *Msg) Ack() error {
+	if len(m.id) <= 0 {
+		return nil
+	}
+
 	resp, err := m.r.ack(m.id)
 	if err != nil {
 		return err
@@ -24,6 +28,10 @@ func (m *Msg) Ack() error {
 }
 
 func (m *Msg) Nack() error {
+	if len(m.id) <= 0 {
+		return nil
+	}
+
 	resp, err := m.r.nack(m.id)
 	if err != nil {
 		return err

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ValerySidorin/fujin/connector/reader"
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -159,6 +159,10 @@ func (s *Subscriber) parse(buf []byte) error {
 				s.ps.ma.idLen = binary.BigEndian.Uint32(s.ps.argBuf)
 				pool.Put(s.ps.argBuf)
 				s.ps.argBuf, s.ps.metaBuf = nil, pool.Get(int(s.ps.ma.idLen))
+				if s.ps.ma.idLen <= 0 {
+					s.ps.state = OP_MSG_ARG
+					continue
+				}
 				s.ps.state = OP_MSG_ID_PAYLOAD
 			}
 		case OP_MSG_ID_PAYLOAD:

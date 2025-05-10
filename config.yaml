@@ -15,7 +15,7 @@ connectors:
   writers:
     pub:
       protocol: kafka
-      kafka:
+      settings:
         brokers: [localhost:9092, localhost:9093, localhost:9094]
         topic: my_pub_topic
         allow_auto_topic_creation: true
@@ -84,7 +84,7 @@ connectors:
   readers:
     sub:
       protocol: kafka
-      kafka:
+      settings:
         brokers: [localhost:9092, localhost:9093, localhost:9094]
         topic: my_pub_topic
         group: fujin

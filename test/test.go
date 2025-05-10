@@ -15,23 +15,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ValerySidorin/fujin/config"
-	"github.com/ValerySidorin/fujin/connector"
-	"github.com/ValerySidorin/fujin/connector/impl/amqp091"
-	"github.com/ValerySidorin/fujin/connector/impl/amqp10"
-	"github.com/ValerySidorin/fujin/connector/impl/kafka"
-	"github.com/ValerySidorin/fujin/connector/impl/mqtt"
-	nats_core "github.com/ValerySidorin/fujin/connector/impl/nats/core"
-	"github.com/ValerySidorin/fujin/connector/impl/nsq"
-	redis_config "github.com/ValerySidorin/fujin/connector/impl/redis/config"
-	"github.com/ValerySidorin/fujin/connector/impl/redis/pubsub"
-	redis_streams "github.com/ValerySidorin/fujin/connector/impl/redis/streams"
-	reader_config "github.com/ValerySidorin/fujin/connector/reader/config"
-	writer_config "github.com/ValerySidorin/fujin/connector/writer/config"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
-	"github.com/ValerySidorin/fujin/server"
-	"github.com/ValerySidorin/fujin/server/fujin"
+	"github.com/ValerySidorin/fujin/internal/server/fujin"
+	"github.com/ValerySidorin/fujin/public/connectors"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/amqp091"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/amqp10"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/kafka"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/mqtt"
+	nats_core "github.com/ValerySidorin/fujin/public/connectors/impl/nats/core"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/nsq"
+	redis_config "github.com/ValerySidorin/fujin/public/connectors/impl/redis/config"
+	"github.com/ValerySidorin/fujin/public/connectors/impl/redis/pubsub"
+	redis_streams "github.com/ValerySidorin/fujin/public/connectors/impl/redis/streams"
+	reader_config "github.com/ValerySidorin/fujin/public/connectors/reader/config"
+	writer_config "github.com/ValerySidorin/fujin/public/connectors/writer/config"
+	"github.com/ValerySidorin/fujin/public/server"
+	"github.com/ValerySidorin/fujin/public/server/config"
 	"github.com/quic-go/quic-go"
 )
 
@@ -47,11 +47,11 @@ var DefaultFujinServerTestConfig = fujin.ServerConfig{
 
 var DefaultTestConfigWithKafka3Brokers = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "kafka",
-				Kafka: kafka.ReaderConfig{
+				Settings: kafka.ReaderConfig{
 					Brokers:                []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 					Topic:                  "my_pub_topic",
 					Group:                  "fujin",
@@ -62,7 +62,7 @@ var DefaultTestConfigWithKafka3Brokers = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "kafka",
-				Kafka: kafka.WriterConfig{
+				Settings: &kafka.WriterConfig{
 					Brokers:                []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 					Topic:                  "my_pub_topic",
 					AllowAutoTopicCreation: true,
@@ -75,11 +75,11 @@ var DefaultTestConfigWithKafka3Brokers = config.Config{
 
 var DefaultTestConfigWithNats = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "nats_core",
-				NatsCore: nats_core.ReaderConfig{
+				Settings: nats_core.ReaderConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -88,7 +88,7 @@ var DefaultTestConfigWithNats = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "nats_core",
-				NatsCore: nats_core.WriterConfig{
+				Settings: &nats_core.WriterConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
@@ -99,11 +99,11 @@ var DefaultTestConfigWithNats = config.Config{
 
 var DefaultTestConfigWithAMQP091 = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "amqp091",
-				AMQP091: amqp091.ReaderConfig{
+				Settings: amqp091.ReaderConfig{
 					Conn: amqp091.ConnConfig{
 						URL: "amqp://guest:guest@localhost",
 					},
@@ -126,7 +126,7 @@ var DefaultTestConfigWithAMQP091 = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "amqp091",
-				AMQP091: amqp091.WriterConfig{
+				Settings: &amqp091.WriterConfig{
 					Conn: amqp091.ConnConfig{
 						URL: "amqp://guest:guest@localhost",
 					},
@@ -151,11 +151,11 @@ var DefaultTestConfigWithAMQP091 = config.Config{
 
 var DefaultTestConfigWithAMQP10 = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "amqp10",
-				AMQP10: amqp10.ReaderConfig{
+				Settings: amqp10.ReaderConfig{
 					Conn: amqp10.ConnConfig{
 						Addr: "amqp://artemis:artemis@localhost:61616",
 					},
@@ -168,7 +168,7 @@ var DefaultTestConfigWithAMQP10 = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "amqp10",
-				AMQP10: amqp10.WriterConfig{
+				Settings: &amqp10.WriterConfig{
 					Conn: amqp10.ConnConfig{
 						Addr: "amqp://artemis:artemis@localhost:61616",
 					},
@@ -183,11 +183,11 @@ var DefaultTestConfigWithAMQP10 = config.Config{
 
 var DefaultTestConfigWithRedisPubSub = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "redis_pubsub",
-				RedisPubSub: pubsub.ReaderConfig{
+				Settings: pubsub.ReaderConfig{
 					ReaderConfig: redis_config.ReaderConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},
@@ -201,7 +201,7 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "redis_pubsub",
-				RedisPubSub: pubsub.WriterConfig{
+				Settings: &pubsub.WriterConfig{
 					WriterConfig: redis_config.WriterConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},
@@ -219,11 +219,11 @@ var DefaultTestConfigWithRedisPubSub = config.Config{
 
 var DefaultTestConfigWithRedisStreams = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "redis_streams",
-				RedisStreams: redis_streams.ReaderConfig{
+				Settings: redis_streams.ReaderConfig{
 					ReaderConfig: redis_config.ReaderConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},
@@ -246,7 +246,7 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "redis_streams",
-				RedisStreams: redis_streams.WriterConfig{
+				Settings: &redis_streams.WriterConfig{
 					WriterConfig: redis_config.WriterConfig{
 						RedisConfig: redis_config.RedisConfig{
 							InitAddress:  []string{"localhost:6379"},
@@ -264,11 +264,11 @@ var DefaultTestConfigWithRedisStreams = config.Config{
 
 var DefaultTestConfigWithMQTT = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "mqtt",
-				MQTT: mqtt.MQTTConfig{
+				Settings: mqtt.MQTTConfig{
 					BrokerURL:         "tcp://localhost:1883",
 					ClientID:          "fujin_sub",
 					Topic:             "my_topic",
@@ -283,7 +283,7 @@ var DefaultTestConfigWithMQTT = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "mqtt",
-				MQTT: mqtt.WriterConfig{
+				Settings: &mqtt.WriterConfig{
 					MQTTConfig: mqtt.MQTTConfig{
 						BrokerURL:         "tcp://localhost:1883",
 						ClientID:          "fujin_pub",
@@ -307,11 +307,11 @@ var DefaultTestConfigWithMQTT = config.Config{
 
 var DefaultTestConfigWithNSQ = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
-	Connectors: connector.Config{
+	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
 			"sub": {
 				Protocol: "nsq",
-				NSQ: nsq.ReaderConfig{
+				Settings: nsq.ReaderConfig{
 					Addresses:   []string{"localhost:4150"},
 					Topic:       "my_topic",
 					Channel:     "my_channel",
@@ -322,7 +322,7 @@ var DefaultTestConfigWithNSQ = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "nsq",
-				NSQ: nsq.WriterConfig{
+				Settings: &nsq.WriterConfig{
 					Address: "localhost:4150",
 					Topic:   "my_topic",
 					Pool: nsq.PoolConfig{

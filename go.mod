@@ -10,6 +10,7 @@ require (
 	github.com/nats-io/nats.go v1.42.0
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/panjf2000/ants/v2 v2.11.3
+	github.com/pebbe/zmq4 v1.4.0
 	github.com/quic-go/quic-go v0.51.0
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/rueidis v1.0.59

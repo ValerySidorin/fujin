@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/client"
-	"github.com/ValerySidorin/fujin/server"
+	"github.com/ValerySidorin/fujin/public/server"
 	"github.com/ValerySidorin/fujin/test"
 
 	nats_server "github.com/nats-io/nats-server/v2/server"
