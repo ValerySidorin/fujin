@@ -15,7 +15,7 @@ import (
 )
 
 type Writer struct {
-	conf   *WriterConfig
+	conf   WriterConfig
 	client rueidis.Client
 	l      *slog.Logger
 
@@ -35,7 +35,7 @@ type Writer struct {
 	bufPool sync.Pool
 }
 
-func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	tlsConf, err := conf.TLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("resp: get tls config: %w", err)

@@ -14,14 +14,14 @@ import (
 )
 
 type Writer struct {
-	conf   *WriterConfig
+	conf   WriterConfig
 	client mqtt.Client
 	pool   *ants.Pool
 	l      *slog.Logger
 	wg     sync.WaitGroup
 }
 
-func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	if err := conf.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}

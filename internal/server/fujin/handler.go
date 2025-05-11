@@ -254,6 +254,7 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_CONNECT_READER):
 					h.ps.state = OP_CONNECT_READER
 				default:
+					fmt.Println("close 1")
 					h.close()
 					return ErrParseProto
 				}
@@ -269,9 +270,11 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_TX_ROLLBACK):
 					h.ps.state = OP_ROLLBACK_TX_FAIL
 				case byte(request.OP_CODE_DISCONNECT):
+					fmt.Println("close 2")
 					h.close()
 					return nil
 				default:
+					fmt.Println("close 3")
 					h.close()
 					return ErrParseProto
 				}
@@ -287,6 +290,7 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_TX_ROLLBACK):
 					h.ps.state = OP_ROLLBACK_TX
 				case byte(request.OP_CODE_DISCONNECT):
+					fmt.Println("close 4")
 					h.close()
 					return nil
 				}
@@ -299,9 +303,11 @@ func (h *handler) handle(buf []byte) error {
 				case byte(request.OP_CODE_NACK):
 					h.ps.state = OP_NACK
 				case byte(request.OP_CODE_DISCONNECT):
+					fmt.Println("close 5")
 					h.close()
 					return nil
 				default:
+					fmt.Println("close 6")
 					h.close()
 					return ErrParseProto
 				}
@@ -359,6 +365,7 @@ func (h *handler) handle(buf []byte) error {
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						fmt.Println("close 7")
 						h.close()
 						return err
 					}
@@ -377,6 +384,7 @@ func (h *handler) handle(buf []byte) error {
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						fmt.Println("close 8")
 						h.close()
 						return err
 					}
@@ -403,6 +411,7 @@ func (h *handler) handle(buf []byte) error {
 					pool.Put(h.ps.argBuf)
 					h.enqueueWriteErrResponse(err)
 					pool.Put(h.ps.ca.cID)
+					fmt.Println("close 9")
 					h.close()
 					return err
 				}
@@ -733,6 +742,7 @@ func (h *handler) handle(buf []byte) error {
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						fmt.Println("close 10")
 						h.close()
 						return err
 					}
@@ -752,6 +762,7 @@ func (h *handler) handle(buf []byte) error {
 						pool.Put(h.ps.argBuf)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
+						fmt.Println("close 11")
 						h.close()
 						return err
 					}
@@ -764,6 +775,7 @@ func (h *handler) handle(buf []byte) error {
 				pool.Put(h.ps.argBuf)
 				h.enqueueWriteErrResponse(ErrParseProto)
 				pool.Put(h.ps.ca.cID)
+				fmt.Println("close 12")
 				h.close()
 				return ErrParseProto
 			}
@@ -780,6 +792,7 @@ func (h *handler) handle(buf []byte) error {
 					pool.Put(h.ps.argBuf)
 					h.enqueueWriteErrResponse(err)
 					pool.Put(h.ps.ca.cID)
+					fmt.Println("close 13")
 					h.close()
 					return err
 				}
@@ -1155,6 +1168,7 @@ func (h *handler) handle(buf []byte) error {
 			if h.ps.cra.typ == 0 {
 				if err := h.parseReaderTypeArg(b); err != nil {
 					enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+					fmt.Println("close 14")
 					h.close()
 					return err
 				}
@@ -1162,6 +1176,7 @@ func (h *handler) handle(buf []byte) error {
 			}
 			if err := h.parseReaderIsAutoCommitArg(b); err != nil {
 				enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+				fmt.Println("close 15")
 				h.close()
 				return err
 			}
@@ -1175,6 +1190,7 @@ func (h *handler) handle(buf []byte) error {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.cra, h.ps.state = nil, connectReaderArgs{}, OP_START
 					enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+					fmt.Println("close 16")
 					h.close()
 					return err
 				}
@@ -1208,6 +1224,7 @@ func (h *handler) handle(buf []byte) error {
 					r, err := h.cman.GetReader(string(h.ps.payloadBuf), h.ps.cra.autoCommit)
 					if err != nil {
 						enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+						fmt.Println("close 17")
 						h.close()
 						return fmt.Errorf("get reader: %w", err)
 					}
@@ -1223,6 +1240,7 @@ func (h *handler) handle(buf []byte) error {
 						ctx, cancel := context.WithCancel(h.ctx)
 						if err := h.connectReader(ctx, cancel, r, h.readerType); err != nil {
 							enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
+							fmt.Println("close 18")
 							h.close()
 							cancel()
 							h.l.Error("subscribe", "err", err)
@@ -1243,6 +1261,7 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 			}
 		default:
+			fmt.Println("close 19")
 			h.close()
 			return ErrParseProto
 		}

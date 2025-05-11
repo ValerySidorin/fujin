@@ -12,7 +12,7 @@ import (
 )
 
 type Writer struct {
-	conf *WriterConfig
+	conf WriterConfig
 
 	conn    *amqp.Conn
 	session *amqp.Session
@@ -21,7 +21,7 @@ type Writer struct {
 	l *slog.Logger
 }
 
-func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	conn, err := amqp.Dial(context.Background(), conf.Conn.Addr, &amqp.ConnOptions{
 		ContainerID:  conf.Conn.ContainerID,
 		HostName:     conf.Conn.HostName,

@@ -16,8 +16,8 @@ import (
 
 func init() {
 	writer.RegisterWriterFactory("resp_streams", func(rawBrokerConfig any, writerID string, l *slog.Logger) (writer.Writer, error) {
-		var typedConfig *WriterConfig
-		if err := util.ConvertConfig(rawBrokerConfig, typedConfig); err != nil {
+		var typedConfig WriterConfig
+		if err := util.ConvertConfig(rawBrokerConfig, &typedConfig); err != nil {
 			return nil, fmt.Errorf("resp_streams writer factory: failed to convert config: %w", err)
 		}
 

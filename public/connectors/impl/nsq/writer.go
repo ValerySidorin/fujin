@@ -14,7 +14,7 @@ import (
 )
 
 type Writer struct {
-	conf     *WriterConfig
+	conf     WriterConfig
 	producer *nsq.Producer
 	pool     *ants.Pool
 	l        *slog.Logger
@@ -22,7 +22,7 @@ type Writer struct {
 	chPool   sync.Pool
 }
 
-func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	cfg := nsq.NewConfig()
 	prod, err := nsq.NewProducer(conf.Address, cfg)
 	if err != nil {

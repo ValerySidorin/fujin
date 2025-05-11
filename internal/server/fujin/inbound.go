@@ -3,6 +3,7 @@ package fujin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"time"
@@ -48,8 +49,10 @@ func (i *inbound) readLoop(ctx context.Context) {
 
 	defer func() {
 		pool.Put(buf)
-		close(stopCh)
+		fmt.Println("close 20")
+		i.h.close()
 		i.close()
+		close(stopCh)
 		i.h.out.BroadcastCond()
 
 	}()

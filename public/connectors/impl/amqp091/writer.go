@@ -11,13 +11,13 @@ import (
 )
 
 type Writer struct {
-	conf    *WriterConfig
+	conf    WriterConfig
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	l       *slog.Logger
 }
 
-func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
+func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	conn, err := amqp.DialConfig(conf.Conn.URL, amqp.Config{
 		Vhost:      conf.Conn.Vhost,
 		ChannelMax: conf.Conn.ChannelMax,

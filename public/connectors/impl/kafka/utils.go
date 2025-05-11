@@ -6,7 +6,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-func kgoOptsFromWriterConf(conf *WriterConfig, writerID string) []kgo.Opt {
+func kgoOptsFromWriterConf(conf WriterConfig, writerID string) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(conf.Brokers...),
 		kgo.DefaultProduceTopic(conf.Topic),
