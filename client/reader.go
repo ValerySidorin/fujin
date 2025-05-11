@@ -203,6 +203,7 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
+					// fmt.Println("buf:", buf[:n])
 					err = parse(buf[:n])
 					if err != nil {
 						c.conn.l.Error("read loop", "err", err)
@@ -217,6 +218,7 @@ func (c *clientReader) readLoop(parse func(buf []byte) error) {
 			continue
 		}
 
+		// fmt.Println("buf:", buf[:n])
 		err = parse(buf[:n])
 		if err != nil {
 			c.conn.l.Error("read loop", "err", err)

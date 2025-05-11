@@ -21,7 +21,6 @@ type Writer struct {
 }
 
 func NewWriter(conf WriterConfig, writerID string, l *slog.Logger) (*Writer, error) {
-	fmt.Println("new kafka writer")
 	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, writerID)...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: new client: %w", err)

@@ -45,9 +45,9 @@ func main() {
 		},
 		func(msg client.Msg) {
 			fmt.Println(string(msg.Value))
-			// if err := msg.Ack(); err != nil {
-			// 	log.Fatal(err)
-			// }
+			if err := msg.Ack(); err != nil {
+				log.Fatal(err)
+			}
 		})
 	if err != nil {
 		log.Fatal(err)
