@@ -75,7 +75,7 @@ func NewWriter(conf *WriterConfig, l *slog.Logger) (*Writer, error) {
 				return make(map[string]string)
 			},
 		},
-		unmarshal: unmarshalFunc(conf.ParseMsgProtocol),
+		unmarshal: unmarshalFunc(conf.Marshaller),
 	}
 
 	go w.flusher()
@@ -188,9 +188,9 @@ func (w *Writer) Close() error {
 	return nil
 }
 
-func unmarshalFunc(proto ParseMsgProtocol) func(data []byte, v any) error {
-	switch proto {
-	case ParseMsgProtocolJSON:
+func unmarshalFunc(marshaller Marshaller) func(data []byte, v any) error {
+	switch marshaller {
+	case JSON:
 		return sonic.Unmarshal
 	default:
 		return func(data []byte, v any) error {

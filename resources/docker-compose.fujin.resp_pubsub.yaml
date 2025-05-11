@@ -1,0 +1,14 @@
+services:
+  fujin:
+    image: fujin:resp_pubsub-${BUILD_TAG}
+    build:
+      context: ./..
+      args:
+        GO_BUILD_TAGS: resp_pubsub
+    container_name: fujin
+    ports:
+      - "4848:4848/udp"
+    volumes:
+      - ./assets:/assets
+    command: /assets/config/config-resp_pubsub.yaml
+    restart: always

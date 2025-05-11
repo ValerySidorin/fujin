@@ -1,0 +1,30 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+connectors:
+  writers:
+    pub:
+      protocol: kafka
+      settings:
+        brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
+        topic: my_pub_topic
+        allow_auto_topic_creation: true
+        linger: 10ms
+        max_buffered_records: 10000
+        disable_idempotent_write: false
+  readers:
+    sub:
+      protocol: kafka
+      settings:
+        brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
+        topic: my_pub_topic
+        group: fujin
+        allow_auto_topic_creation: true
+        max_poll_records: 10000
+        auto_commit_interval: 5s
+        auto_commit_marks: false
+        block_rebalance_on_poll: false
+        balancers:
+          - cooperative_sticky # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
+        fetch_isolation_level: read_uncommited # read_commited/read_uncommited (defaults to read_uncommited)

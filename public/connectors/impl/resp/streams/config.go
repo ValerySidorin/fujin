@@ -7,10 +7,10 @@ import (
 	"github.com/ValerySidorin/fujin/public/connectors/impl/resp/config"
 )
 
-type ParseMsgProtocol string
+type Marshaller string
 
 const (
-	ParseMsgProtocolJSON ParseMsgProtocol = "json"
+	JSON Marshaller = "json"
 )
 
 type StreamConf struct {
@@ -30,13 +30,13 @@ type ReaderConfig struct {
 	Count               int64                 `yaml:"count"`
 	Group               GroupConf             `yaml:"group"`
 
-	ParseMsgProtocol ParseMsgProtocol `yaml:"parse_msg_protocol"`
+	Marshaller Marshaller `yaml:"marshaller"`
 }
 
 type WriterConfig struct {
 	config.WriterConfig `yaml:",inline"`
-	Stream              string           `yaml:"stream"`
-	ParseMsgProtocol    ParseMsgProtocol `yaml:"parse_msg_protocol"`
+	Stream              string     `yaml:"stream"`
+	Marshaller          Marshaller `yaml:"marshaller"`
 }
 
 func (c ReaderConfig) Validate() error {

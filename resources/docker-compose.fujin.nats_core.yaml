@@ -1,0 +1,14 @@
+services:
+  fujin:
+    image: fujin:nats_core-${BUILD_TAG}
+    build:
+      context: ./..
+      args:
+        GO_BUILD_TAGS: nats_core
+    container_name: fujin
+    ports:
+      - "4848:4848/udp"
+    volumes:
+      - ./assets:/assets
+    command: /assets/config/config-nats_core.yaml
+    restart: always

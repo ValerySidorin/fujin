@@ -1,0 +1,21 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+connectors:
+  writers:
+    pub:
+      protocol: amqp10
+      settings:
+        conn:
+          addr: amqp://artemis:artemis@localhost:61616
+        sender:
+          target: exchange
+  readers:
+    sub:
+      protocol: amqp10
+      settings:
+        conn:
+          addr: amqp://artemis:artemis@localhost:61616
+        receiver:
+          source: exchange

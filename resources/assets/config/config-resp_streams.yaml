@@ -1,0 +1,28 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+connectors:
+  writers:
+    pub:
+      protocol: resp_streams
+      settings:
+        init_address: ["localhost:6379"]
+        stream: stream
+        batch_size: 1000
+        linger: 10ms
+        # marshaller: json
+  readers:
+    sub:
+      protocol: resp_streams
+      settings:
+        init_address: ["localhost:6379"]
+        group:
+          name: fujin
+          consumer: fujin
+        streams:
+          stream:
+            group_create_id: $
+            start_id: ">"
+        block: 3s
+        # marshaller: json

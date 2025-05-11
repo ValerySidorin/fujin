@@ -1,0 +1,33 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+connectors:
+  writers:
+    pub:
+      protocol: mqtt
+      settings:
+        broker_url: tcp://localhost:1883
+        client_id: fujin_pub
+        topic: my_topic
+        qos: 0
+        retain: false
+        clean_session: true
+        keep_alive: 2s
+        disconnect_timeout: 5s
+        pool:
+          size: 10000
+          pre_alloc: true
+          release_timeout: 5s
+  readers:
+    sub:
+      protocol: mqtt
+      settings:
+        broker_url: tcp://localhost:1883
+        client_id: fujin_sub
+        topic: my_topic
+        qos: 0
+        retain: false
+        clean_session: true
+        keep_alive: 2s
+        disconnect_timeout: 5s

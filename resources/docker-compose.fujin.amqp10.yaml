@@ -1,0 +1,14 @@
+services:
+  fujin:
+    image: fujin:amqp10-${BUILD_TAG}
+    build:
+      context: ./..
+      args:
+        GO_BUILD_TAGS: amqp10
+    container_name: fujin
+    ports:
+      - "4848:4848/udp"
+    volumes:
+      - ./assets:/assets
+    command: /assets/config/config-amqp10.yaml
+    restart: always

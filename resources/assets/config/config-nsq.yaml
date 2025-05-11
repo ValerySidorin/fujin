@@ -1,0 +1,24 @@
+fujin:
+  tls:
+    server_cert_pem_path: /assets/certs/fujin.io.pem
+    server_key_pem_path: /assets/certs/fujin.io-key.pem
+connectors:
+  writers:
+    pub:
+      protocol: nsq
+      settings:
+        address: "localhost:4150"
+        topic: my_topic
+        pool:
+          size: 10000
+          pre_alloc: true
+          release_timeout: 5s
+  readers:
+    sub:
+      protocol: nsq
+      settings:
+        addresses: ["localhost:4150"]
+        # lookupd_addresses: ["localhost:4161"]
+        topic: my_topic
+        channel: my_channel
+        max_in_flight: 1000000

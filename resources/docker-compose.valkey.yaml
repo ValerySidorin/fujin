@@ -1,0 +1,19 @@
+services:
+  valkey:
+    image: valkey/valkey:latest
+    container_name: valkey
+    ports:
+      - "6379:6379"
+    restart: always
+  # garnet:
+  #   image: ghcr.io/microsoft/garnet
+  #   container_name: garnet
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always
+  # dragonfly:
+  #   image: docker.dragonflydb.io/dragonflydb/dragonfly
+  #   container_name: dragonfly
+  #   ports:
+  #     - "6379:6379"
+  #   restart: always

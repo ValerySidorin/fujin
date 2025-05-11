@@ -1,0 +1,14 @@
+services:
+  fujin:
+    image: fujin:nsq-${BUILD_TAG}
+    build:
+      context: ./..
+      args:
+        GO_BUILD_TAGS: nsq
+    container_name: fujin
+    ports:
+      - "4848:4848/udp"
+    volumes:
+      - ./assets:/assets
+    command: /assets/config/config-nsq.yaml
+    restart: always

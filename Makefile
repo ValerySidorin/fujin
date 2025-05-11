@@ -24,7 +24,7 @@ clean:
 .PHONY: run
 run:
 	@echo "==> Running"
-	@./bin/fujin
+	@./bin/fujin ./config.dev.yaml
 
 .PHONY: help
 help:
@@ -37,3 +37,79 @@ help:
 	@echo "Variables:"
 	@echo "  VERSION (default: git describe || dev) Version tag for builds."
 	@echo "  GO_BUILD_TAGS (default: all brokers)   Comma-separated Go build tags."
+
+# Broker management commands
+.PHONY: up-kafka down-kafka up-nats down-nats up-rabbitmq down-rabbitmq up-artemis down-artemis up-emqx down-emqx up-nsq down-nsq
+
+# Kafka
+up-kafka:
+	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml up -d
+
+down-kafka:
+	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml down
+
+# NATS
+up-nats_core:
+	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml up -d
+
+down-nats_core:
+	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml down
+
+# RabbitMQ
+up-amqp091:
+	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml up -d
+
+down-amqp091:
+	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml down
+
+# ActiveMQ Artemis
+up-amqp10:
+	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml up -d
+
+down-amqp10:
+	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml down
+
+# EMQX
+up-mqtt:
+	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml up -d
+
+down-mqtt:
+	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml down
+# Redis (e.g. ValKey)
+up-resp_pubsub:
+	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml up -d
+
+down-resp_pubsub:
+	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml down
+
+up-resp_streams:
+	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml up -d
+
+down-resp_streams:
+	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml down
+
+
+# NSQ
+up-nsq:
+	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml up -d
+
+down-nsq:
+	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml down
+
+# Helper command to show all available broker commands
+broker-help:
+	@echo "Available broker commands:"
+	@echo "  make up-kafka       - Start Kafka cluster"
+	@echo "  make down-kafka     - Stop Kafka cluster"
+	@echo "  make up-nats_core   - Start NATS server"
+	@echo "  make down-nats_core - Stop NATS server"
+	@echo "  make up-rabbitmq    - Start RabbitMQ server"
+	@echo "  make down-rabbitmq  - Stop RabbitMQ server"
+	@echo "  make up-artemis     - Start ArtemisMQ server"
+	@echo "  make down-artemis   - Stop ArtemisMQ server"
+	@echo "  make up-emqx        - Start EMQX server"
+	@echo "  make down-emqx      - Stop EMQX server"
+	@echo "  make up-redis       - Start Redis server (ValKey)"
+	@echo "  make down-redis     - Stop Redis server (ValKey)"
+	@echo "  make up-nsq         - Start NSQ cluster"
+	@echo "  make down-nsq       - Stop NSQ cluster"

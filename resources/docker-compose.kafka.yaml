@@ -1,17 +1,4 @@
 services:
-  fujin:
-    image: fujin:${BUILD_TAG}
-    build:
-      context: .
-      args:
-        GO_BUILD_TAGS: kafka
-    container_name: fujin
-    ports:
-      - "4848:4848/udp"
-    volumes:
-      - ./assets:/assets
-    command: /assets/config/config-kafka.yaml
-    restart: always
   zoo1:
     image: confluentinc/cp-zookeeper:latest
     hostname: zoo1

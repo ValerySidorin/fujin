@@ -54,7 +54,7 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 	r := &Reader{
 		conf:       conf,
 		client:     client,
-		marshal:    marshalFunc(conf.ParseMsgProtocol),
+		marshal:    marshalFunc(conf.Marshaller),
 		autoCommit: autoCommit,
 		streams:    streams,
 		strSlicePool: sync.Pool{
@@ -313,9 +313,9 @@ func (r *Reader) cmd() rueidis.Completed {
 		Build()
 }
 
-func marshalFunc(proto ParseMsgProtocol) func(v any) ([]byte, error) {
+func marshalFunc(proto Marshaller) func(v any) ([]byte, error) {
 	switch proto {
-	case ParseMsgProtocolJSON:
+	case JSON:
 		return sonic.Marshal
 	default:
 		return func(v any) ([]byte, error) {

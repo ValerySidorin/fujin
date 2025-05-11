@@ -1,0 +1,8 @@
+services:
+  nats:
+    image: nats:latest
+    hostname: nats
+    container_name: nats
+    ports:
+      - "4222:4222"
+    restart: always
