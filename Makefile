@@ -7,6 +7,9 @@ ALL_BROKERS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
 
 GO_BUILD_TAGS ?= $(ALL_BROKERS)
 
+BENCH_TIME ?= 1000x
+BENCH_FUNC ?=
+
 .PHONY: all
 all: clean build run
 
@@ -113,3 +116,7 @@ broker-help:
 	@echo "  make down-redis     - Stop Redis server (ValKey)"
 	@echo "  make up-nsq         - Start NSQ cluster"
 	@echo "  make down-nsq       - Stop NSQ cluster"
+
+.PHONY: bench
+bench:
+	@go test -bench=${BENCH_FUNC} -benchtime=${BENCH_TIME} -tags=${GO_BUILD_TAGS} github.com/ValerySidorin/fujin/test
