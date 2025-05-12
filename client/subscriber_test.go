@@ -352,3 +352,31 @@ func TestSubscriberKafka(t *testing.T) {
 		assert.NoError(t, sub.CheckParseStateAfterOpForTests())
 	})
 }
+
+// func TestParse(t *testing.T) {
+// 	conf := client.SubscriberConfig{
+// 		ReaderConfig: client.ReaderConfig{
+// 			Topic: "sub",
+// 		},
+// 	}
+
+// 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// 	defer cancel()
+
+// 	addr := "localhost:4848"
+// 	conn, err := client.Connect(ctx, addr, generateTLSConfig())
+// 	if err != nil {
+// 		t.Fatalf("failed to connect: %v", err)
+// 	}
+// 	defer conn.Close()
+
+// 	sub, err := conn.ConnectSubscriber(conf, func(msg client.Msg) {})
+// 	assert.NoError(t, err)
+// 	defer sub.Close()
+
+// 	buf := []byte{8, 0, 0, 0, 8, 0, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 3, 6, 109, 121, 95, 112, 117, 98, 95, 116, 111, 112, 105, 99, 0}
+// 	err = sub.Parse(buf)
+// 	assert.NoError(t, err)
+// 	err = sub.CheckParseStateAfterOpForTests()
+// 	assert.NoError(t, err)
+// }

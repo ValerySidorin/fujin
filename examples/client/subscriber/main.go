@@ -38,9 +38,9 @@ func main() {
 	sub, err := conn.ConnectSubscriber(
 		client.SubscriberConfig{
 			ReaderConfig: client.ReaderConfig{
-				Topic:      "sub",
-				AutoCommit: true,
-				Async:      true,
+				Topic: "sub",
+				// AutoCommit: true,
+				Async: true,
 			},
 		},
 		func(msg client.Msg) {

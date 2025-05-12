@@ -488,7 +488,7 @@ func (c *Consumer) parse(buf []byte) error {
 			if len(c.ps.argBuf) >= fujin.Uint32Len {
 				c.ps.aa.currMsgIDLen = binary.BigEndian.Uint32(c.ps.argBuf)
 				pool.Put(c.ps.argBuf)
-				c.ps.argBuf, c.ps.metaBuf = nil, make([]byte, c.ps.aa.currMsgIDLen)
+				c.ps.argBuf, c.ps.metaBuf = nil, make([]byte, 0, c.ps.aa.currMsgIDLen)
 				c.ps.state = OP_ACK_MSG_ID_PAYLOAD
 			}
 		case OP_ACK_MSG_ID_PAYLOAD:
@@ -689,7 +689,7 @@ func (c *Consumer) parse(buf []byte) error {
 			if len(c.ps.argBuf) >= fujin.Uint32Len {
 				c.ps.aa.currMsgIDLen = binary.BigEndian.Uint32(c.ps.argBuf)
 				pool.Put(c.ps.argBuf)
-				c.ps.argBuf, c.ps.metaBuf = nil, make([]byte, c.ps.aa.currMsgIDLen)
+				c.ps.argBuf, c.ps.metaBuf = nil, make([]byte, 0, c.ps.aa.currMsgIDLen)
 				c.ps.state = OP_NACK_MSG_ID_PAYLOAD
 			}
 		case OP_NACK_MSG_ID_PAYLOAD:
