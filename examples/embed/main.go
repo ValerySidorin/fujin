@@ -47,7 +47,7 @@ var DefaultTestConfigWithNats = config.Config{
 		Writers: map[string]writer_config.Config{
 			"pub": {
 				Protocol: "nats_core",
-				Settings: &nats_core.WriterConfig{
+				Settings: nats_core.WriterConfig{
 					URL:     "nats://localhost:4222",
 					Subject: "my_subject",
 				},
