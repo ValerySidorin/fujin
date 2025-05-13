@@ -1,6 +1,6 @@
 module github.com/ValerySidorin/fujin
 
-go 1.24.2
+go 1.24.3
 
 require (
 	github.com/Azure/go-amqp v1.4.0
