@@ -27,12 +27,13 @@ func main() {
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), client.WithLogger(
-		slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			AddSource: true,
-			Level:     slog.LevelDebug,
-		})),
-	))
+	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), nil,
+		client.WithLogger(
+			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			})),
+		))
 	if err != nil {
 		log.Fatal(err)
 	}

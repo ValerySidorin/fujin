@@ -58,6 +58,12 @@ Consider alternatives if:
 - [Protocol Specification](protocol.md)
 - [Configuration Guide](config.yaml)
 
+## TODO
+
+- Request/Reply
+- Protocol versioning
+- Message headers ?
+
 ## Contributing
 
 Fujin is completely open-source, feel free to contribute! If you plan to contribute, please see if there's a `CONTRIBUTING.md` file for guidelines, or start by opening an issue to discuss your proposed changes.

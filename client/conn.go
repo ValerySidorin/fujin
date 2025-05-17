@@ -30,8 +30,8 @@ type Conn struct {
 	l *slog.Logger
 }
 
-func Connect(ctx context.Context, addr string, tlsConf *tls.Config, opts ...Option) (*Conn, error) {
-	conn, err := quic.DialAddr(ctx, addr, tlsConf, nil)
+func Connect(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config, opts ...Option) (*Conn, error) {
+	conn, err := quic.DialAddr(ctx, addr, tlsConf, quicConf)
 	if err != nil {
 		return nil, fmt.Errorf("quic: dial addr: %w", err)
 	}

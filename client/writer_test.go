@@ -24,7 +24,7 @@ func TestWriter(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(),
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
 			client.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -54,7 +54,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -80,7 +80,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -106,7 +106,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -132,7 +132,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -252,7 +252,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -282,7 +282,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -309,7 +309,7 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig())
+		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
