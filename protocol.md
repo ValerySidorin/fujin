@@ -10,16 +10,24 @@ The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylR
 **No Command Delimiters**: The Fujin server receives commands as a plain stream of bytes. Commands are parsed based on their structure.  
 **Byte Order**: The Fujin server uses big-endian byte order.  
 
-## Types
+## Type system
 
 Before describing the commands, let's explore the data types used in the Fujin protocol.
 
-| Type   | Length (bytes)        | Example                                 | Representation              |
-|--------|-----------------------|-----------------------------------------| --------------------------- |
-| byte   | 1                     | `[11]`                                  | `0x0B`                      |
-| uint32 | 4                     | `[0, 0, 1, 1]`                          | `3`                         |
-| string | dynamic (len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]` | `hello`                     |
-| bool   | 1                     | `[0]`                                   | `false`                     |
+| Type               | Length (bytes)               | Example                                    | Representation     |
+|--------------------|------------------------------|--------------------------------------------| ------------------ |
+| byte               | 1                            | `[11]`                                     | `0x0B`             |
+| uint16             | 2                            | `[0, 1]`                                   | `1`                |
+| uint32             | 4                            | `[0, 0, 0, 1]`                             | `1`                |
+| bool               | 1                            | `[0]`                                      | `false`            |
+| [uint16]type       | dynamic (uint16 len+payload) | `[0, 1, 1]`                                | `[1]`              |
+| [uint32]type       | dynamic (uint32 len+payload) | `[0, 0, 0, 1, 1]`                          | `[1]`              |
+| string             | dynamic (uint32 len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]`    | `"hello"`          |
+| type{string, bool} | dynamic                      | `[0, 0, 0, 5, 104, 101, 108, 108, 111, 0]` | `{"hello", false}` |
+
+> **Note**: String is a shortcut for [uint32]byte. Custom types are just an assembly of various simple types.
+
+* **Nullability**: If type is nullable, 1 byte is always prepended before (0 if null, 1 if not). For this doc, nullable types will be illustrated as followed: `string?`
 
 ## PING
 ### Direction
@@ -63,21 +71,21 @@ Client -> Server
 Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT WRITER` command was previously issued.
 ### Syntax
 ##### Request
-`[3, <correlation id>, <topic>, <message>]`  
+`[3, <correlation id>, <topic>, <headers>, <message>]`  
 where:
-| name             | description                                                               | type   | required |
-| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | true     |
-| `topic`          | The target topic for the message.                                         | string | true     |
-| `message`        | The message content.                                                      | string | true     |
+| name             | description                                                               | type                      | required |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------- | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    | true     |
+| `topic`          | The target topic for the message.                                         | string                    | true     |
+| `headers`         | The target topic for the message.                                        | array (uint16) of strings | true     |
+| `message`        | The message content.                                                      | [uint32]byte              | true     |
 ##### Response
-`[2, <correlation id>, <error code>, <error payload>]`  
+`[2, <correlation id>, <error>]`  
 where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
-| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
-| `error payload`  | Error message text, if applicable.                                        | string | optional |
+| `error`     | An error.               | string?   | always   |
 ### Examples
 - `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
 
@@ -96,13 +104,12 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[3, <correlation id>, <error code>, <error payload>]`  
+`[3, <correlation id>, <error>]`  
 where:
 | name             | description                                                               | type   | presence |
 | ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
-| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
-| `error payload`  | Error message text, if applicable.                                        | string | optional |
+| `error`     | An error.               | string?   | always   |
 
 ### Examples
 - `[4, 0, 0, 0, 1]` -> `[3, 0, 0, 0, 1, 0]`
@@ -122,13 +129,12 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[4, <correlation id>, <error code>, <error payload>]`  
+`[4, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type   | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
-| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
-| `error payload`  | Error message text, if applicable.                                        | string | optional |
+| name             | description                                                               | type    | presence |
+| ---------------- | ------------------------------------------------------------------------- | ------- | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  | always   |
+| `error`          | An error.                                                                 | string? | always   |
 
 ### Examples
 - `[5, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
@@ -148,13 +154,12 @@ where:
 | ---------------- | -------------------------------------------------------------------- | ------ | -------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
 ##### Response
-`[5, <correlation id>, <error code>, <error payload>]`  
+`[5, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type   | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
-| `error code`     | Error code: `0` indicates no error, `1` indicates an error.               | byte   | always   |
-| `error payload`  | Error message text, if applicable.                                        | string | optional |
+| name             | description                                                               | type    | presence |
+| ---------------- | ------------------------------------------------------------------------- | ------- | -------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  | always   |
+| `error`          | An error.                                                                 | string? | always   |
 
 ### Examples
 - `[6, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
@@ -176,12 +181,11 @@ where:
 | `auto commit`    | Connect with auto commit.                                       | bool   | true     |
 | `topic`          | Topic to read from.                                             | string | true     |
 ##### Response
-`[1, <error code>, <error payload>]`  
+`[1, <error>]`  
 where:
-| name                  | description                            |  type  | presence |
-| --------------------- | -------------------------------------- | ------ | -------- |
-| `error code`          | Error code. 0 is no error. 1 is error. | byte   | always   |
-| `error payload`       | Error payload text.                    | string | optional |
+| name                  | description                            |  type   | presence |
+| --------------------- | -------------------------------------- | ------- | -------- |
+| `error`               | An error.                              | string? | always   |
 ### Examples
 - `[2, 1, 0, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0]`
 ## MSG
@@ -193,10 +197,10 @@ A message propagated by the server in a client-opened reader QUIC stream. Messag
 ### Syntax
 `[6, <message id>, <message value>]`  
 where:
-| name                  | description                                                  | type     | presence |
-| --------------------- | ------------------------------------------------------------ | -------- | -------- |
-| `message id`          | Message ID. Propagated by server if auto commit is disabled. | string   | optional |
-| `message value`       | Message value.                                               | string   | always   |
+| name                  | description                                                  | type         | presence |
+| --------------------- | ------------------------------------------------------------ | ------------ | -------- |
+| `message id`          | Message ID. Propagated by server if auto commit is disabled. | [uint32]byte | optional |
+| `message value`       | Message value.                                               | [uint32]byte | always   |
 ### Examples
 - `-` -> `[6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
@@ -209,21 +213,20 @@ Must be sent in a QUIC stream, where `CONNECT READER` command was sent previousl
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[8, <correlation id>, <msg id batch len>, <msg id batch>]`  
+`[8, <correlation id>, <msg ids>]`  
 where:
-| name                  | description                                                      | type    | required |
-| ----------------- | ---------------------------------------------------------------------| ------- | -------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `message meta`    | Message meta.                                                        | dynamic | always   | // TODO
+| name             | description                                                          | type                 | required |
+| ---------------- | ---------------------------------------------------------------------| -------------------- | -------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32               | always   |
+| `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte | always   |
 ##### Response
-`[8, <correlation id>, <error code>, <error payload>, <ack msg batch len>, <ack msg batch>]`  
+`[8, <correlation id>, <error>, <ack results>]`  
 where:
-| name               | description                                                          | type   | presence |
-| ------------------ | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id`   | Correlation ID is used to match client request with server response. | uint32 | always   |
-| `error code`       | Error code. 0 is no error. 1 is error.                               | byte   | always   |
-| `error payload`    | Error payload text.                                                  | string | optional |
-// TODO
+| name             | description                                                          | type                             | presence |
+| ---------------- | -------------------------------------------------------------------- | -------------------------------- | -------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32                           | always   |
+| `error`          | An error.                                                            | string?                          | always   |
+| `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]type{[uint32]byte, bool} | optional |
 
 ### Examples
 - `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
@@ -236,20 +239,21 @@ Client -> Server
 Works similarly to `ACK`.
 ### Syntax
 ##### Request
-`[9, <correlation id>, <message meta>]`  
+`[9, <correlation id>, <message ids>]`  
 where:
-| name                  | description                                                      | type    | required |
-| ----------------- | ---------------------------------------------------------------------| ------- | -------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `message meta`    | Message meta.                                                        | dynamic | always   |
+| name              | description                                                          | type                 | required |
+| ----------------- | ---------------------------------------------------------------------| -------------------- | -------- |
+| `correlation id`  | Correlation ID is used to match client request with server response. | uint32               | always   |
+| `msg ids`         | Message ID batch.                                                    | [uint32][uint32]byte | always   |
 ##### Response
-`[9, <correlation id>, <error code>, <error payload>]`  
+`[9, <correlation id>, <error>, <nack results>]`  
 where:
-| name                  | description                                                      | type    | presence |
-| ----------------- | -------------------------------------------------------------------- | ------- | -------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `error code`      | Error code. 0 is no error. 1 is error.                               | byte    | always   |
-| `error payload`   | Error payload text.                                                  | string  | optional |
+| name             | description                                                          | type                             | presence |
+| ---------------- | -------------------------------------------------------------------- | -------------------------------- | -------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32                           | always   |
+| `error`          | An error.                                                            | string?                          | always   |
+| `nack results`   | An array of nack results. (Msg ID + success)                         | [uint32]type{[uint32]byte, bool} | optional |
+
 
 ### Examples
 - `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[9, 0, 0, 0, 1, 0]`
@@ -271,15 +275,14 @@ where:
 | `msg response batch len` | The number of messages the server should send in response.           | uint32  | true     |
 
 ##### Response
-`[7, <correlation id>, <error code>, <error payload>, <msg batch len>, <msg batch>]`  
+`[7, <correlation id>, <error>, <msgs>]`  
 where:
-| name                 | description                                                          | type    | presence |
-| -------------------- | -------------------------------------------------------------------- | ------- | -------- |
-| `correlation id`     | Correlation ID is used to match client request with server response. | uint32  | always   |
-| `error code`         | Error code. 0 is no error. 1 is error.                               | byte    | always   |
-| `error payload`      | Error payload text.                                                  | string  | optional |
-| `msg batch len`      | The number of msg payloads the server should send in response.       | uint32  | optional |
-| `msg response batch` | A batch of msg payloads.                                             | string  | optional |
+| name             | description                                                          | type                  | presence |
+| ---------------- | -------------------------------------------------------------------- | --------------------- | -------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32                | always   |
+| `error`          | An error.                                                            | string?               | always   |
+| `msgs`           | Message batch.                                                       | [uint32][uint32]byte  | optional |
+
 
 
 ### Examples
