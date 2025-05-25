@@ -16,7 +16,7 @@ Before describing the commands, let's explore the data types used in the Fujin p
 
 | Type               | Length (bytes)               | Example                                    | Representation     |
 |--------------------|------------------------------|--------------------------------------------| ------------------ |
-| byte               | 1                            | `[11]`                                     | `0x0B`             |
+| byte               | 1                            | `[1]`                                      | `1`                |
 | uint16             | 2                            | `[0, 1]`                                   | `1`                |
 | uint32             | 4                            | `[0, 0, 0, 1]`                             | `1`                |
 | bool               | 1                            | `[0]`                                      | `false`            |
@@ -25,9 +25,16 @@ Before describing the commands, let's explore the data types used in the Fujin p
 | string             | dynamic (uint32 len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]`    | `"hello"`          |
 | type{string, bool} | dynamic                      | `[0, 0, 0, 5, 104, 101, 108, 108, 111, 0]` | `{"hello", false}` |
 
-> **Note**: String is a shortcut for [uint32]byte. Custom types are just an assembly of various simple types.
+* **Nullability**: If type is nullable, 1 byte is always prepended before (0 if null, 1 if not). For this doc, nullable types will be illustrated as followed: `string?`. In some cases value nullability is client defined, and we don't need to prepend 1 byte. Such values will be illustrated as followed: `string??`.
 
-* **Nullability**: If type is nullable, 1 byte is always prepended before (0 if null, 1 if not). For this doc, nullable types will be illustrated as followed: `string?`
+## Type aliases
+
+For convenience, some type aliases are introduced.
+| Type       | Alias for                          |
+| ---------- | ---------------------------------- |
+| string     | [uint32]byte                       |
+| message    | type{[uint32]byte??, [uint32]byte} |
+| ackres     | type{[uint32]byte, bool}           |
 
 ## PING
 ### Direction
@@ -44,71 +51,97 @@ Since the QUIC protocol supports multiplexing, `PING` messages are sent over a d
 ### Examples
 - `[11]` -> `[11]`
 
-## CONNECT WRITER
+## CONNECT
 
 ### Direction
 Client -> Server
 ### Description
-Before producing messages, the client must open a QUIC stream and send a `CONNECT WRITER` command to the server. When using Kafka, `writer id` is required for transactions and must not be equal to `[0, 0, 0, 0]`.
+Before producing messages, the client must open a QUIC stream and send a `CONNECT` command to the server. When using Kafka, `stream id` is required for transactions and must not be equal to `[0, 0, 0, 0]`.
 ### Syntax
 ##### Request
- `[1, <writer id>]`  
+ `[1, <stream id>]`  
  where:
- | name       | description                                                                    | type   | required |
-| ----------- | ------------------------------------------------------------------------------ | ------ | -------- |
-| `writer id` | A unique writer identifier used for transactional message production in Kafka. | uint32 | true     |
+ | name       | description                                                                    | type   |
+| ----------- | ------------------------------------------------------------------------------ | ------ |
+| `stream id` | A unique stream identifier used for transactional message production in Kafka. | uint32 |
 ##### Response
 `-`
 ### Examples
 - `[1, 0, 0, 0, 0]` -> `-`
 - `[1, 0, 0, 0, 1]` -> `-`
 
-## WRITE
+## PRODUCE
 
 ### Direction
 Client -> Server
 ### Description
-Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT WRITER` command was previously issued.
+Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT` command was previously issued.
+### Syntax
+##### Request
+`[3, <correlation id>, <topic>, <message>]`  
+where:
+| name             | description                                                               | type                      |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
+| `topic`          | The target topic for the message.                                         | string                    |
+| `message`        | The message content.                                                      | [uint32]byte              |
+##### Response
+`[2, <correlation id>, <error>]`  
+where:
+| name             | description                                                               | type   |
+| ---------------- | ------------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
+| `error`     | An error.               | string?   | always   |
+### Examples
+- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+
+## HPRODUCE
+
+### Direction
+Client -> Server
+### Description
+Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT` command was previously issued.
 ### Syntax
 ##### Request
 `[3, <correlation id>, <topic>, <headers>, <message>]`  
 where:
-| name             | description                                                               | type                      | required |
-| ---------------- | ------------------------------------------------------------------------- | ------------------------- | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    | true     |
-| `topic`          | The target topic for the message.                                         | string                    | true     |
-| `headers`         | The target topic for the message.                                        | array (uint16) of strings | true     |
-| `message`        | The message content.                                                      | [uint32]byte              | true     |
+| name             | description                                                               | type                      |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
+| `topic`          | The target topic for the message.                                         | string                    |
+| `headers`        | Optional headers for the message.                                         | array (uint16) of strings |
+| `message`        | The message content.                                                      | [uint32]byte              |
 ##### Response
 `[2, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type   | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
+| name             | description                                                               | type   |
+| ---------------- | ------------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
 | `error`     | An error.               | string?   | always   |
 ### Examples
-- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+
 
 ## BEGIN TX
 ### Direction
 Client -> Server
 
 ### Description
-Begins transaction. Must be send in a QUIC stream, where `CONNECT WRITER` command was sent previously. `producer id` arg is required on `CONNECT WRITER` when Kafka is used.
+Begins transaction. Must be send in a QUIC stream, where `CONNECT` command was sent previously. `stream id` arg is required on `CONNECT` when Kafka is used.
 
 ### Syntax
 ##### Request
 `[4, <correlation id>]`  
 where:
-| name             | description                                                          | type   | required |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
+| name             | description                                                          | type   |
+| ---------------- | -------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
 ##### Response
 `[3, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type   | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 | always   |
+| name             | description                                                               | type   |
+| ---------------- | ------------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
 | `error`     | An error.               | string?   | always   |
 
 ### Examples
@@ -119,22 +152,22 @@ where:
 Client -> Server
 
 ### Description
-Commits transaction. Must be send in a QUIC stream, where `CONNECT WRITER` command was sent previously. `producer id` arg is required on `CONNECT WRITER` when Kafka is used.
+Commits transaction. Must be send in a QUIC stream, where `CONNECT` command was sent previously. `stream id` arg is required on `CONNECT` when Kafka is used.
 
 ### Syntax
 ##### Request
 `[5, <correlation id>]`  
 where:
-| name             | description                                                          | type   | required |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
+| name             | description                                                          | type   |
+| ---------------- | -------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
 ##### Response
 `[4, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type    | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------- | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  | always   |
-| `error`          | An error.                                                                 | string? | always   |
+| name             | description                                                               | type    |
+| ---------------- | ------------------------------------------------------------------------- | ------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
+| `error`          | An error.                                                                 | string? |
 
 ### Examples
 - `[5, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
@@ -144,89 +177,109 @@ where:
 Client -> Server
 
 ### Description
-Rolls back transaction. Must be send in a QUIC stream, where `CONNECT WRITER` command was sent previously. `producer id` arg is required on `CONNECT WRITER` when Kafka is used.
+Rolls back transaction. Must be send in a QUIC stream, where `CONNECT` command was sent previously. `stream id` arg is required on `CONNECT` when Kafka is used.
 
 ### Syntax
 ##### Request
 `[6, <correlation id>]`  
 where:
-| name             | description                                                          | type   | required |
-| ---------------- | -------------------------------------------------------------------- | ------ | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 | true     |
+| name             | description                                                          | type   |
+| ---------------- | -------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
 ##### Response
 `[5, <correlation id>, <error>]`  
 where:
-| name             | description                                                               | type    | presence |
-| ---------------- | ------------------------------------------------------------------------- | ------- | -------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  | always   |
-| `error`          | An error.                                                                 | string? | always   |
+| name             | description                                                               | type    |
+| ---------------- | ------------------------------------------------------------------------- | ------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
+| `error`          | An error.                                                                 | string? |
 
 ### Examples
 - `[6, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
 
-## CONNECT READER
+## SUBSCRIBE
 
 ### Direction
 Client -> Server
 ### Description
-Client opens QUIC stream and initiates a subscription to a topic. Messages will be sent by the server in a stream opened by the client. Message distribution is handled by the underlying broker. There are two types of readers: subscriber (push) and consumer (pull). If the client connects as a subscriber, the server pushes messages into the connection itself. If the client connects as a consumer, the server sends messages on request.
+Client initiates a subscription to a topic. Messages will be sent by the server in a stream opened by the client previously. Message distribution is handled by the underlying broker.
 
 ### Syntax
 ##### Request
-`[2, <type>, <auto commit>, <topic>]`  
+`[2, <correlation id>, <auto commit>, <topic>]`  
 where:
-| name             | description                                                     | type   | required |
-| ---------------- | --------------------------------------------------------------- | ------ | -------- |
-| `type`           | Type of reader: `1` — subscriber (push), `2` — consumer (pull). | byte   | true     |
-| `auto commit`    | Connect with auto commit.                                       | bool   | true     |
-| `topic`          | Topic to read from.                                             | string | true     |
+| name             | description                                                          | type   |
+| ---------------- | -------------------------------------------------------------------- | ------ |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
+| `auto commit`    | Connect with auto commit.                                            | bool   |
+| `topic`          | Topic to read from.                                                  | string |
 ##### Response
-`[1, <error>]`  
+`[1, <correlation id>, <error>, <subscription id>]`  
 where:
-| name                  | description                            |  type   | presence |
-| --------------------- | -------------------------------------- | ------- | -------- |
-| `error`               | An error.                              | string? | always   |
+| name              | description                                                          |  type   |
+| ----------------- | -------------------------------------------------------------------- | ------- |
+| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  |
+| `error`           | An error.                                                            | string? |
+| `subscription id` | Subscription ID.                                                     | byte    |
+
 ### Examples
-- `[2, 1, 0, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0]`
+- `[2, 0, 0, 0, 1, 1, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0, 0, 1, 0, 5]`
 ## MSG
 
 ### Direction
 Server -> Client
 ### Description
-A message propagated by the server in a client-opened reader QUIC stream. Message meta length is returned from `CONNECT READER` response.
+A message propagated by the server in a client-opened QUIC stream after issuing `SUBSCRIBE` command.
 ### Syntax
-`[6, <message id>, <message value>]`  
+`[6, <subscription id>, <message>]`
 where:
-| name                  | description                                                  | type         | presence |
-| --------------------- | ------------------------------------------------------------ | ------------ | -------- |
-| `message id`          | Message ID. Propagated by server if auto commit is disabled. | [uint32]byte | optional |
-| `message value`       | Message value.                                               | [uint32]byte | always   |
+| name                  | description      | type           |
+| --------------------- | ---------------- | -------------- |
+| `subscription id`     | Subscription ID. | byte           |
+| `message`             | Message.         | message        |
 ### Examples
-- `-` -> `[6, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `-` -> `[6, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+
+## HMSG
+
+### Direction
+Server -> Client
+### Description
+A message with headers propagated by the server in a client-opened QUIC stream after issuing `SUBSCRIBE` command.
+### Syntax
+`[6, <subscription id>, <headers>, <message>]`  
+where:
+| name                  | description      | type           |
+| --------------------- | ---------------- | -------------- |
+| `subscription id`     | Subscription ID. | byte           |
+| `headers`             | Message headers. | [uint16]string |
+| `message`             | Message.         | message        |
+### Examples
+- `-` -> `[6, 5, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+
 
 ## ACK
 
 ### Direction
 Client -> Server
 ### Description
-Must be sent in a QUIC stream, where `CONNECT READER` command was sent previously.
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
 `[8, <correlation id>, <msg ids>]`  
 where:
-| name             | description                                                          | type                 | required |
-| ---------------- | ---------------------------------------------------------------------| -------------------- | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32               | always   |
-| `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte | always   |
+| name             | description                                                          | type                 |
+| ---------------- | ---------------------------------------------------------------------| -------------------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32               |
+| `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte |
 ##### Response
 `[8, <correlation id>, <error>, <ack results>]`  
 where:
-| name             | description                                                          | type                             | presence |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------- | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32                           | always   |
-| `error`          | An error.                                                            | string?                          | always   |
-| `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]type{[uint32]byte, bool} | optional |
+| name             | description                                                          | type           |
+| ---------------- | -------------------------------------------------------------------- | -------------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32         |
+| `error`          | An error.                                                            | string?        |
+| `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]ackres |
 
 ### Examples
 - `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
@@ -241,18 +294,18 @@ Works similarly to `ACK`.
 ##### Request
 `[9, <correlation id>, <message ids>]`  
 where:
-| name              | description                                                          | type                 | required |
+| name              | description                                                          | type                 | presence |
 | ----------------- | ---------------------------------------------------------------------| -------------------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32               | always   |
 | `msg ids`         | Message ID batch.                                                    | [uint32][uint32]byte | always   |
 ##### Response
 `[9, <correlation id>, <error>, <nack results>]`  
 where:
-| name             | description                                                          | type                             | presence |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------- | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32                           | always   |
-| `error`          | An error.                                                            | string?                          | always   |
-| `nack results`   | An array of nack results. (Msg ID + success)                         | [uint32]type{[uint32]byte, bool} | optional |
+| name             | description                                                          | type           |
+| ---------------- | -------------------------------------------------------------------- | -------------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32         |
+| `error`          | An error.                                                            | string?        |
+| `nack results`   | An array of nack results. (Msg ID + success)                         | [uint32]ackres |
 
 
 ### Examples
@@ -263,30 +316,54 @@ where:
 ### Direction
 Client -> Server
 ## Description
-When connected as a consumer, the client must send a `FETCH` command to the server to retrieve messages from the current reader stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
+Client can send a `FETCH` command to the server to retrieve messages from the current stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <msg batch len>]`  
+`[7, <correlation id>, <auto commit>, <msg response batch len>]`  
 where:
-| name                     | description                                                          | type    | required |
-| ------------------------ | -------------------------------------------------------------------- | ------- | -------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  | true     |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32  | true     |
+| name                     | description                                                          | type    |
+| ------------------------ | -------------------------------------------------------------------- | ------- |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
+| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
 
 ##### Response
 `[7, <correlation id>, <error>, <msgs>]`  
 where:
-| name             | description                                                          | type                  | presence |
-| ---------------- | -------------------------------------------------------------------- | --------------------- | -------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32                | always   |
-| `error`          | An error.                                                            | string?               | always   |
-| `msgs`           | Message batch.                                                       | [uint32][uint32]byte  | optional |
+| name             | description                                                          | type             |
+| ---------------- | -------------------------------------------------------------------- | ---------------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32           |
+| `error`          | An error.                                                            | string?          |
+| `msgs`           | Message batch.                                                       | [uint32]message  |
 
+## HFETCH
+
+### Direction
+Client -> Server
+## Description
+`FETCH` with headers support.
+
+## Syntax
+##### Request
+`[7, <correlation id>, <auto commit>, <msg response batch len>]`  
+where:
+| name                     | description                                                          | type    |
+| ------------------------ | -------------------------------------------------------------------- | ------- |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
+| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
+
+##### Response
+`[7, <correlation id>, <error>, <msgs>]`  
+where:
+| name             | description                                                          | type                                   |
+| ---------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| `correlation id` | Correlation ID is used to match client request with server response. | uint32                                 |
+| `error`          | An error.                                                            | string?                                |
+| `msgs`           | Message with headers batch.                                          | [uint32]type{[uint16]string, message}  |
 
 
 ### Examples
-- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 - `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
 - `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
 ## DISCONNECT
