@@ -106,7 +106,7 @@ func setup(ctx context.Context) (quic.Connection, error) {
 
 func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 	req := make([]byte, 0, 6+len(sub))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
 	req = append(req, 1)
 	req = req[:6]
 	binary.BigEndian.PutUint32(req[2:6], uint32(len(sub)))
@@ -150,7 +150,7 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 
 func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) error {
 	req := make([]byte, 0, 6+len(topic))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
 	req = append(req, 1)
 	req = req[:6]
 	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
@@ -431,7 +431,7 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 
 func consume(ctx context.Context, topic string, conn quic.Connection) error {
 	req := make([]byte, 0, 6+len(topic))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
+	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
 	req = append(req, 2)
 	req = req[:6]
 	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))

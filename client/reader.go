@@ -153,7 +153,7 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 	defer pool.Put(buf)
 
 	buf = append(buf,
-		byte(request.OP_CODE_CONNECT_READER),
+		byte(request.OP_CODE_SUBSCRIBE),
 		byte(typ),
 		boolToByte(conf.AutoCommit),
 	)
@@ -239,7 +239,7 @@ func (c *clientReader) parseConnectReader(buf []byte) error {
 		switch c.ps.state {
 		case OP_START:
 			switch b {
-			case byte(response.RESP_CODE_CONNECT_READER):
+			case byte(response.RESP_CODE_SUBSCRIBE):
 				c.ps.state = OP_ERROR_CODE_ARG
 			default:
 				c.r.Close()

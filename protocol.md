@@ -61,9 +61,9 @@ Before producing messages, the client must open a QUIC stream and send a `CONNEC
 ##### Request
  `[1, <stream id>]`  
  where:
- | name       | description                                                                    | type   |
-| ----------- | ------------------------------------------------------------------------------ | ------ |
-| `stream id` | A unique stream identifier used for transactional message production in Kafka. | uint32 |
+ | name       | description                                                                             | type   |
+| ----------- | --------------------------------------------------------------------------------------- | ------ |
+| `stream id` | A client provided stream identifier used for transactional message production in Kafka. | uint32 |
 ##### Response
 `-`
 ### Examples
@@ -211,7 +211,7 @@ where:
 | name             | description                                                          | type   |
 | ---------------- | -------------------------------------------------------------------- | ------ |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-| `auto commit`    | Connect with auto commit.                                            | bool   |
+| `auto commit`    | Subscribe with auto commit.                                          | bool   |
 | `topic`          | Topic to read from.                                                  | string |
 ##### Response
 `[1, <correlation id>, <error>, <subscription id>]`  
@@ -320,12 +320,14 @@ Client can send a `FETCH` command to the server to retrieve messages from the cu
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <auto commit>, <msg response batch len>]`  
+`[7, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
 where:
-| name                     | description                                                          | type    |
-| ------------------------ | -------------------------------------------------------------------- | ------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
+| name                     | description                                                          | type   |
+| ------------------------ | -------------------------------------------------------------------- | ------ |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32 |
+| `auto commit`            | Fetch with auto commit.                                              | bool   |
+| `topic`                  | Topic to read from.                                                  | string |
+| `msg response batch len` | The number of messages the server should send in response.           | uint32 |
 
 ##### Response
 `[7, <correlation id>, <error>, <msgs>]`  
