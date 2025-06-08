@@ -10,6 +10,7 @@ import (
 	"time"
 	"unsafe"
 
+	pool2 "github.com/ValerySidorin/fujin/internal/common/pool"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	"github.com/ValerySidorin/fujin/internal/fujin"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
@@ -25,7 +26,7 @@ const (
 	OP_START int = iota
 
 	OP_CONNECT
-	OP_CONNECT_WRITER_ARG
+	OP_CONNECT_STREAM_ID_ARG
 	OP_WRITE
 	OP_WRITE_CORRELATION_ID_ARG
 	OP_WRITE_ARG
@@ -127,12 +128,13 @@ type parseState struct {
 
 	ca correlationIDArg
 
-	cwa connectWriterArgs
+	cna connectArgs
 	wa  writeArgs
 	wma writeMsgArgs
 
-	cra connectReaderArgs
-	aa  ackArgs
+	sa subscribeArgs
+	aa ackArgs
+	fa fetchArgs
 }
 
 type correlationIDArg struct {
@@ -148,15 +150,21 @@ type writeMsgArgs struct {
 	size uint32
 }
 
-type connectReaderArgs struct {
+type subscribeArgs struct {
 	topicLen   uint32
-	typ        byte
+	topic      string
 	autoCommit bool
 }
 
-type connectWriterArgs struct {
-	writerIDLen uint32
-	writerID    string
+type connectArgs struct {
+	streamIDLen uint32
+	streamID    string
+}
+
+type fetchArgs struct {
+	autoCommit bool
+	topicLen   uint32
+	topic      string
 }
 
 type ackArgs struct {
@@ -180,13 +188,15 @@ type handler struct {
 	currentTxWriterTopic string
 
 	// subscriber
-	subscribers   map[uint16]internal_reader.Reader
-	sMu           sync.Mutex
-	subMsgHandler func(message []byte, topic string, args ...any)
+	subIDPool   *pool2.BytePool
+	subscribers map[byte]internal_reader.Reader
+	sMu         sync.Mutex
 
-	fetchers         map[string]map[bool]internal_reader.Reader
+	cpool            *connectors.Pool
 	fetchMsgHandlers map[string]map[bool]func(message []byte, topic string, args ...any)
-	fMu              sync.RWMutex
+	fhMu             sync.RWMutex
+
+	acker internal_reader.Reader
 
 	ackSuccessRespTemplate []byte
 	ackErrRespTemplate     []byte
@@ -217,6 +227,9 @@ func newHandler(
 	return &handler{
 		ctx:          ctx,
 		cman:         cman,
+		subIDPool:    pool2.NewBytePool(),
+		subscribers:  make(map[byte]internal_reader.Reader),
+		cpool:        connectors.NewPool(cman),
 		l:            l,
 		out:          out,
 		ps:           &parseState{},
@@ -264,10 +277,17 @@ func (h *handler) handle(buf []byte) error {
 							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
 							h.currentTxWriter = nil
 						}
+						h.cpool.Close()
+						h.sMu.Lock()
+						for _, sub := range h.subscribers {
+							sub.Close()
+						}
+						h.sMu.Unlock()
 						h.out.EnqueueProto(response.DISCONNECT_RESP)
 					}
 					h.ps.state = OP_CONNECT
 				case byte(request.OP_CODE_SUBSCRIBE):
+					fmt.Println("got sub op code")
 					h.ps.state = OP_SUBSCRIBE
 				default:
 					return ErrParseProto
@@ -494,38 +514,58 @@ func (h *handler) handle(buf []byte) error {
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_FETCH_CORRELATION_ID_ARG
 		case OP_FETCH_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
+			toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+			avail := len(buf) - i
 
-				if avail < toCopy {
-					toCopy = avail
-				}
+			if avail < toCopy {
+				toCopy = avail
+			}
 
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= fujin.Uint32Len {
-					h.ps.argBuf = pool.Get(fujin.Uint32Len)
-					h.ps.state = OP_FETCH_N_ARG
-				}
+			if toCopy > 0 {
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
 			} else {
-				h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+
+			if len(h.ps.ca.cID) >= fujin.Uint32Len {
+				h.ps.state = OP_FETCH_AUTO_COMMIT_ARG
+			}
+		case OP_FETCH_AUTO_COMMIT_ARG:
+			var err error
+			h.ps.fa.autoCommit, err = parseBool(b)
+			if err != nil {
+				// TODO: Respond or abort stream?
+				pool.Put(h.ps.ca.cID)
+				return err
+			}
+			h.ps.state = OP_FETCH_TOPIC_ARG
+			h.ps.argBuf = pool.Get(fujin.Uint32Len)
+		case OP_FETCH_TOPIC_ARG:
+			h.ps.argBuf = append(h.ps.argBuf, b)
+			if len(h.ps.argBuf) >= fujin.Uint32Len {
+				h.ps.fa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf)
+				pool.Put(h.ps.argBuf)
+				h.ps.argBuf = pool.Get(int(h.ps.fa.topicLen))
+				h.ps.state = OP_FETCH_TOPIC_PAYLOAD
+			}
+		case OP_FETCH_TOPIC_PAYLOAD:
+			h.ps.argBuf = append(h.ps.argBuf, b)
+			if len(h.ps.argBuf) >= int(h.ps.fa.topicLen) {
+				h.ps.fa.topic = string(h.ps.argBuf)
+				pool.Put(h.ps.argBuf)
+				h.ps.argBuf = pool.Get(fujin.Uint32Len)
+				h.ps.state = OP_FETCH_N_ARG
 			}
 		case OP_FETCH_N_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
-				val := binary.BigEndian.Uint32(h.ps.argBuf)
+				n := binary.BigEndian.Uint32(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
 				h.ps.argBuf = nil
-				h.fetch(val)
+				h.fetch(h.ps.fa.topic, h.ps.fa.autoCommit, n)
 				pool.Put(h.ps.ca.cID)
 				h.ps.ca.cID, h.ps.state = nil, OP_START
 			}
@@ -582,7 +622,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					h.sessionReader.Ack(h.ctx, h.ps.payloadsBuf,
+					h.acker.Ack(h.ctx, h.ps.payloadsBuf,
 						func(err error) {
 							h.out.Lock()
 							if err != nil {
@@ -667,7 +707,7 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					h.sessionReader.Nack(h.ctx, h.ps.payloadsBuf,
+					h.acker.Nack(h.ctx, h.ps.payloadsBuf,
 						func(err error) {
 							h.out.Lock()
 							if err != nil {
@@ -823,7 +863,7 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.wma.size) {
 					if h.currentTxWriter != nil {
-						if !h.cman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.wa.topic) {
+						if !h.cman.WriterMatchEndpoint(h.currentTxWriter, h.ps.wa.topic) {
 							h.l.Error("writer can not be reused in tx")
 							h.enqueueWriteErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ca.cID)
@@ -862,7 +902,7 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.payloadBuf) >= int(h.ps.wma.size) {
 					if h.currentTxWriter != nil {
-						if !h.cman.WriterCanBeReusedInTx(h.currentTxWriter, h.ps.wa.topic) {
+						if !h.cman.WriterMatchEndpoint(h.currentTxWriter, h.ps.wa.topic) {
 							h.l.Error("writer can not be reused in tx1")
 							h.enqueueWriteErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ca.cID)
@@ -1121,16 +1161,16 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.ca.cID = append(h.ps.ca.cID, b)
 			}
 		case OP_CONNECT:
-			h.ps.state = OP_CONNECT_WRITER_ARG
+			h.ps.state = OP_CONNECT_STREAM_ID_ARG
 			h.ps.argBuf = pool.Get(fujin.Uint32Len)
 			h.ps.argBuf = append(h.ps.argBuf, b)
-		case OP_CONNECT_WRITER_ARG:
-			if h.ps.cwa.writerIDLen != 0 {
+		case OP_CONNECT_STREAM_ID_ARG:
+			if h.ps.cna.streamIDLen != 0 {
 				if h.ps.argBuf == nil {
-					h.ps.argBuf = pool.Get(int(h.ps.cwa.writerIDLen))
+					h.ps.argBuf = pool.Get(int(h.ps.cna.streamIDLen))
 				}
 
-				toCopy := int(h.ps.cwa.writerIDLen) - len(h.ps.argBuf)
+				toCopy := int(h.ps.cna.streamIDLen) - len(h.ps.argBuf)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -1146,11 +1186,11 @@ func (h *handler) handle(buf []byte) error {
 					h.ps.argBuf = append(h.ps.argBuf, b)
 				}
 
-				if len(h.ps.argBuf) >= int(h.ps.cwa.writerIDLen) {
-					h.ps.cwa.writerID = string(h.ps.argBuf)
+				if len(h.ps.argBuf) >= int(h.ps.cna.streamIDLen) {
+					h.ps.cna.streamID = string(h.ps.argBuf)
 					pool.Put(h.ps.argBuf)
-					h.writerID = h.ps.cwa.writerID
-					h.ps.argBuf, h.ps.cwa, h.ps.state = nil, connectWriterArgs{}, OP_START
+					h.writerID = h.ps.cna.streamID
+					h.ps.argBuf, h.ps.cna, h.ps.state = nil, connectArgs{}, OP_START
 				}
 
 				continue
@@ -1159,12 +1199,12 @@ func (h *handler) handle(buf []byte) error {
 			h.ps.argBuf = append(h.ps.argBuf, b)
 
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
-				if h.ps.cwa.writerIDLen == 0 {
-					h.ps.cwa.writerIDLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
+				if h.ps.cna.streamIDLen == 0 {
+					h.ps.cna.streamIDLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf = nil
-					if h.ps.cwa.writerIDLen == 0 {
-						h.ps.argBuf, h.ps.cwa, h.ps.state = nil, connectWriterArgs{}, OP_START
+					if h.ps.cna.streamIDLen == 0 {
+						h.ps.argBuf, h.ps.cna, h.ps.state = nil, connectArgs{}, OP_START
 					}
 				}
 			}
@@ -1172,14 +1212,6 @@ func (h *handler) handle(buf []byte) error {
 			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
 			h.ps.state = OP_SUBSCRIBE_CORRELATION_ID_ARG
-
-			// if err := h.parseReaderIsAutoCommitArg(b); err != nil {
-			// 	enqueueConnectReaderErr(h.out, response.RESP_CODE_CONNECT_READER, response.ERR_CODE_YES, err)
-			// 	return err
-			// }
-
-			// h.ps.argBuf = pool.Get(fujin.Uint32Len)
-			// h.ps.state = OP_SUBSCRIBE_ARG
 		case OP_SUBSCRIBE_CORRELATION_ID_ARG:
 			toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
 			avail := len(buf) - i
@@ -1201,7 +1233,9 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.state = OP_SUBSCRIBE_AUTO_COMMIT_ARG
 			}
 		case OP_SUBSCRIBE_AUTO_COMMIT_ARG:
-			if err := h.parseReaderIsAutoCommitArg(b); err != nil {
+			var err error
+			h.ps.sa.autoCommit, err = parseBool(b)
+			if err != nil {
 				enqueueSubscribeErr(h.out, h.ps.ca.cID, response.RESP_CODE_SUBSCRIBE, response.ERR_CODE_YES, err)
 				return err
 			}
@@ -1211,18 +1245,18 @@ func (h *handler) handle(buf []byte) error {
 		case OP_SUBSCRIBE_TOPIC_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
-				if err := h.parseReaderNameSizeArg(); err != nil {
+				if err := h.parseSubscribeTopicLenArg(); err != nil {
 					pool.Put(h.ps.argBuf)
-					h.ps.argBuf, h.ps.cra, h.ps.state = nil, connectReaderArgs{}, OP_START
+					h.ps.argBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
 					enqueueSubscribeErr(h.out, h.ps.ca.cID, response.RESP_CODE_SUBSCRIBE, response.ERR_CODE_YES, err)
 					return err
 				}
 				pool.Put(h.ps.argBuf)
-				h.ps.payloadBuf = pool.Get(int(h.ps.cra.topicLen))
+				h.ps.payloadBuf = pool.Get(int(h.ps.sa.topicLen))
 				h.ps.argBuf, h.ps.state = nil, OP_SUBSCRIBE_TOPIC_PAYLOAD
 			}
 		case OP_SUBSCRIBE_TOPIC_PAYLOAD:
-			toCopy := int(h.ps.cra.topicLen) - len(h.ps.payloadBuf)
+			toCopy := int(h.ps.sa.topicLen) - len(h.ps.payloadBuf)
 			avail := len(buf) - i
 
 			if avail < toCopy {
@@ -1238,28 +1272,46 @@ func (h *handler) handle(buf []byte) error {
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 			}
 
-			if len(h.ps.payloadBuf) >= int(h.ps.cra.topicLen) {
+			if len(h.ps.payloadBuf) >= int(h.ps.sa.topicLen) {
 				h.ps.state = OP_START
+				h.ps.sa.topic = string(h.ps.payloadBuf)
 				pool.Put(h.ps.payloadBuf)
 
-				r, err := h.cman.GetReader(string(h.ps.payloadBuf), h.ps.cra.autoCommit)
+				subID, err := h.subIDPool.Get()
 				if err != nil {
+					enqueueSubscribeErr(h.out, h.ps.ca.cID, response.RESP_CODE_SUBSCRIBE, response.ERR_CODE_YES, err)
+					return fmt.Errorf("get sub id: %w", err)
+				}
+				r, err := h.cman.GetReader(h.ps.sa.topic, h.ps.sa.autoCommit)
+				if err != nil {
+					err := h.subIDPool.Put(subID)
+					if err != nil {
+						h.l.Error("put sub id", "err", err)
+					}
 					enqueueSubscribeErr(h.out, h.ps.ca.cID, response.RESP_CODE_SUBSCRIBE, response.ERR_CODE_YES, err)
 					return fmt.Errorf("get reader: %w", err)
 				}
 
-				enqueueSubscribeSuccess(h.out)
+				h.sMu.Lock()
+				h.subscribers[subID] = r
+				h.sMu.Unlock()
+
+				enqueueSubscribeSuccess(h.out, h.ps.ca.cID, subID)
 				pool.Put(h.ps.ca.cID)
 				h.wg.Add(1)
 				go func() {
 					ctx, cancel := context.WithCancel(h.ctx)
 					// TODO: save cancel func for ubsub
-					h.subscribe(ctx, r)
+					h.subscribe(ctx, subID, r)
+					err := h.subIDPool.Put(subID)
+					if err != nil {
+						h.l.Error("put sub id", "err", err)
+					}
 					cancel()
 					h.wg.Done()
 				}()
 
-				h.ps.payloadBuf, h.ps.cra, h.ps.state = nil, connectReaderArgs{}, OP_START
+				h.ps.payloadBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
 				continue
 			}
 		default:
@@ -1270,8 +1322,8 @@ func (h *handler) handle(buf []byte) error {
 	return nil
 }
 
-func (h *handler) subscribe(ctx context.Context, r internal_reader.Reader) {
-	msgHandler := h.subEnqueueMsgFunc(h.out, r)
+func (h *handler) subscribe(ctx context.Context, subID byte, r internal_reader.Reader) {
+	msgHandler := h.subEnqueueMsgFunc(h.out, subID, r)
 	for {
 		select {
 		case <-ctx.Done():
@@ -1286,37 +1338,6 @@ func (h *handler) subscribe(ctx context.Context, r internal_reader.Reader) {
 	}
 }
 
-func (h *handler) connectReader(
-	ctx context.Context, cancel context.CancelFunc,
-	r internal_reader.Reader, typ reader.ReaderType,
-) error {
-	h.disconnect = func() {
-		cancel()
-		r.Close()
-		h.out.EnqueueProto(response.DISCONNECT_RESP)
-	}
-
-	msgConstsLen := h.readerMsgIDStaticArgsLen + 4 // msg args + msg len (4)
-	if h.readerType == reader.Subscriber {
-		msgConstsLen += 1 // cmd (1)
-	}
-	if !r.IsAutoCommit() {
-		msgConstsLen += 4 // + msg id len (4). Maybe it can be 1 byte?
-	}
-	h.msgHandler = h.enqueueMsgFunc(h.out, r, h.readerType, msgConstsLen)
-
-	switch typ {
-	case reader.Subscriber:
-		return r.Subscribe(ctx, func(message []byte, topic string, args ...any) {
-			h.msgHandler(message, topic, args...)
-		})
-	case reader.Consumer:
-		<-ctx.Done()
-		return nil
-	default:
-		return fmt.Errorf("invalid reader type: %d", typ)
-	}
-}
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (err no/err yes)
 	successResp := server.WriteResponseSuccess(buf, h.ps.ca.cID)
@@ -1364,11 +1385,16 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 
 	go func() {
 		buf[5] = 0
-		fetcher := h.fetchers[topic][autoCommit]
-		if fetcher == nil {
-
+		fetcher, err := h.cpool.GetReader(topic, autoCommit)
+		if err != nil {
+			buf[5] = 1
+			h.out.QueueOutboundNoLock(buf)
+			h.out.QueueOutboundNoLock(errProtoBuf(err))
+			pool.Put(buf)
+			return
 		}
-		h.sessionReader.Fetch(h.ctx, n,
+
+		fetcher.Fetch(h.ctx, n,
 			func(n uint32, err error) {
 				h.out.Lock()
 				if err != nil {
@@ -1386,9 +1412,7 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 				h.out.QueueOutboundNoLock(buf)
 				pool.Put(buf)
 			},
-			func(message []byte, topic string, args ...any) {
-				h.msgHandler(message, topic, args...)
-			},
+			h.fetchEnqueueMsgFunc(h.out, fetcher, topic, autoCommit),
 		)
 		h.out.SignalFlush()
 		h.out.Unlock()
@@ -1448,30 +1472,10 @@ func (h *handler) parseWriteMsgSizeArg() error {
 	return nil
 }
 
-func (h *handler) parseReaderNameSizeArg() error {
-	h.ps.cra.topicLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
-	if h.ps.cra.topicLen == 0 {
+func (h *handler) parseSubscribeTopicLenArg() error {
+	h.ps.sa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf[0:fujin.Uint32Len])
+	if h.ps.sa.topicLen == 0 {
 		return ErrReaderNameSizeArgNotProvided
-	}
-
-	return nil
-}
-
-func (h *handler) parseReaderTypeArg(b byte) error {
-	if b != 1 && b != 2 {
-		return ErrInvalidReaderType
-	}
-	h.ps.cra.typ = b
-	return nil
-}
-
-func (h *handler) parseReaderIsAutoCommitArg(b byte) error {
-	switch b {
-	case 0:
-	case 1:
-		h.ps.cra.autoCommit = true
-	default:
-		return ErrConnectReaderIsAutoCommitArgInvalid
 	}
 
 	return nil
@@ -1607,17 +1611,16 @@ func (h *handler) enqueueTxRollbackErr(cID []byte, err error) {
 	h.out.EnqueueProtoMulti(h.txRollbackErrRespTemplate, errProtoBuf(err))
 }
 
-func enqueueSubscribeSuccess(out *fujin.Outbound) {
+func enqueueSubscribeSuccess(out *fujin.Outbound, cID []byte, subID byte) {
 	sbuf := pool.Get(fujin.Uint32Len)
-	sbuf = append(sbuf,
-		byte(response.RESP_CODE_SUBSCRIBE),
-		byte(response.ERR_CODE_NO),
-	)
+	sbuf = append(sbuf, byte(response.RESP_CODE_SUBSCRIBE))
+	sbuf = append(sbuf, cID...)
+	sbuf = append(sbuf, response.ERR_CODE_NO, subID)
 	out.EnqueueProto(sbuf)
 	pool.Put(sbuf)
 }
 
-func (h *handler) subEnqueueMsgFunc(out *fujin.Outbound, r internal_reader.Reader,
+func (h *handler) subEnqueueMsgFunc(out *fujin.Outbound, subID byte, r internal_reader.Reader,
 ) func(message []byte, topic string, args ...any) {
 	staticArgsLen := r.MsgIDStaticArgsLen()
 	constBufLen := staticArgsLen + 5
@@ -1629,6 +1632,7 @@ func (h *handler) subEnqueueMsgFunc(out *fujin.Outbound, r internal_reader.Reade
 		return func(message []byte, topic string, args ...any) {
 			buf := pool.Get(len(message) + constBufLen)
 			buf = append(buf, byte(response.RESP_CODE_MSG))
+			buf = append(buf, subID)
 			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
 			buf = append(buf, message...)
 			out.EnqueueProto(buf)
@@ -1646,6 +1650,56 @@ func (h *handler) subEnqueueMsgFunc(out *fujin.Outbound, r internal_reader.Reade
 		out.EnqueueProto(buf)
 		pool.Put(buf)
 	}
+}
+
+func (h *handler) fetchEnqueueMsgFunc(
+	out *fujin.Outbound, r internal_reader.Reader, topic string, autoCommit bool,
+) func(message []byte, topic string, args ...any) {
+	staticArgsLen := r.MsgIDStaticArgsLen()
+	constBufLen := staticArgsLen + 5
+	if !autoCommit {
+		constBufLen += 4
+	}
+
+	h.fhMu.RLock()
+	mh := h.fetchMsgHandlers[topic][autoCommit]
+	h.fhMu.RUnlock()
+	if mh != nil {
+		return mh
+	}
+
+	h.fhMu.Lock()
+	defer h.fhMu.Unlock()
+
+	mhm, ok := h.fetchMsgHandlers[topic]
+	if !ok {
+		mhm = make(map[bool]func(message []byte, topic string, args ...any))
+		h.fetchMsgHandlers[topic] = mhm
+	}
+
+	switch autoCommit {
+	case true:
+		mh = func(message []byte, topic string, args ...any) {
+			buf := pool.Get(len(message) + constBufLen)
+			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
+			buf = append(buf, message...)
+			out.QueueOutboundNoLock(buf)
+			pool.Put(buf)
+		}
+	default:
+		mh = func(message []byte, topic string, args ...any) {
+			buf := pool.Get(len(message) + len(topic) + constBufLen)
+			buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)+staticArgsLen))
+			buf = r.EncodeMsgID(buf, topic, args...)
+			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
+			buf = append(buf, message...)
+			out.QueueOutboundNoLock(buf)
+			pool.Put(buf)
+		}
+	}
+
+	mhm[autoCommit] = mh
+	return mh
 }
 
 func (h *handler) enqueueMsgFunc(
@@ -1725,4 +1779,15 @@ func replaceUnsafe(slice []byte, start int, new []byte) {
 	ptr := unsafe.Pointer(&slice[start])
 	dst := (*[1 << 30]byte)(ptr)
 	copy(dst[:len(new)], new)
+}
+
+func parseBool(b byte) (bool, error) {
+	switch b {
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		return false, ErrParseProto
+	}
 }

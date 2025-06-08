@@ -133,7 +133,7 @@ func (m *Manager) Close() {
 	}
 }
 
-func (m *Manager) WriterCanBeReusedInTx(w writer.Writer, pub string) bool {
+func (m *Manager) WriterMatchEndpoint(w writer.Writer, pub string) bool {
 	writerConf, ok := m.conf.Writers[pub]
 	if !ok {
 		return false

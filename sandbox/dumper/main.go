@@ -51,9 +51,9 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	if err := produceTx(ctx, conn); err != nil {
-		log.Fatal(err)
-	}
+	// if err := produceTx(ctx, conn); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// if err := consume(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -64,10 +64,10 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := subscribe(ctx, "sub", conn); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("subscribed")
+	if err := subscribe(ctx, "sub", conn); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("subscribed")
 
 	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -104,13 +104,16 @@ func setup(ctx context.Context) (quic.Connection, error) {
 	return conn, nil
 }
 
-func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(sub))
+func subscribe(ctx context.Context, topic string, conn quic.Connection) error {
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
 	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
-	req = append(req, 1)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(sub)))
-	req = append(req, []byte(sub)...)
+	req = append(req, []byte{1, 1, 0, 1}...)                     // correlation id
+	req = append(req, 1)                                         // auto commit
+	req = binary.BigEndian.AppendUint32(req, uint32(len(topic))) // topic len
+	req = append(req, []byte(topic)...)
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -149,12 +152,15 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 }
 
 func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(topic))
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
 	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
-	req = append(req, 1)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
-	req = append(req, []byte(topic)...)
+	req = append(req, []byte{0, 0, 0, 0}...)               // correlation id
+	req = append(req, 1)                                   // auto commit
+	binary.BigEndian.AppendUint32(req, uint32(len(topic))) // topic len
+	req = append(req, []byte(topic)...)                    // topic
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -178,7 +184,7 @@ func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) e
 
 func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
 		byte(request.OP_CODE_WRITE),
 		0, 1, 1, 1, // request id
@@ -244,7 +250,7 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 
 func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
@@ -297,10 +303,9 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 
 func produce(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
-		// 0, 0, 0, 1, // producer id is optional (for transactions)
 		byte(request.OP_CODE_WRITE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
@@ -387,7 +392,7 @@ func produce(ctx context.Context, conn quic.Connection) error {
 
 func produceTx(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
