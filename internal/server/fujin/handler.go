@@ -20,6 +20,7 @@ import (
 	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
+	"github.com/quic-go/quic-go"
 )
 
 const (
@@ -40,7 +41,8 @@ const (
 	OP_SUBSCRIBE_TOPIC_PAYLOAD
 
 	OP_UNSUBSCRIBE
-	OP_UNSUBSCRIBE_ARG
+	OP_UNSUBSCRIBE_CORRELATION_ID_ARG
+	OP_UNSUBSCRIBE_SUB_ID_ARG
 
 	OP_FETCH
 	OP_FETCH_CORRELATION_ID_ARG
@@ -176,10 +178,16 @@ type ackArgs struct {
 type handler struct {
 	ctx  context.Context
 	out  *fujin.Outbound
+	str  quic.Stream
 	cman *connectors.Manager
 
 	ps           *parseState
 	sessionState sessionState
+
+	// ping
+	pingInterval time.Duration
+	pingTimeout  time.Duration
+	pingStream   bool
 
 	// producer
 	writerID             string
@@ -190,6 +198,7 @@ type handler struct {
 	// subscriber
 	subIDPool   *pool2.BytePool
 	subscribers map[byte]internal_reader.Reader
+	unsubFuncs  map[byte]func()
 	sMu         sync.Mutex
 
 	cpool            *connectors.Pool
@@ -221,21 +230,28 @@ type handler struct {
 }
 
 func newHandler(
-	ctx context.Context, cman *connectors.Manager,
-	out *fujin.Outbound, l *slog.Logger,
+	ctx context.Context,
+	pingInterval time.Duration, pingTimeout time.Duration, pingStream bool,
+	cman *connectors.Manager,
+	out *fujin.Outbound, str quic.Stream, l *slog.Logger,
 ) *handler {
-	return &handler{
-		ctx:          ctx,
-		cman:         cman,
-		subIDPool:    pool2.NewBytePool(),
-		subscribers:  make(map[byte]internal_reader.Reader),
-		cpool:        connectors.NewPool(cman),
-		l:            l,
-		out:          out,
-		ps:           &parseState{},
-		disconnect:   func() {},
-		sessionState: STREAM_STATE_INIT,
-		closed:       make(chan struct{}),
+	h := &handler{
+		ctx:              ctx,
+		cman:             cman,
+		pingInterval:     pingInterval,
+		pingTimeout:      pingTimeout,
+		subIDPool:        pool2.NewBytePool(),
+		subscribers:      make(map[byte]internal_reader.Reader),
+		unsubFuncs:       make(map[byte]func()),
+		fetchMsgHandlers: make(map[string]map[bool]func(message []byte, topic string, args ...any)),
+		cpool:            connectors.NewPool(cman),
+		l:                l,
+		out:              out,
+		str:              str,
+		ps:               &parseState{},
+		disconnect:       func() {},
+		sessionState:     STREAM_STATE_INIT,
+		closed:           make(chan struct{}),
 
 		ackSuccessRespTemplate:  []byte{byte(response.RESP_CODE_ACK), 0, 0, 0, 0, 0},
 		ackErrRespTemplate:      []byte{byte(response.RESP_CODE_ACK), 0, 0, 0, 0, 1},
@@ -249,6 +265,13 @@ func newHandler(
 		txRollbackSuccessRespTemplate: []byte{byte(response.RESP_CODE_TX_ROLLBACK), 0, 0, 0, 0, 0},
 		txRollbackErrRespTemplate:     []byte{byte(response.RESP_CODE_TX_ROLLBACK), 0, 0, 0, 0, 1},
 	}
+
+	if pingStream {
+		_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
+		go h.writePing()
+	}
+
+	return h
 }
 
 func (h *handler) handle(buf []byte) error {
@@ -279,23 +302,26 @@ func (h *handler) handle(buf []byte) error {
 						}
 						h.cpool.Close()
 						h.sMu.Lock()
-						for _, sub := range h.subscribers {
-							sub.Close()
+						for _, unsub := range h.unsubFuncs {
+							unsub()
 						}
 						h.sMu.Unlock()
 						h.out.EnqueueProto(response.DISCONNECT_RESP)
 					}
 					h.ps.state = OP_CONNECT
 				case byte(request.OP_CODE_SUBSCRIBE):
-					fmt.Println("got sub op code")
 					h.ps.state = OP_SUBSCRIBE
+				case byte(response.RESP_CODE_PONG):
+					if h.pingStream {
+						_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
+					}
 				default:
 					return ErrParseProto
 				}
 			case STREAM_STATE_CONNECTED:
 				switch b {
 				// writer cmds
-				case byte(request.OP_CODE_WRITE):
+				case byte(request.OP_CODE_PRODUCE):
 					h.ps.state = OP_WRITE
 				case byte(request.OP_CODE_TX_BEGIN):
 					h.ps.state = OP_BEGIN_TX
@@ -318,12 +344,16 @@ func (h *handler) handle(buf []byte) error {
 				// common cmds
 				case byte(request.OP_CODE_DISCONNECT):
 					return ErrClose
+				case byte(response.RESP_CODE_PONG):
+					if h.pingStream {
+						_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
+					}
 				default:
 					return ErrParseProto
 				}
 			case STREAM_STATE_CONNECTED_IN_TX:
 				switch b {
-				case byte(request.OP_CODE_WRITE):
+				case byte(request.OP_CODE_PRODUCE):
 					h.ps.state = OP_WRITE_TX
 				case byte(request.OP_CODE_TX_BEGIN):
 					h.ps.state = OP_BEGIN_TX_FAIL
@@ -346,6 +376,10 @@ func (h *handler) handle(buf []byte) error {
 				// common cmds
 				case byte(request.OP_CODE_DISCONNECT):
 					return ErrClose
+				case byte(response.RESP_CODE_PONG):
+					if h.pingStream {
+						_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
+					}
 				default:
 					return ErrParseProto
 				}
@@ -1301,25 +1335,82 @@ func (h *handler) handle(buf []byte) error {
 				h.wg.Add(1)
 				go func() {
 					ctx, cancel := context.WithCancel(h.ctx)
-					// TODO: save cancel func for ubsub
+					unsub := sync.OnceFunc(func() {
+						cancel()
+						r.Close()
+						err := h.subIDPool.Put(subID)
+						if err != nil {
+							h.l.Error("put sub id", "err", err)
+						}
+						delete(h.unsubFuncs, subID)
+					})
+					h.sMu.Lock()
+					h.unsubFuncs[subID] = unsub
+					h.sMu.Unlock()
 					h.subscribe(ctx, subID, r)
-					err := h.subIDPool.Put(subID)
-					if err != nil {
-						h.l.Error("put sub id", "err", err)
-					}
-					cancel()
+					h.sMu.Lock()
+					unsub()
+					h.sMu.Unlock()
+
 					h.wg.Done()
 				}()
 
 				h.ps.payloadBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
 				continue
 			}
+		case OP_UNSUBSCRIBE:
+			h.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
+			h.ps.state = OP_UNSUBSCRIBE_CORRELATION_ID_ARG
+		case OP_UNSUBSCRIBE_CORRELATION_ID_ARG:
+			toCopy := fujin.Uint32Len - len(h.ps.ca.cID)
+			avail := len(buf) - i
+
+			if avail < toCopy {
+				toCopy = avail
+			}
+
+			if toCopy > 0 {
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
+			} else {
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+
+			if len(h.ps.ca.cID) >= fujin.Uint32Len {
+				h.ps.state = OP_UNSUBSCRIBE_SUB_ID_ARG
+			}
+		case OP_UNSUBSCRIBE_SUB_ID_ARG:
+			h.sMu.Lock()
+			if unsub, ok := h.unsubFuncs[b]; ok {
+				unsub()
+			}
+			h.sMu.Unlock()
+			enqueueUnsubscribeSuccess(h.out, h.ps.ca.cID)
+			pool.Put(h.ps.ca.cID)
+			h.ps.ca.cID, h.ps.state = nil, OP_START
 		default:
 			return ErrParseProto
 		}
 	}
 
 	return nil
+}
+
+func (h *handler) writePing() {
+	t := time.NewTicker(h.pingInterval)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		case <-t.C:
+			h.out.EnqueueProto(request.PING_REQ)
+		}
+	}
 }
 
 func (h *handler) subscribe(ctx context.Context, subID byte, r internal_reader.Reader) {
@@ -1616,6 +1707,16 @@ func enqueueSubscribeSuccess(out *fujin.Outbound, cID []byte, subID byte) {
 	sbuf = append(sbuf, byte(response.RESP_CODE_SUBSCRIBE))
 	sbuf = append(sbuf, cID...)
 	sbuf = append(sbuf, response.ERR_CODE_NO, subID)
+	out.EnqueueProto(sbuf)
+	pool.Put(sbuf)
+}
+
+func enqueueUnsubscribeSuccess(out *fujin.Outbound, cID []byte) {
+	// TODO: add template
+	sbuf := pool.Get(fujin.Uint32Len)
+	sbuf = append(sbuf, byte(response.RESP_CODE_UNSUBSCRIBE))
+	sbuf = append(sbuf, cID...)
+	sbuf = append(sbuf, response.ERR_CODE_NO)
 	out.EnqueueProto(sbuf)
 	pool.Put(sbuf)
 }

@@ -414,9 +414,9 @@ func createClientConn(ctx context.Context, addr string) quic.Connection {
 	return conn
 }
 
-func doDefaultConnectProducer(conn quic.Connection) quic.Stream {
+func doDefaultConnect(conn quic.Connection) quic.Stream {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
 	}
 
@@ -426,7 +426,7 @@ func doDefaultConnectProducer(conn quic.Connection) quic.Stream {
 	}
 
 	if _, err := str.Write(req); err != nil {
-		panic(fmt.Errorf("write connect producer request: %w", err))
+		panic(fmt.Errorf("write connect request: %w", err))
 	}
 
 	return str

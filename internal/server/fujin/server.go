@@ -19,11 +19,18 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
+type PingConfig struct {
+	Interval   time.Duration
+	Timeout    time.Duration
+	PingStream bool
+}
+
 type ServerConfig struct {
 	Disabled              bool
 	Addr                  string
 	PingInterval          time.Duration
 	PingTimeout           time.Duration
+	PingStream            bool
 	WriteDeadline         time.Duration
 	ForceTerminateTimeout time.Duration
 	TLS                   *tls.Config
@@ -179,7 +186,9 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					connWg.Add(1)
 					go func() {
 						out := fujin.NewOutbound(str, s.conf.WriteDeadline, s.l)
-						h := newHandler(ctx, s.cman, out, s.l)
+						h := newHandler(ctx,
+							s.conf.PingInterval, s.conf.PingTimeout, s.conf.PingStream,
+							s.cman, out, str, s.l)
 						in := newInbound(str, s.conf.ForceTerminateTimeout, h, s.l)
 						go in.readLoop(ctx)
 						out.WriteLoop()

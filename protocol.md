@@ -41,6 +41,7 @@ For convenience, some type aliases are introduced.
 Server -> Client
 ### Description
 `PING` and `PONG` implement a simple keep-alive mechanism between the client and server. Once a client establishes a connection to the Fujin server, the server continuously opens a QUIC stream and sends `PING` messages at a configurable interval. If the client fails to respond with a `PONG` message within the configured response interval, the server will terminate its connection. If a connection remains idle for too long, it will be closed.
+Additionaly, server can be configured to ping opened streams. This helps to determine broken protocol writes, and close such streams.
 
 Since the QUIC protocol supports multiplexing, `PING` messages are sent over a dedicated control streams, separated from messaging ones.
 ### Syntax
@@ -95,7 +96,7 @@ where:
 ### Examples
 - `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
 
-## HPRODUCE
+## HPRODUCE (TODO)
 
 ### Direction
 Client -> Server
@@ -240,7 +241,7 @@ where:
 ### Examples
 - `-` -> `[6, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
-## HMSG
+## HMSG (TODO)
 
 ### Direction
 Server -> Client
@@ -338,7 +339,7 @@ where:
 | `error`          | An error.                                                            | string?          |
 | `msgs`           | Message batch.                                                       | [uint32]message  |
 
-## HFETCH
+## HFETCH (TODO)
 
 ### Direction
 Client -> Server

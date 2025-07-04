@@ -39,10 +39,11 @@ type Config struct {
 type FujinConfig struct {
 	Disabled              bool          `yaml:"disabled"`
 	Addr                  string        `yaml:"addr"`
-	PingInterval          time.Duration `yaml:"ping_interval"`
-	PingTimeout           time.Duration `yaml:"ping_timeout"`
 	WriteDeadline         time.Duration `yaml:"write_deadline"`
 	ForceTerminateTimeout time.Duration `yaml:"force_terminate_timeout"`
+	PingInterval          time.Duration `yaml:"ping_interval"`
+	PingTimeout           time.Duration `yaml:"ping_timeout"`
+	PingStream            bool          `yaml:"ping_stream"`
 	TLS                   TLSConfig     `yaml:"tls"`
 	QUIC                  QUICConfig    `yaml:"quic"`
 }
@@ -97,8 +98,6 @@ func (c *Config) parseFujinServerConfig() (fujin.ServerConfig, error) {
 	return fujin.ServerConfig{
 		Disabled:              c.Fujin.Disabled,
 		Addr:                  c.Fujin.Addr,
-		PingInterval:          c.Fujin.PingInterval,
-		PingTimeout:           c.Fujin.PingTimeout,
 		WriteDeadline:         c.Fujin.WriteDeadline,
 		ForceTerminateTimeout: c.Fujin.ForceTerminateTimeout,
 		TLS:                   tlsConf,

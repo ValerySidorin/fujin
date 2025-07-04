@@ -7,7 +7,7 @@ const (
 
 	// Client request opcodes
 	OP_CODE_CONNECT
-	OP_CODE_WRITE
+	OP_CODE_PRODUCE
 	OP_CODE_TX_BEGIN
 	OP_CODE_TX_COMMIT
 	OP_CODE_TX_ROLLBACK
@@ -26,5 +26,9 @@ const (
 var (
 	STOP_REQ = []byte{
 		byte(OP_CODE_STOP),
+	}
+
+	PING_REQ = []byte{
+		byte(OP_CODE_PING),
 	}
 )

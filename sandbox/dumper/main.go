@@ -55,10 +55,10 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := consume(ctx, "sub", conn); err != nil {
+	// if err := fetch(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
 	// }
-	// fmt.Println("consuming")
+	// fmt.Println("fetching")
 
 	// if err := produce(ctx, conn); err != nil {
 	// 	log.Fatal(err)
@@ -67,7 +67,6 @@ func main() {
 	if err := subscribe(ctx, "sub", conn); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("subscribed")
 
 	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -127,6 +126,19 @@ func subscribe(ctx context.Context, topic string, conn quic.Connection) error {
 	fmt.Println("subscribe: write req")
 
 	go read(str, "subscribe")
+	fmt.Println("subscribed")
+
+	time.Sleep(10 * time.Second)
+
+	unsubReq := []byte{
+		byte(request.OP_CODE_UNSUBSCRIBE),
+		0, 0, 0, 0, // correlation id
+		0, // sub id
+	}
+	if _, err := str.Write(unsubReq); err != nil {
+		return err
+	}
+	fmt.Println("UNSUBSCRIBED")
 
 	// ackReq := []byte{
 	// 	byte(request.OP_CODE_ACK),
@@ -186,31 +198,31 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -255,7 +267,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -263,7 +275,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 		104, 101, 108, 108, 111, // msg
 		byte(request.OP_CODE_TX_COMMIT),
 		0, 0, 1, 1, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -306,61 +318,61 @@ func produce(ctx context.Context, conn quic.Connection) error {
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -397,7 +409,7 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -434,19 +446,23 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func consume(ctx context.Context, topic string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(topic))
-	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
-	req = append(req, 2)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
-	req = append(req, []byte(topic)...)
+func fetch(ctx context.Context, topic string, conn quic.Connection) error {
+	topicBytes := []byte{}
+	topicBytes = binary.BigEndian.AppendUint32(topicBytes, uint32(len(topic)))
+	topicBytes = append(topicBytes, []byte(topic)...)
+
+	fmt.Println(topicBytes)
+
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
 		return err
 	}
-	fmt.Println("consume: opened stream")
+	fmt.Println("fetch: opened stream")
 
 	if _, err := str.Write(req); err != nil {
 		return err
@@ -454,26 +470,33 @@ func consume(ctx context.Context, topic string, conn quic.Connection) error {
 
 	fetchReq := []byte{
 		byte(request.OP_CODE_FETCH), // cmd
-		0, 0, 0, 1, 0, 0, 0, 1,
+		0, 0, 0, 1,                  // correlation id
+		1, // auth commit
 	}
+	fetchReq = append(fetchReq, topicBytes...) // topic
+	fetchReq = append(fetchReq, 0, 0, 0, 1)    // n
+
+	dCh := make(chan struct{})
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-dCh:
+				return
 			default:
-				time.Sleep(1 * time.Second)
 				if _, err := str.Write(fetchReq); err != nil {
-					log.Fatal(err)
+					log.Fatal("write fetch req ", err)
 				}
+				time.Sleep(6 * time.Second)
 			}
 		}
 	}()
 
-	fmt.Println("consume: write req")
+	fmt.Println("fetch: write req")
 
-	go read(str, "consume")
+	go read(str, "fetch")
 
 	time.Sleep(10 * time.Second)
 	dReq := []byte{
@@ -483,8 +506,11 @@ func consume(ctx context.Context, topic string, conn quic.Connection) error {
 	if _, err := str.Write(dReq); err != nil {
 		return err
 	}
+	close(dCh)
 
+	time.Sleep(1 * time.Second)
 	str.Close()
+	fmt.Println("closed")
 	return nil
 }
 

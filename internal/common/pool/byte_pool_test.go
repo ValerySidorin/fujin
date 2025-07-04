@@ -6,6 +6,28 @@ import (
 	"github.com/ValerySidorin/fujin/internal/common/pool"
 )
 
+func TestBytePool_GetPut0(t *testing.T) {
+	pool := pool.NewBytePool()
+
+	val, err := pool.Get()
+	if err != nil {
+		t.Fatalf("unexpected error on Get(): %v", err)
+	}
+	if val != 0 {
+		t.Fatalf("expected 0, got %d", val)
+	}
+
+	err = pool.Put(0)
+	if err != nil {
+		t.Fatalf("unexpected error on Put(0): %v", err)
+	}
+
+	val, err = pool.Get()
+	if err != nil {
+		t.Fatalf("unexpected error on Put(0): %v", err)
+	}
+}
+
 func TestBytePool_GetPut(t *testing.T) {
 	pool := pool.NewBytePool()
 

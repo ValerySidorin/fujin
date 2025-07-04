@@ -1,7 +1,8 @@
 fujin:
   addr: :4848
   ping_interval: 5s
-  ping_timeout: 5s
+  ping_timeout: 10s
+  ping_stream: false
   write_deadline: 10s
   force_terminate_timeout: 15s
   tls:

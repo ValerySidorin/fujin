@@ -91,7 +91,7 @@ func (w *Writer) Write(topic string, p []byte) error {
 	ch := make(chan error, 1)
 	id := w.cm.next(ch)
 
-	buf = append(buf, byte(request.OP_CODE_WRITE))
+	buf = append(buf, byte(request.OP_CODE_PRODUCE))
 	buf = binary.BigEndian.AppendUint32(buf, id)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
 	buf = append(buf, topic...)
