@@ -33,7 +33,7 @@ func TestSubscriber(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestSubscriber(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -95,7 +95,7 @@ func TestSubscriber(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -142,7 +142,7 @@ func TestSubscriber(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestSubscriberKafka(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -247,7 +247,7 @@ func TestSubscriberKafka(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -304,7 +304,7 @@ func TestSubscriberKafka(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}

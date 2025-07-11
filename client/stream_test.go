@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriter(t *testing.T) {
+func TestStream(t *testing.T) {
 	t.Run("connect", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -24,7 +24,7 @@ func TestWriter(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
 			client.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -38,12 +38,12 @@ func TestWriter(t *testing.T) {
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("success with id", func(t *testing.T) {
@@ -54,22 +54,22 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.Write("pub", []byte("test data"))
+		err = stream.Produce("pub", []byte("test data"))
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("success empty id", func(t *testing.T) {
@@ -80,22 +80,22 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("")
+		stream, err := conn.Connect("")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.Write("pub", []byte("test data"))
+		err = stream.Produce("pub", []byte("test data"))
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("non existent topic", func(t *testing.T) {
@@ -106,22 +106,22 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.Write("non_existent_topic", []byte("test data"))
+		err = stream.Produce("non_existent_topic", []byte("test data"))
 		assert.Error(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("write after close", func(t *testing.T) {
@@ -132,23 +132,23 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
 			t.Fatalf("failed to connect writer: %v", err)
 		}
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
-		writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
+		stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.Write("pub", []byte("test data"))
+		err = stream.Produce("pub", []byte("test data"))
 		assert.Error(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	// Begin transaction will not open transaction in underlying broker straight away.
@@ -161,22 +161,22 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.BeginTx()
+		err = stream.BeginTx()
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	// Commit transaction will do nothing, if no messages are written in it.
@@ -189,15 +189,15 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		writer, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
 		defer writer.Close()
 		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
@@ -221,26 +221,26 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.BeginTx()
+		err = stream.BeginTx()
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.RollbackTx()
+		err = stream.RollbackTx()
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	// Write to NATS in transaction will return 'begin tx' error, because is is not supported.
@@ -252,26 +252,26 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.BeginTx()
+		err = stream.BeginTx()
 		assert.NoError(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.Write("pub", []byte("test data1"))
+		err = stream.Produce("pub", []byte("test data1"))
 		assert.Error(t, err)
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("commit tx invalid tx state", func(t *testing.T) {
@@ -282,23 +282,23 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.CommitTx()
+		err = stream.CommitTx()
 		assert.Error(t, err)
 		assert.Equal(t, "invalid tx state", err.Error())
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 
 	t.Run("rollback tx invalid state", func(t *testing.T) {
@@ -309,22 +309,22 @@ func TestWriter(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
 		defer conn.Close()
 
-		writer, err := conn.ConnectWriter("id")
+		stream, err := conn.Connect("id")
 		if err != nil {
-			t.Fatalf("failed to connect writer: %v", err)
+			t.Fatalf("failed to connect: %v", err)
 		}
-		defer writer.Close()
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		defer stream.Close()
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 
-		err = writer.RollbackTx()
+		err = stream.RollbackTx()
 		assert.Error(t, err)
 		assert.Equal(t, "invalid tx state", err.Error())
-		assert.NoError(t, writer.CheckParseStateAfterOpForTests())
+		assert.NoError(t, stream.CheckParseStateAfterOpForTests())
 	})
 }

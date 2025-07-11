@@ -204,7 +204,7 @@ func (s *Subscriber) parse(buf []byte) error {
 					s.msgs <- Msg{
 						Value: s.ps.payloadBuf,
 						id:    s.ps.metaBuf,
-						r:     s.clientReader,
+						// r:     s.clientReader,
 					}
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}
@@ -216,7 +216,7 @@ func (s *Subscriber) parse(buf []byte) error {
 					s.msgs <- Msg{
 						Value: s.ps.payloadBuf,
 						id:    s.ps.metaBuf,
-						r:     s.clientReader,
+						// r:     s.clientReader,
 					}
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
 				}

@@ -1479,8 +1479,7 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 		fetcher, err := h.cpool.GetReader(topic, autoCommit)
 		if err != nil {
 			buf[5] = 1
-			h.out.QueueOutboundNoLock(buf)
-			h.out.QueueOutboundNoLock(errProtoBuf(err))
+			h.out.EnqueueProtoMulti(buf, errProtoBuf(err))
 			pool.Put(buf)
 			return
 		}

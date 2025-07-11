@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -58,6 +59,10 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 
 	appendBalancersToKgoOpts(opts, conf.Balancers)
 
+	if conf.PingTimeout <= 0 {
+		conf.PingTimeout = 5 * time.Second
+	}
+
 	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: new client: %w", err)
@@ -84,7 +89,10 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 }
 
 func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	if err := r.cl.Ping(ctx); err != nil {
+	pingCtx, cancel := context.WithTimeout(ctx, r.conf.PingTimeout)
+	defer cancel()
+
+	if err := r.cl.Ping(pingCtx); err != nil {
 		return fmt.Errorf("kafka: ping: %w", err)
 	}
 

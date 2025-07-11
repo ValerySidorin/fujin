@@ -39,7 +39,7 @@ func (c *Conn) ConnectConsumer(conf ReaderConfig) (*Consumer, error) {
 
 func (c *Consumer) Fetch(ctx context.Context, n uint32) ([]Msg, error) {
 	if c.closed.Load() {
-		return nil, ErrWriterClosed
+		return nil, ErrStreamClosed
 	}
 
 	buf := pool.Get(9)
@@ -47,7 +47,7 @@ func (c *Consumer) Fetch(ctx context.Context, n uint32) ([]Msg, error) {
 
 	eCh := make(chan error, 1)
 
-	id := c.fcm.next(eCh)
+	id := c.fcm.next(eCh, true)
 	defer c.fcm.delete(id)
 
 	buf = append(buf, byte(request.OP_CODE_FETCH))
@@ -139,7 +139,7 @@ func (c *Consumer) parse(buf []byte) error {
 
 			if len(c.ps.ca.cID) >= fujin.Uint32Len {
 				c.ps.ca.cIDUint32 = binary.BigEndian.Uint32(c.ps.ca.cID)
-				c.ps.fa.msgs, c.ps.fa.err = c.fcm.get(c.ps.ca.cIDUint32)
+				// c.ps.fa.msgs, c.ps.fa.err = c.fcm.get(c.ps.ca.cIDUint32)
 				c.ps.argBuf = pool.Get(fujin.Uint32Len)
 				c.ps.state = OP_FETCH_ERROR_CODE_ARG
 			}
@@ -148,7 +148,7 @@ func (c *Consumer) parse(buf []byte) error {
 			case byte(response.ERR_CODE_NO):
 				pool.Put(c.ps.ca.cID)
 				c.ps.argBuf = pool.Get(fujin.Uint32Len)
-				c.ps.state = OP_FETCH_BATCH_NUM_ARG
+				c.ps.state = OP_FETCH_N_ARG
 				continue
 			case byte(response.ERR_CODE_YES):
 				c.ps.argBuf = pool.Get(fujin.Uint32Len)
@@ -205,7 +205,7 @@ func (c *Consumer) parse(buf []byte) error {
 					c.ps.ca, c.ps.fa, c.ps.payloadBuf, c.ps.ea, c.ps.state = correlationIDArg{}, fetchArg{}, nil, errArg{}, OP_START
 				}
 			}
-		case OP_FETCH_BATCH_NUM_ARG:
+		case OP_FETCH_N_ARG:
 			toCopy := fujin.Uint32Len - len(c.ps.argBuf)
 			avail := len(buf) - i
 
@@ -279,7 +279,7 @@ func (c *Consumer) parse(buf []byte) error {
 					c.ps.fa.msgs = append(c.ps.fa.msgs, Msg{
 						Value: c.ps.payloadBuf,
 						id:    c.ps.metaBuf,
-						r:     c.clientReader,
+						// r:     c.clientReader,
 					})
 					c.ps.fa.handled++
 					if c.ps.fa.handled >= c.ps.fa.n {
@@ -304,7 +304,7 @@ func (c *Consumer) parse(buf []byte) error {
 					c.ps.fa.msgs = append(c.ps.fa.msgs, Msg{
 						Value: c.ps.payloadBuf,
 						id:    c.ps.metaBuf,
-						r:     c.clientReader,
+						// r:     c.clientReader,
 					})
 					c.ps.fa.handled++
 					if c.ps.fa.handled >= c.ps.fa.n {

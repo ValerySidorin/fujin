@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -21,9 +22,20 @@ type Writer struct {
 }
 
 func NewWriter(conf WriterConfig, writerID string, l *slog.Logger) (*Writer, error) {
+	if conf.PingTimeout <= 0 {
+		conf.PingTimeout = 5 * time.Second
+	}
+
 	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, writerID)...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: new client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), conf.PingTimeout)
+	defer cancel()
+
+	if err := c.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("kafka: ping: %w", err)
 	}
 
 	return &Writer{

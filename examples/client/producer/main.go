@@ -6,28 +6,36 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
 	"math/big"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/ValerySidorin/fujin/client"
 )
+
+type TestMsg struct {
+	Field string `json:"field"`
+}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, "localhost:4848", generateTLSConfig(), nil,
+		client.WithTimeout(100*time.Second),
 		client.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 				AddSource: true,
 				Level:     slog.LevelDebug,
 			})),
-		))
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,28 +44,37 @@ func main() {
 
 	defer conn.Close()
 
-	sub, err := conn.ConnectSubscriber(
-		client.SubscriberConfig{
-			ReaderConfig: client.ReaderConfig{
-				Topic: "sub",
-				// AutoCommit: true,
-				Async: true,
-			},
-		},
-		func(msg client.Msg) {
-			fmt.Println(string(msg.Value))
-			if err := msg.Ack(); err != nil {
-				log.Fatal(err)
-			}
-		})
+	s, err := conn.Connect("")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sub.Close()
 
-	fmt.Println("subscriber connected")
+	fmt.Println("stream connected")
 
-	<-ctx.Done()
+	defer s.Close()
+
+	msg := TestMsg{
+		Field: "test",
+	}
+
+	data, err := json.Marshal(&msg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+
+			if err := s.Produce("pub", data); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("message sent")
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
 
 func generateTLSConfig() *tls.Config {

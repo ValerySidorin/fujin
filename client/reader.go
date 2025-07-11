@@ -92,7 +92,7 @@ func (c *clientReader) nack(id []byte) (AckResponse, error) {
 
 func (c *clientReader) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
 	if c.closed.Load() {
-		return AckResponse{}, ErrWriterClosed
+		return AckResponse{}, ErrStreamClosed
 	}
 
 	buf := pool.Get(9)
@@ -308,29 +308,4 @@ func (c *clientReader) parseConnectReader(buf []byte) error {
 	}
 
 	return ErrParseProto
-}
-
-func (c *clientReader) parseErrLenArg() error {
-	c.ps.ea.errLen = binary.BigEndian.Uint32(c.ps.argBuf[0:fujin.Uint32Len])
-	if c.ps.ea.errLen == 0 {
-		return ErrParseProto
-	}
-
-	return nil
-}
-
-func (c *clientReader) parseMsgLenArg() error {
-	c.ps.ma.len = binary.BigEndian.Uint32(c.ps.argBuf[0:fujin.Uint32Len])
-	if c.ps.ma.len == 0 {
-		return ErrParseProto
-	}
-
-	return nil
-}
-
-func boolToByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
 }

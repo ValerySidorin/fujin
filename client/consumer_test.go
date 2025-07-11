@@ -29,7 +29,7 @@ func TestConnectConsumer(t *testing.T) {
 	}
 
 	addr := "localhost:4848"
-	conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
 		client.WithLogger(
 			slog.New(
 				slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -69,7 +69,7 @@ func TestFetch(t *testing.T) {
 		}
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
 			client.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -111,7 +111,7 @@ func TestFetch(t *testing.T) {
 		}
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
 			client.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -169,7 +169,7 @@ func TestFetch(t *testing.T) {
 		}
 
 		addr := "localhost:4848"
-		conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil,
+		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
 			client.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{

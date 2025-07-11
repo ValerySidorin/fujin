@@ -19,7 +19,7 @@ const (
 	OP_MSG_PAYLOAD
 
 	OP_FETCH
-	OP_FETCH_BATCH_NUM_ARG
+	OP_FETCH_N_ARG
 
 	OP_FETCH_CORRELATION_ID_ARG
 	OP_FETCH_ERROR_CODE_ARG
@@ -83,10 +83,11 @@ type msgArg struct {
 }
 
 type fetchArg struct {
-	n       uint32
-	handled uint32
-	msgs    []Msg
-	err     chan error
+	autoCommit bool
+	n          uint32
+	handled    uint32
+	msgs       []Msg
+	err        chan error
 }
 
 type ackArg struct {
