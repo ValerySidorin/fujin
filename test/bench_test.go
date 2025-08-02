@@ -266,10 +266,10 @@ func benchProduce(b *testing.B, typ, pub, payload string) {
 	}()
 
 	c := createClientConn(ctx, PERF_ADDR)
-	p := doDefaultConnectProducer(c)
+	p := doDefaultConnect(c)
 
 	cmd := []byte{
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0,
 	}
 

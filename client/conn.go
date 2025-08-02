@@ -21,7 +21,7 @@ var (
 )
 
 type Conn struct {
-	qconn quic.Connection
+	qconn *quic.Conn
 
 	timeout time.Duration
 	wdl     time.Duration
@@ -30,7 +30,7 @@ type Conn struct {
 	l *slog.Logger
 }
 
-func Connect(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config, opts ...Option) (*Conn, error) {
+func Dial(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config, opts ...Option) (*Conn, error) {
 	conn, err := quic.DialAddr(ctx, addr, tlsConf, quicConf)
 	if err != nil {
 		return nil, fmt.Errorf("quic: dial addr: %w", err)
@@ -84,7 +84,7 @@ func (c *Conn) Close() error {
 	return nil
 }
 
-func handlePing(str quic.Stream, buf []byte) error {
+func handlePing(str *quic.Stream, buf []byte) error {
 	defer str.Close()
 
 	_, err := str.Read(buf[:])

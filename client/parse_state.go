@@ -12,6 +12,19 @@ const (
 
 	// Reader
 	OP_CONNECT_READER
+	OP_SUBSCRIBE
+	OP_SUBSCRIBE_CORRELATION_ID_ARG
+	OP_SUBSCRIBE_ERROR_CODE_ARG
+	OP_SUBSCRIBE_ERROR_PAYLOAD_ARG
+	OP_SUBSCRIBE_ERROR_PAYLOAD
+	OP_SUBSCRIBE_SUB_ID_ARG
+
+	OP_UNSUBSCRIBE
+	OP_UNSUBSCRIBE_CORRELATION_ID_ARG
+	OP_UNSUBSCRIBE_ERROR_CODE_ARG
+	OP_UNSUBSCRIBE_ERROR_PAYLOAD_ARG
+	OP_UNSUBSCRIBE_ERROR_PAYLOAD
+
 	OP_MSG
 	OP_MSG_ID_ARG
 	OP_MSG_ID_PAYLOAD
@@ -19,12 +32,15 @@ const (
 	OP_MSG_PAYLOAD
 
 	OP_FETCH
-	OP_FETCH_BATCH_NUM_ARG
-
+	OP_FETCH_N_ARG
 	OP_FETCH_CORRELATION_ID_ARG
 	OP_FETCH_ERROR_CODE_ARG
 	OP_FETCH_ERROR_PAYLOAD_ARG
 	OP_FETCH_ERROR_PAYLOAD
+	OP_FETCH_MSG_ID_ARG
+	OP_FETCH_MSG_ID_PAYLOAD
+	OP_FETCH_MSG_ARG
+	OP_FETCH_MSG_PAYLOAD
 
 	OP_ACK
 	OP_ACK_CORRELATION_ID_ARG
@@ -78,15 +94,17 @@ type correlationIDArg struct {
 }
 
 type msgArg struct {
+	sub   *Subscription
 	idLen uint32
 	len   uint32
 }
 
 type fetchArg struct {
-	n       uint32
-	handled uint32
-	msgs    []Msg
-	err     chan error
+	autoCommit bool
+	n          uint32
+	handled    uint32
+	msgs       []Msg
+	err        chan error
 }
 
 type ackArg struct {

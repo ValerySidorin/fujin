@@ -36,6 +36,7 @@ type ReaderConfig struct {
 	AutoCommitMarks        bool           `yaml:"auto_commit_marks"`
 	Balancers              []Balancer     `yaml:"balancers"`
 	BlockRebalanceOnPoll   bool           `yaml:"block_rebalance_on_poll"`
+	PingTimeout            time.Duration  `yaml:"ping_timeout"`
 }
 
 type WriterConfig struct {
@@ -45,6 +46,7 @@ type WriterConfig struct {
 	AllowAutoTopicCreation bool          `yaml:"allow_auto_topic_creation"`
 	MaxBufferedRecords     int           `yaml:"max_buffered_records"`
 	DisableIdempotentWrite bool          `yaml:"disable_idempotent_write"`
+	PingTimeout            time.Duration `yaml:"ping_timeout"`
 }
 
 func (c *ReaderConfig) Validate() error {

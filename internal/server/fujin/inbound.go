@@ -22,7 +22,7 @@ const (
 )
 
 type inbound struct {
-	str quic.Stream
+	str *quic.Stream
 	h   *handler
 
 	ftt time.Duration // force terminate timeout
@@ -30,7 +30,7 @@ type inbound struct {
 	l *slog.Logger
 }
 
-func newInbound(str quic.Stream, ftt time.Duration, h *handler, l *slog.Logger) *inbound {
+func newInbound(str *quic.Stream, ftt time.Duration, h *handler, l *slog.Logger) *inbound {
 	assert.NotNil(h)
 	assert.NotNil(l)
 

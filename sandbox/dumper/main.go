@@ -51,23 +51,22 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	if err := produceTx(ctx, conn); err != nil {
-		log.Fatal(err)
-	}
-
-	// if err := consume(ctx, "sub", conn); err != nil {
+	// if err := produceTx(ctx, conn); err != nil {
 	// 	log.Fatal(err)
 	// }
-	// fmt.Println("consuming")
+
+	// if err := fetch(ctx, "sub", conn); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println("fetching")
 
 	// if err := produce(ctx, conn); err != nil {
 	// 	log.Fatal(err)
 	// }
 
-	// if err := subscribe(ctx, "sub", conn); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("subscribed")
+	if err := subscribe(ctx, "sub", conn); err != nil {
+		log.Fatal(err)
+	}
 
 	// if err := subscribeByBytes(ctx, "sub", conn); err != nil {
 	// 	log.Fatal(err)
@@ -83,7 +82,7 @@ func main() {
 
 }
 
-func setup(ctx context.Context) (quic.Connection, error) {
+func setup(ctx context.Context) (*quic.Conn, error) {
 	conn, err := quic.DialAddr(ctx, addr, generateTLSConfig(), nil)
 	if err != nil {
 		return nil, err
@@ -104,13 +103,16 @@ func setup(ctx context.Context) (quic.Connection, error) {
 	return conn, nil
 }
 
-func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(sub))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
-	req = append(req, 1)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(sub)))
-	req = append(req, []byte(sub)...)
+func subscribe(ctx context.Context, topic string, conn *quic.Conn) error {
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
+	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
+	req = append(req, []byte{1, 1, 0, 1}...)                     // correlation id
+	req = append(req, 1)                                         // auto commit
+	req = binary.BigEndian.AppendUint32(req, uint32(len(topic))) // topic len
+	req = append(req, []byte(topic)...)
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -124,6 +126,19 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 	fmt.Println("subscribe: write req")
 
 	go read(str, "subscribe")
+	fmt.Println("subscribed")
+
+	time.Sleep(10 * time.Second)
+
+	unsubReq := []byte{
+		byte(request.OP_CODE_UNSUBSCRIBE),
+		0, 0, 0, 0, // correlation id
+		0, // sub id
+	}
+	if _, err := str.Write(unsubReq); err != nil {
+		return err
+	}
+	fmt.Println("UNSUBSCRIBED")
 
 	// ackReq := []byte{
 	// 	byte(request.OP_CODE_ACK),
@@ -148,13 +163,16 @@ func subscribe(ctx context.Context, sub string, conn quic.Connection) error {
 	return nil
 }
 
-func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(topic))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
-	req = append(req, 1)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
-	req = append(req, []byte(topic)...)
+func subscribeByBytes(ctx context.Context, topic string, conn *quic.Conn) error {
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
+	req = append(req, byte(request.OP_CODE_SUBSCRIBE))
+	req = append(req, []byte{0, 0, 0, 0}...)               // correlation id
+	req = append(req, 1)                                   // auto commit
+	binary.BigEndian.AppendUint32(req, uint32(len(topic))) // topic len
+	req = append(req, []byte(topic)...)                    // topic
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
@@ -176,35 +194,35 @@ func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) e
 	return nil
 }
 
-func produceByBytes(ctx context.Context, conn quic.Connection) error {
+func produceByBytes(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 5, // msg len
 		104, 101, 108, 108, 111, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -242,14 +260,14 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
+func produceTxByBytes(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -257,7 +275,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 		104, 101, 108, 108, 111, // msg
 		byte(request.OP_CODE_TX_COMMIT),
 		0, 0, 1, 1, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -295,67 +313,66 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produce(ctx context.Context, conn quic.Connection) error {
+func produce(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
-		// 0, 0, 0, 1, // producer id is optional (for transactions)
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
 		0, 0, 0, 9, // msg len
 		116, 101, 115, 116, 32, 100, 97, 116, 97, // msg
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		0, 0, 0, 0, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -385,14 +402,14 @@ func produce(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produceTx(ctx context.Context, conn quic.Connection) error {
+func produceTx(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
-		byte(request.OP_CODE_CONNECT_WRITER),
+		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
 		112, 117, 98, // // producer id
 		byte(request.OP_CODE_TX_BEGIN),
 		0, 0, 1, 0, // request id
-		byte(request.OP_CODE_WRITE),
+		byte(request.OP_CODE_PRODUCE),
 		1, 1, 1, 1, // request id
 		0, 0, 0, 3, // pub len
 		112, 117, 98, // pub val
@@ -429,19 +446,23 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func consume(ctx context.Context, topic string, conn quic.Connection) error {
-	req := make([]byte, 0, 6+len(topic))
-	req = append(req, byte(request.OP_CODE_CONNECT_READER))
-	req = append(req, 2)
-	req = req[:6]
-	binary.BigEndian.PutUint32(req[2:6], uint32(len(topic)))
-	req = append(req, []byte(topic)...)
+func fetch(ctx context.Context, topic string, conn *quic.Conn) error {
+	topicBytes := []byte{}
+	topicBytes = binary.BigEndian.AppendUint32(topicBytes, uint32(len(topic)))
+	topicBytes = append(topicBytes, []byte(topic)...)
+
+	fmt.Println(topicBytes)
+
+	req := []byte{
+		byte(request.OP_CODE_CONNECT),
+		0, 0, 0, 0, // producer id is optional (for transactions)
+	}
 
 	str, err := conn.OpenStreamSync(ctx)
 	if err != nil {
 		return err
 	}
-	fmt.Println("consume: opened stream")
+	fmt.Println("fetch: opened stream")
 
 	if _, err := str.Write(req); err != nil {
 		return err
@@ -449,26 +470,33 @@ func consume(ctx context.Context, topic string, conn quic.Connection) error {
 
 	fetchReq := []byte{
 		byte(request.OP_CODE_FETCH), // cmd
-		0, 0, 0, 1, 0, 0, 0, 1,
+		0, 0, 0, 1,                  // correlation id
+		1, // auth commit
 	}
+	fetchReq = append(fetchReq, topicBytes...) // topic
+	fetchReq = append(fetchReq, 0, 0, 0, 1)    // n
+
+	dCh := make(chan struct{})
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-dCh:
+				return
 			default:
-				time.Sleep(1 * time.Second)
 				if _, err := str.Write(fetchReq); err != nil {
-					log.Fatal(err)
+					log.Fatal("write fetch req ", err)
 				}
+				time.Sleep(6 * time.Second)
 			}
 		}
 	}()
 
-	fmt.Println("consume: write req")
+	fmt.Println("fetch: write req")
 
-	go read(str, "consume")
+	go read(str, "fetch")
 
 	time.Sleep(10 * time.Second)
 	dReq := []byte{
@@ -478,12 +506,15 @@ func consume(ctx context.Context, topic string, conn quic.Connection) error {
 	if _, err := str.Write(dReq); err != nil {
 		return err
 	}
+	close(dCh)
 
+	time.Sleep(1 * time.Second)
 	str.Close()
+	fmt.Println("closed")
 	return nil
 }
 
-func produceLoop(ctx context.Context, conn quic.Connection) error {
+func produceLoop(ctx context.Context, conn *quic.Conn) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -497,7 +528,7 @@ func produceLoop(ctx context.Context, conn quic.Connection) error {
 	}
 }
 
-func produceLoopTx(ctx context.Context, conn quic.Connection) error {
+func produceLoopTx(ctx context.Context, conn *quic.Conn) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -522,7 +553,7 @@ func generateTLSConfig() *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
 }
 
-func read(str quic.ReceiveStream, prefix string) {
+func read(str *quic.Stream, prefix string) {
 	buf := make([]byte, 32768)
 
 	for {
@@ -547,7 +578,7 @@ func read(str quic.ReceiveStream, prefix string) {
 	}
 }
 
-func handlePing(str quic.Stream) {
+func handlePing(str *quic.Stream) {
 	defer str.Close()
 	var pingBuf [1]byte
 

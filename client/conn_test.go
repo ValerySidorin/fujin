@@ -32,7 +32,7 @@ func TestConnect(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	addr := "localhost:4848"
-	conn, err := client.Connect(ctx, addr, generateTLSConfig(), nil)
+	conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}

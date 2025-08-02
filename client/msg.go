@@ -7,7 +7,7 @@ import (
 type Msg struct {
 	Value []byte
 	id    []byte
-	r     *clientReader
+	s     *Stream
 }
 
 func (m *Msg) Ack() error {
@@ -15,7 +15,7 @@ func (m *Msg) Ack() error {
 		return nil
 	}
 
-	resp, err := m.r.ack(m.id)
+	resp, err := m.s.ack(m.id)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (m *Msg) Nack() error {
 		return nil
 	}
 
-	resp, err := m.r.nack(m.id)
+	resp, err := m.s.nack(m.id)
 	if err != nil {
 		return err
 	}

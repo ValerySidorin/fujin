@@ -27,13 +27,15 @@ func main() {
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, "localhost:4848", generateTLSConfig(), nil,
+		client.WithTimeout(100*time.Second),
 		client.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 				AddSource: true,
 				Level:     slog.LevelDebug,
 			})),
-		))
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,14 +44,14 @@ func main() {
 
 	defer conn.Close()
 
-	w, err := conn.ConnectWriter("")
+	s, err := conn.Connect("")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("writer connected")
+	fmt.Println("stream connected")
 
-	defer w.Close()
+	defer s.Close()
 
 	msg := TestMsg{
 		Field: "test",
@@ -66,7 +68,7 @@ func main() {
 			return
 		default:
 
-			if err := w.Write("pub", data); err != nil {
+			if err := s.Produce("pub", data); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Println("message sent")

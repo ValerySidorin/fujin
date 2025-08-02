@@ -19,13 +19,13 @@ func main() {
 	}
 	defer nc.Close()
 
-	sub, err := nc.Subscribe("my_subject", func(msg *nats.Msg) {
+	_, err = nc.Subscribe("my_subject", func(msg *nats.Msg) {
 		fmt.Println(string(msg.Data))
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sub.Unsubscribe()
+	// defer sub.Unsubscribe()
 
 	<-ctx.Done()
 	fmt.Println("exit")

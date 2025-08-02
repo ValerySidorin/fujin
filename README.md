@@ -11,8 +11,8 @@ Modern distributed systems often need to work with multiple message brokers, eac
 - **Unified Protocol**: A single, efficient byte-based protocol for all your messaging needs
 - **Zero Broker Lock-in**: Switch between brokers without changing your application code
 - **Dual Message Delivery Models**:
-  - Push (Subscriber): Server pushes messages to clients
-  - Pull (Consumer): Clients request messages from server (not for all brokers)
+  - Push: Server pushes messages to clients
+  - Pull: Clients request messages from server (not for all brokers)
 - **Transaction Support**: Atomic message production across multiple topics (not for all brokers)
 - **Blazing Speed & Efficiency**: Optimized for processing large volumes of messages efficiently, leveraging techniques like zero-allocation parsing.
 - **QUIC Transport**: Reliable, multiplexed communication with built-in security

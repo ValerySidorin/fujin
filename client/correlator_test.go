@@ -6,7 +6,7 @@ import (
 )
 
 func TestCorrelator_Next(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 	ch := make(chan error)
 
 	id := manager.next(ch)
@@ -20,7 +20,7 @@ func TestCorrelator_Next(t *testing.T) {
 }
 
 func TestCorrelator_Concurrency(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 	ch := make(chan error)
 	const goroutines = 100
 
@@ -48,7 +48,7 @@ func TestCorrelator_Concurrency(t *testing.T) {
 	}
 }
 func TestCorrelator_Uint32Max(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 	ch := make(chan error)
 
 	manager.n = ^uint32(0) - 1
@@ -77,7 +77,7 @@ func TestCorrelator_Uint32Max(t *testing.T) {
 }
 
 func TestCorrelator_Delete(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 	ch := make(chan error)
 
 	id := manager.next(ch)
@@ -92,7 +92,7 @@ func TestCorrelator_Delete(t *testing.T) {
 }
 
 func TestCorrelator_DeleteNonExistent(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 
 	manager.delete(12345)
 
@@ -102,7 +102,7 @@ func TestCorrelator_DeleteNonExistent(t *testing.T) {
 }
 
 func TestCorrelator_EmptyMap(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 
 	if len(manager.m) != 0 {
 		t.Errorf("Expected map to be empty, but it has %d entries", len(manager.m))
@@ -110,7 +110,7 @@ func TestCorrelator_EmptyMap(t *testing.T) {
 }
 
 func TestCorrelator_ConcurrentSend(t *testing.T) {
-	manager := newCorrelator()
+	manager := newCorrelator[error]()
 	ch := make(chan error, 100)
 	id := manager.next(ch)
 

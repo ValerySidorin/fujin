@@ -12,22 +12,29 @@ import (
 	"math/big"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/ValerySidorin/fujin/client"
 )
+
+type TestMsg struct {
+	Field string `json:"field"`
+}
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Connect(ctx, "localhost:4848", generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, "localhost:4848", generateTLSConfig(), nil,
+		client.WithTimeout(100*time.Second),
 		client.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 				AddSource: true,
 				Level:     slog.LevelDebug,
 			})),
-		))
+		),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,31 +43,26 @@ func main() {
 
 	defer conn.Close()
 
-	c, err := conn.ConnectConsumer(
-		client.ReaderConfig{
-			Topic:      "sub",
-			AutoCommit: true,
-			Async:      true,
-		})
+	s, err := conn.Connect("")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
 
-	fmt.Println("consumer connected")
+	fmt.Println("stream connected")
+
+	defer s.Close()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			msgs, err := c.Fetch(ctx, 1)
+			msgs, err := s.Fetch(ctx, "sub", 1, true)
 			if err != nil {
 				log.Fatal(err)
 			}
-			for _, msg := range msgs {
-				fmt.Println(msg)
-			}
+			fmt.Println(msgs)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

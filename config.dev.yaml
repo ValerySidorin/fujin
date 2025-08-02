@@ -1,7 +1,8 @@
 fujin:
   addr: :4848
   ping_interval: 5s
-  ping_timeout: 5s
+  ping_timeout: 10s
+  ping_stream: false
   write_deadline: 10s
   force_terminate_timeout: 15s
   tls:
@@ -87,14 +88,14 @@ connectors:
         brokers: [localhost:9092, localhost:9093, localhost:9094]
         topic: my_pub_topic
         group: fujin
-        allow_auto_topic_creation: true
-        max_poll_records: 10000
-        auto_commit_interval: 5s
-        auto_commit_marks: false
-        block_rebalance_on_poll: false
-        balancers:
-          - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
-        fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
+        # allow_auto_topic_creation: true
+        # max_poll_records: 10000
+        # auto_commit_interval: 5s
+        # auto_commit_marks: false
+        # block_rebalance_on_poll: false
+        # balancers:
+        #   - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
+        # fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
     # sub:
     #   protocol: nats
     #   nats:

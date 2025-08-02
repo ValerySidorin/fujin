@@ -17,25 +17,15 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-type AckResponse struct {
-	Err             error
-	AckMsgResponses []AckMsgResponse
-}
-
-type AckMsgResponse struct {
-	MsgID []byte
-	Err   error
-}
-
 type clientReader struct {
 	conn *Conn
 
 	ps  *parseState
-	r   quic.Stream
+	r   *quic.Stream
 	out *fujin.Outbound
 
-	cm *correlator
-	ac *ackCorrelator
+	cm *correlator[error]
+	ac *correlator[AckResponse]
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
@@ -92,7 +82,7 @@ func (c *clientReader) nack(id []byte) (AckResponse, error) {
 
 func (c *clientReader) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
 	if c.closed.Load() {
-		return AckResponse{}, ErrWriterClosed
+		return AckResponse{}, ErrStreamClosed
 	}
 
 	buf := pool.Get(9)
@@ -140,12 +130,12 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 	out := fujin.NewOutbound(stream, c.wdl, c.l)
 
 	r := &clientReader{
-		conn:         c,
-		r:            stream,
-		ps:           &parseState{},
-		out:          out,
-		cm:           newCorrelator(),
-		ac:           newAckCorrelator(),
+		conn: c,
+		r:    stream,
+		ps:   &parseState{},
+		out:  out,
+		// cm:           newCorrelator(),
+		// ac:           newAckCorrelator(),
 		disconnectCh: make(chan struct{}),
 	}
 
@@ -153,7 +143,7 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 	defer pool.Put(buf)
 
 	buf = append(buf,
-		byte(request.OP_CODE_CONNECT_READER),
+		byte(request.OP_CODE_SUBSCRIBE),
 		byte(typ),
 		boolToByte(conf.AutoCommit),
 	)
@@ -239,7 +229,7 @@ func (c *clientReader) parseConnectReader(buf []byte) error {
 		switch c.ps.state {
 		case OP_START:
 			switch b {
-			case byte(response.RESP_CODE_CONNECT_READER):
+			case byte(response.RESP_CODE_SUBSCRIBE):
 				c.ps.state = OP_ERROR_CODE_ARG
 			default:
 				c.r.Close()
@@ -308,29 +298,4 @@ func (c *clientReader) parseConnectReader(buf []byte) error {
 	}
 
 	return ErrParseProto
-}
-
-func (c *clientReader) parseErrLenArg() error {
-	c.ps.ea.errLen = binary.BigEndian.Uint32(c.ps.argBuf[0:fujin.Uint32Len])
-	if c.ps.ea.errLen == 0 {
-		return ErrParseProto
-	}
-
-	return nil
-}
-
-func (c *clientReader) parseMsgLenArg() error {
-	c.ps.ma.len = binary.BigEndian.Uint32(c.ps.argBuf[0:fujin.Uint32Len])
-	if c.ps.ma.len == 0 {
-		return ErrParseProto
-	}
-
-	return nil
-}
-
-func boolToByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
 }

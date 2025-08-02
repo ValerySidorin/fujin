@@ -41,6 +41,7 @@ For convenience, some type aliases are introduced.
 Server -> Client
 ### Description
 `PING` and `PONG` implement a simple keep-alive mechanism between the client and server. Once a client establishes a connection to the Fujin server, the server continuously opens a QUIC stream and sends `PING` messages at a configurable interval. If the client fails to respond with a `PONG` message within the configured response interval, the server will terminate its connection. If a connection remains idle for too long, it will be closed.
+Additionaly, server can be configured to ping opened streams. This helps to determine broken protocol writes, and close such streams.
 
 Since the QUIC protocol supports multiplexing, `PING` messages are sent over a dedicated control streams, separated from messaging ones.
 ### Syntax
@@ -61,9 +62,9 @@ Before producing messages, the client must open a QUIC stream and send a `CONNEC
 ##### Request
  `[1, <stream id>]`  
  where:
- | name       | description                                                                    | type   |
-| ----------- | ------------------------------------------------------------------------------ | ------ |
-| `stream id` | A unique stream identifier used for transactional message production in Kafka. | uint32 |
+ | name       | description                                                                             | type   |
+| ----------- | --------------------------------------------------------------------------------------- | ------ |
+| `stream id` | A client provided stream identifier used for transactional message production in Kafka. | uint32 |
 ##### Response
 `-`
 ### Examples
@@ -95,7 +96,7 @@ where:
 ### Examples
 - `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
 
-## HPRODUCE
+## HPRODUCE (TODO)
 
 ### Direction
 Client -> Server
@@ -211,7 +212,7 @@ where:
 | name             | description                                                          | type   |
 | ---------------- | -------------------------------------------------------------------- | ------ |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-| `auto commit`    | Connect with auto commit.                                            | bool   |
+| `auto commit`    | Subscribe with auto commit.                                          | bool   |
 | `topic`          | Topic to read from.                                                  | string |
 ##### Response
 `[1, <correlation id>, <error>, <subscription id>]`  
@@ -240,7 +241,7 @@ where:
 ### Examples
 - `-` -> `[6, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
-## HMSG
+## HMSG (TODO)
 
 ### Direction
 Server -> Client
@@ -320,12 +321,14 @@ Client can send a `FETCH` command to the server to retrieve messages from the cu
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <auto commit>, <msg response batch len>]`  
+`[7, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
 where:
-| name                     | description                                                          | type    |
-| ------------------------ | -------------------------------------------------------------------- | ------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
+| name                     | description                                                          | type   |
+| ------------------------ | -------------------------------------------------------------------- | ------ |
+| `correlation id`         | Correlation ID is used to match client request with server response. | uint32 |
+| `auto commit`            | Fetch with auto commit.                                              | bool   |
+| `topic`                  | Topic to read from.                                                  | string |
+| `msg response batch len` | The number of messages the server should send in response.           | uint32 |
 
 ##### Response
 `[7, <correlation id>, <error>, <msgs>]`  
@@ -336,7 +339,7 @@ where:
 | `error`          | An error.                                                            | string?          |
 | `msgs`           | Message batch.                                                       | [uint32]message  |
 
-## HFETCH
+## HFETCH (TODO)
 
 ### Direction
 Client -> Server
