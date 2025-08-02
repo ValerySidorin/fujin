@@ -282,7 +282,6 @@ func (s *Stream) readLoop() {
 		if err != nil {
 			if err == io.EOF {
 				if n != 0 {
-					fmt.Println(buf[:n])
 					err = s.parse(buf[:n])
 					if err != nil {
 						s.l.Error("writer read loop", "err", err)
@@ -297,7 +296,6 @@ func (s *Stream) readLoop() {
 			continue
 		}
 
-		fmt.Println(buf[:n])
 		err = s.parse(buf[:n])
 		if err != nil {
 			s.l.Error("writer read loop", "err", err)
