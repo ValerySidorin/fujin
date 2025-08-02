@@ -56,7 +56,7 @@ Consider alternatives if:
 ## Documentation
 
 - [Protocol Specification](protocol.md)
-- [Configuration Guide](config.yaml)
+- [Configuration Guide](config.dev.yaml)
 
 ## TODO
 
