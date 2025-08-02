@@ -17,25 +17,15 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-type AckResponse struct {
-	Err             error
-	AckMsgResponses []AckMsgResponse
-}
-
-type AckMsgResponse struct {
-	MsgID []byte
-	Err   error
-}
-
 type clientReader struct {
 	conn *Conn
 
 	ps  *parseState
-	r   quic.Stream
+	r   *quic.Stream
 	out *fujin.Outbound
 
-	cm *correlator
-	ac *ackCorrelator
+	cm *correlator[error]
+	ac *correlator[AckResponse]
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
@@ -140,12 +130,12 @@ func (c *Conn) connectReader(conf ReaderConfig, typ reader.ReaderType) (*clientR
 	out := fujin.NewOutbound(stream, c.wdl, c.l)
 
 	r := &clientReader{
-		conn:         c,
-		r:            stream,
-		ps:           &parseState{},
-		out:          out,
-		cm:           newCorrelator(),
-		ac:           newAckCorrelator(),
+		conn: c,
+		r:    stream,
+		ps:   &parseState{},
+		out:  out,
+		// cm:           newCorrelator(),
+		// ac:           newAckCorrelator(),
 		disconnectCh: make(chan struct{}),
 	}
 

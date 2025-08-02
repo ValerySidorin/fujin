@@ -389,7 +389,7 @@ func RunServer(ctx context.Context, conf config.Config) *server.Server {
 	return s
 }
 
-func createClientConn(ctx context.Context, addr string) quic.Connection {
+func createClientConn(ctx context.Context, addr string) *quic.Conn {
 	conn, err := quic.DialAddr(ctx, addr, generateTLSConfig(), nil)
 	if err != nil {
 		panic(fmt.Errorf("dial addr: %w", err))
@@ -414,7 +414,7 @@ func createClientConn(ctx context.Context, addr string) quic.Connection {
 	return conn
 }
 
-func doDefaultConnect(conn quic.Connection) quic.Stream {
+func doDefaultConnect(conn *quic.Conn) *quic.Stream {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
@@ -432,7 +432,7 @@ func doDefaultConnect(conn quic.Connection) quic.Stream {
 	return str
 }
 
-func drainStream(b *testing.B, str quic.Stream, ch chan int) {
+func drainStream(b *testing.B, str *quic.Stream, ch chan int) {
 	buf := make([]byte, defaultRecvBufSize)
 	bytes := 0
 
@@ -451,7 +451,7 @@ func drainStream(b *testing.B, str quic.Stream, ch chan int) {
 	ch <- bytes
 }
 
-func handlePing(str quic.Stream) {
+func handlePing(str *quic.Stream) {
 	defer str.Close()
 	var pingBuf [1]byte
 

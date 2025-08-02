@@ -178,7 +178,7 @@ type ackArgs struct {
 type handler struct {
 	ctx  context.Context
 	out  *fujin.Outbound
-	str  quic.Stream
+	str  *quic.Stream
 	cman *connectors.Manager
 
 	ps           *parseState
@@ -233,7 +233,7 @@ func newHandler(
 	ctx context.Context,
 	pingInterval time.Duration, pingTimeout time.Duration, pingStream bool,
 	cman *connectors.Manager,
-	out *fujin.Outbound, str quic.Stream, l *slog.Logger,
+	out *fujin.Outbound, str *quic.Stream, l *slog.Logger,
 ) *handler {
 	h := &handler{
 		ctx:              ctx,

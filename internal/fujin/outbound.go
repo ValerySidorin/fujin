@@ -22,14 +22,14 @@ type Outbound struct {
 	wv     net.Buffers   // working vector
 	wdl    time.Duration // write deadline
 	c      *sync.Cond
-	pb     int64           // pending bytes
-	str    quic.SendStream // current quic stream
+	pb     int64        // pending bytes
+	str    *quic.Stream // current quic stream
 	closed atomic.Bool
 	l      *slog.Logger
 }
 
 func NewOutbound(
-	str quic.SendStream, wdl time.Duration,
+	str *quic.Stream, wdl time.Duration,
 	l *slog.Logger) *Outbound {
 	o := &Outbound{
 		str: str,

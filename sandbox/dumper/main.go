@@ -82,7 +82,7 @@ func main() {
 
 }
 
-func setup(ctx context.Context) (quic.Connection, error) {
+func setup(ctx context.Context) (*quic.Conn, error) {
 	conn, err := quic.DialAddr(ctx, addr, generateTLSConfig(), nil)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func setup(ctx context.Context) (quic.Connection, error) {
 	return conn, nil
 }
 
-func subscribe(ctx context.Context, topic string, conn quic.Connection) error {
+func subscribe(ctx context.Context, topic string, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
@@ -163,7 +163,7 @@ func subscribe(ctx context.Context, topic string, conn quic.Connection) error {
 	return nil
 }
 
-func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) error {
+func subscribeByBytes(ctx context.Context, topic string, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
@@ -194,7 +194,7 @@ func subscribeByBytes(ctx context.Context, topic string, conn quic.Connection) e
 	return nil
 }
 
-func produceByBytes(ctx context.Context, conn quic.Connection) error {
+func produceByBytes(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 0, // producer id is optional (for transactions)
@@ -260,7 +260,7 @@ func produceByBytes(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
+func produceTxByBytes(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
@@ -313,7 +313,7 @@ func produceTxByBytes(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produce(ctx context.Context, conn quic.Connection) error {
+func produce(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
@@ -402,7 +402,7 @@ func produce(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func produceTx(ctx context.Context, conn quic.Connection) error {
+func produceTx(ctx context.Context, conn *quic.Conn) error {
 	req := []byte{
 		byte(request.OP_CODE_CONNECT),
 		0, 0, 0, 3, // producer id len
@@ -446,7 +446,7 @@ func produceTx(ctx context.Context, conn quic.Connection) error {
 	return nil
 }
 
-func fetch(ctx context.Context, topic string, conn quic.Connection) error {
+func fetch(ctx context.Context, topic string, conn *quic.Conn) error {
 	topicBytes := []byte{}
 	topicBytes = binary.BigEndian.AppendUint32(topicBytes, uint32(len(topic)))
 	topicBytes = append(topicBytes, []byte(topic)...)
@@ -514,7 +514,7 @@ func fetch(ctx context.Context, topic string, conn quic.Connection) error {
 	return nil
 }
 
-func produceLoop(ctx context.Context, conn quic.Connection) error {
+func produceLoop(ctx context.Context, conn *quic.Conn) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -528,7 +528,7 @@ func produceLoop(ctx context.Context, conn quic.Connection) error {
 	}
 }
 
-func produceLoopTx(ctx context.Context, conn quic.Connection) error {
+func produceLoopTx(ctx context.Context, conn *quic.Conn) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -553,7 +553,7 @@ func generateTLSConfig() *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
 }
 
-func read(str quic.ReceiveStream, prefix string) {
+func read(str *quic.Stream, prefix string) {
 	buf := make([]byte, 32768)
 
 	for {
@@ -578,7 +578,7 @@ func read(str quic.ReceiveStream, prefix string) {
 	}
 }
 
-func handlePing(str quic.Stream) {
+func handlePing(str *quic.Stream) {
 	defer str.Close()
 	var pingBuf [1]byte
 

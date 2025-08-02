@@ -4,20 +4,20 @@ import (
 	"sync"
 )
 
-type correlator struct {
+type correlator[T any] struct {
 	n uint32
-	m map[uint32]chan error
+	m map[uint32]chan T
 
 	mu sync.RWMutex
 }
 
-func newCorrelator() *correlator {
-	return &correlator{
-		m: make(map[uint32]chan error),
+func newCorrelator[T any]() *correlator[T] {
+	return &correlator[T]{
+		m: make(map[uint32]chan T),
 	}
 }
 
-func (m *correlator) next(c chan error) uint32 {
+func (m *correlator[T]) next(c chan T) uint32 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -26,17 +26,17 @@ func (m *correlator) next(c chan error) uint32 {
 	return m.n
 }
 
-func (m *correlator) send(id uint32, err error) {
+func (m *correlator[T]) send(id uint32, val T) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	c, ok := m.m[id]
 	if ok {
-		c <- err
+		c <- val
 	}
 }
 
-func (m *correlator) delete(id uint32) {
+func (m *correlator[T]) delete(id uint32) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
