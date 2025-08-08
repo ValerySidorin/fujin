@@ -25,6 +25,10 @@ func (c *Config) SetDefaults() {
 		c.Fujin.PingTimeout = 5 * time.Second
 	}
 
+	if c.Fujin.PingMaxRetries == 0 {
+		c.Fujin.PingMaxRetries = 3
+	}
+
 	if c.Fujin.WriteDeadline == 0 {
 		c.Fujin.WriteDeadline = 10 * time.Second
 	}

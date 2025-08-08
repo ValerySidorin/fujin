@@ -44,6 +44,7 @@ type FujinConfig struct {
 	PingInterval          time.Duration `yaml:"ping_interval"`
 	PingTimeout           time.Duration `yaml:"ping_timeout"`
 	PingStream            bool          `yaml:"ping_stream"`
+	PingMaxRetries        int           `yaml:"ping_max_retries"`
 	TLS                   TLSConfig     `yaml:"tls"`
 	QUIC                  QUICConfig    `yaml:"quic"`
 }
@@ -100,6 +101,10 @@ func (c *Config) parseFujinServerConfig() (fujin.ServerConfig, error) {
 		Addr:                  c.Fujin.Addr,
 		WriteDeadline:         c.Fujin.WriteDeadline,
 		ForceTerminateTimeout: c.Fujin.ForceTerminateTimeout,
+		PingInterval:          c.Fujin.PingInterval,
+		PingTimeout:           c.Fujin.PingTimeout,
+		PingStream:            c.Fujin.PingStream,
+		PingMaxRetries:        c.Fujin.PingMaxRetries,
 		TLS:                   tlsConf,
 		QUIC:                  c.Fujin.QUIC.parse(),
 	}, nil

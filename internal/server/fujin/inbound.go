@@ -52,7 +52,6 @@ func (i *inbound) readLoop(ctx context.Context) {
 		i.close()
 		close(stopCh)
 		i.h.out.BroadcastCond()
-
 	}()
 
 	var (
@@ -74,7 +73,7 @@ func (i *inbound) readLoop(ctx context.Context) {
 			if errors.Is(err, io.EOF) {
 				break
 			}
-
+			i.str.CancelRead(ferr.ConnErr)
 			i.l.Error("read stream", "err", err)
 			break
 		}
@@ -83,6 +82,7 @@ func (i *inbound) readLoop(ctx context.Context) {
 		if err != nil {
 			if !errors.Is(err, ErrClose) {
 				i.l.Error("handle buf", "err", err)
+				i.str.CancelRead(ferr.ConnErr)
 			}
 			break
 		}

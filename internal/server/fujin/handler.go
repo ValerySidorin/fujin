@@ -435,8 +435,8 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseWriteTopicArg(); err != nil {
 						h.l.Error("parse write topic arg", "err", err)
 						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						pool.Put(h.ps.argBuf)
 						return err
 					}
 					pool.Put(h.ps.argBuf)
@@ -452,17 +452,17 @@ func (h *handler) handle(buf []byte) error {
 					if err := h.parseWriteTopicLenArg(); err != nil {
 						h.l.Error("parse write topic len arg", "err", err)
 						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						pool.Put(h.ps.argBuf)
 						return err
 					}
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf = nil
 					continue
 				}
-				pool.Put(h.ps.argBuf)
 				h.enqueueWriteErrResponse(ErrParseProto)
 				pool.Put(h.ps.ca.cID)
+				pool.Put(h.ps.argBuf)
 				h.ps.argBuf, h.ps.ca.cID, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 				continue
 			}
@@ -476,9 +476,9 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
 				if err := h.parseWriteMsgSizeArg(); err != nil {
 					h.l.Error("parse write msg size arg", "err", err)
-					pool.Put(h.ps.argBuf)
 					h.enqueueWriteErrResponse(err)
 					pool.Put(h.ps.ca.cID)
+					pool.Put(h.ps.argBuf)
 					return err
 				}
 				pool.Put(h.ps.argBuf)
@@ -509,6 +509,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -531,6 +532,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -825,14 +827,13 @@ func (h *handler) handle(buf []byte) error {
 
 				if len(h.ps.argBuf) >= int(h.ps.wa.topicLen) {
 					if err := h.parseWriteTopicArg(); err != nil {
+						h.l.Error("parse write topic arg", "err", err)
 						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.argBuf)
 						pool.Put(h.ps.ca.cID)
+						pool.Put(h.ps.argBuf)
 						return err
 					}
 					pool.Put(h.ps.argBuf)
-					h.ps.argBuf = nil
-
 					h.ps.argBuf, h.ps.state = nil, OP_WRITE_TX_MSG_ARG
 				}
 				continue
@@ -843,9 +844,9 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
 				if h.ps.wa.topicLen == 0 {
 					if err := h.parseWriteTopicLenArg(); err != nil {
-						pool.Put(h.ps.argBuf)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
+						pool.Put(h.ps.argBuf)
 						return err
 					}
 					pool.Put(h.ps.argBuf)
@@ -854,10 +855,7 @@ func (h *handler) handle(buf []byte) error {
 				}
 
 				// this should not happen ever
-				pool.Put(h.ps.argBuf)
-				h.enqueueWriteErrResponse(ErrParseProto)
-				pool.Put(h.ps.ca.cID)
-				return ErrParseProto
+				panic("unreachable")
 			}
 		case OP_WRITE_TX_MSG_ARG:
 			if h.ps.argBuf == nil {
@@ -869,9 +867,9 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
 				if err := h.parseWriteMsgSizeArg(); err != nil {
 					h.l.Error("parse write msg size arg", "err", err)
-					pool.Put(h.ps.argBuf)
 					h.enqueueWriteErrResponse(err)
 					pool.Put(h.ps.ca.cID)
+					pool.Put(h.ps.argBuf)
 					return err
 				}
 				pool.Put(h.ps.argBuf)
@@ -901,6 +899,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("writer can not be reused in tx")
 							h.enqueueWriteErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -911,6 +910,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -919,6 +919,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("begin tx", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -940,6 +941,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("writer can not be reused in tx1")
 							h.enqueueWriteErrResponse(ErrWriterCanNotBeReusedInTx)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -950,6 +952,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}
@@ -958,6 +961,7 @@ func (h *handler) handle(buf []byte) error {
 							h.l.Error("begin tx", "err", err)
 							h.enqueueWriteErrResponse(err)
 							pool.Put(h.ps.ca.cID)
+							pool.Put(h.ps.payloadBuf)
 							h.ps.ca.cID, h.ps.payloadBuf, h.ps.wa, h.ps.state = nil, nil, writeArgs{}, OP_START
 							continue
 						}

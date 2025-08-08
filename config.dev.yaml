@@ -3,6 +3,7 @@ fujin:
   ping_interval: 5s
   ping_timeout: 10s
   ping_stream: false
+  ping_max_retries: 5
   write_deadline: 10s
   force_terminate_timeout: 15s
   tls:

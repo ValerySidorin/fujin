@@ -19,18 +19,13 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-type PingConfig struct {
-	Interval   time.Duration
-	Timeout    time.Duration
-	PingStream bool
-}
-
 type ServerConfig struct {
 	Disabled              bool
 	Addr                  string
 	PingInterval          time.Duration
 	PingTimeout           time.Duration
 	PingStream            bool
+	PingMaxRetries        int
 	WriteDeadline         time.Duration
 	ForceTerminateTimeout time.Duration
 	TLS                   *tls.Config
@@ -126,17 +121,19 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 			}
 
 			ctx, cancel := context.WithCancel(ctx)
+			connWg.Add(1)
 			go func() {
+				retryCount := 0
 				t := time.NewTicker(s.conf.PingInterval)
 				defer func() {
 					t.Stop()
 					cancel()
+					connWg.Done()
 				}()
 
 				pingBuf := pool.Get(1)
-				pingBuf = pingBuf[:1]
-
 				defer pool.Put(pingBuf)
+				pingBuf = pingBuf[:1]
 
 				for {
 					select {
@@ -145,28 +142,54 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 					case <-t.C:
 						str, err := conn.OpenStreamSync(ctx)
 						if err != nil {
-							if err := conn.CloseWithError(ferr.PingErr, "open stream: "+err.Error()); err != nil {
-								s.l.Error("close with error", "err", err)
+							retryCount++
+							s.l.Error("open ping stream error", "err", err, "retry", retryCount)
+							if retryCount >= s.conf.PingMaxRetries {
+								if err := conn.CloseWithError(ferr.PingErr, "open stream failed after retries: "+err.Error()); err != nil {
+									s.l.Error("close with error", "err", err)
+								}
+								return
 							}
-							return
+							continue
 						}
+						retryCount = 0
 
 						pingBuf[0] = byte(request.OP_CODE_PING)
-
-						if _, err := str.Write(pingBuf[:]); err != nil {
-							if err := conn.CloseWithError(ferr.PingErr, "write: "+err.Error()); err != nil {
-								s.l.Error("close with error", "err", err)
+						if _, err := str.Write(pingBuf); err != nil {
+							retryCount++
+							s.l.Error("write ping error", "err", err, "retry", retryCount)
+							_ = str.Close()
+							if retryCount >= s.conf.PingMaxRetries {
+								if err := conn.CloseWithError(ferr.PingErr, "write failed after retries: "+err.Error()); err != nil {
+									s.l.Error("close with error", "err", err)
+								}
+								return
 							}
-							return
+							continue
 						}
-						str.Close()
 
-						_ = str.SetDeadline(time.Now().Add(s.conf.PingTimeout))
-						if _, err := io.ReadAll(str); err != nil {
-							if err := conn.CloseWithError(ferr.PingErr, "read: "+err.Error()); err != nil {
-								s.l.Error("close with error", "err", err)
-							}
+						if err := str.Close(); err != nil {
+							s.l.Error("close ping stream error", "err", err)
 						}
+
+						err = str.SetDeadline(time.Now().Add(s.conf.PingTimeout))
+						if err != nil {
+							s.l.Error("set read deadline error", "err", err)
+						}
+
+						_, err = io.ReadAll(str)
+						if err != nil {
+							retryCount++
+							s.l.Error("read ping response error", "err", err, "retry", retryCount)
+							if retryCount >= s.conf.PingMaxRetries {
+								if err := conn.CloseWithError(ferr.PingErr, "read failed after retries: "+err.Error()); err != nil {
+									s.l.Error("close with error", "err", err)
+								}
+								return
+							}
+							continue
+						}
+						retryCount = 0
 					}
 				}
 			}()
