@@ -11,7 +11,7 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2888:3888
     restart: always
   kafka1:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.8.1
     hostname: kafka1
     container_name: kafka1
     ports:
@@ -30,7 +30,7 @@ services:
     depends_on:
       - zoo1
   kafka2:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.8.1
     hostname: kafka2
     container_name: kafka2
     ports:
@@ -49,7 +49,7 @@ services:
     depends_on:
       - zoo1
   kafka3:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.8.1
     hostname: kafka3
     container_name: kafka3
     ports:
@@ -67,85 +67,3 @@ services:
     restart: always
     depends_on:
       - zoo1
-  # nats:
-  #   image: nats:latest
-  #   hostname: nats
-  #   container_name: nats
-  #   ports:
-  #     - "4222:4222"
-  #   restart: always
-  # rabbitmq:
-  #   image: rabbitmq:management-alpine
-  #   container_name: rabbitmq
-  #   ports:
-  #     - "5672:5672"
-  #     - "15672:15672"
-  #   environment:
-  #     RABBITMQ_DEFAULT_VHOST: /
-  #   restart: always
-  # artemismq:
-  #   image: apache/activemq-artemis:latest-alpine
-  #   container_name: artemismq
-  #   ports:
-  #     - "61616:61616"
-  #     - "8161:8161"
-  #   restart: always
-  # valkey:
-  #   image: valkey/valkey:latest
-  #   container_name: valkey
-  #   ports:
-  #     - "6379:6379"
-  #   restart: always
-  # emqx:
-  #   image: emqx:latest
-  #   container_name: emqx
-  #   ports:
-  #     - "1883:1883"
-  #   restart: always
-  # nsqlookupd:
-  #   image: nsqio/nsq:latest
-  #   container_name: nsqlookupd
-  #   command: /nsqlookupd
-  #   ports:
-  #     - "4160:4160"
-  #     - "4161:4161"
-  #   restart: always
-  # nsqd:
-  #   image: nsqio/nsq:latest
-  #   container_name: nsqd
-  #   command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
-  #   depends_on:
-  #     - nsqlookupd
-  #   ports:
-  #     - "4150:4150"
-  #     - "4151:4151"
-  #   restart: always
-  # nsqadmin:
-  #   image: nsqio/nsq:latest
-  #   container_name: nsqadmin
-  #   command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
-  #   depends_on:
-  #     - nsqlookupd  
-  #   ports:
-  #     - "4171:4171"
-  #   restart: always
-  # garnet:
-  #   image: ghcr.io/microsoft/garnet
-  #   container_name: garnet
-  #   ports:
-  #     - "6379:6379"
-  #   restart: always
-  # dragonfly:
-  #   image: docker.dragonflydb.io/dragonflydb/dragonfly
-  #   container_name: dragonfly
-  #   ports:
-  #     - "6379:6379"
-  #   restart: always
-  # nanomq:
-  #   image: emqx/nanomq:latest
-  #   container_name: nanomq
-  #   ports:
-  #     - "1883:1883"
-  #     - "8083:8083"
-  #     - "8883:8883"
-  #   restart: always
