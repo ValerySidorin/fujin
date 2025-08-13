@@ -11,6 +11,7 @@ import (
 
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/fujin/version"
 	"github.com/quic-go/quic-go"
 )
 
@@ -31,6 +32,12 @@ type Conn struct {
 }
 
 func Dial(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config, opts ...Option) (*Conn, error) {
+	if tlsConf != nil {
+		if len(tlsConf.NextProtos) == 0 {
+			tlsConf = tlsConf.Clone()
+			tlsConf.NextProtos = []string{version.Fujin1}
+		}
+	}
 	conn, err := quic.DialAddr(ctx, addr, tlsConf, quicConf)
 	if err != nil {
 		return nil, fmt.Errorf("quic: dial addr: %w", err)

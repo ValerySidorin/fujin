@@ -17,6 +17,7 @@ import (
 
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/connectors/impl/amqp091"
@@ -481,5 +482,5 @@ func generateTLSConfig() *tls.Config {
 		Certificate: [][]byte{cert},
 		PrivateKey:  key,
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{version.Fujin1}}
 }
