@@ -39,6 +39,7 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	s.l.Info("starting fujin server")
+	defer s.cman.Close()
 	eg, eCtx := errgroup.WithContext(ctx)
 	if s.fujinServer != nil {
 		eg.Go(func() error {

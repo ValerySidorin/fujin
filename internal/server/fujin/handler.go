@@ -110,8 +110,7 @@ var (
 )
 
 var (
-	errNoTemplate  = []byte{0}
-	errYesTemplate = []byte{1}
+// removed templates; build response buffers per call to avoid races
 )
 
 type sessionState byte
@@ -207,18 +206,7 @@ type handler struct {
 
 	acker internal_reader.Reader
 
-	ackSuccessRespTemplate []byte
-	ackErrRespTemplate     []byte
-
-	nackSuccessRespTemplate []byte
-	nackErrRespTemplate     []byte
-
-	txBeginSuccessRespTemplate    []byte
-	txBeginErrRespTemplate        []byte
-	txCommitSuccessRespTemplate   []byte
-	txCommitErrRespTemplate       []byte
-	txRollbackSuccessRespTemplate []byte
-	txRollbackErrRespTemplate     []byte
+	// response templates removed to prevent concurrent in-place mutations
 
 	disconnect func()
 
@@ -252,18 +240,6 @@ func newHandler(
 		disconnect:       func() {},
 		sessionState:     STREAM_STATE_INIT,
 		closed:           make(chan struct{}),
-
-		ackSuccessRespTemplate:  []byte{byte(response.RESP_CODE_ACK), 0, 0, 0, 0, 0},
-		ackErrRespTemplate:      []byte{byte(response.RESP_CODE_ACK), 0, 0, 0, 0, 1},
-		nackSuccessRespTemplate: []byte{byte(response.RESP_CODE_NACK), 0, 0, 0, 0, 0},
-		nackErrRespTemplate:     []byte{byte(response.RESP_CODE_NACK), 0, 0, 0, 0, 1},
-
-		txBeginSuccessRespTemplate:    []byte{byte(response.RESP_CODE_TX_BEGIN), 0, 0, 0, 0, 0},
-		txBeginErrRespTemplate:        []byte{byte(response.RESP_CODE_TX_BEGIN), 0, 0, 0, 0, 1},
-		txCommitSuccessRespTemplate:   []byte{byte(response.RESP_CODE_TX_COMMIT), 0, 0, 0, 0, 0},
-		txCommitErrRespTemplate:       []byte{byte(response.RESP_CODE_TX_COMMIT), 0, 0, 0, 0, 1},
-		txRollbackSuccessRespTemplate: []byte{byte(response.RESP_CODE_TX_ROLLBACK), 0, 0, 0, 0, 0},
-		txRollbackErrRespTemplate:     []byte{byte(response.RESP_CODE_TX_ROLLBACK), 0, 0, 0, 0, 1},
 	}
 
 	if pingStream {
@@ -1474,17 +1450,17 @@ func (h *handler) produceTx(msg []byte) {
 }
 
 func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
-	buf := pool.Get(6)[:6]
-	buf[0] = byte(response.RESP_CODE_FETCH)
-	replaceUnsafe(buf, 1, h.ps.ca.cID)
+	header := pool.Get(6)[:0]
+	header = append(header, byte(response.RESP_CODE_FETCH))
+	header = append(header, h.ps.ca.cID...)
+	header = append(header, response.ERR_CODE_NO)
 
 	go func() {
-		buf[5] = 0
 		fetcher, err := h.cpool.GetReader(topic, autoCommit)
 		if err != nil {
-			buf[5] = 1
-			h.out.EnqueueProtoMulti(buf, errProtoBuf(err))
-			pool.Put(buf)
+			header[5] = response.ERR_CODE_YES
+			h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+			pool.Put(header)
 			return
 		}
 
@@ -1492,19 +1468,19 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 			func(n uint32, err error) {
 				h.out.Lock()
 				if err != nil {
-					buf[5] = 1
-					h.out.QueueOutboundNoLock(buf)
+					header[5] = response.ERR_CODE_YES
+					h.out.QueueOutboundNoLock(header)
 					h.out.QueueOutboundNoLock(errProtoBuf(err))
-					pool.Put(buf)
+					pool.Put(header)
 					return
 				}
 
-				h.out.QueueOutboundNoLock(buf)
-				pool.Put(buf)
-				buf = pool.Get(fujin.Uint32Len)
-				buf = binary.BigEndian.AppendUint32(buf, n)
-				h.out.QueueOutboundNoLock(buf)
-				pool.Put(buf)
+				h.out.QueueOutboundNoLock(header)
+				pool.Put(header)
+				count := pool.Get(fujin.Uint32Len)
+				count = binary.BigEndian.AppendUint32(count, n)
+				h.out.QueueOutboundNoLock(count)
+				pool.Put(count)
 			},
 			h.fetchEnqueueMsgFunc(h.out, fetcher, topic, autoCommit),
 		)
@@ -1605,104 +1581,158 @@ func (h *handler) enqueueStop() {
 }
 
 func (h *handler) enqueueAckSuccess(cID []byte) {
-	replaceUnsafe(h.ackSuccessRespTemplate, 1, cID)
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, h.ps.aa.msgIDsLen)
-	h.out.EnqueueProtoMulti(h.ackSuccessRespTemplate, buf)
-	pool.Put(buf)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_ACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	count := pool.Get(fujin.Uint32Len)
+	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
+	h.out.EnqueueProtoMulti(header, count)
+	pool.Put(header)
+	pool.Put(count)
 }
 
 func (h *handler) enqueueAckSuccessNoLock(cID []byte) {
-	replaceUnsafe(h.ackSuccessRespTemplate, 1, cID)
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, h.ps.aa.msgIDsLen)
-	h.out.QueueOutboundNoLock(h.ackSuccessRespTemplate)
-	h.out.QueueOutboundNoLock(buf)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_ACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	count := pool.Get(fujin.Uint32Len)
+	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
+	h.out.QueueOutboundNoLock(header)
+	h.out.QueueOutboundNoLock(count)
 	h.out.SignalFlush()
-	pool.Put(buf)
+	pool.Put(header)
+	pool.Put(count)
 }
 
 func (h *handler) enqueueAckErrNoLock(cID []byte, err error) {
-	replaceUnsafe(h.ackErrRespTemplate, 1, cID)
-	h.out.QueueOutboundNoLock(h.ackErrRespTemplate)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_ACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_YES)
+	h.out.QueueOutboundNoLock(header)
 	h.out.QueueOutboundNoLock(errProtoBuf(err))
 	h.out.SignalFlush()
+	pool.Put(header)
 }
 
 func (h *handler) enqueueAckMsgIDSuccessNoLock(msgID []byte) {
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msgID)))
-	h.out.QueueOutboundNoLock(buf)
+	lenBuf := pool.Get(fujin.Uint32Len)
+	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(msgID)))
+	okFlag := pool.Get(1)
+	okFlag = append(okFlag, response.ERR_CODE_NO)
+	h.out.QueueOutboundNoLock(lenBuf)
 	h.out.QueueOutboundNoLock(msgID)
-	h.out.QueueOutboundNoLock(errNoTemplate)
+	h.out.QueueOutboundNoLock(okFlag)
 	h.out.SignalFlush()
-	pool.Put(buf)
+	pool.Put(lenBuf)
+	pool.Put(okFlag)
 }
 
 func (h *handler) enqueueAckMsgIDErrNoLock(msgID []byte, err error) {
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msgID)))
-	h.out.QueueOutboundNoLock(buf)
+	lenBuf := pool.Get(fujin.Uint32Len)
+	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(msgID)))
+	errFlag := pool.Get(1)
+	errFlag = append(errFlag, response.ERR_CODE_YES)
+	h.out.QueueOutboundNoLock(lenBuf)
 	h.out.QueueOutboundNoLock(msgID)
-	h.out.QueueOutboundNoLock(errYesTemplate)
+	h.out.QueueOutboundNoLock(errFlag)
 	h.out.QueueOutboundNoLock(errProtoBuf(err))
 	h.out.SignalFlush()
-	pool.Put(buf)
+	pool.Put(lenBuf)
+	pool.Put(errFlag)
 }
 
 func (h *handler) enqueueNackSuccess(cID []byte) {
-	replaceUnsafe(h.nackSuccessRespTemplate, 1, cID)
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, h.ps.aa.msgIDsLen)
-	h.out.EnqueueProtoMulti(h.nackSuccessRespTemplate, buf)
-	pool.Put(buf)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_NACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	count := pool.Get(fujin.Uint32Len)
+	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
+	h.out.EnqueueProtoMulti(header, count)
+	pool.Put(header)
+	pool.Put(count)
 }
 
 func (h *handler) enqueueNackSuccessNoLock(cID []byte) {
-	replaceUnsafe(h.nackSuccessRespTemplate, 1, cID)
-	buf := pool.Get(fujin.Uint32Len)
-	buf = binary.BigEndian.AppendUint32(buf, h.ps.aa.msgIDsLen)
-	h.out.QueueOutboundNoLock(h.nackSuccessRespTemplate)
-	h.out.QueueOutboundNoLock(buf)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_NACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	count := pool.Get(fujin.Uint32Len)
+	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
+	h.out.QueueOutboundNoLock(header)
+	h.out.QueueOutboundNoLock(count)
 	h.out.SignalFlush()
-	pool.Put(buf)
+	pool.Put(header)
+	pool.Put(count)
 }
 
 func (h *handler) enqueueNackErrNoLock(cID []byte, err error) {
-	replaceUnsafe(h.nackErrRespTemplate, 1, cID)
-	h.out.QueueOutboundNoLock(h.nackErrRespTemplate)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_NACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_YES)
+	h.out.QueueOutboundNoLock(header)
 	h.out.QueueOutboundNoLock(errProtoBuf(err))
 	h.out.SignalFlush()
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxBeginSuccess(cID []byte) {
-	replaceUnsafe(h.txBeginSuccessRespTemplate, 1, cID)
-	h.out.EnqueueProto(h.txBeginSuccessRespTemplate)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_BEGIN))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	h.out.EnqueueProto(header)
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxBeginErr(cID []byte, err error) {
-	replaceUnsafe(h.txBeginErrRespTemplate, 1, cID)
-	h.out.EnqueueProtoMulti(h.txBeginErrRespTemplate, errProtoBuf(err))
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_BEGIN))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_YES)
+	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxCommitSuccess(cID []byte) {
-	replaceUnsafe(h.txCommitSuccessRespTemplate, 1, cID)
-	h.out.EnqueueProto(h.txCommitSuccessRespTemplate)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_COMMIT))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	h.out.EnqueueProto(header)
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxCommitErr(cID []byte, err error) {
-	replaceUnsafe(h.txCommitErrRespTemplate, 1, cID)
-	h.out.EnqueueProtoMulti(h.txCommitErrRespTemplate, errProtoBuf(err))
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_COMMIT))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_YES)
+	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxRollbackSuccess(cID []byte) {
-	replaceUnsafe(h.txRollbackSuccessRespTemplate, 1, cID)
-	h.out.EnqueueProto(h.txRollbackSuccessRespTemplate)
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_ROLLBACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_NO)
+	h.out.EnqueueProto(header)
+	pool.Put(header)
 }
 
 func (h *handler) enqueueTxRollbackErr(cID []byte, err error) {
-	replaceUnsafe(h.txRollbackErrRespTemplate, 1, cID)
-	h.out.EnqueueProtoMulti(h.txRollbackErrRespTemplate, errProtoBuf(err))
+	header := pool.Get(6)
+	header = append(header, byte(response.RESP_CODE_TX_ROLLBACK))
+	header = append(header, cID...)
+	header = append(header, response.ERR_CODE_YES)
+	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	pool.Put(header)
 }
 
 func enqueueSubscribeSuccess(out *fujin.Outbound, cID []byte, subID byte) {
