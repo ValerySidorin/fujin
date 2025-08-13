@@ -5,7 +5,7 @@ import (
 )
 
 func WriteResponseSuccess(buf []byte, cID []byte) []byte {
-	buf = append(buf, byte(response.RESP_CODE_WRITE))
+	buf = append(buf, byte(response.RESP_CODE_PRODUCE))
 	buf = append(buf, cID...)
 	return append(buf, response.ERR_CODE_NO)
 }

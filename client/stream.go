@@ -316,15 +316,19 @@ func (s *Stream) parse(buf []byte) error {
 		switch s.ps.state {
 		case OP_START:
 			switch b {
-			case byte(response.RESP_CODE_WRITE):
+			case byte(response.RESP_CODE_PRODUCE):
 				s.ps.state = OP_WRITE
 			case byte(response.RESP_CODE_MSG):
+				s.ps.state = OP_MSG
+			case byte(response.RESP_CODE_HMSG):
 				s.ps.state = OP_MSG
 			case byte(response.RESP_CODE_ACK):
 				s.ps.state = OP_ACK
 			case byte(response.RESP_CODE_NACK):
 				s.ps.state = OP_NACK
 			case byte(response.RESP_CODE_FETCH):
+				s.ps.state = OP_FETCH
+			case byte(response.RESP_CODE_HFETCH):
 				s.ps.state = OP_FETCH
 			case byte(response.RESP_CODE_TX_BEGIN):
 				s.ps.state = OP_TX_BEGIN
