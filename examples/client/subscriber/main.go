@@ -65,5 +65,5 @@ func main() {
 }
 
 func generateTLSConfig() *tls.Config {
-	return &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
+	return &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"fujin/1"}}
 }

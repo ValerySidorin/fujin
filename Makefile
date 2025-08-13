@@ -29,6 +29,11 @@ run:
 	@echo "==> Running"
 	@./bin/fujin ./config.dev.yaml
 
+.PHONY: test
+test:
+	@echo "==> Running tests"
+	@go test -v -tags=${GO_BUILD_TAGS} ./...
+
 .PHONY: help
 help:
 	@echo "Fujin Makefile"
