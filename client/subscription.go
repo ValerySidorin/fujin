@@ -124,6 +124,99 @@ func (s *Stream) Subscribe(
 	}
 }
 
+func (s *Stream) HSubscribe(
+	topic string,
+	autoCommit bool,
+	handler func(msg Msg),
+	opts ...SubscriptionOption,
+) (*Subscription, error) {
+	if topic == "" {
+		return nil, ErrEmptyTopic
+	}
+
+	if s == nil {
+		return nil, ErrStreamClosed
+	}
+
+	if s.closed.Load() {
+		return nil, ErrStreamClosed
+	}
+
+	h := func(msg Msg) {
+		handler(msg)
+		if msg.id != nil {
+			pool.Put(msg.id)
+		}
+		pool.Put(msg.Value)
+	}
+
+	sub := &Subscription{
+		conf: SubscriptionConfig{
+			MsgBufSize: 1024,
+		},
+		autoCommit: autoCommit,
+		stream:     s,
+		h:          h,
+	}
+	for _, opt := range opts {
+		opt(sub)
+	}
+
+	sub.msgs = make(chan Msg, sub.conf.MsgBufSize)
+
+	if sub.conf.Async {
+		pool, err := ants.NewPool(sub.conf.Pool.Size, ants.WithPreAlloc(sub.conf.Pool.PreAlloc))
+		if err != nil {
+			return nil, fmt.Errorf("new pool: %w", err)
+		}
+
+		sub.pool = pool
+		sub.h = func(msg Msg) {
+			_ = pool.Submit(func() {
+				h(msg)
+			})
+		}
+	}
+
+	ch := make(chan SubscribeResponse, 1)
+	id := s.sc.next(ch)
+
+	buf := pool.Get(10 + len(topic))
+
+	buf = append(buf, byte(request.OP_CODE_HSUBSCRIBE))
+	buf = binary.BigEndian.AppendUint32(buf, id)
+	buf = append(buf, boolToByte(autoCommit))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
+	buf = append(buf, topic...)
+
+	s.out.EnqueueProto(buf)
+	pool.Put(buf)
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.conn.timeout)
+
+	select {
+	case <-ctx.Done():
+		cancel()
+		s.sc.delete(id)
+		close(ch)
+		pool.Put(buf)
+		return nil, ErrTimeout
+	case resp := <-ch:
+		cancel()
+		s.cm.delete(id)
+		close(ch)
+		pool.Put(buf)
+		if resp.Err != nil {
+			return nil, resp.Err
+		}
+		sub.id = resp.SubID
+		s.subs.add(sub)
+		s.wg.Add(1)
+		go sub.handle()
+		return sub, nil
+	}
+}
+
 func (s *Subscription) Close() error {
 	if s.closed.Load() {
 		return nil

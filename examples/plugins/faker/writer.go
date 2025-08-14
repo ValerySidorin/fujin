@@ -21,6 +21,11 @@ func (w *Writer) Write(_ context.Context, msg []byte, callback func(err error)) 
 	callback(nil)
 }
 
+func (w *Writer) WriteH(_ context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.l.Info("fake write with headers")
+	callback(nil)
+}
+
 func (w *Writer) Flush(_ context.Context) error {
 	return nil
 }

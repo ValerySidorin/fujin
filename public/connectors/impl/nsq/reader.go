@@ -79,6 +79,34 @@ func (r *Reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) 
 	return nil
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	r.consumer.AddHandler(nsq.HandlerFunc(func(msg *nsq.Message) error {
+		if r.autoAck {
+			h(msg.Body, r.conf.Topic, nil)
+			msg.Finish()
+		} else {
+			r.msgs.Store(msg.ID, msg)
+			h(msg.Body, r.conf.Topic, nil, msg.ID)
+		}
+		return nil
+	}))
+
+	if r.connectThroughLookupds {
+		if err := r.consumer.ConnectToNSQLookupds(r.conf.LookupdAddresses); err != nil {
+			return fmt.Errorf("connect to nsq lookupds: %w", err)
+		}
+	} else {
+		if err := r.consumer.ConnectToNSQDs(r.conf.Addresses); err != nil {
+			return fmt.Errorf("connect to nsqds: %w", err)
+		}
+	}
+
+	<-ctx.Done()
+	r.consumer.Stop()
+	<-r.consumer.StopChan
+	return nil
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),

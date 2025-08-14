@@ -5,9 +5,10 @@ import (
 )
 
 type Msg struct {
-	Value []byte
-	id    []byte
-	s     *Stream
+	Value   []byte
+	Headers map[string]string
+	id      []byte
+	s       *Stream
 }
 
 func (m *Msg) Ack() error {

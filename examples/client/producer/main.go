@@ -67,8 +67,9 @@ func main() {
 		case <-ctx.Done():
 			return
 		default:
-
-			if err := s.Produce("pub", data); err != nil {
+			if err := s.HProduce("pub", data, map[string]string{
+				"key": "value",
+			}); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Println("message sent")

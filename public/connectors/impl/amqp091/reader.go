@@ -142,6 +142,136 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	return nil
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	r.mu.Lock()
+	if r.channel != nil {
+		return fmt.Errorf("amqp091: reader busy")
+	}
+
+	if err := r.checkConnAndReconnectIfNeeded(); err != nil {
+		r.mu.Unlock()
+		return fmt.Errorf("amqp091: check conn and reconnect if needed: %w", err)
+	}
+
+	var err error
+	r.channel, err = r.conn.Channel()
+	if err != nil {
+		_ = r.conn.Close()
+		r.mu.Unlock()
+		return fmt.Errorf("amqp091: open channel: %w", err)
+	}
+
+	if err = r.channel.ExchangeDeclare(
+		r.conf.Exchange.Name,
+		r.conf.Exchange.Kind,
+		r.conf.Exchange.Durable,
+		r.conf.Exchange.AutoDelete,
+		r.conf.Exchange.Internal,
+		r.conf.Exchange.NoWait,
+		r.conf.Exchange.Args,
+	); err != nil {
+		r.mu.Unlock()
+		return fmt.Errorf("amqp091: declare exchange: %w", err)
+	}
+
+	queue, err := r.channel.QueueDeclare(
+		r.conf.Queue.Name,
+		r.conf.Queue.Durable,
+		r.conf.Queue.AutoDelete,
+		r.conf.Queue.Exclusive,
+		r.conf.Queue.NoWait,
+		r.conf.Queue.Args,
+	)
+	if err != nil {
+		r.mu.Unlock()
+		return fmt.Errorf("amqp091: declare queue: %w", err)
+	}
+
+	if err = r.channel.QueueBind(
+		queue.Name,
+		r.conf.QueueBind.RoutingKey,
+		r.conf.Exchange.Name,
+		r.conf.QueueBind.NoWait,
+		r.conf.QueueBind.Args,
+	); err != nil {
+		r.mu.Unlock()
+		return fmt.Errorf("amqp091: queue bind: %w", err)
+	}
+
+	r.mu.Unlock()
+
+	msgs, err := r.channel.Consume(
+		r.conf.Queue.Name,
+		r.conf.Consume.Consumer,
+		r.autoCommit,
+		r.conf.Consume.Exclusive,
+		r.conf.Consume.NoLocal,
+		r.conf.Consume.NoWait,
+		r.conf.Consume.Args,
+	)
+	if err != nil {
+		return err
+	}
+
+	var handler func(d amqp.Delivery)
+	if r.IsAutoCommit() {
+		handler = func(d amqp.Delivery) {
+			// Extract headers from d.Headers
+			var hs [][]byte
+			if d.Headers != nil {
+				for k, v := range d.Headers {
+					keyBytes := []byte(k)
+					var valueBytes []byte
+					switch val := v.(type) {
+					case string:
+						valueBytes = []byte(val)
+					case []byte:
+						valueBytes = val
+					default:
+						continue
+					}
+					hs = append(hs, keyBytes, valueBytes)
+				}
+			}
+			h(d.Body, d.Exchange, hs)
+		}
+	} else {
+		handler = func(d amqp.Delivery) {
+			var hs [][]byte
+			if d.Headers != nil {
+				for k, v := range d.Headers {
+					keyBytes := []byte(k)
+					var valueBytes []byte
+					switch val := v.(type) {
+					case string:
+						valueBytes = []byte(val)
+					case []byte:
+						valueBytes = val
+					default:
+						continue
+					}
+					hs = append(hs, keyBytes, valueBytes)
+				}
+			}
+			h(d.Body, d.Exchange, hs, d.DeliveryTag)
+		}
+	}
+
+	go func() {
+		for d := range msgs {
+			handler(d)
+		}
+	}()
+
+	<-ctx.Done()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := r.channel.Close(); err != nil {
+		r.l.Error("close channel", "err", err)
+	}
+	return nil
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),

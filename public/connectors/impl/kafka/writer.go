@@ -57,6 +57,30 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	})
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.wg.Add(1)
+	rec := &kgo.Record{
+		Topic: w.conf.Topic,
+		Value: msg,
+	}
+	if len(headers) > 0 {
+		var kh []kgo.RecordHeader
+		for i := 0; i < len(headers); i += 2 {
+			key := headers[i]
+			var val []byte
+			if i+1 < len(headers) {
+				val = headers[i+1]
+			}
+			kh = append(kh, kgo.RecordHeader{Key: string(key), Value: val})
+		}
+		rec.Headers = kh
+	}
+	w.c.Produce(ctx, rec, func(r *kgo.Record, err error) {
+		callback(err)
+		w.wg.Done()
+	})
+}
+
 func (w *Writer) Flush(ctx context.Context) error {
 	w.wg.Wait()
 	return nil

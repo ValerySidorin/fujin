@@ -18,6 +18,7 @@ const (
 
 type Reader interface {
 	Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error
+	SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error
 	Fetch(
 		ctx context.Context, n uint32,
 		fetchResponseHandler func(n uint32, err error),

@@ -4,20 +4,22 @@ const (
 	OP_START int = iota
 
 	// Writer
-	OP_WRITE
+	OP_PRODUCE
+	OP_PRODUCE_H
 
 	OP_TX_BEGIN
 	OP_TX_COMMIT
 	OP_TX_ROLLBACK
 
 	// Reader
-	OP_CONNECT_READER
 	OP_SUBSCRIBE
 	OP_SUBSCRIBE_CORRELATION_ID_ARG
 	OP_SUBSCRIBE_ERROR_CODE_ARG
 	OP_SUBSCRIBE_ERROR_PAYLOAD_ARG
 	OP_SUBSCRIBE_ERROR_PAYLOAD
 	OP_SUBSCRIBE_SUB_ID_ARG
+
+	OP_SUBSCRIBE_H
 
 	OP_UNSUBSCRIBE
 	OP_UNSUBSCRIBE_CORRELATION_ID_ARG
@@ -26,12 +28,15 @@ const (
 	OP_UNSUBSCRIBE_ERROR_PAYLOAD
 
 	OP_MSG
-	OP_MSG_H
-	OP_HMSG_HEADERS_COUNT_ARG
 	OP_MSG_ID_ARG
 	OP_MSG_ID_PAYLOAD
 	OP_MSG_ARG
 	OP_MSG_PAYLOAD
+
+	OP_MSG_H
+	OP_MSG_H_HEADERS_COUNT_ARG
+	OP_MSG_H_HEADER_LEN
+	OP_MSG_H_HEADER_PAYLOAD
 
 	OP_FETCH
 	OP_FETCH_N_ARG
@@ -100,6 +105,14 @@ type msgArg struct {
 	sub   *Subscription
 	idLen uint32
 	len   uint32
+
+	// For HMSG
+	headers     map[string]string
+	headerCount uint16
+	headerStep  int
+	headerLen   uint32
+	headerBuf   []byte
+	headerKey   string
 }
 
 type fetchArg struct {
