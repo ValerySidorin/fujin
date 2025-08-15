@@ -238,6 +238,45 @@ func (s *Stream) Fetch(
 	}
 }
 
+func (s *Stream) HFetch(
+	ctx context.Context, topic string, n uint32, autoCommit bool,
+) ([]Msg, error) {
+	if s.closed.Load() {
+		return nil, ErrStreamClosed
+	}
+
+	buf := pool.Get(9)
+	defer pool.Put(buf)
+
+	eCh := make(chan error, 1)
+
+	id := s.fcm.next(eCh, autoCommit)
+	defer s.fcm.delete(id)
+
+	buf = append(buf, byte(request.OP_CODE_HFETCH))
+	buf = binary.BigEndian.AppendUint32(buf, id)
+	buf = append(buf, boolToByte(autoCommit))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
+	buf = append(buf, []byte(topic)...)
+	buf = binary.BigEndian.AppendUint32(buf, n)
+
+	s.out.EnqueueProto(buf)
+
+	ctx, cancel := context.WithTimeout(ctx, s.conn.timeout)
+	defer cancel()
+
+	select {
+	case <-ctx.Done():
+		return nil, ErrTimeout
+	case err := <-eCh:
+		if err != nil {
+			return nil, err
+		}
+
+		return s.fcm.getMsgs(id), nil
+	}
+}
+
 func (s *Stream) Close() error {
 	if s.closed.Load() {
 		return nil
@@ -380,7 +419,7 @@ func (s *Stream) parse(buf []byte) error {
 			case byte(response.RESP_CODE_HMSG):
 				s.ps.state = OP_MSG_H
 			case byte(response.RESP_CODE_HFETCH):
-				s.ps.state = OP_FETCH
+				s.ps.state = OP_FETCH_H
 			case byte(response.RESP_CODE_ACK):
 				s.ps.state = OP_ACK
 			case byte(response.RESP_CODE_NACK):
@@ -613,7 +652,6 @@ func (s *Stream) parse(buf []byte) error {
 				if s.ps.ma.headerStep < int(s.ps.ma.headerCount) {
 					s.ps.state = OP_MSG_H_HEADER_LEN
 				} else {
-					fmt.Println("headers:", s.ps.ma.headers)
 					if s.ps.ma.sub.autoCommit {
 						s.ps.state = OP_MSG_ARG
 						continue
@@ -812,7 +850,7 @@ func (s *Stream) parse(buf []byte) error {
 					}
 
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma = nil, nil, msgArg{}
-					if true { // TODO: fix
+					if s.ps.fa.autoCommit {
 						s.ps.state = OP_FETCH_MSG_ARG
 						continue
 					}
@@ -827,6 +865,250 @@ func (s *Stream) parse(buf []byte) error {
 						Value: s.ps.payloadBuf,
 						id:    s.ps.metaBuf,
 						s:     s,
+					})
+					s.ps.fa.handled++
+					if s.ps.fa.handled >= s.ps.fa.n {
+						s.fcm.setMsgs(s.ps.ca.cIDUint32, s.ps.fa.msgs)
+						close(s.ps.fa.err)
+						s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.fa, s.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+					}
+					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.fa, s.ps.state = nil, nil, msgArg{}, fetchArg{}, OP_START
+				}
+			}
+		case OP_FETCH_H:
+			s.ps.ca.cID = pool.Get(fujin.Uint32Len)
+			s.ps.ca.cID = append(s.ps.ca.cID, b)
+			s.ps.state = OP_FETCH_H_CORRELATION_ID_ARG
+		case OP_FETCH_H_CORRELATION_ID_ARG:
+			toCopy := fujin.Uint32Len - len(s.ps.ca.cID)
+			avail := len(buf) - i
+
+			if avail < toCopy {
+				toCopy = avail
+			}
+
+			if toCopy > 0 {
+				start := len(s.ps.ca.cID)
+				s.ps.ca.cID = s.ps.ca.cID[:start+toCopy]
+				copy(s.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
+			} else {
+				s.ps.ca.cID = append(s.ps.ca.cID, b)
+			}
+
+			if len(s.ps.ca.cID) >= fujin.Uint32Len {
+				s.ps.ca.cIDUint32 = binary.BigEndian.Uint32(s.ps.ca.cID)
+				s.ps.fa.msgs, s.ps.fa.autoCommit, s.ps.fa.err = s.fcm.get(s.ps.ca.cIDUint32)
+				s.ps.argBuf = pool.Get(fujin.Uint32Len)
+				s.ps.state = OP_FETCH_H_ERROR_CODE_ARG
+			}
+		case OP_FETCH_H_ERROR_CODE_ARG:
+			switch b {
+			case byte(response.ERR_CODE_NO):
+				pool.Put(s.ps.ca.cID)
+				s.ps.argBuf = pool.Get(fujin.Uint32Len)
+				s.ps.state = OP_FETCH_H_N_ARG
+				continue
+			case byte(response.ERR_CODE_YES):
+				s.ps.argBuf = pool.Get(fujin.Uint32Len)
+				s.ps.state = OP_FETCH_H_ERROR_PAYLOAD_ARG
+			default:
+				s.quicStream.Close()
+				return ErrParseProto
+			}
+		case OP_FETCH_H_ERROR_PAYLOAD_ARG:
+			s.ps.argBuf = append(s.ps.argBuf, b)
+			if len(s.ps.argBuf) >= fujin.Uint32Len {
+				if err := s.parseErrLenArg(); err != nil {
+					pool.Put(s.ps.argBuf)
+					pool.Put(s.ps.ca.cID)
+					s.quicStream.Close()
+					err = fmt.Errorf("parse write err len arg: %w", err)
+					s.ps.fa.err <- err
+					close(s.ps.fa.err)
+					return err
+				}
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf, s.ps.state = nil, OP_FETCH_H_ERROR_PAYLOAD
+			}
+		case OP_FETCH_H_ERROR_PAYLOAD:
+			if s.ps.payloadBuf != nil {
+				toCopy := int(s.ps.ea.errLen) - len(s.ps.payloadBuf)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(s.ps.payloadBuf)
+					s.ps.payloadBuf = s.ps.payloadBuf[:start+toCopy]
+					copy(s.ps.payloadBuf[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					s.ps.payloadBuf = append(s.ps.payloadBuf, b)
+				}
+
+				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
+					s.ps.fa.err <- errors.New(string(s.ps.payloadBuf))
+					close(s.ps.fa.err)
+					s.ps.ca, s.ps.fa, s.ps.payloadBuf, s.ps.ea, s.ps.state = correlationIDArg{}, fetchArg{}, nil, errArg{}, OP_START
+				}
+			} else {
+				s.ps.payloadBuf = make([]byte, 0, s.ps.ea.errLen)
+				s.ps.payloadBuf = append(s.ps.payloadBuf, b)
+
+				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
+					s.ps.fa.err <- errors.New(string(s.ps.payloadBuf))
+					close(s.ps.fa.err)
+					s.ps.ca, s.ps.fa, s.ps.payloadBuf, s.ps.ea, s.ps.state = correlationIDArg{}, fetchArg{}, nil, errArg{}, OP_START
+				}
+			}
+		case OP_FETCH_H_N_ARG:
+			toCopy := fujin.Uint32Len - len(s.ps.argBuf)
+			avail := len(buf) - i
+
+			if avail < toCopy {
+				toCopy = avail
+			}
+
+			if toCopy > 0 {
+				start := len(s.ps.argBuf)
+				s.ps.argBuf = s.ps.argBuf[:start+toCopy]
+				copy(s.ps.argBuf[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
+			} else {
+				s.ps.argBuf = append(s.ps.argBuf, b)
+			}
+
+			if len(s.ps.argBuf) >= fujin.Uint32Len {
+				s.ps.fa.n = binary.BigEndian.Uint32(s.ps.argBuf)
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf = pool.Get(fujin.Uint32Len)
+				s.ps.state = OP_FETCH_H_HEADERS_COUNT_ARG
+			}
+		case OP_FETCH_H_HEADERS_COUNT_ARG:
+			s.ps.argBuf = append(s.ps.argBuf, b)
+			if len(s.ps.argBuf) >= fujin.Uint16Len {
+				s.ps.fa.headerCount = binary.BigEndian.Uint16(s.ps.argBuf)
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf = nil
+				s.ps.fa.headers = make(map[string]string, s.ps.fa.headerCount/2)
+				s.ps.fa.headerStep = 0
+				s.ps.state = OP_FETCH_H_HEADER_LEN
+			}
+		case OP_FETCH_H_HEADER_LEN:
+			s.ps.argBuf = append(s.ps.argBuf, b)
+			if len(s.ps.argBuf) >= fujin.Uint32Len {
+				s.ps.fa.headerLen = binary.BigEndian.Uint32(s.ps.argBuf)
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf = nil
+				s.ps.fa.headerBuf = pool.Get(int(s.ps.fa.headerLen))
+				s.ps.state = OP_FETCH_H_HEADER_PAYLOAD
+			}
+		case OP_FETCH_H_HEADER_PAYLOAD:
+			s.ps.fa.headerBuf = append(s.ps.fa.headerBuf, b)
+			if len(s.ps.fa.headerBuf) >= int(s.ps.fa.headerLen) {
+				if s.ps.fa.headerStep%2 == 0 {
+					s.ps.fa.headerKey = string(s.ps.fa.headerBuf)
+				} else {
+					s.ps.fa.headers[s.ps.fa.headerKey] = string(s.ps.fa.headerBuf)
+				}
+				pool.Put(s.ps.fa.headerBuf)
+				s.ps.fa.headerBuf = nil
+				s.ps.fa.headerLen = 0
+				s.ps.fa.headerStep++
+				if s.ps.fa.headerStep < int(s.ps.fa.headerCount) {
+					s.ps.state = OP_FETCH_H_HEADER_LEN
+				} else {
+					if s.ps.fa.autoCommit {
+						s.ps.state = OP_FETCH_H_MSG_ARG
+						continue
+					}
+					s.ps.argBuf = pool.Get(fujin.Uint32Len)
+					s.ps.state = OP_FETCH_H_MSG_ID_ARG
+				}
+			}
+		case OP_FETCH_H_MSG_ID_ARG:
+			s.ps.argBuf = append(s.ps.argBuf, b)
+			if len(s.ps.argBuf) >= fujin.Uint32Len {
+				s.ps.ma.idLen = binary.BigEndian.Uint32(s.ps.argBuf)
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf, s.ps.metaBuf = nil, make([]byte, 0, s.ps.ma.idLen)
+				if s.ps.ma.idLen <= 0 {
+					s.ps.state = OP_FETCH_H_MSG_ARG
+					continue
+				}
+				s.ps.state = OP_FETCH_H_MSG_ID_PAYLOAD
+			}
+		case OP_FETCH_H_MSG_ID_PAYLOAD:
+			s.ps.metaBuf = append(s.ps.metaBuf, b)
+			if len(s.ps.metaBuf) >= int(s.ps.ma.idLen) {
+				s.ps.argBuf = pool.Get(fujin.Uint32Len)
+				s.ps.state = OP_FETCH_H_MSG_ARG
+			}
+		case OP_FETCH_H_MSG_ARG:
+			s.ps.argBuf = append(s.ps.argBuf, b)
+			if len(s.ps.argBuf) >= fujin.Uint32Len {
+				if err := s.parseMsgLenArg(); err != nil {
+					pool.Put(s.ps.argBuf)
+					_ = s.quicStream.Close()
+					return fmt.Errorf("parse msg len arg: %w", err)
+				}
+				pool.Put(s.ps.argBuf)
+				s.ps.argBuf, s.ps.state = nil, OP_FETCH_H_MSG_PAYLOAD
+			}
+		case OP_FETCH_H_MSG_PAYLOAD:
+			if s.ps.payloadBuf != nil {
+				toCopy := int(s.ps.ma.len) - len(s.ps.payloadBuf)
+				avail := len(buf) - i
+
+				if avail < toCopy {
+					toCopy = avail
+				}
+
+				if toCopy > 0 {
+					start := len(s.ps.payloadBuf)
+					s.ps.payloadBuf = s.ps.payloadBuf[:start+toCopy]
+					copy(s.ps.payloadBuf[start:], buf[i:i+toCopy])
+					i = (i + toCopy) - 1
+				} else {
+					s.ps.payloadBuf = append(s.ps.payloadBuf, b)
+				}
+
+				if len(s.ps.payloadBuf) >= int(s.ps.ma.len) {
+					s.ps.fa.msgs = append(s.ps.fa.msgs, Msg{
+						Value:   s.ps.payloadBuf,
+						Headers: s.ps.fa.headers,
+						id:      s.ps.metaBuf,
+						s:       s,
+					})
+					s.ps.fa.handled++
+					if s.ps.fa.handled >= s.ps.fa.n {
+						s.fcm.setMsgs(s.ps.ca.cIDUint32, s.ps.fa.msgs)
+						close(s.ps.fa.err)
+						s.ps.metaBuf, s.ps.payloadBuf, s.ps.ca, s.ps.ma, s.ps.fa, s.ps.state = nil, nil, correlationIDArg{}, msgArg{}, fetchArg{}, OP_START
+						continue
+					}
+
+					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma = nil, nil, msgArg{}
+					if s.ps.fa.autoCommit {
+						s.ps.state = OP_FETCH_H_MSG_ARG
+						continue
+					}
+					s.ps.state = OP_FETCH_H_MSG_ID_ARG
+				}
+			} else {
+				s.ps.payloadBuf = make([]byte, 0, s.ps.ma.len)
+				s.ps.payloadBuf = append(s.ps.payloadBuf, b)
+
+				if len(s.ps.payloadBuf) >= int(s.ps.ma.len) {
+					fmt.Println(s.ps.fa.headers)
+					s.ps.fa.msgs = append(s.ps.fa.msgs, Msg{
+						Value:   s.ps.payloadBuf,
+						Headers: s.ps.fa.headers,
+						id:      s.ps.metaBuf,
+						s:       s,
 					})
 					s.ps.fa.handled++
 					if s.ps.fa.handled >= s.ps.fa.n {

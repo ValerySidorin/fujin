@@ -71,6 +71,14 @@ func (r *Reader) Fetch(
 	fetchHandler(0, cerr.ErrNotSupported)
 }
 
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
+}
+
 func (r *Reader) Ack(
 	ctx context.Context, msgIDs [][]byte,
 	ackHandler func(error),

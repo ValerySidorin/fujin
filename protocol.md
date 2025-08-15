@@ -30,11 +30,12 @@ Before describing the commands, let's explore the data types used in the Fujin p
 ## Type aliases
 
 For convenience, some type aliases are introduced.
-| Type       | Alias for                          |
-| ---------- | ---------------------------------- |
-| string     | [uint32]byte                       |
-| message    | type{[uint32]byte??, [uint32]byte} |
-| ackres     | type{[uint32]byte, bool}           |
+| Type       | Alias for                                            |
+| ---------- | ---------------------------------------------------- |
+| string     | [uint32]byte                                         |
+| message    | type{[uint32]byte??, string}                         |
+| hmessage   | type{[uint32]byte??, string, [uint16]byte??, string} |
+| ackres     | type{[uint32]byte, bool}                             |
 
 ## Versioning
 
@@ -260,13 +261,12 @@ Server -> Client
 ### Description
 A message with headers propagated by the server in a client-opened QUIC stream after issuing `SUBSCRIBE` command.
 ### Syntax
-`[9, <subscription id>, <headers>, <message>]`  
+`[9, <subscription id>, <hmessage>]`  
 where:
-| name                  | description      | type           |
-| --------------------- | ---------------- | -------------- |
-| `subscription id`     | Subscription ID. | byte           |
-| `headers`             | Message headers. | [uint16]string |
-| `message`             | Message.         | message        |
+| name                  | description       | type           |
+| --------------------- | ----------------- | -------------- |
+| `subscription id`     | Subscription ID.  | byte           |
+| `message`             | Headered message. | hmessage       |
 ### Examples
 - `-` -> `[9, 5, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 

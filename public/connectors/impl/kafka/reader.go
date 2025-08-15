@@ -202,6 +202,45 @@ func (r *Reader) Fetch(
 	}
 }
 
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+) {
+	if r.fetching.Load() {
+		fetchHandler(0, nil)
+		return
+	}
+
+	r.fetching.Store(true)
+	defer r.fetching.Store(false)
+
+	fetches := r.cl.PollRecords(ctx, int(n))
+	if ctx.Err() != nil {
+		fetchHandler(0, nil)
+		return
+	}
+	if errs := fetches.Errors(); len(errs) > 0 {
+		fetchHandler(0, fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs)))
+		return
+	}
+
+	fetchHandler(uint32(fetches.NumRecords()), nil)
+
+	iter := fetches.RecordIter()
+	var rec *kgo.Record
+	for !iter.Done() {
+		rec = iter.Next()
+		r.headeredHandler(rec, msgHandler)
+	}
+
+	if r.autoCommit {
+		if err := r.cl.CommitRecords(ctx, rec); err != nil {
+			r.l.Error("commit record", "err", err)
+		}
+	}
+}
+
 func (r *Reader) Ack(
 	ctx context.Context, msgIDs [][]byte,
 	ackHandler func(error),

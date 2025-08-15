@@ -24,6 +24,11 @@ type Reader interface {
 		fetchResponseHandler func(n uint32, err error),
 		msgHandler func(message []byte, topic string, args ...any),
 	)
+	FetchH(
+		ctx context.Context, n uint32,
+		fetchResponseHandler func(n uint32, err error),
+		msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+	)
 	Ack(
 		ctx context.Context, msgIDs [][]byte,
 		ackHandler func(error),

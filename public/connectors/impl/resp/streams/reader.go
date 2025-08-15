@@ -289,6 +289,33 @@ func (r *Reader) Fetch(
 	r.handler(resp, msgHandler)
 }
 
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+) {
+	resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
+
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			fetchHandler(0, nil)
+			return
+		}
+		fetchHandler(0, fmt.Errorf("resp: xread: %w", err))
+		return
+	}
+
+	var numMsgs uint32
+	for _, msgs := range resp {
+		for range msgs {
+			numMsgs++
+		}
+	}
+	fetchHandler(numMsgs, nil)
+
+	r.headeredHandler(resp, msgHandler)
+}
+
 func (r *Reader) Ack(
 	ctx context.Context, msgIDs [][]byte,
 	ackHandler func(error),

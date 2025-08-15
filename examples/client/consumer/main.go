@@ -57,11 +57,13 @@ func main() {
 		case <-ctx.Done():
 			return
 		default:
-			msgs, err := s.Fetch(ctx, "sub", 1, true)
+			msgs, err := s.HFetch(ctx, "sub", 1, true)
 			if err != nil {
 				log.Fatal(err)
 			}
-			fmt.Println(msgs)
+			for _, msg := range msgs {
+				fmt.Println("Value:", string(msg.Value), "Headers:", msg.Headers)
+			}
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

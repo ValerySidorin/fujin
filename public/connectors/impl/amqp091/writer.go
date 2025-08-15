@@ -96,6 +96,39 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	)
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	var amqpHeaders amqp.Table
+	if len(headers) > 0 {
+		amqpHeaders = make(amqp.Table)
+		for i := 0; i < len(headers); i += 2 {
+			if i+1 < len(headers) {
+				key := string(headers[i])
+				value := string(headers[i+1])
+				amqpHeaders[key] = value
+			}
+		}
+	}
+
+	callback(
+		w.channel.PublishWithContext(
+			ctx,
+			w.conf.Exchange.Name,
+			w.conf.QueueBind.RoutingKey,
+			w.conf.Publish.Mandatory,
+			w.conf.Publish.Immediate,
+			amqp.Publishing{
+				ContentType:     w.conf.Publish.ContentType,
+				ContentEncoding: w.conf.Publish.ContentEncoding,
+				DeliveryMode:    w.conf.Publish.DeliveryMode,
+				Priority:        w.conf.Publish.Priority,
+				ReplyTo:         w.conf.Publish.ReplyTo,
+				AppId:           w.conf.Publish.AppId,
+				Headers:         amqpHeaders,
+				Body:            msg,
+			}),
+	)
+}
+
 func (w *Writer) Flush(ctx context.Context) error {
 	return nil
 }
