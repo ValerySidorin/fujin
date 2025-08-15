@@ -1916,7 +1916,7 @@ func (h *handler) hsubscribe(ctx context.Context, subID byte, r internal_reader.
 
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (err no/err yes)
-	successResp := server.WriteResponseSuccess(buf, h.ps.ca.cID)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
 	h.nonTxSessionWriters[h.ps.pa.topic].Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
@@ -1958,7 +1958,7 @@ func (h *handler) hproduce(msg []byte) {
 
 func (h *handler) produceTx(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-	successResp := server.WriteResponseSuccess(buf, h.ps.ca.cID)
+	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
 	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {

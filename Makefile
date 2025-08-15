@@ -5,7 +5,7 @@ VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")
 
 ALL_BROKERS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
 
-GO_BUILD_TAGS ?= kafka
+GO_BUILD_TAGS ?= ${ALL_BROKERS}
 
 BENCH_TIME ?= 1000x
 BENCH_FUNC ?=
