@@ -1779,9 +1779,9 @@ func (h *handler) handle(buf []byte) error {
 				}
 				r, err := h.cman.GetReader(h.ps.sa.topic, h.ps.sa.autoCommit)
 				if err != nil {
-					err := h.subIDPool.Put(subID)
-					if err != nil {
-						h.l.Error("put sub id", "err", err)
+					pErr := h.subIDPool.Put(subID)
+					if pErr != nil {
+						h.l.Error("put sub id", "err", pErr)
 					}
 					enqueueSubscribeErr(h.out, h.ps.ca.cID, response.RESP_CODE_SUBSCRIBE, response.ERR_CODE_YES, err)
 					return fmt.Errorf("get reader: %w", err)

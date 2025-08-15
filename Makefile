@@ -7,8 +7,8 @@ ALL_BROKERS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
 
 GO_BUILD_TAGS ?= ${ALL_BROKERS}
 
-BENCH_TIME ?= 1000x
-BENCH_FUNC ?=
+BENCH_TIME ?= 1000000x
+BENCH_FUNC ?= Benchmark_Produce_1BPayload_RedisPubSub
 
 .PHONY: all
 all: clean build run

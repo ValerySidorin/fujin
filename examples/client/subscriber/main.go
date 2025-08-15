@@ -49,17 +49,16 @@ func main() {
 	defer fmt.Println("stream closed")
 	defer s.Close()
 
-	sub, err := s.HSubscribe("sub", true, func(msg client.Msg) {
+	sub, err := s.Subscribe("sub", true, func(msg client.Msg) {
 		fmt.Println("Value:", string(msg.Value), "Headers:", msg.Headers)
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println("subscribed")
-
 	defer fmt.Println("subscription closed")
 	defer sub.Close()
+
+	fmt.Println("subscribed")
 
 	<-ctx.Done()
 }

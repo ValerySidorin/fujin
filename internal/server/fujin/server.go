@@ -134,7 +134,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 				_ = conn.CloseWithError(ferr.ConnErr, "unsupported protocol: "+negotiated)
 				continue
 			}
-			s.l.Info("negotiated protocol", "alpn", negotiated)
 
 			ctx, cancel := context.WithCancel(ctx)
 			connWg.Add(1)
