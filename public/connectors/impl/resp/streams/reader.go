@@ -19,14 +19,15 @@ import (
 )
 
 type Reader struct {
-	conf         ReaderConfig
-	client       rueidis.Client
-	handler      func(resp map[string][]rueidis.XRangeEntry, h func(message []byte, stream string, args ...any))
-	marshal      func(v any) ([]byte, error)
-	autoCommit   bool
-	streams      map[string]string
-	strSlicePool sync.Pool
-	l            *slog.Logger
+	conf            ReaderConfig
+	client          rueidis.Client
+	handler         func(resp map[string][]rueidis.XRangeEntry, h func(message []byte, stream string, args ...any))
+	headeredHandler func(resp map[string][]rueidis.XRangeEntry, h func(message []byte, stream string, hs [][]byte, args ...any))
+	marshal         func(v any) ([]byte, error)
+	autoCommit      bool
+	streams         map[string]string
+	strSlicePool    sync.Pool
+	l               *slog.Logger
 }
 
 func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
@@ -104,6 +105,26 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 					}
 				}
 			}
+			r.headeredHandler = func(
+				resp map[string][]rueidis.XRangeEntry,
+				h func(message []byte, stream string, hs [][]byte, args ...any),
+			) {
+				for stream, msgs := range resp {
+					var msg rueidis.XRangeEntry
+					for _, msg = range msgs {
+						data, err := r.marshal(msg.FieldValues)
+						if err != nil {
+							r.l.Error("resp: failed to marshal message", "error", err)
+							continue
+						}
+						h(data, stream, nil)
+					}
+
+					if r.streams[stream] != ">" {
+						r.streams[stream] = msg.ID
+					}
+				}
+			}
 		} else {
 			r.handler = func(
 				resp map[string][]rueidis.XRangeEntry,
@@ -121,6 +142,29 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 						ts, _ := strconv.ParseInt(metaParts[0], 10, 64)
 						seq, _ := strconv.ParseInt(metaParts[1], 10, 64)
 						h(data, stream, uint32(ts), uint32(seq))
+					}
+
+					if r.streams[stream] != ">" {
+						r.streams[stream] = msg.ID
+					}
+				}
+			}
+			r.headeredHandler = func(
+				resp map[string][]rueidis.XRangeEntry,
+				h func(message []byte, stream string, hs [][]byte, args ...any),
+			) {
+				for stream, msgs := range resp {
+					var msg rueidis.XRangeEntry
+					for _, msg = range msgs {
+						data, err := r.marshal(msg.FieldValues)
+						if err != nil {
+							r.l.Error("resp: failed to marshal message", "error", err)
+							continue
+						}
+						metaParts := strings.Split(msg.ID, "-")
+						ts, _ := strconv.ParseInt(metaParts[0], 10, 64)
+						seq, _ := strconv.ParseInt(metaParts[1], 10, 64)
+						h(data, stream, nil, uint32(ts), uint32(seq))
 					}
 
 					if r.streams[stream] != ">" {
@@ -194,6 +238,29 @@ func (r *Reader) Subscribe(ctx context.Context, h func(msg []byte, topic string,
 	}
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
+
+			if err != nil {
+				if rueidis.IsRedisNil(err) {
+					continue
+				}
+				if errors.Is(err, ctx.Err()) {
+					return nil
+				}
+				return fmt.Errorf("resp: xread: %w", err)
+			}
+
+			r.headeredHandler(resp, h)
+		}
+	}
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
@@ -220,6 +287,33 @@ func (r *Reader) Fetch(
 	}
 	fetchHandler(numMsgs, nil)
 	r.handler(resp, msgHandler)
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+) {
+	resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
+
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			fetchHandler(0, nil)
+			return
+		}
+		fetchHandler(0, fmt.Errorf("resp: xread: %w", err))
+		return
+	}
+
+	var numMsgs uint32
+	for _, msgs := range resp {
+		for range msgs {
+			numMsgs++
+		}
+	}
+	fetchHandler(numMsgs, nil)
+
+	r.headeredHandler(resp, msgHandler)
 }
 
 func (r *Reader) Ack(

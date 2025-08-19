@@ -35,6 +35,27 @@ func (w *Writer) Write(_ context.Context, msg []byte, callback func(err error)) 
 	callback(err)
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	natsMsg := &nats.Msg{
+		Subject: w.conf.Subject,
+		Data:    msg,
+	}
+
+	if len(headers) > 0 {
+		natsMsg.Header = make(nats.Header)
+		for i := 0; i < len(headers); i += 2 {
+			if i+1 < len(headers) {
+				key := string(headers[i])
+				value := string(headers[i+1])
+				natsMsg.Header.Set(key, value)
+			}
+		}
+	}
+
+	err := w.nc.PublishMsg(natsMsg)
+	callback(err)
+}
+
 func (w *Writer) Flush(_ context.Context) error {
 	w.nc.Flush()
 	return nil

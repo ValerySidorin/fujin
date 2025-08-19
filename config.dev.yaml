@@ -25,6 +25,13 @@ connectors:
         max_buffered_records: 10000
         disable_idempotent_write: false
     # pub:
+    #   protocol: resp_pubsub
+    #   settings:
+    #     init_address: ["localhost:6379"]
+    #     channel: example-channel
+    #     batch_size: 1000
+    #     linger: 10ms
+    # pub:
     #   protocol: nats
     #   nats:
     #     url: nats://localhost:4222
@@ -129,7 +136,7 @@ connectors:
     #   protocol: resp_pubsub
     #   settings:
     #     init_address: ["localhost:6379"]
-    #     channel: example-channel
+    #     channels: [example-channel]
     # sub:
     #   protocol: resp_streams
     #   settings:

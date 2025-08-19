@@ -30,11 +30,24 @@ Before describing the commands, let's explore the data types used in the Fujin p
 ## Type aliases
 
 For convenience, some type aliases are introduced.
-| Type       | Alias for                          |
-| ---------- | ---------------------------------- |
-| string     | [uint32]byte                       |
-| message    | type{[uint32]byte??, [uint32]byte} |
-| ackres     | type{[uint32]byte, bool}           |
+| Type       | Alias for                                            |
+| ---------- | ---------------------------------------------------- |
+| string     | [uint32]byte                                         |
+| message    | type{[uint32]byte??, string}                         |
+| hmessage   | type{[uint32]byte??, string, [uint16]byte??, string} |
+| ackres     | type{[uint32]byte, bool}                             |
+
+## Versioning
+
+Fujin uses protocol versioning at the QUIC/TLS layer via ALPN.
+
+- Current protocol version: "fujin/1" (v1)
+- The server only accepts connections with supported ALPN versions and rejects others.
+
+Compatibility rules:
+- All opcodes and formats below apply to v1 (ALPN "fujin/1").
+- Future versions will use a new ALPN value (e.g., "fujin/2"). Clients may provide multiple values to negotiate the highest mutually supported version.
+- Header semantics may evolve in future versions without changing the opcodes.
 
 ## PING
 ### Direction
@@ -46,11 +59,11 @@ Additionaly, server can be configured to ping opened streams. This helps to dete
 Since the QUIC protocol supports multiplexing, `PING` messages are sent over a dedicated control streams, separated from messaging ones.
 ### Syntax
 ##### Request
-`[11]`
+`[99]`
 ##### Response
-`[11]`
+`[99]`
 ### Examples
-- `[11]` -> `[11]`
+- `[99]` -> `[99]`
 
 ## CONNECT
 
@@ -79,7 +92,7 @@ Client -> Server
 Sends a message to the specified topic. This must be sent in the same QUIC stream where the `CONNECT` command was previously issued.
 ### Syntax
 ##### Request
-`[3, <correlation id>, <topic>, <message>]`  
+`[2, <correlation id>, <topic>, <message>]`  
 where:
 | name             | description                                                               | type                      |
 | ---------------- | ------------------------------------------------------------------------- | ------------------------- |
@@ -87,16 +100,16 @@ where:
 | `topic`          | The target topic for the message.                                         | string                    |
 | `message`        | The message content.                                                      | [uint32]byte              |
 ##### Response
-`[2, <correlation id>, <error>]`  
+`[3, <correlation id>, <error>]`  
 where:
 | name             | description                                                               | type   |
 | ---------------- | ------------------------------------------------------------------------- | ------ |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
 | `error`     | An error.               | string?   | always   |
 ### Examples
-- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+- `[2, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[3, 0, 1, 1, 1, 0]`
 
-## HPRODUCE (TODO)
+## HPRODUCE
 
 ### Direction
 Client -> Server
@@ -113,14 +126,14 @@ where:
 | `headers`        | Optional headers for the message.                                         | array (uint16) of strings |
 | `message`        | The message content.                                                      | [uint32]byte              |
 ##### Response
-`[2, <correlation id>, <error>]`  
+`[4, <correlation id>, <error>]`  
 where:
 | name             | description                                                               | type   |
 | ---------------- | ------------------------------------------------------------------------- | ------ |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
 | `error`     | An error.               | string?   | always   |
 ### Examples
-- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[2, 0, 1, 1, 1, 0]`
+- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[4, 0, 1, 1, 1, 0]`
 
 
 ## BEGIN TX
@@ -207,7 +220,7 @@ Client initiates a subscription to a topic. Messages will be sent by the server 
 
 ### Syntax
 ##### Request
-`[2, <correlation id>, <auto commit>, <topic>]`  
+`[11, <correlation id>, <auto commit>, <topic>]`  
 where:
 | name             | description                                                          | type   |
 | ---------------- | -------------------------------------------------------------------- | ------ |
@@ -224,7 +237,7 @@ where:
 | `subscription id` | Subscription ID.                                                     | byte    |
 
 ### Examples
-- `[2, 0, 0, 0, 1, 1, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0, 0, 1, 0, 5]`
+- `[11, 0, 0, 0, 1, 1, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0, 0, 1, 0, 5]`
 ## MSG
 
 ### Direction
@@ -232,31 +245,30 @@ Server -> Client
 ### Description
 A message propagated by the server in a client-opened QUIC stream after issuing `SUBSCRIBE` command.
 ### Syntax
-`[6, <subscription id>, <message>]`
+`[8, <subscription id>, <message>]`
 where:
 | name                  | description      | type           |
 | --------------------- | ---------------- | -------------- |
 | `subscription id`     | Subscription ID. | byte           |
 | `message`             | Message.         | message        |
 ### Examples
-- `-` -> `[6, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `-` -> `[8, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
-## HMSG (TODO)
+## HMSG
 
 ### Direction
 Server -> Client
 ### Description
 A message with headers propagated by the server in a client-opened QUIC stream after issuing `SUBSCRIBE` command.
 ### Syntax
-`[6, <subscription id>, <headers>, <message>]`  
+`[9, <subscription id>, <hmessage>]`  
 where:
-| name                  | description      | type           |
-| --------------------- | ---------------- | -------------- |
-| `subscription id`     | Subscription ID. | byte           |
-| `headers`             | Message headers. | [uint16]string |
-| `message`             | Message.         | message        |
+| name                  | description       | type           |
+| --------------------- | ----------------- | -------------- |
+| `subscription id`     | Subscription ID.  | byte           |
+| `message`             | Headered message. | hmessage       |
 ### Examples
-- `-` -> `[6, 5, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `-` -> `[9, 5, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
 
 ## ACK
@@ -267,14 +279,14 @@ Client -> Server
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[8, <correlation id>, <msg ids>]`  
+`[9, <correlation id>, <msg ids>]`  
 where:
 | name             | description                                                          | type                 |
 | ---------------- | ---------------------------------------------------------------------| -------------------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32               |
 | `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte |
 ##### Response
-`[8, <correlation id>, <error>, <ack results>]`  
+`[12, <correlation id>, <error>, <ack results>]`  
 where:
 | name             | description                                                          | type           |
 | ---------------- | -------------------------------------------------------------------- | -------------- |
@@ -283,7 +295,7 @@ where:
 | `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]ackres |
 
 ### Examples
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[8, 0, 0, 0, 1, 0]`
+- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[12, 0, 0, 0, 1, 0]`
 
 ## NACK
 
@@ -293,14 +305,14 @@ Client -> Server
 Works similarly to `ACK`.
 ### Syntax
 ##### Request
-`[9, <correlation id>, <message ids>]`  
+`[10, <correlation id>, <message ids>]`  
 where:
 | name              | description                                                          | type                 | presence |
 | ----------------- | ---------------------------------------------------------------------| -------------------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32               | always   |
 | `msg ids`         | Message ID batch.                                                    | [uint32][uint32]byte | always   |
 ##### Response
-`[9, <correlation id>, <error>, <nack results>]`  
+`[13, <correlation id>, <error>, <nack results>]`  
 where:
 | name             | description                                                          | type           |
 | ---------------- | -------------------------------------------------------------------- | -------------- |
@@ -310,7 +322,7 @@ where:
 
 
 ### Examples
-- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[9, 0, 0, 0, 1, 0]`
+- `[10, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[13, 0, 0, 0, 1, 0]`
 
 ## FETCH
 
@@ -331,7 +343,7 @@ where:
 | `msg response batch len` | The number of messages the server should send in response.           | uint32 |
 
 ##### Response
-`[7, <correlation id>, <error>, <msgs>]`  
+`[10, <correlation id>, <error>, <msgs>]`  
 where:
 | name             | description                                                          | type             |
 | ---------------- | -------------------------------------------------------------------- | ---------------- |
@@ -339,7 +351,7 @@ where:
 | `error`          | An error.                                                            | string?          |
 | `msgs`           | Message batch.                                                       | [uint32]message  |
 
-## HFETCH (TODO)
+## HFETCH
 
 ### Direction
 Client -> Server
@@ -348,7 +360,7 @@ Client -> Server
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <auto commit>, <msg response batch len>]`  
+`[8, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
 where:
 | name                     | description                                                          | type    |
 | ------------------------ | -------------------------------------------------------------------- | ------- |
@@ -356,7 +368,7 @@ where:
 | `msg response batch len` | The number of messages the server should send in response.           | uint32  |
 
 ##### Response
-`[7, <correlation id>, <error>, <msgs>]`  
+`[11, <correlation id>, <error>, <msgs>]`  
 where:
 | name             | description                                                          | type                                   |
 | ---------------- | -------------------------------------------------------------------- | -------------------------------------- |
@@ -366,9 +378,9 @@ where:
 
 
 ### Examples
-- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
-- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
-- `[7, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[7, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
+- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
 ## DISCONNECT
 
 ### Direction
@@ -377,11 +389,11 @@ Client -> Server
 The client should send `DISCONNECT` request to the server and receive response before closing QUIC streams and connection. `DISCONNECT` should be sent both in writer and reader streams. Server will close QUIC stream after receiving `DISCONNECT` response.
 ### Syntax
 ##### Request
-`[10]`
+`[14]`
 ##### Response
-`[10]`
+`[15]`
 ### Examples
-- `[10]` -> `[10]`
+- `[14]` -> `[15]`
 
 ## STOP
 
@@ -391,8 +403,8 @@ Server -> Client
 The server can sometimes send `STOP` command to the client, when trying to shutdown gracefully. If the client does not disconnect within the configured response interval, the server will terminate its connection.
 ### Syntax
 ##### Request
-`[12]`
+`[98]`
 ##### Response
 `-`
 ### Examples
-- `[12]` -> `-`
+- `[98]` -> `-`

@@ -72,10 +72,35 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	return nil
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	sub := r.cl.Subscribe(r.conf.Topic, r.conf.QoS, func(_ mqtt.Client, msg mqtt.Message) {
+		if r.autoAck {
+			h(msg.Payload(), msg.Topic(), nil)
+		} else {
+			r.msgs.Store(msg.MessageID(), msg)
+			h(msg.Payload(), msg.Topic(), nil, msg.MessageID())
+		}
+	})
+
+	if sub.Wait() && sub.Error() != nil {
+		return sub.Error()
+	}
+
+	return nil
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
 ) {
 	fetchHandler(0, cerr.ErrNotSupported)
 }

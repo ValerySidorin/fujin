@@ -80,6 +80,28 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	)
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	amqpMsg := amqp.NewMessage(msg)
+
+	if len(headers) > 0 {
+		props := make(map[string]interface{})
+		for i := 0; i < len(headers); i += 2 {
+			if i+1 < len(headers) {
+				key := string(headers[i])
+				value := string(headers[i+1])
+				props[key] = value
+			}
+		}
+		amqpMsg.ApplicationProperties = props
+	}
+
+	callback(
+		w.sender.Send(ctx, amqpMsg, &amqp.SendOptions{
+			Settled: w.conf.Send.Settled,
+		}),
+	)
+}
+
 func (w *Writer) Flush(ctx context.Context) error {
 	return nil
 }

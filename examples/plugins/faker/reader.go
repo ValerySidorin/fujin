@@ -42,10 +42,39 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	return nil
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	r.l.Info("fake subscribe with headers")
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-t.C:
+				r.l.Info("fake read")
+				h([]byte("fake read"), "", [][]byte{[]byte("fake"), []byte("header")})
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	<-ctx.Done()
+	return nil
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
 ) {
 	fetchHandler(0, cerr.ErrNotSupported)
 }

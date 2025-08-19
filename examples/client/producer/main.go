@@ -67,8 +67,12 @@ func main() {
 		case <-ctx.Done():
 			return
 		default:
-
 			if err := s.Produce("pub", data); err != nil {
+				log.Fatal(err)
+			}
+			if err := s.HProduce("pub", data, map[string]string{
+				"key": "value",
+			}); err != nil {
 				log.Fatal(err)
 			}
 			fmt.Println("message sent")
@@ -85,5 +89,5 @@ func generateTLSConfig() *tls.Config {
 		Certificate: [][]byte{cert},
 		PrivateKey:  key,
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin"}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin/1"}}
 }

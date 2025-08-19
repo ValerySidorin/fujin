@@ -7,7 +7,7 @@ connectors:
     pub:
       protocol: resp_pubsub
       settings:
-        init_address: ["localhost:6379"]
+        init_address: ["valkey:6379"]
         channel: example-channel
         batch_size: 1000
         linger: 10ms
@@ -15,5 +15,5 @@ connectors:
     sub:
       protocol: resp_pubsub
       settings:
-        init_address: ["localhost:6379"]
-        channel: example-channel
+        init_address: ["valkey:6379"]
+        channels: [example-channel]

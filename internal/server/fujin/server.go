@@ -16,6 +16,7 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/fujin/version"
 	"github.com/quic-go/quic-go"
 )
 
@@ -117,6 +118,20 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 				if !errors.Is(err, ctx.Err()) {
 					s.l.Error(fmt.Errorf("accept conn: %w", err).Error())
 				}
+				continue
+			}
+
+			negotiated := conn.ConnectionState().TLS.NegotiatedProtocol
+			if negotiated == "" {
+				_ = conn.CloseWithError(ferr.ConnErr, "unsupported protocol: none")
+				continue
+			}
+			switch negotiated {
+			case version.Fujin1:
+				// ok – current version
+			default:
+				s.l.Warn("rejecting connection: unsupported ALPN", "alpn", negotiated)
+				_ = conn.CloseWithError(ferr.ConnErr, "unsupported protocol: "+negotiated)
 				continue
 			}
 

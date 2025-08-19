@@ -6,13 +6,13 @@ import (
 )
 
 type ReaderConfig struct {
-	config.ReaderConfig
-	Channels []string `yaml:"channels"`
+	config.ReaderConfig `yaml:",inline"`
+	Channels            []string `yaml:"channels"`
 }
 
 type WriterConfig struct {
-	config.WriterConfig
-	Channel string `yaml:"channel"`
+	config.WriterConfig `yaml:",inline"`
+	Channel             string `yaml:"channel"`
 }
 
 func (c ReaderConfig) Validate() error {

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -19,9 +20,10 @@ type Reader struct {
 	conf ReaderConfig
 	cl   *kgo.Client
 
-	handler    func(r *kgo.Record, h func(message []byte, topic string, args ...any))
-	fetching   atomic.Bool
-	autoCommit bool
+	handler         func(r *kgo.Record, h func(message []byte, topic string, args ...any))
+	headeredHandler func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any))
+	fetching        atomic.Bool
+	autoCommit      bool
 
 	l *slog.Logger
 }
@@ -79,9 +81,23 @@ func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, err
 		reader.handler = func(r *kgo.Record, h func(message []byte, topic string, args ...any)) {
 			h(r.Value, r.Topic)
 		}
+		reader.headeredHandler = func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any)) {
+			var hs [][]byte
+			for _, kh := range r.Headers {
+				hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(kh.Key)), len(kh.Key)), kh.Value)
+			}
+			h(r.Value, r.Topic, hs)
+		}
 	} else {
 		reader.handler = func(r *kgo.Record, h func(message []byte, topic string, args ...any)) {
 			h(r.Value, r.Topic, r.Partition, r.LeaderEpoch, r.Offset)
+		}
+		reader.headeredHandler = func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any)) {
+			var hs [][]byte
+			for _, kh := range r.Headers {
+				hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(kh.Key)), len(kh.Key)), kh.Value)
+			}
+			h(r.Value, r.Topic, hs, r.Partition, r.LeaderEpoch, r.Offset)
 		}
 	}
 
@@ -112,6 +128,35 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 			iter := fetches.RecordIter()
 			for !iter.Done() {
 				r.handler(iter.Next(), h)
+			}
+		}
+	}
+}
+
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	pingCtx, cancel := context.WithTimeout(ctx, r.conf.PingTimeout)
+	defer cancel()
+
+	if err := r.cl.Ping(pingCtx); err != nil {
+		return fmt.Errorf("kafka: ping: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			fetches := r.cl.PollRecords(ctx, r.conf.MaxPollRecords)
+			if ctx.Err() != nil {
+				return nil
+			}
+			if errs := fetches.Errors(); len(errs) > 0 {
+				return fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs))
+			}
+
+			iter := fetches.RecordIter()
+			for !iter.Done() {
+				r.headeredHandler(iter.Next(), h)
 			}
 		}
 	}
@@ -150,6 +195,45 @@ func (r *Reader) Fetch(
 	}
 
 	// We need to commit messages manually for some reason, even if auto commit is enabled
+	if r.autoCommit {
+		if err := r.cl.CommitRecords(ctx, rec); err != nil {
+			r.l.Error("commit record", "err", err)
+		}
+	}
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
+) {
+	if r.fetching.Load() {
+		fetchHandler(0, nil)
+		return
+	}
+
+	r.fetching.Store(true)
+	defer r.fetching.Store(false)
+
+	fetches := r.cl.PollRecords(ctx, int(n))
+	if ctx.Err() != nil {
+		fetchHandler(0, nil)
+		return
+	}
+	if errs := fetches.Errors(); len(errs) > 0 {
+		fetchHandler(0, fmt.Errorf("kafka: poll fetches: %v", fmt.Sprint(errs)))
+		return
+	}
+
+	fetchHandler(uint32(fetches.NumRecords()), nil)
+
+	iter := fetches.RecordIter()
+	var rec *kgo.Record
+	for !iter.Done() {
+		rec = iter.Next()
+		r.headeredHandler(rec, msgHandler)
+	}
+
 	if r.autoCommit {
 		if err := r.cl.CommitRecords(ctx, rec); err != nil {
 			r.l.Error("commit record", "err", err)

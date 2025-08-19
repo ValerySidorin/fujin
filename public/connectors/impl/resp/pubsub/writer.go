@@ -97,6 +97,10 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	}
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.Write(ctx, msg, callback)
+}
+
 func (w *Writer) flusher() {
 	ticker := time.NewTicker(w.linger)
 	defer ticker.Stop()

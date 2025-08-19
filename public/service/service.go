@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
@@ -28,7 +29,7 @@ var (
 	ErrTLSServerCertPathNotSpecified = errors.New("server cert path not specified")
 	ErrTLSServerKeyPathNotSpecified  = errors.New("server cert path not specified")
 
-	NextProtos = []string{"fujin"}
+	NextProtos = []string{version.Fujin1}
 )
 
 type Config struct {

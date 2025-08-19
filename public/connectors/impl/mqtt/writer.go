@@ -66,6 +66,10 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	}
 }
 
+func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.Write(ctx, msg, callback)
+}
+
 func (w *Writer) Flush(ctx context.Context) error {
 	w.wg.Wait()
 	return nil

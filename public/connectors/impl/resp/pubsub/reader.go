@@ -61,10 +61,33 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	}
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			if err := r.client.Receive(ctx, r.subscribe, func(msg rueidis.PubSubMessage) {
+				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel, nil)
+			}); err != nil {
+				return fmt.Errorf("resp: receive: %w", err)
+			}
+		}
+	}
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
 ) {
 	fetchHandler(0, cerr.ErrNotSupported)
 }

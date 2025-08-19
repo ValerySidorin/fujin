@@ -104,10 +104,78 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	}
 }
 
+func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	var handler func(msg *amqp.Message) error
+	if r.IsAutoCommit() {
+		handler = func(msg *amqp.Message) error {
+			var hs [][]byte
+			if msg.ApplicationProperties != nil {
+				for k, v := range msg.ApplicationProperties {
+					keyBytes := unsafe.Slice((*byte)(unsafe.StringData(k)), len(k))
+					var valueBytes []byte
+					switch val := v.(type) {
+					case string:
+						valueBytes = unsafe.Slice((*byte)(unsafe.StringData(val)), len(val))
+					case []byte:
+						valueBytes = val
+					default:
+						continue
+					}
+					hs = append(hs, keyBytes, valueBytes)
+				}
+			}
+			h(msg.GetData(), r.conf.Receiver.Source, hs)
+			return r.receiver.AcceptMessage(ctx, msg)
+		}
+	} else {
+		handler = func(msg *amqp.Message) error {
+			var hs [][]byte
+			if msg.ApplicationProperties != nil {
+				for k, v := range msg.ApplicationProperties {
+					keyBytes := unsafe.Slice((*byte)(unsafe.StringData(k)), len(k))
+					var valueBytes []byte
+					switch val := v.(type) {
+					case string:
+						valueBytes = unsafe.Slice((*byte)(unsafe.StringData(val)), len(val))
+					case []byte:
+						valueBytes = val
+					default:
+						continue
+					}
+					hs = append(hs, keyBytes, valueBytes)
+				}
+			}
+			h(msg.GetData(), r.conf.Receiver.Source, hs, GetDeliveryId(msg))
+			return nil
+		}
+	}
+
+	for {
+		msg, err := r.receiver.Receive(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("amqp10: receive: %w", err)
+		}
+		if err := r.receiver.AcceptMessage(ctx, msg); err != nil {
+			return err
+		}
+		if err := handler(msg); err != nil {
+			return fmt.Errorf("amqp10: handler: %w", err)
+		}
+	}
+}
+
 func (r *Reader) Fetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, args ...any),
+) {
+	fetchHandler(0, cerr.ErrNotSupported)
+}
+
+func (r *Reader) FetchH(
+	ctx context.Context, n uint32,
+	fetchHandler func(n uint32, err error),
+	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
 ) {
 	fetchHandler(0, cerr.ErrNotSupported)
 }
