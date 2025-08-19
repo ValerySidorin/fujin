@@ -624,6 +624,14 @@ func (s *Stream) parse(buf []byte) error {
 				s.ps.ma.headerCount = binary.BigEndian.Uint16(s.ps.argBuf)
 				pool.Put(s.ps.argBuf)
 				s.ps.argBuf = nil
+				if s.ps.ma.headerCount <= 0 {
+					if s.ps.ma.sub.autoCommit {
+						s.ps.state = OP_MSG_ARG
+						continue
+					}
+					s.ps.argBuf = pool.Get(fujin.Uint32Len)
+					s.ps.state = OP_MSG_ID_ARG
+				}
 				s.ps.ma.headers = make(map[string]string, s.ps.ma.headerCount/2)
 				s.ps.ma.headerStep = 0
 				s.ps.state = OP_MSG_H_HEADER_LEN
@@ -993,6 +1001,14 @@ func (s *Stream) parse(buf []byte) error {
 				s.ps.fa.headerCount = binary.BigEndian.Uint16(s.ps.argBuf)
 				pool.Put(s.ps.argBuf)
 				s.ps.argBuf = nil
+				if s.ps.ma.headerCount <= 0 {
+					if s.ps.ma.sub.autoCommit {
+						s.ps.state = OP_FETCH_H_MSG_ARG
+						continue
+					}
+					s.ps.argBuf = pool.Get(fujin.Uint32Len)
+					s.ps.state = OP_FETCH_H_MSG_ID_ARG
+				}
 				s.ps.fa.headers = make(map[string]string, s.ps.fa.headerCount/2)
 				s.ps.fa.headerStep = 0
 				s.ps.state = OP_FETCH_H_HEADER_LEN
