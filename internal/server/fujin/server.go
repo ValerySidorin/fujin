@@ -17,7 +17,9 @@ import (
 	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
 	"github.com/ValerySidorin/fujin/internal/fujin/version"
+	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/metrics"
 )
 
 type ServerConfig struct {
@@ -65,6 +67,11 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 	tr := &quic.Transport{
 		Conn: conn,
+	}
+
+	if observability.MetricsEnabled() {
+		tr.Tracer = metrics.NewTracer()
+		s.conf.QUIC.Tracer = metrics.DefaultConnectionTracer
 	}
 
 	ln, err := tr.Listen(s.conf.TLS, s.conf.QUIC)

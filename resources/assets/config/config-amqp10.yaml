@@ -19,3 +19,17 @@ connectors:
           addr: amqp://artemis:artemis@localhost:61616
         receiver:
           source: exchange
+observability:
+  metrics:
+    enabled: false
+    addr: ":9090"
+    path: "/metrics"
+  tracing:
+    enabled: false
+    otlp_addr: "localhost:4317"
+    insecure: true
+    sample_ratio: 0.1
+    resource:
+      service_name: "fujin"
+      service_version: "dev"
+      env: "dev"

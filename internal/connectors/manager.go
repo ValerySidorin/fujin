@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ValerySidorin/fujin/internal/common/pool"
+	"github.com/ValerySidorin/fujin/internal/connectors/observability"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
@@ -52,6 +53,7 @@ func (m *Manager) GetReader(name string, autoCommit bool) (reader.Reader, error)
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
+	r = observability.WrapOtelReaderIfEnabled(observability.WrapMetricsReaderIfEnabled(r, name), name)
 	return r, nil
 }
 
@@ -71,7 +73,12 @@ func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
 
 		wpoolm = make(map[string]*pool.Pool, 1)
 		pool := pool.NewPool(func() (any, error) {
-			return writer.NewWriter(conf, writerID, m.l)
+			w, err := writer.NewWriter(conf, writerID, m.l)
+			if err != nil {
+				return nil, err
+			}
+			w = observability.WrapOtelWriterIfEnabled(observability.WrapMetricsWriterIfEnabled(w, name), name)
+			return w, nil
 		})
 		wpoolm[writerID] = pool
 		m.wpoolms[name] = wpoolm
@@ -97,7 +104,12 @@ func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
 
 		wpoolm = make(map[string]*pool.Pool, 1)
 		pool := pool.NewPool(func() (any, error) {
-			return writer.NewWriter(conf, writerID, m.l)
+			w, err := writer.NewWriter(conf, writerID, m.l)
+			if err != nil {
+				return nil, err
+			}
+			w = observability.WrapOtelWriterIfEnabled(observability.WrapMetricsWriterIfEnabled(w, name), name)
+			return w, nil
 		})
 		wpoolm[writerID] = pool
 		m.wpoolms[name] = wpoolm

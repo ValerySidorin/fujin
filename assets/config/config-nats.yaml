@@ -15,3 +15,17 @@ connectors:
       nats:
         url: nats://nats:4222
         subject: my_subject
+observability:
+  metrics:
+    enabled: false
+    addr: ":9090"
+    path: "/metrics"
+  tracing:
+    enabled: false
+    otlp_addr: "localhost:4317"
+    insecure: true
+    sample_ratio: 0.1
+    resource:
+      service_name: "fujin"
+      service_version: "dev"
+      env: "dev"

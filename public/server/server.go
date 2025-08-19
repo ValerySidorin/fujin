@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/connectors"
+	obs "github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/server/config"
 	"golang.org/x/sync/errgroup"
@@ -40,6 +41,16 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	s.l.Info("starting fujin server")
 	defer s.cman.Close()
+
+	shutdown, _ := obs.Init(ctx, s.conf.Observability, s.l)
+	if shutdown != nil {
+		defer func() {
+			stopCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+			_ = shutdown(stopCtx)
+		}()
+	}
+
 	eg, eCtx := errgroup.WithContext(ctx)
 	if s.fujinServer != nil {
 		eg.Go(func() error {

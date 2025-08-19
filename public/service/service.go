@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/fujin/version"
+	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
@@ -33,8 +34,9 @@ var (
 )
 
 type Config struct {
-	Fujin      FujinConfig       `yaml:"fujin"`
-	Connectors connectors.Config `yaml:"connectors"`
+	Fujin         FujinConfig          `yaml:"fujin"`
+	Connectors    connectors.Config    `yaml:"connectors"`
+	Observability observability.Config `yaml:"observability"`
 }
 
 type FujinConfig struct {
@@ -82,8 +84,9 @@ func (c *Config) parse() (config.Config, error) {
 	}
 
 	return config.Config{
-		Fujin:      fujinConf,
-		Connectors: c.Connectors,
+		Fujin:         fujinConf,
+		Connectors:    c.Connectors,
+		Observability: c.Observability,
 	}, nil
 }
 

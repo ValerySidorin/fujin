@@ -176,3 +176,17 @@ connectors:
     #     topic: my_topic
     #     channel: my_channel
     #     max_in_flight: 1000000
+observability:
+  metrics:
+    enabled: true
+    addr: ":9090"
+    path: "/metrics"
+  tracing:
+    enabled: false
+    otlp_addr: "localhost:4317"
+    insecure: true
+    sample_ratio: 0.1
+    resource:
+      service_name: "fujin"
+      service_version: "dev"
+      env: "dev"

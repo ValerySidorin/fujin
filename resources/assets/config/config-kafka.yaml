@@ -28,3 +28,17 @@ connectors:
         balancers:
           - cooperative_sticky # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
         fetch_isolation_level: read_uncommited # read_commited/read_uncommited (defaults to read_uncommited)
+observability:
+  metrics:
+    enabled: false
+    addr: ":9090"
+    path: "/metrics"
+  tracing:
+    enabled: false
+    otlp_addr: "localhost:4317"
+    insecure: true
+    sample_ratio: 0.1
+    resource:
+      service_name: "fujin"
+      service_version: "dev"
+      env: "dev"
