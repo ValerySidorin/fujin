@@ -15,15 +15,22 @@ fujin:
     keepalive_period: 2s
 connectors:
   writers:
+    # pub:
+    #   protocol: kafka
+    #   settings:
+    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
+    #     topic: my_pub_topic
+    #     allow_auto_topic_creation: true
+    #     linger: 10ms
+    #     max_buffered_records: 10000
+    #     disable_idempotent_write: false
     pub:
-      protocol: kafka
+      protocol: resp_pubsub
       settings:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        topic: my_pub_topic
-        allow_auto_topic_creation: true
+        init_address: ["localhost:6379"]
+        channel: example-channel
+        batch_size: 1000
         linger: 10ms
-        max_buffered_records: 10000
-        disable_idempotent_write: false
     # pub:
     #   protocol: resp_pubsub
     #   settings:
@@ -90,12 +97,12 @@ connectors:
     #       pre_alloc: true
     #       release_timeout: 5s
   readers:
-    sub:
-      protocol: kafka
-      settings:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        topic: my_pub_topic
-        group: fujin
+    # sub:
+    #   protocol: kafka
+    #   settings:
+    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
+    #     topic: my_pub_topic
+    #     group: fujin
         # allow_auto_topic_creation: true
         # max_poll_records: 10000
         # auto_commit_interval: 5s
@@ -132,11 +139,11 @@ connectors:
     #       addr: amqp://artemis:artemis@localhost:61616
     #     receiver:
     #       source: exchange
-    # sub:
-    #   protocol: resp_pubsub
-    #   settings:
-    #     init_address: ["localhost:6379"]
-    #     channels: [example-channel]
+    sub:
+      protocol: resp_pubsub
+      settings:
+        init_address: ["localhost:6379"]
+        channels: [example-channel]
     # sub:
     #   protocol: resp_streams
     #   settings:
