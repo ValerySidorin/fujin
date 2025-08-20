@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -70,6 +71,10 @@ func Tracer() trace.Tracer {
 		return defaultTracer
 	}
 	return otel.Tracer("fujin")
+}
+
+func Propagator() propagation.TextMapPropagator {
+	return otel.GetTextMapPropagator()
 }
 
 func Init(ctx context.Context, cfg Config, l *slog.Logger) (func(context.Context) error, error) {
@@ -132,6 +137,7 @@ func Init(ctx context.Context, cfg Config, l *slog.Logger) (func(context.Context
 				sdktrace.WithResource(res),
 			)
 			otel.SetTracerProvider(tp)
+			otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 			defaultTracer = tp.Tracer("fujin")
 			shutdownFns = append(shutdownFns, func(ctx context.Context) error { return tp.Shutdown(ctx) })
 		}
