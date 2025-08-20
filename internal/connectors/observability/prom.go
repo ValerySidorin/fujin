@@ -21,10 +21,10 @@ type metricsWriterDecorator struct {
 	connectorName string
 }
 
-func (d *metricsWriterDecorator) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (d *metricsWriterDecorator) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	start := time.Now()
-	d.w.Write(ctx, msg, func(err error) {
-		obs.IncOp("PRODUCE", d.connectorName)
+	d.w.Produce(ctx, msg, func(err error) {
+		obs.IncOp("produce", d.connectorName)
 		if err != nil {
 			obs.IncError("produce", d.connectorName)
 		}
@@ -35,12 +35,12 @@ func (d *metricsWriterDecorator) Write(ctx context.Context, msg []byte, callback
 	})
 }
 
-func (d *metricsWriterDecorator) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (d *metricsWriterDecorator) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	start := time.Now()
-	d.w.WriteH(ctx, msg, headers, func(err error) {
-		obs.IncOp("HPRODUCE", d.connectorName)
+	d.w.HProduce(ctx, msg, headers, func(err error) {
+		obs.IncOp("hproduce", d.connectorName)
 		if err != nil {
-			obs.IncError("produce_h", d.connectorName)
+			obs.IncError("hproduce", d.connectorName)
 		}
 		obs.ObserveWriteLatency(d.connectorName, time.Since(start))
 		if callback != nil {
@@ -58,7 +58,7 @@ func (d *metricsWriterDecorator) Flush(ctx context.Context) error {
 }
 
 func (d *metricsWriterDecorator) BeginTx(ctx context.Context) error {
-	obs.IncOp("BEGIN_TX", d.connectorName)
+	obs.IncOp("begin_tx", d.connectorName)
 	err := d.w.BeginTx(ctx)
 	if err != nil {
 		obs.IncError("begin_tx", d.connectorName)
@@ -67,7 +67,7 @@ func (d *metricsWriterDecorator) BeginTx(ctx context.Context) error {
 }
 
 func (d *metricsWriterDecorator) CommitTx(ctx context.Context) error {
-	obs.IncOp("COMMIT_TX", d.connectorName)
+	obs.IncOp("commit_tx", d.connectorName)
 	err := d.w.CommitTx(ctx)
 	if err != nil {
 		obs.IncError("commit_tx", d.connectorName)
@@ -76,7 +76,7 @@ func (d *metricsWriterDecorator) CommitTx(ctx context.Context) error {
 }
 
 func (d *metricsWriterDecorator) RollbackTx(ctx context.Context) error {
-	obs.IncOp("ROLLBACK_TX", d.connectorName)
+	obs.IncOp("rollback_tx", d.connectorName)
 	err := d.w.RollbackTx(ctx)
 	if err != nil {
 		obs.IncError("rollback_tx", d.connectorName)
@@ -105,22 +105,22 @@ type metricsReaderDecorator struct {
 }
 
 func (d *metricsReaderDecorator) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	obs.IncOp("SUBSCRIBE", d.connectorName)
+	obs.IncOp("subscribe", d.connectorName)
 	return d.r.Subscribe(
 		ctx,
 		func(message []byte, topic string, args ...any) {
-			obs.IncOp("MSG", d.connectorName)
+			obs.IncOp("msg", d.connectorName)
 			h(message, topic, args...)
 		},
 	)
 }
 
-func (d *metricsReaderDecorator) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	obs.IncOp("HSUBSCRIBE", d.connectorName)
-	return d.r.SubscribeH(
+func (d *metricsReaderDecorator) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	obs.IncOp("hsubscribe", d.connectorName)
+	return d.r.HSubscribe(
 		ctx,
 		func(message []byte, topic string, hs [][]byte, args ...any) {
-			obs.IncOp("HMSG", d.connectorName)
+			obs.IncOp("hmsg", d.connectorName)
 			h(message, topic, hs, args...)
 		},
 	)
@@ -128,7 +128,7 @@ func (d *metricsReaderDecorator) SubscribeH(ctx context.Context, h func(message 
 
 func (d *metricsReaderDecorator) Fetch(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, args ...any)) {
 	frh := func(n uint32, err error) {
-		obs.IncOp("FETCH", d.connectorName)
+		obs.IncOp("fetch", d.connectorName)
 		if err != nil {
 			obs.IncError("fetch", d.connectorName)
 		}
@@ -137,22 +137,22 @@ func (d *metricsReaderDecorator) Fetch(ctx context.Context, n uint32, fetchRespo
 	d.r.Fetch(ctx, n, frh, msgHandler)
 }
 
-func (d *metricsReaderDecorator) FetchH(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, hs [][]byte, args ...any)) {
+func (d *metricsReaderDecorator) HFetch(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, hs [][]byte, args ...any)) {
 	frh := func(n uint32, err error) {
-		obs.IncOp("HFETCH", d.connectorName)
+		obs.IncOp("hfetch", d.connectorName)
 		if err != nil {
-			obs.IncError("fetch_h", d.connectorName)
+			obs.IncError("hfetch", d.connectorName)
 		}
 		fetchResponseHandler(n, err)
 	}
-	d.r.FetchH(ctx, n, frh, msgHandler)
+	d.r.HFetch(ctx, n, frh, msgHandler)
 }
 
 func (d *metricsReaderDecorator) Ack(ctx context.Context, msgIDs [][]byte, ackHandler func(error), ackMsgHandler func([]byte, error)) {
 	d.r.Ack(
 		ctx, msgIDs,
 		func(err error) {
-			obs.IncOp("ACK", d.connectorName)
+			obs.IncOp("ack", d.connectorName)
 			if err != nil {
 				obs.IncError("ack", d.connectorName)
 			}
@@ -171,7 +171,7 @@ func (d *metricsReaderDecorator) Nack(ctx context.Context, msgIDs [][]byte, nack
 	d.r.Ack(
 		ctx, msgIDs,
 		func(err error) {
-			obs.IncOp("NACK", d.connectorName)
+			obs.IncOp("nack", d.connectorName)
 			if err != nil {
 				obs.IncError("nack", d.connectorName)
 			}

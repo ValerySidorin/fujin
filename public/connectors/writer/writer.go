@@ -18,8 +18,8 @@ var (
 )
 
 type Writer interface {
-	Write(ctx context.Context, msg []byte, callback func(err error))
-	WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error))
+	Produce(ctx context.Context, msg []byte, callback func(err error))
+	HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error))
 	Flush(ctx context.Context) error
 	BeginTx(ctx context.Context) error
 	CommitTx(ctx context.Context) error

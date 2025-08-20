@@ -22,11 +22,11 @@ type otelWriterDecorator struct {
 	connectorName string
 }
 
-func (d *otelWriterDecorator) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (d *otelWriterDecorator) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	var span trace.Span
-	ctx, span = obs.Tracer().Start(ctx, "writer.write")
+	ctx, span = obs.Tracer().Start(ctx, "writer.produce")
 	span.SetAttributes(attribute.String("connector", d.connectorName))
-	d.w.Write(ctx, msg, func(err error) {
+	d.w.Produce(ctx, msg, func(err error) {
 		if err != nil {
 			span.RecordError(err)
 		}
@@ -35,11 +35,11 @@ func (d *otelWriterDecorator) Write(ctx context.Context, msg []byte, callback fu
 	})
 }
 
-func (d *otelWriterDecorator) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (d *otelWriterDecorator) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	var span trace.Span
-	ctx, span = obs.Tracer().Start(ctx, "writer.write_h")
+	ctx, span = obs.Tracer().Start(ctx, "writer.hproduce")
 	span.SetAttributes(attribute.String("connector", d.connectorName), attribute.Int("header_pairs", len(headers)/2))
-	d.w.WriteH(ctx, msg, headers, func(err error) {
+	d.w.HProduce(ctx, msg, headers, func(err error) {
 		if err != nil {
 			span.RecordError(err)
 		}
@@ -58,7 +58,7 @@ func (d *otelWriterDecorator) Flush(ctx context.Context) error {
 
 func (d *otelWriterDecorator) BeginTx(ctx context.Context) error {
 	var span trace.Span
-	ctx, span = obs.Tracer().Start(ctx, "writer.tx_begin")
+	ctx, span = obs.Tracer().Start(ctx, "writer.begin_tx")
 	span.SetAttributes(attribute.String("connector", d.connectorName))
 	defer span.End()
 	return d.w.BeginTx(ctx)
@@ -66,7 +66,7 @@ func (d *otelWriterDecorator) BeginTx(ctx context.Context) error {
 
 func (d *otelWriterDecorator) CommitTx(ctx context.Context) error {
 	var span trace.Span
-	ctx, span = obs.Tracer().Start(ctx, "writer.tx_commit")
+	ctx, span = obs.Tracer().Start(ctx, "writer.commit_tx")
 	span.SetAttributes(attribute.String("connector", d.connectorName))
 	defer span.End()
 	return d.w.CommitTx(ctx)
@@ -74,7 +74,7 @@ func (d *otelWriterDecorator) CommitTx(ctx context.Context) error {
 
 func (d *otelWriterDecorator) RollbackTx(ctx context.Context) error {
 	var span trace.Span
-	ctx, span = obs.Tracer().Start(ctx, "writer.tx_rollback")
+	ctx, span = obs.Tracer().Start(ctx, "writer.rollback_tx")
 	span.SetAttributes(attribute.String("connector", d.connectorName))
 	defer span.End()
 	return d.w.RollbackTx(ctx)
@@ -112,11 +112,11 @@ func (d *otelReaderDecorator) Subscribe(ctx context.Context, h func(message []by
 	)
 }
 
-func (d *otelReaderDecorator) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	return d.r.SubscribeH(
+func (d *otelReaderDecorator) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	return d.r.HSubscribe(
 		ctx,
 		func(message []byte, topic string, hs [][]byte, args ...any) {
-			_, span := obs.Tracer().Start(ctx, "reader.subscribe_h.handle")
+			_, span := obs.Tracer().Start(ctx, "reader.hsubscribe.handle")
 			span.SetAttributes(attribute.String("connector", d.connectorName))
 			h(message, topic, hs, args...)
 			span.End()
@@ -141,16 +141,16 @@ func (d *otelReaderDecorator) Fetch(ctx context.Context, n uint32, fetchResponse
 	)
 }
 
-func (d *otelReaderDecorator) FetchH(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, hs [][]byte, args ...any)) {
-	d.r.FetchH(ctx, n,
+func (d *otelReaderDecorator) HFetch(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, hs [][]byte, args ...any)) {
+	d.r.HFetch(ctx, n,
 		func(n uint32, err error) {
-			_, span := obs.Tracer().Start(ctx, "reader.fetch.handle")
+			_, span := obs.Tracer().Start(ctx, "reader.hfetch.handle")
 			span.SetAttributes(attribute.String("connector", d.connectorName))
 			fetchResponseHandler(n, err)
 			span.End()
 		},
 		func(message []byte, topic string, hs [][]byte, args ...any) {
-			_, span := obs.Tracer().Start(ctx, "reader.fetch.handle_msg")
+			_, span := obs.Tracer().Start(ctx, "reader.hfetch.handle_hmsg")
 			span.SetAttributes(attribute.String("connector", d.connectorName))
 			msgHandler(message, topic, hs, args...)
 			span.End()

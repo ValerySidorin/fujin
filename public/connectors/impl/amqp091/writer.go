@@ -76,7 +76,7 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	callback(
 		w.channel.PublishWithContext(
 			ctx,
@@ -96,7 +96,7 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	)
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	var amqpHeaders amqp.Table
 	if len(headers) > 0 {
 		amqpHeaders = make(amqp.Table)

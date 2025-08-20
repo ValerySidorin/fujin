@@ -79,7 +79,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) 
 	return nil
 }
 
-func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	r.consumer.AddHandler(nsq.HandlerFunc(func(msg *nsq.Message) error {
 		if r.autoAck {
 			h(msg.Body, r.conf.Topic, nil)
@@ -115,7 +115,7 @@ func (r *Reader) Fetch(
 	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) FetchH(
+func (r *Reader) HFetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),

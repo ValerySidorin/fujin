@@ -47,7 +47,7 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	ch := w.chPool.Get().(chan *nsq.ProducerTransaction)
 
 	err := w.producer.PublishAsync(w.conf.Topic, msg, ch)
@@ -76,8 +76,8 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	}
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
-	w.Write(ctx, msg, callback)
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.Produce(ctx, msg, callback)
 }
 
 func (w *Writer) Flush(ctx context.Context) error {

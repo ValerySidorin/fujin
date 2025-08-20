@@ -1905,7 +1905,7 @@ func (h *handler) hsubscribe(ctx context.Context, subID byte, r internal_reader.
 		case <-ctx.Done():
 			return
 		default:
-			err := r.SubscribeH(ctx, msgHandler)
+			err := r.HSubscribe(ctx, msgHandler)
 			if err != nil {
 				h.l.Error("subscribe with headers", "err", err)
 				time.Sleep(1 * time.Second)
@@ -1917,7 +1917,7 @@ func (h *handler) hsubscribe(ctx context.Context, subID byte, r internal_reader.
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (err no/err yes)
 	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
-	h.nonTxSessionWriters[h.ps.pa.topic].Write(h.ctx, msg, func(err error) {
+	h.nonTxSessionWriters[h.ps.pa.topic].Produce(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
 			h.l.Error("write", "err", err)
@@ -1940,10 +1940,10 @@ func (h *handler) hproduce(msg []byte) {
 	hdr = append(hdr, byte(response.RESP_CODE_HPRODUCE))
 	hdr = append(hdr, h.ps.ca.cID...)
 	hdr = append(hdr, response.ERR_CODE_NO)
-	h.nonTxSessionWriters[h.ps.pa.topic].WriteH(h.ctx, msg, h.ps.ha.headersKV, func(err error) {
+	h.nonTxSessionWriters[h.ps.pa.topic].HProduce(h.ctx, msg, h.ps.ha.headersKV, func(err error) {
 		pool.Put(msg)
 		if err != nil {
-			h.l.Error("write", "err", err)
+			h.l.Error("produce", "err", err)
 			hdr[5] = response.ERR_CODE_YES
 			errProto := errProtoBuf(err)
 			h.out.EnqueueProtoMulti(hdr, errProto)
@@ -1959,10 +1959,10 @@ func (h *handler) hproduce(msg []byte) {
 func (h *handler) produceTx(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
 	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
-	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
+	h.currentTxWriter.Produce(h.ctx, msg, func(err error) {
 		pool.Put(msg)
 		if err != nil {
-			h.l.Error("write", "err", err)
+			h.l.Error("produce", "err", err)
 
 			successResp[5] = response.ERR_CODE_YES
 			errProtoBuf := errProtoBuf(err)
@@ -1982,32 +1982,10 @@ func (h *handler) hproduceTx(msg []byte) {
 	hdr = append(hdr, byte(response.RESP_CODE_HPRODUCE))
 	hdr = append(hdr, h.ps.ca.cID...)
 	hdr = append(hdr, response.ERR_CODE_NO)
-	h.currentTxWriter.WriteH(h.ctx, msg, h.ps.ha.headersKV, func(err error) {
+	h.currentTxWriter.HProduce(h.ctx, msg, h.ps.ha.headersKV, func(err error) {
 		pool.Put(msg)
 		if err != nil {
 			h.l.Error("write with headers", "err", err)
-			hdr[5] = response.ERR_CODE_YES
-			errProto := errProtoBuf(err)
-			h.out.EnqueueProtoMulti(hdr, errProto)
-			pool.Put(errProto)
-			pool.Put(buf)
-			return
-		}
-		h.out.EnqueueProto(hdr)
-		pool.Put(buf)
-	})
-}
-
-func (h *handler) produceTxWithCode(respCode response.RespCode, msg []byte) {
-	buf := pool.Get(6)
-	hdr := buf[:0]
-	hdr = append(hdr, byte(respCode))
-	hdr = append(hdr, h.ps.ca.cID...)
-	hdr = append(hdr, response.ERR_CODE_NO)
-	h.currentTxWriter.Write(h.ctx, msg, func(err error) {
-		pool.Put(msg)
-		if err != nil {
-			h.l.Error("write", "err", err)
 			hdr[5] = response.ERR_CODE_YES
 			errProto := errProtoBuf(err)
 			h.out.EnqueueProtoMulti(hdr, errProto)
@@ -2040,7 +2018,7 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 		}
 
 		if headered {
-			fetcher.FetchH(h.ctx, n,
+			fetcher.HFetch(h.ctx, n,
 				func(n uint32, err error) {
 					h.out.Lock()
 					if err != nil {

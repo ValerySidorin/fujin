@@ -16,13 +16,13 @@ func NewWriter(l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(_ context.Context, msg []byte, callback func(err error)) {
-	w.l.Info("fake write")
+func (w *Writer) Produce(_ context.Context, msg []byte, callback func(err error)) {
+	w.l.Info("fake produce")
 	callback(nil)
 }
 
-func (w *Writer) WriteH(_ context.Context, msg []byte, headers [][]byte, callback func(err error)) {
-	w.l.Info("fake write with headers")
+func (w *Writer) HProduce(_ context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.l.Info("fake produce with headers")
 	callback(nil)
 }
 

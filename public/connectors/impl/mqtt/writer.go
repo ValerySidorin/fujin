@@ -51,7 +51,7 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	token := w.client.Publish(w.conf.Topic, w.conf.QoS, w.conf.Retain, msg)
 	w.wg.Add(1)
 	err := w.pool.Submit(func() {
@@ -66,8 +66,8 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	}
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
-	w.Write(ctx, msg, callback)
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+	w.Produce(ctx, msg, callback)
 }
 
 func (w *Writer) Flush(ctx context.Context) error {

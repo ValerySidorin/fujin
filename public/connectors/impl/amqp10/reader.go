@@ -104,7 +104,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	}
 }
 
-func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	var handler func(msg *amqp.Message) error
 	if r.IsAutoCommit() {
 		handler = func(msg *amqp.Message) error {
@@ -172,7 +172,7 @@ func (r *Reader) Fetch(
 	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) FetchH(
+func (r *Reader) HFetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
