@@ -17,7 +17,7 @@ connectors:
         subject: my_subject
 observability:
   metrics:
-    enabled: false
+    enabled: true
     addr: ":9090"
     path: "/metrics"
   tracing:
