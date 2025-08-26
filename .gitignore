@@ -26,8 +26,8 @@ go.work.sum
 bin/
 
 ## Metrics
-grafana/
-prometheus/
+grafana
+prometheus
 
 ## test dir
 # sandbox
