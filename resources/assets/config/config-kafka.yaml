@@ -30,7 +30,7 @@ connectors:
         fetch_isolation_level: read_uncommited # read_commited/read_uncommited (defaults to read_uncommited)
 observability:
   metrics:
-    enabled: false
+    enabled: true
     addr: ":9090"
     path: "/metrics"
   tracing:

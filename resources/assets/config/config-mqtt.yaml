@@ -33,7 +33,7 @@ connectors:
         disconnect_timeout: 5s
 observability:
   metrics:
-    enabled: false
+    enabled: true
     addr: ":9090"
     path: "/metrics"
   tracing:
