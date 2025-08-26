@@ -217,7 +217,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum(rate(fujin_ops_total{opcode=~\"hmsg|msg\"}[$__rate_interval]))",
+          "expr": "sum by(connector) (rate(fujin_ops_total{opcode=~\"hmsg|msg\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
