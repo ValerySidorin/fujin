@@ -24,7 +24,10 @@ go.work.sum
 .vscode
 .DS_Store
 bin/
+
+## Metrics
 grafana/
+prometheus/
 
 ## test dir
 # sandbox

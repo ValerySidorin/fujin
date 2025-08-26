@@ -3,9 +3,9 @@
 APP_NAME := fujin
 VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")
 
-ALL_BROKERS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
+ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
 
-GO_BUILD_TAGS ?= ${ALL_BROKERS}
+GO_BUILD_TAGS ?= ${ALL_TAGS}
 
 BENCH_TIME ?= 1000000x
 BENCH_FUNC ?= Benchmark_Produce_1BPayload_RedisPubSub

@@ -1,3 +1,5 @@
+//go:build observability
+
 package observability
 
 import (
@@ -12,6 +14,11 @@ import (
 )
 
 var MessagingSystemFujin = semconv.MessagingSystemKey.String("fujin")
+
+func init() {
+	OtelWriterWrapper = WrapOtelWriterIfEnabled
+	OtelReaderWrapper = WrapOtelReaderIfEnabled
+}
 
 func WrapOtelWriterIfEnabled(w writer.Writer, connectorName string) writer.Writer {
 	if !obs.TracingEnabled() {

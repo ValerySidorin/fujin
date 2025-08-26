@@ -1,3 +1,5 @@
+//go:build observability
+
 package observability
 
 import (
@@ -8,6 +10,11 @@ import (
 	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
 )
+
+func init() {
+	MetricsWriterWrapper = WrapMetricsWriterIfEnabled
+	MetricsReaderWrapper = WrapMetricsReaderIfEnabled
+}
 
 func WrapMetricsWriterIfEnabled(w writer.Writer, connectorName string) writer.Writer {
 	if !obs.MetricsEnabled() {
@@ -28,7 +35,7 @@ func (d *metricsWriterDecorator) Produce(ctx context.Context, msg []byte, callba
 		if err != nil {
 			obs.IncError("produce", d.connectorName)
 		}
-		obs.ObserveWriteLatency(d.connectorName, time.Since(start))
+		obs.ObserveProduceLatency(d.connectorName, time.Since(start))
 		if callback != nil {
 			callback(err)
 		}
@@ -42,7 +49,7 @@ func (d *metricsWriterDecorator) HProduce(ctx context.Context, msg []byte, heade
 		if err != nil {
 			obs.IncError("hproduce", d.connectorName)
 		}
-		obs.ObserveWriteLatency(d.connectorName, time.Since(start))
+		obs.ObserveProduceLatency(d.connectorName, time.Since(start))
 		if callback != nil {
 			callback(err)
 		}

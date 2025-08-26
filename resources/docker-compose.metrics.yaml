@@ -9,7 +9,7 @@ services:
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
     volumes:
-      - ./prometheus/prom.yml:/etc/prometheus/prom.yml:ro
+      - ./assets/prom_assets/prom.yml:/etc/prometheus/prom.yml:ro
       - ./prometheus:/etc/prometheus
     ports:
       - "9091:9090"

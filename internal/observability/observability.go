@@ -1,3 +1,5 @@
+//go:build observability
+
 package observability
 
 import (
@@ -18,52 +20,25 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type MetricsConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Addr    string `yaml:"addr"`
-	Path    string `yaml:"path"`
-}
-
-type TracingConfig struct {
-	Enabled      bool           `yaml:"enabled"`
-	OTLPEndpoint string         `yaml:"otlp_endpoint"`
-	Insecure     bool           `yaml:"insecure"`
-	SampleRatio  float64        `yaml:"sample_ratio"`
-	Resource     ResourceConfig `yaml:"resource"`
-}
-
-type ResourceConfig struct {
-	ServiceName    string `yaml:"service_name"`
-	ServiceVersion string `yaml:"service_version"`
-	Environment    string `yaml:"environment"`
-}
-
-type Config struct {
-	Metrics MetricsConfig `yaml:"metrics"`
-	Tracing TracingConfig `yaml:"tracing"`
-}
-
 var (
-	metricsEnabled int32
-	tracingEnabled int32
+	metricsEnabled atomic.Bool
+	tracingEnabled atomic.Bool
 
 	defaultTracer trace.Tracer
 
 	opsTotal                 *prometheus.CounterVec
 	errorsTotal              *prometheus.CounterVec
 	connectorWriteLatencySec *prometheus.HistogramVec
-	quicSessionsActive       prometheus.Gauge
-	streamsActive            prometheus.Gauge
 
 	httpSrv *http.Server
 )
 
 func MetricsEnabled() bool {
-	return atomic.LoadInt32(&metricsEnabled) == 1
+	return metricsEnabled.Load()
 }
 
 func TracingEnabled() bool {
-	return atomic.LoadInt32(&tracingEnabled) == 1
+	return tracingEnabled.Load()
 }
 
 func Tracer() trace.Tracer {
@@ -81,7 +56,7 @@ func Init(ctx context.Context, cfg Config, l *slog.Logger) (func(context.Context
 	shutdownFns := []func(context.Context) error{}
 
 	if cfg.Metrics.Enabled {
-		atomic.StoreInt32(&metricsEnabled, 1)
+		metricsEnabled.Store(true)
 		opsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "fujin_ops_total",
 			Help: "Number of protocol operations",
@@ -91,8 +66,8 @@ func Init(ctx context.Context, cfg Config, l *slog.Logger) (func(context.Context
 			Help: "Errors by stage and connector",
 		}, []string{"stage", "connector"})
 		connectorWriteLatencySec = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Name:    "fujin_connector_write_latency_seconds",
-			Help:    "Connector write latency",
+			Name:    "fujin_connector_produce_latency_seconds",
+			Help:    "Connector produce latency",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"connector"})
 		prometheus.MustRegister(opsTotal, errorsTotal, connectorWriteLatencySec)
@@ -114,7 +89,7 @@ func Init(ctx context.Context, cfg Config, l *slog.Logger) (func(context.Context
 	}
 
 	if cfg.Tracing.Enabled {
-		atomic.StoreInt32(&tracingEnabled, 1)
+		tracingEnabled.Store(true)
 		var opts []otlptracegrpc.Option
 		opts = append(opts, otlptracegrpc.WithEndpoint(cfg.Tracing.OTLPEndpoint))
 		if cfg.Tracing.Insecure {
@@ -159,14 +134,6 @@ func IncError(stage, connector string) {
 	errorsTotal.WithLabelValues(stage, connector).Inc()
 }
 
-func ObserveWriteLatency(connector string, d time.Duration) {
+func ObserveProduceLatency(connector string, d time.Duration) {
 	connectorWriteLatencySec.WithLabelValues(connector).Observe(d.Seconds())
-}
-
-func IncQuicSessions(delta float64) {
-	quicSessionsActive.Add(delta)
-}
-
-func IncStreams(delta float64) {
-	streamsActive.Add(delta)
 }

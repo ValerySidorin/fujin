@@ -53,7 +53,7 @@ func (m *Manager) GetReader(name string, autoCommit bool) (reader.Reader, error)
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
-	r = observability.WrapOtelReaderIfEnabled(observability.WrapMetricsReaderIfEnabled(r, name), name)
+	r = observability.OtelReaderWrapper(observability.MetricsReaderWrapper(r, name), name)
 	return r, nil
 }
 
@@ -77,7 +77,7 @@ func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
 			if err != nil {
 				return nil, err
 			}
-			w = observability.WrapOtelWriterIfEnabled(observability.WrapMetricsWriterIfEnabled(w, name), name)
+			w = observability.OtelWriterWrapper(observability.MetricsWriterWrapper(w, name), name)
 			return w, nil
 		})
 		wpoolm[writerID] = pool
@@ -108,7 +108,7 @@ func (m *Manager) GetWriter(name, writerID string) (writer.Writer, error) {
 			if err != nil {
 				return nil, err
 			}
-			w = observability.WrapOtelWriterIfEnabled(observability.WrapMetricsWriterIfEnabled(w, name), name)
+			w = observability.OtelWriterWrapper(observability.MetricsWriterWrapper(w, name), name)
 			return w, nil
 		})
 		wpoolm[writerID] = pool
