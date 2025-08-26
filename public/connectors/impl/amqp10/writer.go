@@ -72,7 +72,7 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	callback(
 		w.sender.Send(ctx, amqp.NewMessage(msg), &amqp.SendOptions{
 			Settled: w.conf.Send.Settled,
@@ -80,7 +80,7 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	)
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	amqpMsg := amqp.NewMessage(msg)
 
 	if len(headers) > 0 {

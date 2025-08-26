@@ -25,5 +25,9 @@ go.work.sum
 .DS_Store
 bin/
 
+## Metrics
+grafana
+prometheus
+
 ## test dir
 # sandbox

@@ -133,7 +133,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	}
 }
 
-func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	pingCtx, cancel := context.WithTimeout(ctx, r.conf.PingTimeout)
 	defer cancel()
 
@@ -202,7 +202,7 @@ func (r *Reader) Fetch(
 	}
 }
 
-func (r *Reader) FetchH(
+func (r *Reader) HFetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),

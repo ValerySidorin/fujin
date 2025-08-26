@@ -18,3 +18,17 @@ connectors:
         topic: my_pub_topic
         group: fujin
         allow_auto_topic_creation: true
+observability:
+  metrics:
+    enabled: false
+    addr: ":9090"
+    path: "/metrics"
+  tracing:
+    enabled: false
+    otlp_addr: "localhost:4317"
+    insecure: true
+    sample_ratio: 0.1
+    resource:
+      service_name: "fujin"
+      service_version: "dev"
+      env: "dev"

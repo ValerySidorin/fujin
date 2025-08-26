@@ -30,12 +30,12 @@ func NewWriter(conf WriterConfig, l *slog.Logger) (*Writer, error) {
 	}, nil
 }
 
-func (w *Writer) Write(_ context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(_ context.Context, msg []byte, callback func(err error)) {
 	err := w.nc.Publish(w.conf.Subject, msg)
 	callback(err)
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	natsMsg := &nats.Msg{
 		Subject: w.conf.Subject,
 		Data:    msg,

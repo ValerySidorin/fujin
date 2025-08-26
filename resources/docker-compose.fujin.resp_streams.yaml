@@ -4,7 +4,7 @@ services:
     build:
       context: ./..
       args:
-        GO_BUILD_TAGS: resp_streams
+        GO_BUILD_TAGS: resp_streams,observability
     container_name: fujin
     ports:
       - "4848:4848/udp"

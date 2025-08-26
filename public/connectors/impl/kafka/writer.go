@@ -46,7 +46,7 @@ func NewWriter(conf WriterConfig, writerID string, l *slog.Logger) (*Writer, err
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)) {
+func (w *Writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
 	w.wg.Add(1)
 	w.c.Produce(ctx, &kgo.Record{
 		Topic: w.conf.Topic,
@@ -57,7 +57,7 @@ func (w *Writer) Write(ctx context.Context, msg []byte, callback func(err error)
 	})
 }
 
-func (w *Writer) WriteH(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
 	w.wg.Add(1)
 	rec := &kgo.Record{
 		Topic: w.conf.Topic,

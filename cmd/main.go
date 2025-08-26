@@ -5,10 +5,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ValerySidorin/fujin/public/service"
-	_ "go.uber.org/automaxprocs"
-
 	_ "github.com/ValerySidorin/fujin/public/connectors/all"
+	"github.com/ValerySidorin/fujin/public/service"
 )
 
 func main() {

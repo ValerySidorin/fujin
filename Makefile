@@ -3,9 +3,9 @@
 APP_NAME := fujin
 VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")
 
-ALL_BROKERS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
+ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq
 
-GO_BUILD_TAGS ?= ${ALL_BROKERS}
+GO_BUILD_TAGS ?= ${ALL_TAGS}
 
 BENCH_TIME ?= 1000000x
 BENCH_FUNC ?= Benchmark_Produce_1BPayload_RedisPubSub
@@ -51,58 +51,58 @@ help:
 
 # Kafka
 up-kafka:
-	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml up -d
+	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-kafka:
-	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml down
+	docker compose -f resources/docker-compose.fujin.kafka.yaml -f resources/docker-compose.kafka.yaml -f resources/docker-compose.metrics.yaml down
 
 # NATS
 up-nats_core:
-	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml up -d
+	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-nats_core:
-	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml down
+	docker compose -f resources/docker-compose.fujin.nats_core.yaml -f resources/docker-compose.nats_core.yaml -f resources/docker-compose.metrics.yaml down
 
 # RabbitMQ
 up-amqp091:
-	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml up -d
+	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-amqp091:
-	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml down
+	docker compose -f resources/docker-compose.fujin.amqp091.yaml -f resources/docker-compose.rabbitmq.yaml -f resources/docker-compose.metrics.yaml down
 
 # ActiveMQ Artemis
 up-amqp10:
-	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml up -d
+	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-amqp10:
-	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml down
+	docker compose -f resources/docker-compose.fujin.amqp10.yaml -f resources/docker-compose.artemis.yaml -f resources/docker-compose.metrics.yaml down
 
 # EMQX
 up-mqtt:
-	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml up -d
+	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-mqtt:
-	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml down
+	docker compose -f resources/docker-compose.fujin.mqtt.yaml -f resources/docker-compose.emqx.yaml -f resources/docker-compose.metrics.yaml down
 # Redis (e.g. ValKey)
 up-resp_pubsub:
-	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml up -d
+	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-resp_pubsub:
-	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml down
+	docker compose -f resources/docker-compose.fujin.resp_pubsub.yaml -f resources/docker-compose.valkey.yaml -f resources/docker-compose.metrics.yaml down
 
 up-resp_streams:
-	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml up -d
+	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-resp_streams:
-	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml down
+	docker compose -f resources/docker-compose.fujin.resp_streams.yaml -f resources/docker-compose.valkey.yaml -f resources/docker-compose.metrics.yaml down
 
 
 # NSQ
 up-nsq:
-	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml up -d
+	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml -f resources/docker-compose.metrics.yaml up -d
 
 down-nsq:
-	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml down
+	docker compose -f resources/docker-compose.fujin.nsq.yaml -f resources/docker-compose.nsq.yaml -f resources/docker-compose.metrics.yaml down
 
 # Helper command to show all available broker commands
 broker-help:

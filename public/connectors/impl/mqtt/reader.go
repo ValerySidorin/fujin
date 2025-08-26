@@ -72,7 +72,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	return nil
 }
 
-func (r *Reader) SubscribeH(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) HSubscribe(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	sub := r.cl.Subscribe(r.conf.Topic, r.conf.QoS, func(_ mqtt.Client, msg mqtt.Message) {
 		if r.autoAck {
 			h(msg.Payload(), msg.Topic(), nil)
@@ -97,7 +97,7 @@ func (r *Reader) Fetch(
 	fetchHandler(0, cerr.ErrNotSupported)
 }
 
-func (r *Reader) FetchH(
+func (r *Reader) HFetch(
 	ctx context.Context, n uint32,
 	fetchHandler func(n uint32, err error),
 	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),

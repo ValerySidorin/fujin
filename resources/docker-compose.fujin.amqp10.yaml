@@ -4,7 +4,7 @@ services:
     build:
       context: ./..
       args:
-        GO_BUILD_TAGS: amqp10
+        GO_BUILD_TAGS: amqp10,observability
     container_name: fujin
     ports:
       - "4848:4848/udp"
