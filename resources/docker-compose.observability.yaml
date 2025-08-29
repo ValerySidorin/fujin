@@ -29,3 +29,23 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./assets/tempo_assets/tempo.yaml:/etc/tempo.yaml:ro
+      - ./tempo:/var/tempo
+    ports:
+      - "3200:3200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol-config.yaml"]
+    volumes:
+      - ./assets/otelcol_assets/otelcol-config.yaml:/etc/otelcol-config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
