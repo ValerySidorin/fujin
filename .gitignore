@@ -25,9 +25,10 @@ go.work.sum
 .DS_Store
 bin/
 
-## Metrics
+## Observability
 grafana
 prometheus
+tempo
 
 ## test dir
 # sandbox

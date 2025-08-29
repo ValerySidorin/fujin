@@ -182,8 +182,8 @@ observability:
     addr: ":9090"
     path: "/metrics"
   tracing:
-    enabled: false
-    otlp_addr: "localhost:4317"
+    enabled: true
+    otlp_endpoint: "localhost:4317"
     insecure: true
     sample_ratio: 0.1
     resource:

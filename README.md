@@ -61,7 +61,6 @@ Consider alternatives if:
 ## TODO
 
 - Request/Reply
-- Protocol versioning
 - Message headers ?
 
 ## Contributing
