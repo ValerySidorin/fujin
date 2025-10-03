@@ -10,6 +10,6 @@ import (
 
 // newGRPCServerImpl creates a new gRPC server implementation
 // This is a stub that returns nil when gRPC is not enabled
-func newGRPCServerImpl(addr string, cman *connectors.Manager, l *slog.Logger) GRPCServer {
+func newGRPCServerImpl(_ string, _ *connectors.Manager, _ *slog.Logger) GRPCServer {
 	return nil
 }

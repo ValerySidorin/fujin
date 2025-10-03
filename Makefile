@@ -3,7 +3,7 @@
 APP_NAME := fujin
 VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")
 
-ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq,observability
+ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq,observability,grpc,fujin
 
 GO_BUILD_TAGS ?= ${ALL_TAGS}
 

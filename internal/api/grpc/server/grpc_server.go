@@ -3,68 +3,459 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"sync"
 
-	fujinv1 "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
-	iconn "github.com/ValerySidorin/fujin/internal/connectors"
+	pb "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
+	"github.com/ValerySidorin/fujin/internal/connectors"
+	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
+	"github.com/ValerySidorin/fujin/public/connectors/writer"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
-// GRPCServerWrapper wraps the gRPC server for integration with the main server
-type GRPCServerWrapper struct {
-	server *grpc.Server
-	addr   string
-	l      *slog.Logger
+// GRPCServer implements the Fujin gRPC service
+type GRPCServer struct {
+	pb.UnimplementedFujinServiceServer
+
+	addr string
+	cman *connectors.Manager
+	l    *slog.Logger
+
+	grpcServer *grpc.Server
 }
 
-// NewGRPCServerWrapper creates a new gRPC server wrapper
-func NewGRPCServerWrapper(addr string, cman *iconn.Manager, l *slog.Logger) *GRPCServerWrapper {
-	// Create gRPC server
-	grpcServer := grpc.NewServer()
-
-	// Register the Fujin service
-	fujinService := NewGRPCServer(cman, l)
-	fujinv1.RegisterFujinServiceServer(grpcServer, fujinService)
-
-	// Enable reflection for debugging
-	reflection.Register(grpcServer)
-
-	return &GRPCServerWrapper{
-		server: grpcServer,
-		addr:   addr,
-		l:      l,
+// NewGRPCServer creates a new gRPC server instance
+func NewGRPCServer(addr string, cman *connectors.Manager, l *slog.Logger) *GRPCServer {
+	return &GRPCServer{
+		addr: addr,
+		cman: cman,
+		l:    l,
 	}
 }
 
 // ListenAndServe starts the gRPC server
-func (s *GRPCServerWrapper) ListenAndServe(ctx context.Context) error {
+func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 	lis, err := net.Listen("tcp", s.addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen: %w", err)
+		return fmt.Errorf("failed to listen on %s: %w", s.addr, err)
 	}
-	defer lis.Close()
 
-	s.l.Info("starting gRPC server", "addr", s.addr)
+	s.grpcServer = grpc.NewServer()
+	pb.RegisterFujinServiceServer(s.grpcServer, s)
 
-	// Start serving in a goroutine
+	s.l.Info("gRPC server started", "addr", s.addr)
+
+	errCh := make(chan error, 1)
 	go func() {
-		if err := s.server.Serve(lis); err != nil {
-			s.l.Error("failed to serve gRPC", "error", err)
+		if err := s.grpcServer.Serve(lis); err != nil {
+			errCh <- err
 		}
 	}()
 
-	// Wait for context cancellation
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		s.l.Info("shutting down gRPC server")
+		s.grpcServer.GracefulStop()
+		return nil
+	case err := <-errCh:
+		return err
+	}
+}
 
-	s.l.Info("stopping gRPC server")
-	s.server.GracefulStop()
+// Stop gracefully stops the gRPC server
+func (s *GRPCServer) Stop() {
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
+	}
+}
+
+// Stream implements the bidirectional streaming RPC
+func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
+	ctx := stream.Context()
+
+	session := &streamSession{
+		stream:      stream,
+		cman:        s.cman,
+		l:           s.l,
+		ctx:         ctx,
+		writers:     make(map[string]writer.Writer),
+		readers:     make(map[byte]*readerState),
+		nextSubID:   0,
+		connected:   false,
+		correlators: make(map[uint32]chan error),
+	}
+
+	// Start goroutines for receiving and sending
+	errCh := make(chan error, 2)
+
+	// Receiver goroutine
+	go func() {
+		err := session.receiveLoop()
+		errCh <- err
+	}()
+
+	// Wait for either error or context cancellation
+	select {
+	case <-ctx.Done():
+		session.cleanup()
+		return ctx.Err()
+	case err := <-errCh:
+		session.cleanup()
+		if err == io.EOF {
+			return nil
+		}
+		return err
+	}
+}
+
+// streamSession represents a single bidirectional stream session
+type streamSession struct {
+	stream pb.FujinService_StreamServer
+	cman   *connectors.Manager
+	l      *slog.Logger
+	ctx    context.Context
+
+	mu          sync.RWMutex
+	writers     map[string]writer.Writer
+	readers     map[byte]*readerState
+	nextSubID   byte
+	streamID    string
+	connected   bool
+	correlators map[uint32]chan error
+}
+
+type readerState struct {
+	reader     internal_reader.Reader
+	topic      string
+	autoCommit bool
+	cancel     context.CancelFunc
+}
+
+// receiveLoop handles incoming requests from client
+func (s *streamSession) receiveLoop() error {
+	for {
+		req, err := s.stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				return io.EOF
+			}
+			return fmt.Errorf("receive error: %w", err)
+		}
+
+		if err := s.handleRequest(req); err != nil {
+			s.l.Error("handle request error", "err", err)
+			return err
+		}
+	}
+}
+
+// handleRequest processes a single request
+func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
+	switch r := req.Request.(type) {
+	case *pb.FujinRequest_Connect:
+		return s.handleConnect(r.Connect)
+	case *pb.FujinRequest_Produce:
+		return s.handleProduce(r.Produce)
+	case *pb.FujinRequest_Subscribe:
+		return s.handleSubscribe(r.Subscribe)
+	case *pb.FujinRequest_Ack:
+		return s.handleAck(r.Ack)
+	case *pb.FujinRequest_Nack:
+		return s.handleNack(r.Nack)
+	default:
+		return fmt.Errorf("unknown request type")
+	}
+}
+
+// handleConnect processes CONNECT request
+func (s *streamSession) handleConnect(req *pb.ConnectRequest) error {
+	if s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Connect{
+				Connect: &pb.ConnectResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "already connected",
+				},
+			},
+		})
+	}
+
+	s.streamID = req.StreamId
+	s.connected = true
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Connect{
+			Connect: &pb.ConnectResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         "",
+			},
+		},
+	})
+}
+
+// handleProduce processes PRODUCE request
+func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Produce{
+				Produce: &pb.ProduceResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	// Get or create writer for this topic
+	w, err := s.getWriter(req.Topic)
+	if err != nil {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Produce{
+				Produce: &pb.ProduceResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         err.Error(),
+				},
+			},
+		})
+	}
+
+	// Convert headers to [][]byte format
+	var headers [][]byte
+	if len(req.Headers) > 0 {
+		headers = make([][]byte, 0, len(req.Headers)*2)
+		for _, h := range req.Headers {
+			headers = append(headers, h.Key, h.Value)
+		}
+	}
+
+	// Channel for async callback
+	errCh := make(chan error, 1)
+	callback := func(writeErr error) {
+		errCh <- writeErr
+	}
+
+	// Write message
+	if len(headers) > 0 {
+		w.HProduce(s.ctx, req.Message, headers, callback)
+	} else {
+		w.Produce(s.ctx, req.Message, callback)
+	}
+
+	// Wait for callback
+	writeErr := <-errCh
+
+	errMsg := ""
+	if writeErr != nil {
+		errMsg = writeErr.Error()
+	}
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Produce{
+			Produce: &pb.ProduceResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errMsg,
+			},
+		},
+	})
+}
+
+// handleSubscribe processes SUBSCRIBE request
+func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Subscribe{
+				Subscribe: &pb.SubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "not connected",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	if s.nextSubID == 255 {
+		s.mu.Unlock()
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Subscribe{
+				Subscribe: &pb.SubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "maximum subscriptions reached (255)",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+	s.nextSubID++
+	subID := s.nextSubID
+	s.mu.Unlock()
+
+	r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
+	if err != nil {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Subscribe{
+				Subscribe: &pb.SubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          err.Error(),
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	ctx, cancel := context.WithCancel(s.ctx)
+
+	state := &readerState{
+		reader:     r,
+		topic:      req.Topic,
+		autoCommit: req.AutoCommit,
+		cancel:     cancel,
+	}
+
+	s.mu.Lock()
+	s.readers[subID] = state
+	s.mu.Unlock()
+
+	if err := s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Subscribe{
+			Subscribe: &pb.SubscribeResponse{
+				CorrelationId:  req.CorrelationId,
+				Error:          "",
+				SubscriptionId: uint32(subID),
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	// Start subscription goroutine
+	go s.subscribeLoop(ctx, subID, state)
 
 	return nil
 }
 
-// Stop gracefully stops the gRPC server
-func (s *GRPCServerWrapper) Stop() {
-	s.server.GracefulStop()
+// subscribeLoop continuously reads messages and sends them to client
+func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *readerState) {
+	defer func() {
+		s.mu.Lock()
+		delete(s.readers, subID)
+		s.mu.Unlock()
+		state.reader.Close()
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			var err error
+			msgHandler := func(message []byte, topic string, args ...any) {
+				// Encode message ID if not auto-commit
+				var msgID []byte
+				if !state.autoCommit && len(args) > 0 {
+					msgIDBuf := make([]byte, state.reader.MsgIDStaticArgsLen())
+					msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
+				}
+
+				_ = s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Message{
+						Message: &pb.Message{
+							CorrelationId: uint32(subID),
+							Topic:         topic,
+							Payload:       message,
+							Headers:       nil,
+							DeliveryId:    msgID,
+						},
+					},
+				})
+			}
+			err = state.reader.Subscribe(ctx, msgHandler)
+			if err != nil && ctx.Err() == nil {
+				s.l.Error("subscribe error", "sub_id", subID, "err", err)
+			}
+			if ctx.Err() != nil {
+				return
+			}
+		}
+	}
+}
+
+// handleAck processes ACK request
+func (s *streamSession) handleAck(req *pb.AckRequest) error {
+	// Find the reader associated with this message
+	// Not implemented
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Ack{
+			Ack: &pb.Empty{
+				CorrelationId: req.CorrelationId,
+				Error:         "",
+			},
+		},
+	})
+}
+
+// handleNack processes NACK request
+func (s *streamSession) handleNack(req *pb.NackRequest) error {
+	// Find the reader associated with this message
+	// Not implemented
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Nack{
+			Nack: &pb.Empty{
+				CorrelationId: req.CorrelationId,
+				Error:         "",
+			},
+		},
+	})
+}
+
+// getWriter retrieves or creates a writer for the given topic
+func (s *streamSession) getWriter(topic string) (writer.Writer, error) {
+	s.mu.RLock()
+	if w, exists := s.writers[topic]; exists {
+		s.mu.RUnlock()
+		return w, nil
+	}
+	s.mu.RUnlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	w, err := s.cman.GetWriter(topic, s.streamID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.writers[topic] = w
+	return w, nil
+}
+
+// sendResponse sends a response to the client
+func (s *streamSession) sendResponse(resp *pb.FujinResponse) error {
+	if err := s.stream.Send(resp); err != nil {
+		return fmt.Errorf("send response: %w", err)
+	}
+	return nil
+}
+
+// cleanup releases all resources
+func (s *streamSession) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Close all writers
+	for topic, w := range s.writers {
+		w.Flush(s.ctx)
+		s.cman.PutWriter(w, topic, s.streamID)
+	}
+	s.writers = make(map[string]writer.Writer)
+
+	// Cancel all readers
+	for _, state := range s.readers {
+		state.cancel()
+		state.reader.Close()
+	}
+	s.readers = make(map[byte]*readerState)
 }

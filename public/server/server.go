@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/api/fujin/server"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	obs "github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/public/server/config"
@@ -15,11 +14,18 @@ import (
 type Server struct {
 	conf config.Config
 
-	fujinServer *server.Server
+	fujinServer FujinServer
 	grpcServer  GRPCServer
 	cman        *connectors.Manager
 
 	l *slog.Logger
+}
+
+// FujinServer interface for optional Fujin server
+type FujinServer interface {
+	ListenAndServe(ctx context.Context) error
+	ReadyForConnections(timeout time.Duration) bool
+	Done() <-chan struct{}
 }
 
 // GRPCServer interface for optional gRPC server
@@ -40,7 +46,7 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 	s.cman = connectors.NewManager(s.conf.Connectors, s.l)
 
 	if !conf.Fujin.Disabled {
-		s.fujinServer = server.NewServer(conf.Fujin, s.cman, s.l)
+		s.fujinServer = newFujinServerImpl(conf.Fujin, s.cman, s.l)
 	}
 
 	// Initialize gRPC server if enabled
@@ -50,7 +56,6 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
-	s.l.Info("starting fujin server")
 	defer s.cman.Close()
 
 	shutdown, _ := obs.Init(ctx, s.conf.Observability, s.l)

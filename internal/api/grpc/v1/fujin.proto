@@ -44,6 +44,13 @@ message SubscribeRequest {
   repeated Header headers = 4;
 }
 
+// Subscribe response
+message SubscribeResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+  uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
+}
+
 // Message delivery
 message Message {
   uint32 correlation_id = 1;
@@ -93,10 +100,9 @@ message FujinResponse {
   oneof response {
     ConnectResponse connect = 1;
     ProduceResponse produce = 2;
-    Message message = 3;
-    Empty ack = 4;
-    Empty nack = 5;
+    SubscribeResponse subscribe = 3;
+    Message message = 4;
+    Empty ack = 5;
+    Empty nack = 6;
   }
 }
-
-
