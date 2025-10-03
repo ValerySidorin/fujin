@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
-	"github.com/ValerySidorin/fujin/internal/fujin/version"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
 	"github.com/quic-go/quic-go"
 )
 

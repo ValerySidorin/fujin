@@ -1,4 +1,4 @@
-package fujin
+package server
 
 import (
 	"context"
@@ -10,13 +10,13 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/ValerySidorin/fujin/internal/api/fujin"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response/server"
 	pool2 "github.com/ValerySidorin/fujin/internal/common/pool"
 	"github.com/ValerySidorin/fujin/internal/connectors"
-	"github.com/ValerySidorin/fujin/internal/fujin"
-	"github.com/ValerySidorin/fujin/internal/fujin/pool"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/response/server"
 	"github.com/ValerySidorin/fujin/public/connectors/reader"
 	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"

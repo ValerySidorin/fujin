@@ -13,6 +13,9 @@ fujin:
     max_incoming_streams: 1000
     max_idle_timeout: 5s
     keepalive_period: 2s
+grpc:
+  disabled: false
+  addr: :9091
 connectors:
   writers:
     # pub:
@@ -83,10 +86,6 @@ connectors:
     #     clean_session: true
     #     keep_alive: 2s
     #     disconnect_timeout: 5s
-    #     pool:
-    #       size: 10000
-    #       pre_alloc: true
-    #       release_timeout: 5s
     # pub:
     #   protocol: nsq
     #   settings:

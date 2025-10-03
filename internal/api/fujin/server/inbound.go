@@ -1,4 +1,4 @@
-package fujin
+package server
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/api/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/common/assert"
-	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
-	"github.com/ValerySidorin/fujin/internal/fujin/pool"
 	"github.com/quic-go/quic-go"
 )
 
