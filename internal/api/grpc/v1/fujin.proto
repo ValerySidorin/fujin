@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package fujin.v1;
+
+option go_package = "github.com/ValerySidorin/fujin/internal/api/grpc/v1";
+
+// Binary-safe header, matching [][]byte in native protocol.
+message Header {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+// Connect request - must be sent first to initialize the stream
+message ConnectRequest {
+  uint32 correlation_id = 1;
+  string stream_id = 2;  // Used as transactional ID for Kafka
+}
+
+// Connect response
+message ConnectResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// Produce request with correlation ID for async response matching
+message ProduceRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bytes message = 3;
+  repeated Header headers = 4;
+}
+
+// Produce response with correlation ID
+message ProduceResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// Subscribe request
+message SubscribeRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bool auto_commit = 3;
+  repeated Header headers = 4;
+}
+
+// Subscribe response
+message SubscribeResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+  uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
+}
+
+// Message delivery
+message Message {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bytes payload = 3;
+  repeated Header headers = 4;
+  bytes delivery_id = 5;
+}
+
+// Ack request
+message AckRequest {
+  uint32 correlation_id = 1;
+  bytes message_id = 2;
+}
+
+// Nack request
+message NackRequest {
+  uint32 correlation_id = 1;
+  bytes message_id = 2;
+}
+
+// Empty response
+message Empty {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// Bidirectional streaming service for async request-response
+service FujinService {
+  // Bidirectional stream for all operations
+  rpc Stream(stream FujinRequest) returns (stream FujinResponse);
+}
+
+// Union type for all requests
+message FujinRequest {
+  oneof request {
+    ConnectRequest connect = 1;
+    ProduceRequest produce = 2;
+    SubscribeRequest subscribe = 3;
+    AckRequest ack = 4;
+    NackRequest nack = 5;
+  }
+}
+
+// Union type for all responses
+message FujinResponse {
+  oneof response {
+    ConnectResponse connect = 1;
+    ProduceResponse produce = 2;
+    SubscribeResponse subscribe = 3;
+    Message message = 4;
+    Empty ack = 5;
+    Empty nack = 6;
+  }
+}

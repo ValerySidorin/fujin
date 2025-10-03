@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/fujin/pool"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
 	"github.com/panjf2000/ants/v2"
 )
 

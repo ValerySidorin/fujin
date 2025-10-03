@@ -1,4 +1,4 @@
-package fujin
+package server
 
 import (
 	"context"
@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/api/fujin"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/ferr"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/connectors"
-	"github.com/ValerySidorin/fujin/internal/fujin"
-	"github.com/ValerySidorin/fujin/internal/fujin/ferr"
-	"github.com/ValerySidorin/fujin/internal/fujin/pool"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/metrics"

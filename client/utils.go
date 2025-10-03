@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/binary"
 
-	"github.com/ValerySidorin/fujin/internal/fujin"
+	"github.com/ValerySidorin/fujin/internal/api/fujin"
 )
 
 func (s *Stream) parseErrLenArg() error {

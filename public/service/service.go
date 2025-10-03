@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/fujin/version"
+	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/observability"
-	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
 	"github.com/ValerySidorin/fujin/public/server/config"
@@ -35,6 +35,7 @@ var (
 
 type Config struct {
 	Fujin         FujinConfig          `yaml:"fujin"`
+	GRPC          GRPCConfig           `yaml:"grpc"`
 	Connectors    connectors.Config    `yaml:"connectors"`
 	Observability observability.Config `yaml:"observability"`
 }
@@ -50,6 +51,11 @@ type FujinConfig struct {
 	PingMaxRetries        int           `yaml:"ping_max_retries"`
 	TLS                   TLSConfig     `yaml:"tls"`
 	QUIC                  QUICConfig    `yaml:"quic"`
+}
+
+type GRPCConfig struct {
+	Disabled bool   `yaml:"disabled"`
+	Addr     string `yaml:"addr"`
 }
 
 type TLSConfig struct {
@@ -68,7 +74,7 @@ type QUICConfig struct {
 
 func (c *Config) parse() (config.Config, error) {
 	var (
-		fujinConf fujin.ServerConfig
+		fujinConf fujin_server.ServerConfig
 		err       error
 	)
 
@@ -85,22 +91,23 @@ func (c *Config) parse() (config.Config, error) {
 
 	return config.Config{
 		Fujin:         fujinConf,
+		GRPC:          config.GRPCConfig{Disabled: c.GRPC.Disabled, Addr: c.GRPC.Addr},
 		Connectors:    c.Connectors,
 		Observability: c.Observability,
 	}, nil
 }
 
-func (c *Config) parseFujinServerConfig() (fujin.ServerConfig, error) {
+func (c *Config) parseFujinServerConfig() (fujin_server.ServerConfig, error) {
 	if c == nil {
-		return fujin.ServerConfig{}, ErrNilConfig
+		return fujin_server.ServerConfig{}, ErrNilConfig
 	}
 
 	tlsConf, err := c.Fujin.TLS.parse()
 	if err != nil {
-		return fujin.ServerConfig{}, fmt.Errorf("parse TLS conf: %w", err)
+		return fujin_server.ServerConfig{}, fmt.Errorf("parse TLS conf: %w", err)
 	}
 
-	return fujin.ServerConfig{
+	return fujin_server.ServerConfig{
 		Disabled:              c.Fujin.Disabled,
 		Addr:                  c.Fujin.Addr,
 		WriteDeadline:         c.Fujin.WriteDeadline,

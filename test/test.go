@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/request"
-	"github.com/ValerySidorin/fujin/internal/fujin/proto/response"
-	"github.com/ValerySidorin/fujin/internal/fujin/version"
-	"github.com/ValerySidorin/fujin/internal/server/fujin"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/response"
+	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/connectors/impl/amqp091"
 	"github.com/ValerySidorin/fujin/public/connectors/impl/amqp10"
@@ -41,7 +41,7 @@ const (
 	defaultRecvBufSize = 32768
 )
 
-var DefaultFujinServerTestConfig = fujin.ServerConfig{
+var DefaultFujinServerTestConfig = fujin_server.ServerConfig{
 	Addr: ":4848",
 	TLS:  generateTLSConfig(),
 }

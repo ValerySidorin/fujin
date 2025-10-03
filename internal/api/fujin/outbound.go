@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ValerySidorin/fujin/internal/fujin/pool"
+	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
 	"github.com/quic-go/quic-go"
 )
 

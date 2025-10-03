@@ -3,15 +3,21 @@ package config
 import (
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/api/fujin/server"
 	"github.com/ValerySidorin/fujin/internal/observability"
-	"github.com/ValerySidorin/fujin/internal/server/fujin"
 	"github.com/ValerySidorin/fujin/public/connectors"
 )
 
 type Config struct {
-	Fujin         fujin.ServerConfig
+	Fujin         server.ServerConfig
+	GRPC          GRPCConfig
 	Connectors    connectors.Config
 	Observability observability.Config
+}
+
+type GRPCConfig struct {
+	Disabled bool   `yaml:"disabled"`
+	Addr     string `yaml:"addr"`
 }
 
 type ObservabilityConfig struct {
@@ -36,6 +42,10 @@ type ObservabilityConfig struct {
 func (c *Config) SetDefaults() {
 	if c.Fujin.Addr == "" {
 		c.Fujin.Addr = ":4848"
+	}
+
+	if c.GRPC.Addr == "" {
+		c.GRPC.Addr = ":9091"
 	}
 
 	if c.Fujin.PingInterval == 0 {
