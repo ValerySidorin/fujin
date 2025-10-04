@@ -41,7 +41,7 @@ const (
 	defaultRecvBufSize = 32768
 )
 
-var DefaultFujinServerTestConfig = fujin_server.ServerConfig{
+var DefaultFujinServerTestConfig = fujin_server.FujinServerConfig{
 	Addr: ":4848",
 	TLS:  generateTLSConfig(),
 }

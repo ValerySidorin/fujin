@@ -2,24 +2,35 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	pb "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
+
+type GRPCServerConfig struct {
+	Enabled              bool
+	Addr                 string
+	ConnectionTimeout    time.Duration
+	MaxConcurrentStreams uint32
+	TLS                  *tls.Config
+}
 
 // GRPCServer implements the Fujin gRPC service
 type GRPCServer struct {
 	pb.UnimplementedFujinServiceServer
 
-	addr string
+	conf GRPCServerConfig
 	cman *connectors.Manager
 	l    *slog.Logger
 
@@ -27,26 +38,45 @@ type GRPCServer struct {
 }
 
 // NewGRPCServer creates a new gRPC server instance
-func NewGRPCServer(addr string, cman *connectors.Manager, l *slog.Logger) *GRPCServer {
+func NewGRPCServer(conf GRPCServerConfig, cman *connectors.Manager, l *slog.Logger) *GRPCServer {
 	return &GRPCServer{
-		addr: addr,
+		conf: conf,
 		cman: cman,
-		l:    l,
+		l:    l.With("server", "grpc"),
 	}
 }
 
 // ListenAndServe starts the gRPC server
 func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
-	lis, err := net.Listen("tcp", s.addr)
+	lis, err := net.Listen("tcp", s.conf.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", s.addr, err)
+		return fmt.Errorf("failed to listen on %s: %w", s.conf.Addr, err)
 	}
 
-	s.grpcServer = grpc.NewServer()
+	var serverOpts []grpc.ServerOption
+
+	if s.conf.ConnectionTimeout > 0 {
+		serverOpts = append(serverOpts, grpc.ConnectionTimeout(s.conf.ConnectionTimeout))
+	}
+
+	if s.conf.MaxConcurrentStreams > 0 {
+		serverOpts = append(serverOpts, grpc.MaxConcurrentStreams(s.conf.MaxConcurrentStreams))
+	}
+
+	if s.conf.TLS == nil {
+		s.conf.TLS = &tls.Config{}
+	}
+
+	if len(s.conf.TLS.Certificates) == 0 ||
+		s.conf.TLS.ClientCAs == nil {
+		s.l.Warn("tls not configured, this is not recommended for production environment")
+	}
+
+	serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(s.conf.TLS)))
+
+	s.grpcServer = grpc.NewServer(serverOpts...)
 	pb.RegisterFujinServiceServer(s.grpcServer, s)
-
-	s.l.Info("gRPC server started", "addr", s.addr)
-
+	s.l.Info("grpc server started", "addr", s.conf.Addr)
 	errCh := make(chan error, 1)
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
@@ -56,8 +86,9 @@ func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		s.l.Info("shutting down gRPC server")
+		s.l.Info("shutting down grpc server")
 		s.grpcServer.GracefulStop()
+		s.l.Info("grpc server stopped")
 		return nil
 	case err := <-errCh:
 		return err

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
-	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
+	grpc_server "github.com/ValerySidorin/fujin/internal/api/grpc/server"
 	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
@@ -26,11 +26,9 @@ import (
 
 var (
 	ErrNilConfig                     = errors.New("nil config")
-	ErrTLSClientCertsDirNotSpecified = errors.New("client certs dir not specified, while mTLS enabled")
+	ErrTLSClientCertsDirNotSpecified = errors.New("client certs dir not specified, while mtls enabled")
 	ErrTLSServerCertPathNotSpecified = errors.New("server cert path not specified")
 	ErrTLSServerKeyPathNotSpecified  = errors.New("server cert path not specified")
-
-	NextProtos = []string{version.Fujin1}
 )
 
 type Config struct {
@@ -41,7 +39,7 @@ type Config struct {
 }
 
 type FujinConfig struct {
-	Disabled              bool          `yaml:"disabled"`
+	Enabled               bool          `yaml:"enabled"`
 	Addr                  string        `yaml:"addr"`
 	WriteDeadline         time.Duration `yaml:"write_deadline"`
 	ForceTerminateTimeout time.Duration `yaml:"force_terminate_timeout"`
@@ -54,15 +52,19 @@ type FujinConfig struct {
 }
 
 type GRPCConfig struct {
-	Disabled bool   `yaml:"disabled"`
-	Addr     string `yaml:"addr"`
+	Enabled              bool          `yaml:"enabled"`
+	Addr                 string        `yaml:"addr"`
+	ConnectionTimeout    time.Duration `yaml:"connection_timeout"`
+	MaxConcurrentStreams uint32        `yaml:"max_concurrent_streams"`
+	TLS                  TLSConfig     `yaml:"tls"`
 }
 
 type TLSConfig struct {
-	ClientCertsDir    string `yaml:"client_certs_dir"`
-	ServerCertPEMPath string `yaml:"server_cert_pem_path"`
-	ServerKeyPEMPath  string `yaml:"server_key_pem_path"`
-	MTLSEnabled       bool   `yaml:"mtls_enabled"`
+	Enabled                    bool   `yaml:"enabled"`
+	ClientCertsDir             string `yaml:"client_certs_dir"`
+	ServerCertPEMPath          string `yaml:"server_cert_pem_path"`
+	ServerKeyPEMPath           string `yaml:"server_key_pem_path"`
+	RequireAndVerifyClientCert bool   `yaml:"require_and_verify_client_cert"`
 }
 
 type QUICConfig struct {
@@ -74,15 +76,19 @@ type QUICConfig struct {
 
 func (c *Config) parse() (config.Config, error) {
 	var (
-		fujinConf fujin_server.ServerConfig
+		fujinConf fujin_server.FujinServerConfig
+		grpcConf  grpc_server.GRPCServerConfig
 		err       error
 	)
 
-	if !c.Fujin.Disabled {
-		fujinConf, err = c.parseFujinServerConfig()
-		if err != nil {
-			return config.Config{}, fmt.Errorf("parse fujin server config: %w", err)
-		}
+	fujinConf, err = c.parseFujinServerConfig()
+	if err != nil {
+		return config.Config{}, fmt.Errorf("parse fujin server config: %w", err)
+	}
+
+	grpcConf, err = c.parseGRPCConfig()
+	if err != nil {
+		return config.Config{}, fmt.Errorf("parse grpc server config: %w", err)
 	}
 
 	if err := c.Connectors.Validate(); err != nil {
@@ -91,24 +97,30 @@ func (c *Config) parse() (config.Config, error) {
 
 	return config.Config{
 		Fujin:         fujinConf,
-		GRPC:          config.GRPCConfig{Disabled: c.GRPC.Disabled, Addr: c.GRPC.Addr},
+		GRPC:          grpcConf,
 		Connectors:    c.Connectors,
 		Observability: c.Observability,
 	}, nil
 }
 
-func (c *Config) parseFujinServerConfig() (fujin_server.ServerConfig, error) {
+func (c *Config) parseFujinServerConfig() (fujin_server.FujinServerConfig, error) {
 	if c == nil {
-		return fujin_server.ServerConfig{}, ErrNilConfig
+		return fujin_server.FujinServerConfig{}, ErrNilConfig
+	}
+
+	if !c.Fujin.Enabled {
+		return fujin_server.FujinServerConfig{
+			Enabled: c.Fujin.Enabled,
+		}, nil
 	}
 
 	tlsConf, err := c.Fujin.TLS.parse()
 	if err != nil {
-		return fujin_server.ServerConfig{}, fmt.Errorf("parse TLS conf: %w", err)
+		return fujin_server.FujinServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
 	}
 
-	return fujin_server.ServerConfig{
-		Disabled:              c.Fujin.Disabled,
+	return fujin_server.FujinServerConfig{
+		Enabled:               c.Fujin.Enabled,
 		Addr:                  c.Fujin.Addr,
 		WriteDeadline:         c.Fujin.WriteDeadline,
 		ForceTerminateTimeout: c.Fujin.ForceTerminateTimeout,
@@ -118,6 +130,31 @@ func (c *Config) parseFujinServerConfig() (fujin_server.ServerConfig, error) {
 		PingMaxRetries:        c.Fujin.PingMaxRetries,
 		TLS:                   tlsConf,
 		QUIC:                  c.Fujin.QUIC.parse(),
+	}, nil
+}
+
+func (c *Config) parseGRPCConfig() (grpc_server.GRPCServerConfig, error) {
+	if c == nil {
+		return grpc_server.GRPCServerConfig{}, ErrNilConfig
+	}
+
+	if !c.GRPC.Enabled {
+		return grpc_server.GRPCServerConfig{
+			Enabled: c.GRPC.Enabled,
+		}, nil
+	}
+
+	tlsConf, err := c.GRPC.TLS.parse()
+	if err != nil {
+		return grpc_server.GRPCServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
+	}
+
+	return grpc_server.GRPCServerConfig{
+		Enabled:              c.GRPC.Enabled,
+		Addr:                 c.GRPC.Addr,
+		ConnectionTimeout:    c.GRPC.ConnectionTimeout,
+		MaxConcurrentStreams: c.GRPC.MaxConcurrentStreams,
+		TLS:                  tlsConf,
 	}, nil
 }
 
@@ -131,7 +168,11 @@ func (c *QUICConfig) parse() *quic.Config {
 }
 
 func (c *TLSConfig) validate() error {
-	if c.ClientCertsDir == "" && c.MTLSEnabled {
+	if !c.Enabled {
+		return nil
+	}
+
+	if c.ClientCertsDir == "" && c.RequireAndVerifyClientCert {
 		return ErrTLSClientCertsDirNotSpecified
 	}
 
@@ -151,19 +192,23 @@ func (c *TLSConfig) parse() (*tls.Config, error) {
 		return nil, fmt.Errorf("validate: %w", err)
 	}
 
+	if !c.Enabled {
+		return nil, nil
+	}
+
 	caCertPool := x509.NewCertPool()
 
 	if c.ClientCertsDir != "" {
 		clientCAs, err := os.ReadDir(c.ClientCertsDir)
 		if err != nil {
-			return nil, fmt.Errorf("read client CAs dir: %w", err)
+			return nil, fmt.Errorf("read client certs dir: %w", err)
 		}
 
 		for _, certEntry := range clientCAs {
 			if !certEntry.IsDir() {
 				cert, err := os.ReadFile(filepath.Join(c.ClientCertsDir, certEntry.Name()))
 				if err != nil {
-					return nil, fmt.Errorf("read client CA: %w", err)
+					return nil, fmt.Errorf("read client cert: %w", err)
 				}
 				caCertPool.AppendCertsFromPEM(cert)
 			}
@@ -176,7 +221,7 @@ func (c *TLSConfig) parse() (*tls.Config, error) {
 	}
 
 	clientAuth := tls.NoClientCert
-	if c.MTLSEnabled {
+	if c.RequireAndVerifyClientCert {
 		clientAuth = tls.RequireAndVerifyClientCert
 	}
 
@@ -184,7 +229,6 @@ func (c *TLSConfig) parse() (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    caCertPool,
 		ClientAuth:   clientAuth,
-		NextProtos:   NextProtos,
 	}, nil
 }
 

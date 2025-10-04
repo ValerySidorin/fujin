@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/ValerySidorin/fujin/internal/api/fujin/server"
+	grpc_server "github.com/ValerySidorin/fujin/internal/api/grpc/server"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	obs "github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/public/server/config"
@@ -45,12 +47,14 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 
 	s.cman = connectors.NewManager(s.conf.Connectors, s.l)
 
-	if !conf.Fujin.Disabled {
-		s.fujinServer = newFujinServerImpl(conf.Fujin, s.cman, s.l)
+	if conf.Fujin.Enabled {
+		s.fujinServer = server.NewFujinServer(s.conf.Fujin, s.cman, s.l)
 	}
 
 	// Initialize gRPC server if enabled
-	s.grpcServer = newGRPCServer(conf.GRPC, s.cman, l)
+	if conf.GRPC.Enabled {
+		s.grpcServer = grpc_server.NewGRPCServerWrapper(s.conf.GRPC, s.cman, s.l)
+	}
 
 	return s, nil
 }
@@ -111,14 +115,4 @@ func (s *Server) Done() <-chan struct{} {
 	done := make(chan struct{})
 	close(done)
 	return done
-}
-
-// newGRPCServer creates a new gRPC server instance if gRPC is enabled
-func newGRPCServer(conf config.GRPCConfig, cman *connectors.Manager, l *slog.Logger) GRPCServer {
-	if conf.Disabled {
-		return nil
-	}
-
-	// This will only be compiled when the grpc build tag is present
-	return newGRPCServerImpl(conf.Addr, cman, l)
 }

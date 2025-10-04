@@ -3,7 +3,7 @@
 APP_NAME := fujin
 VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")
 
-ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq,observability,grpc,fujin
+ALL_TAGS = kafka,nats_core,amqp091,amqp10,resp_pubsub,resp_streams,mqtt,nsq,observability
 
 GO_BUILD_TAGS ?= ${ALL_TAGS}
 
@@ -27,7 +27,16 @@ clean:
 .PHONY: run
 run:
 	@echo "==> Running"
-	@./bin/fujin ./config.dev.yaml
+	@if [ -n "$(CONFIG)" ]; then \
+		echo "Using custom config: $(CONFIG)"; \
+		./bin/fujin $(CONFIG); \
+	elif [ -f "./config.dev.yaml" ]; then \
+		echo "Using config.dev.yaml"; \
+		./bin/fujin ./config.dev.yaml; \
+	else \
+		echo "Using examples/config/config.yaml"; \
+		./bin/fujin ./examples/config/config.yaml; \
+	fi
 
 .PHONY: test
 test:
@@ -39,12 +48,19 @@ help:
 	@echo "Fujin Makefile"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build [GO_BUILD_TAGS=\"tag1,tag2\"]  Build binary. Default GO_BUILD_TAGS=\"$(ALL_BROKERS)\"."
+	@echo "  make build [GO_BUILD_TAGS=\"tag1,tag2\"]  Build binary. Default GO_BUILD_TAGS=\"$(ALL_TAGS)\"."
+	@echo "  make run [CONFIG=\"path/to/config.yaml\"]  Run binary with config."
 	@echo "  make clean                             Remove build artifacts."
+	@echo ""
+	@echo "Config Priority:"
+	@echo "  1. CONFIG parameter (if provided)"
+	@echo "  2. ./config.dev.yaml (if exists)"
+	@echo "  3. ./examples/config/config.yaml (fallback)"
 	@echo ""
 	@echo "Variables:"
 	@echo "  VERSION (default: git describe || dev) Version tag for builds."
-	@echo "  GO_BUILD_TAGS (default: all brokers)   Comma-separated Go build tags."
+	@echo "  GO_BUILD_TAGS (default: all features)  Comma-separated Go build tags."
+	@echo "  CONFIG (optional)                      Path to custom config file."
 
 # Broker management commands
 .PHONY: up-kafka down-kafka up-nats down-nats up-rabbitmq down-rabbitmq up-artemis down-artemis up-emqx down-emqx up-nsq down-nsq
