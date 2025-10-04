@@ -26,22 +26,22 @@ grpc:
     server_key_pem_path: ./resources/assets/certs/fujin.io-key.pem
 connectors:
   writers:
-    # pub:
-    #   protocol: kafka
-    #   settings:
-    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
-    #     topic: my_pub_topic
-    #     allow_auto_topic_creation: true
-    #     linger: 10ms
-    #     max_buffered_records: 10000
-    #     disable_idempotent_write: false
     pub:
-      protocol: resp_pubsub
+      protocol: kafka
       settings:
-        init_address: ["localhost:6379"]
-        channel: example-channel
-        batch_size: 1000
+        brokers: [localhost:9092, localhost:9093, localhost:9094]
+        topic: my_pub_topic
+        allow_auto_topic_creation: true
         linger: 10ms
+        max_buffered_records: 10000
+        disable_idempotent_write: false
+    # pub:
+    #   protocol: resp_pubsub
+    #   settings:
+    #     init_address: ["localhost:6379"]
+    #     channel: example-channel
+    #     batch_size: 1000
+    #     linger: 10ms
     # pub:
     #   protocol: resp_pubsub
     #   settings:
@@ -104,53 +104,53 @@ connectors:
     #       pre_alloc: true
     #       release_timeout: 5s
   readers:
-    # sub:
-    #   protocol: kafka
-    #   settings:
-    #     brokers: [localhost:9092, localhost:9093, localhost:9094]
-    #     topic: my_pub_topic
-    #     group: fujin
-        # allow_auto_topic_creation: true
-        # max_poll_records: 10000
-        # auto_commit_interval: 5s
-        # auto_commit_marks: false
-        # block_rebalance_on_poll: false
-        # balancers:
-        #   - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
-        # fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
-    # sub:
-    #   protocol: nats
-    #   nats:
-    #     url: nats://localhost:4222
-    #     subject: my_subject
-    # sub:
-    #   protocol: amqp091
-    #   settings:
-    #     conn:
-    #       url: amqp://guest:guest@localhost
-    #     exchange:
-    #       name: events
-    #       kind: fanout
-    #     queue:
-    #       name: my_queue
-    #     queue_bind:
-    #       routing_key: my_routing_key
-    #     consume:
-    #       consumer: fujin
-    #     nack:
-    #       requeue: true
-    # sub:
-    #   protocol: amqp10
-    #   settings:
-    #     conn:
-    #       addr: amqp://artemis:artemis@localhost:61616
-    #     receiver:
-    #       source: exchange
     sub:
-      protocol: resp_pubsub
+      protocol: kafka
       settings:
-        init_address: ["localhost:6379"]
-        channels: [example-channel]
+        brokers: [localhost:9092, localhost:9093, localhost:9094]
+        topic: my_pub_topic
+        group: fujin
+        allow_auto_topic_creation: true
+        max_poll_records: 10000
+        auto_commit_interval: 5s
+        auto_commit_marks: false
+        block_rebalance_on_poll: false
+        balancers:
+          - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
+        fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
+    sub:
+      protocol: nats
+      nats:
+        url: nats://localhost:4222
+        subject: my_subject
+    sub:
+      protocol: amqp091
+      settings:
+        conn:
+          url: amqp://guest:guest@localhost
+        exchange:
+          name: events
+          kind: fanout
+        queue:
+          name: my_queue
+        queue_bind:
+          routing_key: my_routing_key
+        consume:
+          consumer: fujin
+        nack:
+          requeue: true
+    sub:
+      protocol: amqp10
+      settings:
+        conn:
+          addr: amqp://artemis:artemis@localhost:61616
+        receiver:
+          source: exchange
+    # sub:
+    #   protocol: resp_pubsub
+    #   settings:
+    #     init_address: ["localhost:6379"]
+    #     channels: [example-channel]
     # sub:
     #   protocol: resp_streams
     #   settings:

@@ -2,15 +2,11 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
-	"math/big"
 	"os"
 	"os/signal"
 	"time"
@@ -27,7 +23,7 @@ func main() {
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Dial(ctx, "localhost:4848", generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, "localhost:4848", &tls.Config{InsecureSkipVerify: true}, nil,
 		client.WithTimeout(100*time.Second),
 		client.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -79,15 +75,4 @@ func main() {
 			time.Sleep(1 * time.Second)
 		}
 	}
-}
-
-func generateTLSConfig() *tls.Config {
-	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	template := x509.Certificate{SerialNumber: big.NewInt(1)}
-	cert, _ := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	tlsCert := tls.Certificate{
-		Certificate: [][]byte{cert},
-		PrivateKey:  key,
-	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin/1"}}
 }

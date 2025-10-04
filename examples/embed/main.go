@@ -113,5 +113,5 @@ func generateTLSConfig() *tls.Config {
 		Certificate: [][]byte{cert},
 		PrivateKey:  key,
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{"fujin/1"}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true}
 }
