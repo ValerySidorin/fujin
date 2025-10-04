@@ -1,7 +1,7 @@
 services:
   fujin:
     build:
-      context: https://github.com/ValerySidorin/fujin.git#v0.0.1-alpha.6
+      context: https://github.com/ValerySidorin/fujin.git#v0.0.1-alpha.7
       dockerfile: Dockerfile
       args:
         GO_BUILD_TAGS: kafka,observability
@@ -14,7 +14,7 @@ services:
       - kafka3
     volumes:
       - ../assets:/assets
-    command: /assets/config/config-kafka.yaml
+    command: /assets/config/config.yaml
     restart: always
   zoo1:
     image: confluentinc/cp-zookeeper:7.9.1

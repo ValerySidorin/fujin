@@ -33,10 +33,8 @@ type Conn struct {
 
 func Dial(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config, opts ...Option) (*Conn, error) {
 	if tlsConf != nil {
-		if len(tlsConf.NextProtos) == 0 {
-			tlsConf = tlsConf.Clone()
-			tlsConf.NextProtos = []string{version.Fujin1}
-		}
+		tlsConf = tlsConf.Clone()
+		tlsConf.NextProtos = []string{version.Fujin1}
 	}
 	conn, err := quic.DialAddr(ctx, addr, tlsConf, quicConf)
 	if err != nil {

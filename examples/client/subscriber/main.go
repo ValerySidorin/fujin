@@ -22,7 +22,7 @@ func main() {
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Dial(ctx, "localhost:4848", generateTLSConfig(), nil,
+	conn, err := client.Dial(ctx, "localhost:4848", &tls.Config{InsecureSkipVerify: true}, nil,
 		client.WithTimeout(100*time.Second),
 		client.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -70,8 +70,4 @@ func main() {
 	fmt.Println("subscribed")
 
 	<-ctx.Done()
-}
-
-func generateTLSConfig() *tls.Config {
-	return &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"fujin/1"}}
 }
