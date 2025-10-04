@@ -13,9 +13,9 @@ type GRPCServerWrapper struct {
 }
 
 // NewGRPCServerWrapper creates a new gRPC server wrapper
-func NewGRPCServerWrapper(addr string, cman *connectors.Manager, l *slog.Logger) *GRPCServerWrapper {
+func NewGRPCServerWrapper(conf GRPCServerConfig, cman *connectors.Manager, l *slog.Logger) *GRPCServerWrapper {
 	return &GRPCServerWrapper{
-		server: NewGRPCServer(addr, cman, l),
+		server: NewGRPCServer(conf, cman, l),
 	}
 }
 

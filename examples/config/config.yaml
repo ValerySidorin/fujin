@@ -1,5 +1,5 @@
 fujin:
-  # disabled: false  # Set to true to disable fujin server
+  enabled: true
   addr: :4848
   ping_interval: 5s
   ping_timeout: 10s
@@ -8,6 +8,7 @@ fujin:
   write_deadline: 10s
   force_terminate_timeout: 15s
   tls:
+    enabled: true
     server_cert_pem_path: ./resources/assets/certs/fujin.io.pem
     server_key_pem_path: ./resources/assets/certs/fujin.io-key.pem
   quic:
@@ -15,8 +16,14 @@ fujin:
     max_idle_timeout: 5s
     keepalive_period: 2s
 grpc:
-  disabled: false
+  enabled: false
   addr: :4849
+  connection_timeout: 10s
+  max_concurrent_streams: 1000
+  tls:
+    enabled: false
+    server_cert_pem_path: ./resources/assets/certs/fujin.io.pem
+    server_key_pem_path: ./resources/assets/certs/fujin.io-key.pem
 connectors:
   writers:
     # pub:

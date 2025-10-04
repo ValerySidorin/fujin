@@ -22,8 +22,12 @@ import (
 	"github.com/quic-go/quic-go/metrics"
 )
 
-type ServerConfig struct {
-	Disabled              bool
+var (
+	NextProtos = []string{version.Fujin1}
+)
+
+type FujinServerConfig struct {
+	Enabled               bool
 	Addr                  string
 	PingInterval          time.Duration
 	PingTimeout           time.Duration
@@ -35,8 +39,8 @@ type ServerConfig struct {
 	QUIC                  *quic.Config
 }
 
-type Server struct {
-	conf ServerConfig
+type FujinServer struct {
+	conf FujinServerConfig
 	cman *connectors.Manager
 
 	ready chan struct{}
@@ -45,17 +49,17 @@ type Server struct {
 	l *slog.Logger
 }
 
-func NewServer(conf ServerConfig, cman *connectors.Manager, l *slog.Logger) *Server {
-	return &Server{
+func NewFujinServer(conf FujinServerConfig, cman *connectors.Manager, l *slog.Logger) *FujinServer {
+	return &FujinServer{
 		conf:  conf,
 		cman:  cman,
 		ready: make(chan struct{}),
 		done:  make(chan struct{}),
-		l:     l,
+		l:     l.With("server", "fujin"),
 	}
 }
 
-func (s *Server) ListenAndServe(ctx context.Context) error {
+func (s *FujinServer) ListenAndServe(ctx context.Context) error {
 	addr, err := net.ResolveUDPAddr("udp", s.conf.Addr)
 	if err != nil {
 		return fmt.Errorf("resolve udp addr: %w", err)
@@ -72,6 +76,19 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	if observability.MetricsEnabled() {
 		tr.Tracer = metrics.NewTracer()
 		s.conf.QUIC.Tracer = metrics.DefaultConnectionTracer
+	}
+
+	if s.conf.TLS == nil {
+		s.conf.TLS = &tls.Config{}
+	}
+
+	if s.conf.TLS.NextProtos == nil {
+		s.conf.TLS.NextProtos = NextProtos
+	}
+
+	if len(s.conf.TLS.Certificates) == 0 ||
+		s.conf.TLS.ClientCAs == nil {
+		s.l.Warn("tls not configured, this is not recommended for production environment")
 	}
 
 	ln, err := tr.Listen(s.conf.TLS, s.conf.QUIC)
@@ -246,7 +263,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 }
 
-func (s *Server) ReadyForConnections(timeout time.Duration) bool {
+func (s *FujinServer) ReadyForConnections(timeout time.Duration) bool {
 	select {
 	case <-time.After(timeout):
 		return false
@@ -255,6 +272,6 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 	}
 }
 
-func (s *Server) Done() <-chan struct{} {
+func (s *FujinServer) Done() <-chan struct{} {
 	return s.done
 }

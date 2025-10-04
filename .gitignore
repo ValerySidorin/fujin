@@ -30,6 +30,9 @@ grafana
 prometheus
 tempo
 
+## Dev configs
+config.dev.yaml
+
 ## test dir
 # sandbox
 

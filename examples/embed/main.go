@@ -27,7 +27,7 @@ import (
 	nats_core "github.com/ValerySidorin/fujin/public/connectors/impl/nats/core"
 )
 
-var DefaultFujinServerTestConfig = fujin_server.ServerConfig{
+var DefaultFujinServerTestConfig = fujin_server.FujinServerConfig{
 	Addr: ":4848",
 	TLS:  generateTLSConfig(),
 }
