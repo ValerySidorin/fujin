@@ -11,7 +11,7 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2888:3888
     restart: always
   kafka1:
-    image: confluentinc/cp-kafka:7.8.1
+    image: confluentinc/cp-kafka:7.9.1
     hostname: kafka1
     container_name: kafka1
     ports:
@@ -30,7 +30,7 @@ services:
     depends_on:
       - zoo1
   kafka2:
-    image: confluentinc/cp-kafka:7.8.1
+    image: confluentinc/cp-kafka:7.9.1
     hostname: kafka2
     container_name: kafka2
     ports:
@@ -49,7 +49,7 @@ services:
     depends_on:
       - zoo1
   kafka3:
-    image: confluentinc/cp-kafka:7.8.1
+    image: confluentinc/cp-kafka:7.9.1
     hostname: kafka3
     container_name: kafka3
     ports:

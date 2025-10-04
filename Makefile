@@ -34,8 +34,8 @@ run:
 		echo "Using config.dev.yaml"; \
 		./bin/fujin ./config.dev.yaml; \
 	else \
-		echo "Using examples/config/config.yaml"; \
-		./bin/fujin ./examples/config/config.yaml; \
+		echo "Using examples/assets/config/config.yaml"; \
+		./bin/fujin ./examples/assets/config/config.yaml; \
 	fi
 
 .PHONY: test
@@ -55,7 +55,7 @@ help:
 	@echo "Config Priority:"
 	@echo "  1. CONFIG parameter (if provided)"
 	@echo "  2. ./config.dev.yaml (if exists)"
-	@echo "  3. ./examples/config/config.yaml (fallback)"
+	@echo "  3. ./examples/assets/config/config.yaml (fallback)"
 	@echo ""
 	@echo "Variables:"
 	@echo "  VERSION (default: git describe || dev) Version tag for builds."

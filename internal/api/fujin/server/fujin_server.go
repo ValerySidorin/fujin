@@ -78,13 +78,13 @@ func (s *FujinServer) ListenAndServe(ctx context.Context) error {
 		s.conf.QUIC.Tracer = metrics.DefaultConnectionTracer
 	}
 
+	s.conf.TLS = s.conf.TLS.Clone()
+
 	if s.conf.TLS == nil {
 		s.conf.TLS = &tls.Config{}
 	}
 
-	if s.conf.TLS.NextProtos == nil {
-		s.conf.TLS.NextProtos = NextProtos
-	}
+	s.conf.TLS.NextProtos = NextProtos
 
 	if len(s.conf.TLS.Certificates) == 0 ||
 		s.conf.TLS.ClientCAs == nil {
