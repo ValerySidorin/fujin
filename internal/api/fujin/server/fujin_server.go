@@ -18,6 +18,7 @@ import (
 	"github.com/ValerySidorin/fujin/internal/api/fujin/version"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	"github.com/ValerySidorin/fujin/internal/observability"
+	"github.com/ValerySidorin/fujin/public/server/config"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/metrics"
 )
@@ -26,21 +27,8 @@ var (
 	NextProtos = []string{version.Fujin1}
 )
 
-type FujinServerConfig struct {
-	Enabled               bool
-	Addr                  string
-	PingInterval          time.Duration
-	PingTimeout           time.Duration
-	PingStream            bool
-	PingMaxRetries        int
-	WriteDeadline         time.Duration
-	ForceTerminateTimeout time.Duration
-	TLS                   *tls.Config
-	QUIC                  *quic.Config
-}
-
 type FujinServer struct {
-	conf FujinServerConfig
+	conf config.FujinServerConfig
 	cman *connectors.Manager
 
 	ready chan struct{}
@@ -49,7 +37,7 @@ type FujinServer struct {
 	l *slog.Logger
 }
 
-func NewFujinServer(conf FujinServerConfig, cman *connectors.Manager, l *slog.Logger) *FujinServer {
+func NewFujinServer(conf config.FujinServerConfig, cman *connectors.Manager, l *slog.Logger) *FujinServer {
 	return &FujinServer{
 		conf:  conf,
 		cman:  cman,
