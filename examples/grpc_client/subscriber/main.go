@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	pb "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
+	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
