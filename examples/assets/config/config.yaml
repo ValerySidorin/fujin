@@ -1,5 +1,6 @@
 fujin:
   enabled: true
+  addr: :4848
   tls:
     enabled: true
     server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
