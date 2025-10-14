@@ -3,13 +3,16 @@
 package kafka
 
 import (
+	"crypto/tls"
+
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
-func kgoOptsFromWriterConf(conf WriterConfig, writerID string) []kgo.Opt {
+func kgoOptsFromWriterConf(conf WriterConfig, writerID string, tlsConfig *tls.Config) []kgo.Opt {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(conf.Brokers...),
 		kgo.DefaultProduceTopic(conf.Topic),
+		kgo.DialTLSConfig(tlsConfig),
 	}
 
 	if conf.AllowAutoTopicCreation {

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	pconfig "github.com/ValerySidorin/fujin/public/config"
 	"github.com/ValerySidorin/fujin/public/connectors/cerr"
 )
 
@@ -26,27 +27,29 @@ const (
 )
 
 type ReaderConfig struct {
-	Brokers                []string       `yaml:"brokers"`
-	Topic                  string         `yaml:"topic"`
-	Group                  string         `yaml:"group"`
-	AllowAutoTopicCreation bool           `yaml:"allow_auto_topic_creation"`
-	MaxPollRecords         int            `yaml:"max_poll_records"`
-	FetchIsolationLevel    IsolationLevel `yaml:"fetch_isolation_level"`
-	AutoCommitInterval     time.Duration  `yaml:"auto_commit_interval"`
-	AutoCommitMarks        bool           `yaml:"auto_commit_marks"`
-	Balancers              []Balancer     `yaml:"balancers"`
-	BlockRebalanceOnPoll   bool           `yaml:"block_rebalance_on_poll"`
-	PingTimeout            time.Duration  `yaml:"ping_timeout"`
+	Brokers                []string          `yaml:"brokers"`
+	Topic                  string            `yaml:"topic"`
+	Group                  string            `yaml:"group"`
+	AllowAutoTopicCreation bool              `yaml:"allow_auto_topic_creation"`
+	MaxPollRecords         int               `yaml:"max_poll_records"`
+	FetchIsolationLevel    IsolationLevel    `yaml:"fetch_isolation_level"`
+	AutoCommitInterval     time.Duration     `yaml:"auto_commit_interval"`
+	AutoCommitMarks        bool              `yaml:"auto_commit_marks"`
+	Balancers              []Balancer        `yaml:"balancers"`
+	BlockRebalanceOnPoll   bool              `yaml:"block_rebalance_on_poll"`
+	PingTimeout            time.Duration     `yaml:"ping_timeout"`
+	TLS                    pconfig.TLSConfig `yaml:"tls"`
 }
 
 type WriterConfig struct {
-	Brokers                []string      `yaml:"brokers"`
-	Topic                  string        `yaml:"topic"`
-	Linger                 time.Duration `yaml:"linger"`
-	AllowAutoTopicCreation bool          `yaml:"allow_auto_topic_creation"`
-	MaxBufferedRecords     int           `yaml:"max_buffered_records"`
-	DisableIdempotentWrite bool          `yaml:"disable_idempotent_write"`
-	PingTimeout            time.Duration `yaml:"ping_timeout"`
+	Brokers                []string          `yaml:"brokers"`
+	Topic                  string            `yaml:"topic"`
+	Linger                 time.Duration     `yaml:"linger"`
+	AllowAutoTopicCreation bool              `yaml:"allow_auto_topic_creation"`
+	MaxBufferedRecords     int               `yaml:"max_buffered_records"`
+	DisableIdempotentWrite bool              `yaml:"disable_idempotent_write"`
+	PingTimeout            time.Duration     `yaml:"ping_timeout"`
+	TLS                    pconfig.TLSConfig `yaml:"tls"`
 }
 
 func (c *ReaderConfig) Validate() error {

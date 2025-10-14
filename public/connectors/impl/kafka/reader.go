@@ -29,10 +29,16 @@ type Reader struct {
 }
 
 func NewReader(conf ReaderConfig, autoCommit bool, l *slog.Logger) (*Reader, error) {
+	err := conf.TLS.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("kafka: parse tls: %w", err)
+	}
+
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(conf.Brokers...),
 		kgo.ConsumeTopics(conf.Topic),
 		kgo.ConsumerGroup(conf.Group),
+		kgo.DialTLSConfig(conf.TLS.Config),
 	}
 
 	if conf.AllowAutoTopicCreation {

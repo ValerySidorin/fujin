@@ -26,7 +26,12 @@ func NewWriter(conf WriterConfig, writerID string, l *slog.Logger) (*Writer, err
 		conf.PingTimeout = 5 * time.Second
 	}
 
-	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, writerID)...)
+	err := conf.TLS.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("kafka: parse tls: %w", err)
+	}
+
+	c, err := kgo.NewClient(kgoOptsFromWriterConf(conf, writerID, conf.TLS.Config)...)
 	if err != nil {
 		return nil, fmt.Errorf("kafka: new client: %w", err)
 	}
