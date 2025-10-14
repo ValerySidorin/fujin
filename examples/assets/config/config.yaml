@@ -2,8 +2,8 @@ fujin:
   enabled: true
   tls:
     enabled: true
-    server_cert_pem_path: /assets/certs/fujin.io.pem
-    server_key_pem_path: /assets/certs/fujin.io-key.pem
+    server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
+    server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
 connectors:
   writers:
     pub:
