@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
 	"github.com/ValerySidorin/fujin/public/server/config"
@@ -27,9 +26,10 @@ import (
 	nats_core "github.com/ValerySidorin/fujin/public/connectors/impl/nats/core"
 )
 
-var DefaultFujinServerTestConfig = fujin_server.FujinServerConfig{
-	Addr: ":4848",
-	TLS:  generateTLSConfig(),
+var DefaultFujinServerTestConfig = config.FujinServerConfig{
+	Enabled: true,
+	Addr:    ":4848",
+	TLS:     generateTLSConfig(),
 }
 
 var DefaultTestConfigWithNats = config.Config{

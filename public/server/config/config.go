@@ -1,38 +1,40 @@
 package config
 
 import (
+	"crypto/tls"
 	"time"
 
-	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
-	grpc_server "github.com/ValerySidorin/fujin/internal/api/grpc/server"
 	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/public/connectors"
+	"github.com/quic-go/quic-go"
 )
 
 type Config struct {
-	Fujin         fujin_server.FujinServerConfig
-	GRPC          grpc_server.GRPCServerConfig
+	Fujin         FujinServerConfig
+	GRPC          GRPCServerConfig
 	Connectors    connectors.Config
 	Observability observability.Config
 }
 
-type ObservabilityConfig struct {
-	Metrics struct {
-		Enabled bool
-		Bind    string
-		Path    string
-	}
-	Tracing struct {
-		Enabled     bool
-		OTLPAddress string
-		Insecure    bool
-		SampleRatio float64
-	}
-	Resource struct {
-		ServiceName    string
-		ServiceVersion string
-		Environment    string
-	}
+type FujinServerConfig struct {
+	Enabled               bool
+	Addr                  string
+	PingInterval          time.Duration
+	PingTimeout           time.Duration
+	PingStream            bool
+	PingMaxRetries        int
+	WriteDeadline         time.Duration
+	ForceTerminateTimeout time.Duration
+	TLS                   *tls.Config
+	QUIC                  *quic.Config
+}
+
+type GRPCServerConfig struct {
+	Enabled              bool
+	Addr                 string
+	ConnectionTimeout    time.Duration
+	MaxConcurrentStreams uint32
+	TLS                  *tls.Config
 }
 
 func (c *Config) SetDefaults() {
