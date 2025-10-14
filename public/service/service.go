@@ -2,19 +2,17 @@ package service
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ValerySidorin/fujin/internal/observability"
+	pconfig "github.com/ValerySidorin/fujin/public/config"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
 	"github.com/ValerySidorin/fujin/public/server/config"
@@ -23,10 +21,7 @@ import (
 )
 
 var (
-	ErrNilConfig                     = errors.New("nil config")
-	ErrTLSClientCertsDirNotSpecified = errors.New("client certs dir not specified, while mtls enabled")
-	ErrTLSServerCertPathNotSpecified = errors.New("server cert path not specified")
-	ErrTLSServerKeyPathNotSpecified  = errors.New("server cert path not specified")
+	ErrNilConfig = errors.New("nil config")
 )
 
 type Config struct {
@@ -37,32 +32,24 @@ type Config struct {
 }
 
 type FujinConfig struct {
-	Enabled               bool          `yaml:"enabled"`
-	Addr                  string        `yaml:"addr"`
-	WriteDeadline         time.Duration `yaml:"write_deadline"`
-	ForceTerminateTimeout time.Duration `yaml:"force_terminate_timeout"`
-	PingInterval          time.Duration `yaml:"ping_interval"`
-	PingTimeout           time.Duration `yaml:"ping_timeout"`
-	PingStream            bool          `yaml:"ping_stream"`
-	PingMaxRetries        int           `yaml:"ping_max_retries"`
-	TLS                   TLSConfig     `yaml:"tls"`
-	QUIC                  QUICConfig    `yaml:"quic"`
+	Enabled               bool              `yaml:"enabled"`
+	Addr                  string            `yaml:"addr"`
+	WriteDeadline         time.Duration     `yaml:"write_deadline"`
+	ForceTerminateTimeout time.Duration     `yaml:"force_terminate_timeout"`
+	PingInterval          time.Duration     `yaml:"ping_interval"`
+	PingTimeout           time.Duration     `yaml:"ping_timeout"`
+	PingStream            bool              `yaml:"ping_stream"`
+	PingMaxRetries        int               `yaml:"ping_max_retries"`
+	TLS                   pconfig.TLSConfig `yaml:"tls"`
+	QUIC                  QUICConfig        `yaml:"quic"`
 }
 
 type GRPCConfig struct {
-	Enabled              bool          `yaml:"enabled"`
-	Addr                 string        `yaml:"addr"`
-	ConnectionTimeout    time.Duration `yaml:"connection_timeout"`
-	MaxConcurrentStreams uint32        `yaml:"max_concurrent_streams"`
-	TLS                  TLSConfig     `yaml:"tls"`
-}
-
-type TLSConfig struct {
-	Enabled                    bool   `yaml:"enabled"`
-	ClientCertsDir             string `yaml:"client_certs_dir"`
-	ServerCertPEMPath          string `yaml:"server_cert_pem_path"`
-	ServerKeyPEMPath           string `yaml:"server_key_pem_path"`
-	RequireAndVerifyClientCert bool   `yaml:"require_and_verify_client_cert"`
+	Enabled              bool              `yaml:"enabled"`
+	Addr                 string            `yaml:"addr"`
+	ConnectionTimeout    time.Duration     `yaml:"connection_timeout"`
+	MaxConcurrentStreams uint32            `yaml:"max_concurrent_streams"`
+	TLS                  pconfig.TLSConfig `yaml:"tls"`
 }
 
 type QUICConfig struct {
@@ -112,7 +99,7 @@ func (c *Config) parseFujinServerConfig() (config.FujinServerConfig, error) {
 		}, nil
 	}
 
-	tlsConf, err := c.Fujin.TLS.parse()
+	err := c.Fujin.TLS.Parse()
 	if err != nil {
 		return config.FujinServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
 	}
@@ -126,7 +113,7 @@ func (c *Config) parseFujinServerConfig() (config.FujinServerConfig, error) {
 		PingTimeout:           c.Fujin.PingTimeout,
 		PingStream:            c.Fujin.PingStream,
 		PingMaxRetries:        c.Fujin.PingMaxRetries,
-		TLS:                   tlsConf,
+		TLS:                   c.Fujin.TLS.Config,
 		QUIC:                  c.Fujin.QUIC.parse(),
 	}, nil
 }
@@ -142,7 +129,7 @@ func (c *Config) parseGRPCConfig() (config.GRPCServerConfig, error) {
 		}, nil
 	}
 
-	tlsConf, err := c.GRPC.TLS.parse()
+	err := c.GRPC.TLS.Parse()
 	if err != nil {
 		return config.GRPCServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
 	}
@@ -152,7 +139,7 @@ func (c *Config) parseGRPCConfig() (config.GRPCServerConfig, error) {
 		Addr:                 c.GRPC.Addr,
 		ConnectionTimeout:    c.GRPC.ConnectionTimeout,
 		MaxConcurrentStreams: c.GRPC.MaxConcurrentStreams,
-		TLS:                  tlsConf,
+		TLS:                  c.GRPC.TLS.Config,
 	}, nil
 }
 
@@ -163,71 +150,6 @@ func (c *QUICConfig) parse() *quic.Config {
 		HandshakeIdleTimeout: c.HandshakeIdleTimeout,
 		MaxIdleTimeout:       c.MaxIdleTimeout,
 	}
-}
-
-func (c *TLSConfig) validate() error {
-	if !c.Enabled {
-		return nil
-	}
-
-	if c.ClientCertsDir == "" && c.RequireAndVerifyClientCert {
-		return ErrTLSClientCertsDirNotSpecified
-	}
-
-	if c.ServerCertPEMPath == "" {
-		return ErrTLSServerCertPathNotSpecified
-	}
-
-	if c.ServerKeyPEMPath == "" {
-		return ErrTLSServerKeyPathNotSpecified
-	}
-
-	return nil
-}
-
-func (c *TLSConfig) parse() (*tls.Config, error) {
-	if err := c.validate(); err != nil {
-		return nil, fmt.Errorf("validate: %w", err)
-	}
-
-	if !c.Enabled {
-		return nil, nil
-	}
-
-	caCertPool := x509.NewCertPool()
-
-	if c.ClientCertsDir != "" {
-		clientCAs, err := os.ReadDir(c.ClientCertsDir)
-		if err != nil {
-			return nil, fmt.Errorf("read client certs dir: %w", err)
-		}
-
-		for _, certEntry := range clientCAs {
-			if !certEntry.IsDir() {
-				cert, err := os.ReadFile(filepath.Join(c.ClientCertsDir, certEntry.Name()))
-				if err != nil {
-					return nil, fmt.Errorf("read client cert: %w", err)
-				}
-				caCertPool.AppendCertsFromPEM(cert)
-			}
-		}
-	}
-
-	cert, err := tls.LoadX509KeyPair(c.ServerCertPEMPath, c.ServerKeyPEMPath)
-	if err != nil {
-		return nil, fmt.Errorf("load x509 key pair: %w", err)
-	}
-
-	clientAuth := tls.NoClientCert
-	if c.RequireAndVerifyClientCert {
-		clientAuth = tls.RequireAndVerifyClientCert
-	}
-
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientCAs:    caCertPool,
-		ClientAuth:   clientAuth,
-	}, nil
 }
 
 var (
