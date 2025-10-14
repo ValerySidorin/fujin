@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	fujin_server "github.com/ValerySidorin/fujin/internal/api/fujin/server"
-	grpc_server "github.com/ValerySidorin/fujin/internal/api/grpc/server"
 	"github.com/ValerySidorin/fujin/internal/observability"
 	"github.com/ValerySidorin/fujin/public/connectors"
 	"github.com/ValerySidorin/fujin/public/server"
@@ -76,8 +74,8 @@ type QUICConfig struct {
 
 func (c *Config) parse() (config.Config, error) {
 	var (
-		fujinConf fujin_server.FujinServerConfig
-		grpcConf  grpc_server.GRPCServerConfig
+		fujinConf config.FujinServerConfig
+		grpcConf  config.GRPCServerConfig
 		err       error
 	)
 
@@ -103,23 +101,23 @@ func (c *Config) parse() (config.Config, error) {
 	}, nil
 }
 
-func (c *Config) parseFujinServerConfig() (fujin_server.FujinServerConfig, error) {
+func (c *Config) parseFujinServerConfig() (config.FujinServerConfig, error) {
 	if c == nil {
-		return fujin_server.FujinServerConfig{}, ErrNilConfig
+		return config.FujinServerConfig{}, ErrNilConfig
 	}
 
 	if !c.Fujin.Enabled {
-		return fujin_server.FujinServerConfig{
+		return config.FujinServerConfig{
 			Enabled: c.Fujin.Enabled,
 		}, nil
 	}
 
 	tlsConf, err := c.Fujin.TLS.parse()
 	if err != nil {
-		return fujin_server.FujinServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
+		return config.FujinServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
 	}
 
-	return fujin_server.FujinServerConfig{
+	return config.FujinServerConfig{
 		Enabled:               c.Fujin.Enabled,
 		Addr:                  c.Fujin.Addr,
 		WriteDeadline:         c.Fujin.WriteDeadline,
@@ -133,23 +131,23 @@ func (c *Config) parseFujinServerConfig() (fujin_server.FujinServerConfig, error
 	}, nil
 }
 
-func (c *Config) parseGRPCConfig() (grpc_server.GRPCServerConfig, error) {
+func (c *Config) parseGRPCConfig() (config.GRPCServerConfig, error) {
 	if c == nil {
-		return grpc_server.GRPCServerConfig{}, ErrNilConfig
+		return config.GRPCServerConfig{}, ErrNilConfig
 	}
 
 	if !c.GRPC.Enabled {
-		return grpc_server.GRPCServerConfig{
+		return config.GRPCServerConfig{
 			Enabled: c.GRPC.Enabled,
 		}, nil
 	}
 
 	tlsConf, err := c.GRPC.TLS.parse()
 	if err != nil {
-		return grpc_server.GRPCServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
+		return config.GRPCServerConfig{}, fmt.Errorf("parse tls conf: %w", err)
 	}
 
-	return grpc_server.GRPCServerConfig{
+	return config.GRPCServerConfig{
 		Enabled:              c.GRPC.Enabled,
 		Addr:                 c.GRPC.Addr,
 		ConnectionTimeout:    c.GRPC.ConnectionTimeout,

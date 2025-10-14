@@ -8,29 +8,21 @@ import (
 	"log/slog"
 	"net"
 	"sync"
-	"time"
 
 	pb "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
+	"github.com/ValerySidorin/fujin/public/server/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
-
-type GRPCServerConfig struct {
-	Enabled              bool
-	Addr                 string
-	ConnectionTimeout    time.Duration
-	MaxConcurrentStreams uint32
-	TLS                  *tls.Config
-}
 
 // GRPCServer implements the Fujin gRPC service
 type GRPCServer struct {
 	pb.UnimplementedFujinServiceServer
 
-	conf GRPCServerConfig
+	conf config.GRPCServerConfig
 	cman *connectors.Manager
 	l    *slog.Logger
 
@@ -38,7 +30,7 @@ type GRPCServer struct {
 }
 
 // NewGRPCServer creates a new gRPC server instance
-func NewGRPCServer(conf GRPCServerConfig, cman *connectors.Manager, l *slog.Logger) *GRPCServer {
+func NewGRPCServer(conf config.GRPCServerConfig, cman *connectors.Manager, l *slog.Logger) *GRPCServer {
 	return &GRPCServer{
 		conf: conf,
 		cman: cman,
