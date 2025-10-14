@@ -2,7 +2,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/ValerySidorin/fujin/internal/api/grpc
+    default: github.com/ValerySidorin/fujin/public/grpc
 plugins:
   - plugin: buf.build/protocolbuffers/go
     out: .

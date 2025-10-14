@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package fujin.v1;
 
-option go_package = "github.com/ValerySidorin/fujin/internal/api/grpc/v1";
+option go_package = "github.com/ValerySidorin/fujin/public/grpc/v1";
 
 // Binary-safe header, matching [][]byte in native protocol.
 message Header {

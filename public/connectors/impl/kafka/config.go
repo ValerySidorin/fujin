@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -53,6 +54,8 @@ type WriterConfig struct {
 }
 
 func (c *ReaderConfig) Validate() error {
+	fmt.Println(*c)
+
 	if len(c.Brokers) <= 0 {
 		return cerr.ValidationErr("brokers not defined")
 	}

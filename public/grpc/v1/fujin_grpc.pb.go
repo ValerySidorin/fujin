@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v6.32.1
-// source: internal/api/grpc/v1/fujin.proto
+// source: fujin.proto
 
 package v1
 
@@ -117,5 +117,5 @@ var FujinService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "internal/api/grpc/v1/fujin.proto",
+	Metadata: "fujin.proto",
 }

@@ -2,17 +2,16 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"sync"
 
-	pb "github.com/ValerySidorin/fujin/internal/api/grpc/v1"
 	"github.com/ValerySidorin/fujin/internal/connectors"
 	internal_reader "github.com/ValerySidorin/fujin/public/connectors/reader"
 	"github.com/ValerySidorin/fujin/public/connectors/writer"
+	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
 	"github.com/ValerySidorin/fujin/public/server/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -55,16 +54,11 @@ func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 		serverOpts = append(serverOpts, grpc.MaxConcurrentStreams(s.conf.MaxConcurrentStreams))
 	}
 
-	if s.conf.TLS == nil {
-		s.conf.TLS = &tls.Config{}
-	}
-
-	if len(s.conf.TLS.Certificates) == 0 ||
-		s.conf.TLS.ClientCAs == nil {
+	if s.conf.TLS != nil && len(s.conf.TLS.Certificates) > 0 {
+		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(s.conf.TLS)))
+	} else {
 		s.l.Warn("tls not configured, this is not recommended for production environment")
 	}
-
-	serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(s.conf.TLS)))
 
 	s.grpcServer = grpc.NewServer(serverOpts...)
 	pb.RegisterFujinServiceServer(s.grpcServer, s)
