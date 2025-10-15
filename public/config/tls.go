@@ -26,6 +26,10 @@ type TLSConfig struct {
 }
 
 func (c *TLSConfig) Parse() error {
+	if c.Config != nil {
+		return nil
+	}
+
 	if err := c.validate(); err != nil {
 		return fmt.Errorf("validate: %w", err)
 	}
