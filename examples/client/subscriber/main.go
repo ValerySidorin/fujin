@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/ValerySidorin/fujin/client"
+	"github.com/ValerySidorin/fujin/client/fujin"
 )
 
 type TestMsg struct {
@@ -22,9 +22,9 @@ func main() {
 	defer cancel()
 	defer fmt.Println("disconnected")
 
-	conn, err := client.Dial(ctx, "localhost:4848", &tls.Config{InsecureSkipVerify: true}, nil,
-		client.WithTimeout(100*time.Second),
-		client.WithLogger(
+	conn, err := fujin.Dial(ctx, "localhost:4848", &tls.Config{InsecureSkipVerify: true}, nil,
+		fujin.WithTimeout(100*time.Second),
+		fujin.WithLogger(
 			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 				AddSource: true,
 				Level:     slog.LevelDebug,
@@ -49,7 +49,7 @@ func main() {
 	defer fmt.Println("stream closed")
 	defer s.Close()
 
-	sub, err := s.HSubscribe("sub", true, func(msg client.Msg) {
+	sub, err := s.HSubscribe("sub", true, func(msg fujin.Msg) {
 		fmt.Println("Value:", string(msg.Value), "Headers:", msg.Headers)
 	})
 	if err != nil {
@@ -58,7 +58,7 @@ func main() {
 	defer fmt.Println("subscription closed")
 	defer sub.Close()
 
-	sub2, err := s.HSubscribe("sub", true, func(msg client.Msg) {
+	sub2, err := s.HSubscribe("sub", true, func(msg fujin.Msg) {
 		fmt.Println("Value:", string(msg.Value), "Headers:", msg.Headers)
 	})
 	if err != nil {

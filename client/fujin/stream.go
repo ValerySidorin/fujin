@@ -1,4 +1,4 @@
-package client
+package fujin
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ValerySidorin/fujin/client/correlator"
 	"github.com/ValerySidorin/fujin/internal/api/fujin"
 	"github.com/ValerySidorin/fujin/internal/api/fujin/pool"
 	"github.com/ValerySidorin/fujin/internal/api/fujin/proto/request"
@@ -33,10 +34,10 @@ type Stream struct {
 
 	subs *subscriptions
 
-	cm  *correlator[error]
-	ac  *correlator[AckResponse]
+	cm  *correlator.Correlator[error]
+	ac  *correlator.Correlator[AckResponse]
 	fcm *fetchCorrelator
-	sc  *correlator[SubscribeResponse]
+	sc  *correlator.Correlator[SubscribeResponse]
 
 	closed       atomic.Bool
 	disconnectCh chan struct{}
@@ -80,9 +81,9 @@ func (c *Conn) Connect(id string) (*Stream, error) {
 		quicStream:   stream,
 		ps:           &parseState{},
 		subs:         newSubscriptions(),
-		cm:           newCorrelator[error](),
-		ac:           newCorrelator[AckResponse](),
-		sc:           newCorrelator[SubscribeResponse](),
+		cm:           correlator.New[error](),
+		ac:           correlator.New[AckResponse](),
+		sc:           correlator.New[SubscribeResponse](),
 		fcm:          newFetchCorrelator(),
 		disconnectCh: make(chan struct{}),
 		l:            l,
@@ -105,7 +106,7 @@ func (s *Stream) Produce(topic string, p []byte) error {
 
 	buf := pool.Get(len(topic) + len(p) + 13)
 	ch := make(chan error, 1)
-	id := s.cm.next(ch)
+	id := s.cm.Next(ch)
 
 	buf = append(buf, byte(request.OP_CODE_PRODUCE))
 	buf = binary.BigEndian.AppendUint32(buf, id)
@@ -121,13 +122,13 @@ func (s *Stream) Produce(topic string, p []byte) error {
 	select {
 	case <-ctx.Done():
 		cancel()
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return ErrTimeout
 	case err := <-ch:
 		cancel()
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return err
@@ -152,7 +153,7 @@ func (s *Stream) HProduce(topic string, p []byte, hs map[string]string) error {
 	}
 	buf := pool.Get(1 + 4 + 4 + len(topic) + 2 + headersSize + 4 + len(p))
 	ch := make(chan error, 1)
-	id := s.cm.next(ch)
+	id := s.cm.Next(ch)
 
 	buf = append(buf, byte(request.OP_CODE_HPRODUCE))
 	buf = binary.BigEndian.AppendUint32(buf, id)
@@ -175,12 +176,12 @@ func (s *Stream) HProduce(topic string, p []byte, hs map[string]string) error {
 
 	select {
 	case <-ctx.Done():
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return ErrTimeout
 	case err := <-ch:
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return err
@@ -318,8 +319,8 @@ func (s *Stream) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
 	ch := make(chan AckResponse, 1)
 	defer close(ch)
 
-	correlationID := s.ac.next(ch)
-	defer s.ac.delete(correlationID)
+	correlationID := s.ac.Next(ch)
+	defer s.ac.Delete(correlationID)
 
 	buf = append(buf, cmd)
 	buf = binary.BigEndian.AppendUint32(buf, correlationID)
@@ -347,8 +348,8 @@ func (s *Stream) sendTxCmd(cmd byte) error {
 	ch := make(chan error, 1)
 	defer close(ch)
 
-	id := s.cm.next(ch)
-	defer s.cm.delete(id)
+	id := s.cm.Next(ch)
+	defer s.cm.Delete(id)
 
 	buf = append(buf, cmd)
 	buf = binary.BigEndian.AppendUint32(buf, id)
@@ -474,7 +475,7 @@ func (s *Stream) parse(buf []byte) error {
 		case OP_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
-				s.cm.send(s.ps.ca.cIDUint32, nil)
+				s.cm.Send(s.ps.ca.cIDUint32, nil)
 				s.ps.ca, s.ps.state = correlationIDArg{}, OP_START
 				continue
 			case byte(response.ERR_CODE_YES):
@@ -514,7 +515,7 @@ func (s *Stream) parse(buf []byte) error {
 				}
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.cm.send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
+					s.cm.Send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
 					pool.Put(s.ps.payloadBuf)
 					s.ps.ca.cID, s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, nil, correlationIDArg{}, errArg{}, OP_START
 				}
@@ -523,7 +524,7 @@ func (s *Stream) parse(buf []byte) error {
 				s.ps.payloadBuf = append(s.ps.payloadBuf, b)
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.cm.send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
+					s.cm.Send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
 					pool.Put(s.ps.payloadBuf)
 					s.ps.ca.cID, s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, nil, correlationIDArg{}, errArg{}, OP_START
 				}
@@ -1203,7 +1204,7 @@ func (s *Stream) parse(buf []byte) error {
 				}
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.sc.send(s.ps.ca.cIDUint32, SubscribeResponse{Err: errors.New(string(s.ps.payloadBuf))})
+					s.sc.Send(s.ps.ca.cIDUint32, SubscribeResponse{Err: errors.New(string(s.ps.payloadBuf))})
 					pool.Put(s.ps.payloadBuf)
 					s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, correlationIDArg{}, errArg{}, OP_START
 				}
@@ -1212,13 +1213,13 @@ func (s *Stream) parse(buf []byte) error {
 				s.ps.payloadBuf = append(s.ps.payloadBuf, b)
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.sc.send(s.ps.ca.cIDUint32, SubscribeResponse{Err: errors.New(string(s.ps.payloadBuf))})
+					s.sc.Send(s.ps.ca.cIDUint32, SubscribeResponse{Err: errors.New(string(s.ps.payloadBuf))})
 					pool.Put(s.ps.payloadBuf)
 					s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, correlationIDArg{}, errArg{}, OP_START
 				}
 			}
 		case OP_SUBSCRIBE_SUB_ID_ARG:
-			s.sc.send(s.ps.ca.cIDUint32, SubscribeResponse{SubID: b})
+			s.sc.Send(s.ps.ca.cIDUint32, SubscribeResponse{SubID: b})
 			s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, correlationIDArg{}, errArg{}, OP_START
 		case OP_UNSUBSCRIBE:
 			s.ps.ca.cID = pool.Get(fujin.Uint32Len)
@@ -1234,7 +1235,7 @@ func (s *Stream) parse(buf []byte) error {
 		case OP_UNSUBSCRIBE_ERROR_CODE_ARG:
 			switch b {
 			case byte(response.ERR_CODE_NO):
-				s.cm.send(s.ps.ca.cIDUint32, nil)
+				s.cm.Send(s.ps.ca.cIDUint32, nil)
 				s.ps.ca, s.ps.state = correlationIDArg{}, OP_START
 				continue
 			case byte(response.ERR_CODE_YES):
@@ -1274,7 +1275,7 @@ func (s *Stream) parse(buf []byte) error {
 				}
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.cm.send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
+					s.cm.Send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
 					pool.Put(s.ps.payloadBuf)
 					s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, correlationIDArg{}, errArg{}, OP_START
 				}
@@ -1283,7 +1284,7 @@ func (s *Stream) parse(buf []byte) error {
 				s.ps.payloadBuf = append(s.ps.payloadBuf, b)
 
 				if len(s.ps.payloadBuf) >= int(s.ps.ea.errLen) {
-					s.cm.send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
+					s.cm.Send(s.ps.ca.cIDUint32, errors.New(string(s.ps.payloadBuf)))
 					pool.Put(s.ps.payloadBuf)
 					s.ps.payloadBuf, s.ps.ca, s.ps.ea, s.ps.state = nil, correlationIDArg{}, errArg{}, OP_START
 				}

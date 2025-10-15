@@ -51,6 +51,18 @@ message SubscribeResponse {
   uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
 }
 
+// Unsubscribe request
+message UnsubscribeRequest {
+  uint32 correlation_id = 1;
+  uint32 subscription_id = 2;
+}
+
+// Unsubscribe response
+message UnsubscribeResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
 // Message delivery
 message Message {
   uint32 correlation_id = 1;
@@ -90,8 +102,9 @@ message FujinRequest {
     ConnectRequest connect = 1;
     ProduceRequest produce = 2;
     SubscribeRequest subscribe = 3;
-    AckRequest ack = 4;
-    NackRequest nack = 5;
+    UnsubscribeRequest unsubscribe = 4;
+    AckRequest ack = 5;
+    NackRequest nack = 6;
   }
 }
 
@@ -101,8 +114,9 @@ message FujinResponse {
     ConnectResponse connect = 1;
     ProduceResponse produce = 2;
     SubscribeResponse subscribe = 3;
-    Message message = 4;
-    Empty ack = 5;
-    Empty nack = 6;
+    UnsubscribeResponse unsubscribe = 4;
+    Message message = 5;
+    Empty ack = 6;
+    Empty nack = 7;
   }
 }

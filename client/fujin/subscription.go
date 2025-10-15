@@ -1,4 +1,4 @@
-package client
+package fujin
 
 import (
 	"context"
@@ -86,7 +86,7 @@ func (s *Stream) Subscribe(
 	}
 
 	ch := make(chan SubscribeResponse, 1)
-	id := s.sc.next(ch)
+	id := s.sc.Next(ch)
 
 	buf := pool.Get(10 + len(topic))
 
@@ -104,13 +104,13 @@ func (s *Stream) Subscribe(
 	select {
 	case <-ctx.Done():
 		cancel()
-		s.sc.delete(id)
+		s.sc.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return nil, ErrTimeout
 	case resp := <-ch:
 		cancel()
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		if resp.Err != nil {
@@ -179,7 +179,7 @@ func (s *Stream) HSubscribe(
 	}
 
 	ch := make(chan SubscribeResponse, 1)
-	id := s.sc.next(ch)
+	id := s.sc.Next(ch)
 
 	buf := pool.Get(10 + len(topic))
 
@@ -197,13 +197,13 @@ func (s *Stream) HSubscribe(
 	select {
 	case <-ctx.Done():
 		cancel()
-		s.sc.delete(id)
+		s.sc.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		return nil, ErrTimeout
 	case resp := <-ch:
 		cancel()
-		s.cm.delete(id)
+		s.cm.Delete(id)
 		close(ch)
 		pool.Put(buf)
 		if resp.Err != nil {
@@ -225,7 +225,7 @@ func (s *Subscription) Close() error {
 	s.closed.Store(true)
 
 	ch := make(chan error)
-	id := s.stream.cm.next(ch)
+	id := s.stream.cm.Next(ch)
 
 	buf := pool.Get(6)
 	buf = append(buf, byte(request.OP_CODE_UNSUBSCRIBE))

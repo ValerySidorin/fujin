@@ -1,4 +1,4 @@
-package client_test
+package fujin_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ValerySidorin/fujin/client"
+	"github.com/ValerySidorin/fujin/client/fujin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,8 +24,8 @@ func TestStream(t *testing.T) {
 		}()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil,
-			client.WithLogger(
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil,
+			fujin.WithLogger(
 				slog.New(
 					slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 						AddSource: true,
@@ -54,7 +54,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -80,7 +80,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -106,7 +106,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -132,7 +132,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -189,7 +189,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -221,7 +221,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -252,7 +252,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -282,7 +282,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}
@@ -309,7 +309,7 @@ func TestStream(t *testing.T) {
 		defer shutdown()
 
 		addr := "localhost:4848"
-		conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+		conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 		if err != nil {
 			t.Fatalf("failed to connect: %v", err)
 		}

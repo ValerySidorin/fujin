@@ -1,4 +1,4 @@
-package client
+package fujin
 
 const (
 	OP_START int = iota

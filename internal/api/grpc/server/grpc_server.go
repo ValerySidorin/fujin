@@ -177,6 +177,8 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 		return s.handleProduce(r.Produce)
 	case *pb.FujinRequest_Subscribe:
 		return s.handleSubscribe(r.Subscribe)
+	case *pb.FujinRequest_Unsubscribe:
+		return s.handleUnsubscribe(r.Unsubscribe)
 	case *pb.FujinRequest_Ack:
 		return s.handleAck(r.Ack)
 	case *pb.FujinRequest_Nack:
@@ -351,6 +353,53 @@ func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
 	go s.subscribeLoop(ctx, subID, state)
 
 	return nil
+}
+
+// handleUnsubscribe processes UNSUBSCRIBE request
+func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Unsubscribe{
+				Unsubscribe: &pb.UnsubscribeResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	subID := byte(req.SubscriptionId)
+
+	s.mu.Lock()
+	state, exists := s.readers[subID]
+	if !exists {
+		s.mu.Unlock()
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Unsubscribe{
+				Unsubscribe: &pb.UnsubscribeResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "subscription not found",
+				},
+			},
+		})
+	}
+
+	// Cancel the subscription context to stop the goroutine
+	state.cancel()
+	delete(s.readers, subID)
+	s.mu.Unlock()
+
+	// Close the reader
+	state.reader.Close()
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Unsubscribe{
+			Unsubscribe: &pb.UnsubscribeResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         "",
+			},
+		},
+	})
 }
 
 // subscribeLoop continuously reads messages and sends them to client

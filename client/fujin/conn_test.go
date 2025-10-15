@@ -1,4 +1,4 @@
-package client_test
+package fujin_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ValerySidorin/fujin/client"
+	"github.com/ValerySidorin/fujin/client/fujin"
 	"github.com/ValerySidorin/fujin/public/server"
 	"github.com/ValerySidorin/fujin/test"
 
@@ -32,7 +32,7 @@ func TestConnect(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	addr := "localhost:4848"
-	conn, err := client.Dial(ctx, addr, generateTLSConfig(), nil)
+	conn, err := fujin.Dial(ctx, addr, generateTLSConfig(), nil)
 	if err != nil {
 		t.Fatalf("failed to connect: %v", err)
 	}

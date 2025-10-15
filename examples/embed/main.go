@@ -36,7 +36,7 @@ var DefaultTestConfigWithNats = config.Config{
 	Fujin: DefaultFujinServerTestConfig,
 	GRPC: config.GRPCServerConfig{
 		Enabled: true,
-		TLS:     generateTLSConfig(),
+		Addr:    ":4849",
 	},
 	Connectors: connectors.Config{
 		Readers: map[string]reader_config.Config{
