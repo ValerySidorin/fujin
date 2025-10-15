@@ -11,6 +11,8 @@ import (
 
 	v1 "github.com/ValerySidorin/fujin/client/grpc/v1"
 	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -23,21 +25,8 @@ func main() {
 		Level:     slog.LevelInfo,
 	}))
 
-	// Create connection configuration
-	connConfig := &v1.ConnConfig{
-		Address:              "localhost:4849",
-		TLSEnabled:           false,
-		InsecureSkipVerify:   true,
-		KeepAlive:            30 * time.Second,
-		KeepAliveTimeout:     5 * time.Second,
-		MaxRetries:           3,
-		RetryDelay:           1 * time.Second,
-		ConnectionTimeout:    10 * time.Second,
-		MaxConcurrentStreams: 100,
-	}
-
 	// Create connection
-	conn, err := v1.NewConn(connConfig, logger)
+	conn, err := v1.NewConn("localhost:4849", logger, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Failed to create connection: %v", err)
 	}
