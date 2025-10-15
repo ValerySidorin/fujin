@@ -1,4 +1,4 @@
-package client
+package fujin
 
 type AckResponse struct {
 	Err             error

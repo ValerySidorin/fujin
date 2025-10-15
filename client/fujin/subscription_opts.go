@@ -1,4 +1,4 @@
-package client
+package fujin
 
 type SubscriptionOption func(s *Subscription)
 
