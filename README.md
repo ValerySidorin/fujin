@@ -16,6 +16,7 @@ Modern distributed systems often need to work with multiple message brokers, eac
 - **Transaction Support**: Atomic message production across multiple topics (not for all brokers)
 - **Blazing Speed & Efficiency**: Optimized for processing large volumes of messages efficiently, leveraging techniques like zero-allocation parsing.
 - **QUIC Transport**: Reliable, multiplexed communication with built-in security
+- **gRPC Interface**: Modern, language-agnostic RPC interface for easy integration
 - **Keep-Alive Mechanism**: Automatic connection health monitoring
 
 ## Supported Protocols
@@ -23,10 +24,19 @@ Modern distributed systems often need to work with multiple message brokers, eac
 - Kafka
 - NATS Core
 - AMQP 0.9.1 (RabbitMQ)
-- AMQP 1.0 (Azure Service Bus)
+- AMQP 1.0 (Azure Service Bus, Apache ActiveMQ)
 - RESP (PubSub/Streams)
 - NSQ
 - MQTT
+
+## Client Interfaces
+Fujin provides two client interfaces to suit different needs:
+
+### Fujin Native Protocol (QUIC)
+Optimized binary protocol with minimal overhead. Best for high-performance applications. Only Go client is supporter right now.
+
+### gRPC Interface
+Easy to use, works with any language that supports gRPC.
 
 ## Use Cases
 
@@ -55,8 +65,9 @@ Consider alternatives if:
 
 ## Documentation
 
-- [Protocol Specification](protocol.md)
-- [Configuration Guide](config.dev.yaml)
+- [Native Protocol Specification](protocol.md)
+- [gRPC Protocol Specification](public/grpc/v1/fujin.proto)
+- [Configuration Guide](examples/assets/config/config.yaml)
 
 ## TODO
 
