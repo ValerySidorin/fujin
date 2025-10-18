@@ -16,14 +16,21 @@ fujin:
     max_idle_timeout: 5s
     keepalive_period: 2s
 grpc:
-  enabled: false
+  enabled: true
   addr: :4849
-  connection_timeout: 10s
-  max_concurrent_streams: 1000
-  tls:
-    enabled: false
-    server_cert_pem_path: ./resources/assets/certs/fujin.io.pem
-    server_key_pem_path: ./resources/assets/certs/fujin.io-key.pem
+  max_recv_msg_size: 4194304
+  max_send_msg_size: 4194304
+  initial_window_size: 1048576
+  initial_conn_window_size: 1048576
+  server_keepalive:
+    time: 2h
+    timeout: 20s
+    max_connection_idle: 15m
+    max_connection_age: 30m
+    max_connection_age_grace: 5s
+  client_keepalive:
+    min_time: 5m
+    permit_without_stream: false
 connectors:
   writers:
     pub:
@@ -118,34 +125,34 @@ connectors:
         balancers:
           - round_robin # sticky/cooperative_sticky/range/round_robin (defaults to cooperative_sticky)
         fetch_isolation_level: read_commited # read_commited/read_uncommited (defaults to read_uncommited)
-    sub:
-      protocol: nats
-      nats:
-        url: nats://localhost:4222
-        subject: my_subject
-    sub:
-      protocol: amqp091
-      settings:
-        conn:
-          url: amqp://guest:guest@localhost
-        exchange:
-          name: events
-          kind: fanout
-        queue:
-          name: my_queue
-        queue_bind:
-          routing_key: my_routing_key
-        consume:
-          consumer: fujin
-        nack:
-          requeue: true
-    sub:
-      protocol: amqp10
-      settings:
-        conn:
-          addr: amqp://artemis:artemis@localhost:61616
-        receiver:
-          source: exchange
+    # sub:
+    #   protocol: nats
+    #   nats:
+    #     url: nats://localhost:4222
+    #     subject: my_subject
+    # sub:
+    #   protocol: amqp091
+    #   settings:
+    #     conn:
+    #       url: amqp://guest:guest@localhost
+    #     exchange:
+    #       name: events
+    #       kind: fanout
+    #     queue:
+    #       name: my_queue
+    #     queue_bind:
+    #       routing_key: my_routing_key
+    #     consume:
+    #       consumer: fujin
+    #     nack:
+    #       requeue: true
+    # sub:
+    #   protocol: amqp10
+    #   settings:
+    #     conn:
+    #       addr: amqp://artemis:artemis@localhost:61616
+    #     receiver:
+    #       source: exchange
     # sub:
     #   protocol: resp_pubsub
     #   settings:

@@ -35,6 +35,31 @@ type GRPCServerConfig struct {
 	ConnectionTimeout    time.Duration
 	MaxConcurrentStreams uint32
 	TLS                  *tls.Config
+
+	// Message size limits (bytes)
+	MaxRecvMsgSize int // Maximum message size the server can receive
+	MaxSendMsgSize int // Maximum message size the server can send
+
+	// Flow control window sizes (bytes)
+	InitialWindowSize     int32 // Initial window size for stream-level flow control
+	InitialConnWindowSize int32 // Initial window size for connection-level flow control
+
+	// KeepAlive settings
+	ServerKeepAlive ServerKeepAliveConfig
+	ClientKeepAlive ClientKeepAliveConfig
+}
+
+type ServerKeepAliveConfig struct {
+	Time                  time.Duration
+	Timeout               time.Duration
+	MaxConnectionIdle     time.Duration
+	MaxConnectionAge      time.Duration
+	MaxConnectionAgeGrace time.Duration
+}
+
+type ClientKeepAliveConfig struct {
+	MinTime             time.Duration
+	PermitWithoutStream bool
 }
 
 func (c *Config) SetDefaults() {

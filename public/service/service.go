@@ -45,11 +45,30 @@ type FujinConfig struct {
 }
 
 type GRPCConfig struct {
-	Enabled              bool              `yaml:"enabled"`
-	Addr                 string            `yaml:"addr"`
-	ConnectionTimeout    time.Duration     `yaml:"connection_timeout"`
-	MaxConcurrentStreams uint32            `yaml:"max_concurrent_streams"`
-	TLS                  pconfig.TLSConfig `yaml:"tls"`
+	Enabled               bool                  `yaml:"enabled"`
+	Addr                  string                `yaml:"addr"`
+	ConnectionTimeout     time.Duration         `yaml:"connection_timeout"`
+	MaxConcurrentStreams  uint32                `yaml:"max_concurrent_streams"`
+	MaxRecvMsgSize        int                   `yaml:"max_recv_msg_size"`
+	MaxSendMsgSize        int                   `yaml:"max_send_msg_size"`
+	InitialWindowSize     int32                 `yaml:"initial_window_size"`
+	InitialConnWindowSize int32                 `yaml:"initial_conn_window_size"`
+	ServerKeepAlive       ServerKeepAliveConfig `yaml:"server_keepalive"`
+	ClientKeepAlive       ClientKeepAliveConfig `yaml:"client_keepalive"`
+	TLS                   pconfig.TLSConfig     `yaml:"tls"`
+}
+
+type ServerKeepAliveConfig struct {
+	Time                  time.Duration `yaml:"time"`
+	Timeout               time.Duration `yaml:"timeout"`
+	MaxConnectionIdle     time.Duration `yaml:"max_connection_idle"`
+	MaxConnectionAge      time.Duration `yaml:"max_connection_age"`
+	MaxConnectionAgeGrace time.Duration `yaml:"max_connection_age_grace"`
+}
+
+type ClientKeepAliveConfig struct {
+	MinTime             time.Duration `yaml:"min_time"`
+	PermitWithoutStream bool          `yaml:"permit_without_stream"`
 }
 
 type QUICConfig struct {
@@ -135,12 +154,35 @@ func (c *Config) parseGRPCConfig() (config.GRPCServerConfig, error) {
 	}
 
 	return config.GRPCServerConfig{
-		Enabled:              c.GRPC.Enabled,
-		Addr:                 c.GRPC.Addr,
-		ConnectionTimeout:    c.GRPC.ConnectionTimeout,
-		MaxConcurrentStreams: c.GRPC.MaxConcurrentStreams,
-		TLS:                  c.GRPC.TLS.Config,
+		Enabled:               c.GRPC.Enabled,
+		Addr:                  c.GRPC.Addr,
+		ConnectionTimeout:     c.GRPC.ConnectionTimeout,
+		MaxConcurrentStreams:  c.GRPC.MaxConcurrentStreams,
+		MaxRecvMsgSize:        c.GRPC.MaxRecvMsgSize,
+		MaxSendMsgSize:        c.GRPC.MaxSendMsgSize,
+		InitialWindowSize:     c.GRPC.InitialWindowSize,
+		InitialConnWindowSize: c.GRPC.InitialConnWindowSize,
+		ServerKeepAlive:       c.GRPC.ServerKeepAlive.parse(),
+		ClientKeepAlive:       c.GRPC.ClientKeepAlive.parse(),
+		TLS:                   c.GRPC.TLS.Config,
 	}, nil
+}
+
+func (c *ServerKeepAliveConfig) parse() config.ServerKeepAliveConfig {
+	return config.ServerKeepAliveConfig{
+		Time:                  c.Time,
+		Timeout:               c.Timeout,
+		MaxConnectionIdle:     c.MaxConnectionIdle,
+		MaxConnectionAge:      c.MaxConnectionAge,
+		MaxConnectionAgeGrace: c.MaxConnectionAgeGrace,
+	}
+}
+
+func (c *ClientKeepAliveConfig) parse() config.ClientKeepAliveConfig {
+	return config.ClientKeepAliveConfig{
+		MinTime:             c.MinTime,
+		PermitWithoutStream: c.PermitWithoutStream,
+	}
 }
 
 func (c *QUICConfig) parse() *quic.Config {

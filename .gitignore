@@ -33,5 +33,6 @@ tempo
 ## Dev configs
 config.dev.yaml
 
-## test dir
+## test files and dirs
 # sandbox
+TEST_COVERAGE_PLAN.md
