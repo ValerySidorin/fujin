@@ -291,7 +291,6 @@ func (s *stream) subscribe(topic string, autoCommit bool, handler func(msg *pb.F
 			topic:   topic,
 			handler: handler,
 			stream:  s,
-			closed:  atomic.Bool{},
 		}
 
 		s.subsMu.Lock()

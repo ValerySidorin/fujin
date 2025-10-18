@@ -1917,21 +1917,23 @@ func (h *handler) hsubscribe(ctx context.Context, subID byte, r internal_reader.
 func (h *handler) produce(msg []byte) {
 	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (err no/err yes)
 	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
-	h.nonTxSessionWriters[h.ps.pa.topic].Produce(h.ctx, msg, func(err error) {
-		pool.Put(msg)
-		if err != nil {
-			h.l.Error("write", "err", err)
+	h.nonTxSessionWriters[h.ps.pa.topic].Produce(
+		h.ctx, msg,
+		func(err error) {
+			pool.Put(msg)
+			if err != nil {
+				h.l.Error("write", "err", err)
 
-			successResp[5] = response.ERR_CODE_YES
-			errProtoBuf := errProtoBuf(err)
-			h.out.EnqueueProtoMulti(successResp, errProtoBuf)
-			pool.Put(errProtoBuf)
+				successResp[5] = response.ERR_CODE_YES
+				errProtoBuf := errProtoBuf(err)
+				h.out.EnqueueProtoMulti(successResp, errProtoBuf)
+				pool.Put(errProtoBuf)
+				pool.Put(buf)
+				return
+			}
+			h.out.EnqueueProto(successResp)
 			pool.Put(buf)
-			return
-		}
-		h.out.EnqueueProto(successResp)
-		pool.Put(buf)
-	})
+		})
 }
 
 func (h *handler) hproduce(msg []byte) {
@@ -1940,20 +1942,22 @@ func (h *handler) hproduce(msg []byte) {
 	hdr = append(hdr, byte(response.RESP_CODE_HPRODUCE))
 	hdr = append(hdr, h.ps.ca.cID...)
 	hdr = append(hdr, response.ERR_CODE_NO)
-	h.nonTxSessionWriters[h.ps.pa.topic].HProduce(h.ctx, msg, h.ps.ha.headersKV, func(err error) {
-		pool.Put(msg)
-		if err != nil {
-			h.l.Error("produce", "err", err)
-			hdr[5] = response.ERR_CODE_YES
-			errProto := errProtoBuf(err)
-			h.out.EnqueueProtoMulti(hdr, errProto)
-			pool.Put(errProto)
+	h.nonTxSessionWriters[h.ps.pa.topic].HProduce(
+		h.ctx, msg, h.ps.ha.headersKV,
+		func(err error) {
+			pool.Put(msg)
+			if err != nil {
+				h.l.Error("produce", "err", err)
+				hdr[5] = response.ERR_CODE_YES
+				errProto := errProtoBuf(err)
+				h.out.EnqueueProtoMulti(hdr, errProto)
+				pool.Put(errProto)
+				pool.Put(buf)
+				return
+			}
+			h.out.EnqueueProto(hdr)
 			pool.Put(buf)
-			return
-		}
-		h.out.EnqueueProto(hdr)
-		pool.Put(buf)
-	})
+		})
 }
 
 func (h *handler) produceTx(msg []byte) {

@@ -15,6 +15,7 @@ import (
 	"github.com/ValerySidorin/fujin/public/server/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 )
 
 // GRPCServer implements the Fujin gRPC service
@@ -46,6 +47,7 @@ func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 
 	var serverOpts []grpc.ServerOption
 
+	// Connection settings
 	if s.conf.ConnectionTimeout > 0 {
 		serverOpts = append(serverOpts, grpc.ConnectionTimeout(s.conf.ConnectionTimeout))
 	}
@@ -54,6 +56,50 @@ func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 		serverOpts = append(serverOpts, grpc.MaxConcurrentStreams(s.conf.MaxConcurrentStreams))
 	}
 
+	// Message size limits
+	if s.conf.MaxRecvMsgSize > 0 {
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(s.conf.MaxRecvMsgSize))
+	}
+	if s.conf.MaxSendMsgSize > 0 {
+		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(s.conf.MaxSendMsgSize))
+	}
+
+	// Flow control window sizes
+	if s.conf.InitialWindowSize > 0 {
+		serverOpts = append(serverOpts, grpc.InitialWindowSize(s.conf.InitialWindowSize))
+	}
+	if s.conf.InitialConnWindowSize > 0 {
+		serverOpts = append(serverOpts, grpc.InitialConnWindowSize(s.conf.InitialConnWindowSize))
+	}
+
+	// Server KeepAlive settings
+	if s.conf.ServerKeepAlive.Time > 0 || s.conf.ServerKeepAlive.Timeout > 0 {
+		kaParams := keepalive.ServerParameters{
+			Time:    s.conf.ServerKeepAlive.Time,
+			Timeout: s.conf.ServerKeepAlive.Timeout,
+		}
+		if s.conf.ServerKeepAlive.MaxConnectionIdle > 0 {
+			kaParams.MaxConnectionIdle = s.conf.ServerKeepAlive.MaxConnectionIdle
+		}
+		if s.conf.ServerKeepAlive.MaxConnectionAge > 0 {
+			kaParams.MaxConnectionAge = s.conf.ServerKeepAlive.MaxConnectionAge
+		}
+		if s.conf.ServerKeepAlive.MaxConnectionAgeGrace > 0 {
+			kaParams.MaxConnectionAgeGrace = s.conf.ServerKeepAlive.MaxConnectionAgeGrace
+		}
+		serverOpts = append(serverOpts, grpc.KeepaliveParams(kaParams))
+	}
+
+	// Client KeepAlive settings
+	if s.conf.ClientKeepAlive.MinTime > 0 {
+		kaPolicy := keepalive.EnforcementPolicy{
+			MinTime:             s.conf.ClientKeepAlive.MinTime,
+			PermitWithoutStream: s.conf.ClientKeepAlive.PermitWithoutStream,
+		}
+		serverOpts = append(serverOpts, grpc.KeepaliveEnforcementPolicy(kaPolicy))
+	}
+
+	// TLS configuration
 	if s.conf.TLS != nil && len(s.conf.TLS.Certificates) > 0 {
 		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(s.conf.TLS)))
 	} else {
@@ -93,15 +139,14 @@ func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
 	ctx := stream.Context()
 
 	session := &streamSession{
-		stream:      stream,
-		cman:        s.cman,
-		l:           s.l,
-		ctx:         ctx,
-		writers:     make(map[string]writer.Writer),
-		readers:     make(map[byte]*readerState),
-		nextSubID:   0,
-		connected:   false,
-		correlators: make(map[uint32]chan error),
+		stream:    stream,
+		cman:      s.cman,
+		l:         s.l,
+		ctx:       ctx,
+		writers:   make(map[string]writer.Writer),
+		readers:   make(map[byte]*readerState),
+		nextSubID: 0,
+		connected: false,
 	}
 
 	// Start goroutines for receiving and sending
@@ -109,8 +154,7 @@ func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
 
 	// Receiver goroutine
 	go func() {
-		err := session.receiveLoop()
-		errCh <- err
+		errCh <- session.receiveLoop()
 	}()
 
 	// Wait for either error or context cancellation
@@ -134,13 +178,13 @@ type streamSession struct {
 	l      *slog.Logger
 	ctx    context.Context
 
-	mu          sync.RWMutex
-	writers     map[string]writer.Writer
-	readers     map[byte]*readerState
-	nextSubID   byte
-	streamID    string
-	connected   bool
-	correlators map[uint32]chan error
+	mu        sync.RWMutex
+	sendMu    sync.Mutex
+	writers   map[string]writer.Writer
+	readers   map[byte]*readerState
+	nextSubID byte
+	streamID  string
+	connected bool
 }
 
 type readerState struct {
@@ -162,8 +206,8 @@ func (s *streamSession) receiveLoop() error {
 		}
 
 		if err := s.handleRequest(req); err != nil {
-			s.l.Error("handle request error", "err", err)
-			return err
+			s.l.Error("handle request", "err", err)
+			return fmt.Errorf("handle request: %w", err)
 		}
 	}
 }
@@ -227,7 +271,6 @@ func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
 		})
 	}
 
-	// Get or create writer for this topic
 	w, err := s.getWriter(req.Topic)
 	if err != nil {
 		return s.sendResponse(&pb.FujinResponse{
@@ -240,44 +283,30 @@ func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
 		})
 	}
 
-	// Convert headers to [][]byte format
-	var headers [][]byte
-	if len(req.Headers) > 0 {
-		headers = make([][]byte, 0, len(req.Headers)*2)
-		for _, h := range req.Headers {
-			headers = append(headers, h.Key, h.Value)
-		}
-	}
+	correlationID := req.CorrelationId
 
-	// Channel for async callback
-	errCh := make(chan error, 1)
-	callback := func(writeErr error) {
-		errCh <- writeErr
-	}
+	w.Produce(
+		s.ctx, req.Message,
+		func(writeErr error) {
+			var errMsg string
+			if writeErr != nil {
+				errMsg = writeErr.Error()
+			}
 
-	// Write message
-	if len(headers) > 0 {
-		w.HProduce(s.ctx, req.Message, headers, callback)
-	} else {
-		w.Produce(s.ctx, req.Message, callback)
-	}
+			err := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Produce{
+					Produce: &pb.ProduceResponse{
+						CorrelationId: correlationID,
+						Error:         errMsg,
+					},
+				},
+			})
+			if err != nil {
+				s.l.Error("send produce response", "err", err)
+			}
+		})
 
-	// Wait for callback
-	writeErr := <-errCh
-
-	errMsg := ""
-	if writeErr != nil {
-		errMsg = writeErr.Error()
-	}
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Produce{
-			Produce: &pb.ProduceResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         errMsg,
-			},
-		},
-	})
+	return nil
 }
 
 // handleSubscribe processes SUBSCRIBE request
@@ -349,7 +378,6 @@ func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
 		return err
 	}
 
-	// Start subscription goroutine
 	go s.subscribeLoop(ctx, subID, state)
 
 	return nil
@@ -384,12 +412,10 @@ func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
 		})
 	}
 
-	// Cancel the subscription context to stop the goroutine
 	state.cancel()
 	delete(s.readers, subID)
 	s.mu.Unlock()
 
-	// Close the reader
 	state.reader.Close()
 
 	return s.sendResponse(&pb.FujinResponse{
@@ -411,33 +437,38 @@ func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *re
 		state.reader.Close()
 	}()
 
+	var msgIDBuf []byte
+	if !state.autoCommit {
+		msgIDBuf = make([]byte, state.reader.MsgIDStaticArgsLen())
+	}
+
+	msgHandler := func(message []byte, topic string, args ...any) {
+		var msgID []byte
+		if !state.autoCommit && len(args) > 0 {
+			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
+		}
+
+		if err := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Message{
+				Message: &pb.Message{
+					CorrelationId: uint32(subID),
+					Topic:         topic,
+					Payload:       message,
+					Headers:       nil,
+					DeliveryId:    msgID,
+				},
+			},
+		}); err != nil {
+			s.l.Error("failed to send message", "sub_id", subID, "err", err)
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			var err error
-			msgHandler := func(message []byte, topic string, args ...any) {
-				// Encode message ID if not auto-commit
-				var msgID []byte
-				if !state.autoCommit && len(args) > 0 {
-					msgIDBuf := make([]byte, state.reader.MsgIDStaticArgsLen())
-					msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-				}
-
-				_ = s.sendResponse(&pb.FujinResponse{
-					Response: &pb.FujinResponse_Message{
-						Message: &pb.Message{
-							CorrelationId: uint32(subID),
-							Topic:         topic,
-							Payload:       message,
-							Headers:       nil,
-							DeliveryId:    msgID,
-						},
-					},
-				})
-			}
-			err = state.reader.Subscribe(ctx, msgHandler)
+			err := state.reader.Subscribe(ctx, msgHandler)
 			if err != nil && ctx.Err() == nil {
 				s.l.Error("subscribe error", "sub_id", subID, "err", err)
 			}
@@ -500,6 +531,8 @@ func (s *streamSession) getWriter(topic string) (writer.Writer, error) {
 
 // sendResponse sends a response to the client
 func (s *streamSession) sendResponse(resp *pb.FujinResponse) error {
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
 	if err := s.stream.Send(resp); err != nil {
 		return fmt.Errorf("send response: %w", err)
 	}

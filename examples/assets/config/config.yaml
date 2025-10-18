@@ -1,17 +1,11 @@
 fujin:
   enabled: true
-  addr: :4848
   tls:
     enabled: true
     server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
     server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
 grpc:
   enabled: true
-  addr: :4849
-  tls:
-    enabled: false
-    server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
-    server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
 connectors:
   writers:
     pub:
