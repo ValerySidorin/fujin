@@ -279,11 +279,12 @@ Client -> Server
 If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
-`[9, <correlation id>, <msg ids>]`  
+`[9, <correlation id>, <subscription id>, <msg ids>]`  
 where:
 | name             | description                                                          | type                 |
 | ---------------- | ---------------------------------------------------------------------| -------------------- |
 | `correlation id` | Correlation ID is used to match client request with server response. | uint32               |
+| `subscription id`| Subscription ID to identify the subscription.                        | byte                 |
 | `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte |
 ##### Response
 `[12, <correlation id>, <error>, <ack results>]`  
@@ -295,7 +296,7 @@ where:
 | `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]ackres |
 
 ### Examples
-- `[9, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[12, 0, 0, 0, 1, 0]`
+- `[9, 0, 0, 0, 1, 1, 0, 0, 0, 1]` -> `[12, 0, 0, 0, 1, 0]`
 
 ## NACK
 
@@ -305,11 +306,12 @@ Client -> Server
 Works similarly to `ACK`.
 ### Syntax
 ##### Request
-`[10, <correlation id>, <message ids>]`  
+`[10, <correlation id>, <subscription id>, <message ids>]`  
 where:
 | name              | description                                                          | type                 | presence |
 | ----------------- | ---------------------------------------------------------------------| -------------------- | -------- |
 | `correlation id`  | Correlation ID is used to match client request with server response. | uint32               | always   |
+| `subscription id` | Subscription ID to identify the subscription.                        | byte                 | always   |
 | `msg ids`         | Message ID batch.                                                    | [uint32][uint32]byte | always   |
 ##### Response
 `[13, <correlation id>, <error>, <nack results>]`  
@@ -322,7 +324,7 @@ where:
 
 
 ### Examples
-- `[10, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[13, 0, 0, 0, 1, 0]`
+- `[10, 0, 0, 0, 1, 1, 0, 0, 0, 1]` -> `[13, 0, 0, 0, 1, 0]`
 
 ## FETCH
 

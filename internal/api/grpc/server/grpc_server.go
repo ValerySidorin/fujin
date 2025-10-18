@@ -451,11 +451,9 @@ func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *re
 		if err := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Message{
 				Message: &pb.Message{
-					CorrelationId: uint32(subID),
-					Topic:         topic,
-					Payload:       message,
-					Headers:       nil,
-					DeliveryId:    msgID,
+					SubscriptionId: uint32(subID),
+					MessageId:      msgID,
+					Payload:        message,
 				},
 			},
 		}); err != nil {
@@ -481,32 +479,164 @@ func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *re
 
 // handleAck processes ACK request
 func (s *streamSession) handleAck(req *pb.AckRequest) error {
-	// Find the reader associated with this message
-	// Not implemented
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Ack{
-			Ack: &pb.Empty{
-				CorrelationId: req.CorrelationId,
-				Error:         "",
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Ack{
+				Ack: &pb.AckResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
 			},
+		})
+	}
+
+	// Convert subscription_id to byte (as per native protocol)
+	subID := byte(req.SubscriptionId)
+
+	s.mu.RLock()
+	state, exists := s.readers[subID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Ack{
+				Ack: &pb.AckResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         fmt.Sprintf("subscription %d not found", subID),
+				},
+			},
+		})
+	}
+
+	// Use message IDs from the request (now supports multiple IDs)
+	msgIDs := req.MessageIds
+
+	// Collect per-message results
+	results := make([]*pb.AckMessageResult, 0, len(msgIDs))
+	var resultsMu sync.Mutex
+
+	// Call Ack on the reader
+	state.reader.Ack(
+		s.ctx,
+		msgIDs,
+		func(err error) {
+			// Ack handler - called when all acks are processed
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+			}
+
+			if sendErr := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Ack{
+					Ack: &pb.AckResponse{
+						CorrelationId: req.CorrelationId,
+						Error:         errMsg,
+						Results:       results,
+					},
+				},
+			}); sendErr != nil {
+				s.l.Error("failed to send ack response", "err", sendErr)
+			}
 		},
-	})
+		func(msgID []byte, err error) {
+			// Individual message ack handler
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+				s.l.Error("ack message", "msgID", msgID, "err", err)
+			}
+
+			resultsMu.Lock()
+			results = append(results, &pb.AckMessageResult{
+				MessageId: msgID,
+				Error:     errMsg,
+			})
+			resultsMu.Unlock()
+		},
+	)
+
+	return nil
 }
 
 // handleNack processes NACK request
 func (s *streamSession) handleNack(req *pb.NackRequest) error {
-	// Find the reader associated with this message
-	// Not implemented
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Nack{
-			Nack: &pb.Empty{
-				CorrelationId: req.CorrelationId,
-				Error:         "",
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Nack{
+				Nack: &pb.NackResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
 			},
+		})
+	}
+
+	// Convert subscription_id to byte (as per native protocol)
+	subID := byte(req.SubscriptionId)
+
+	s.mu.RLock()
+	state, exists := s.readers[subID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Nack{
+				Nack: &pb.NackResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         fmt.Sprintf("subscription %d not found", subID),
+				},
+			},
+		})
+	}
+
+	// Use message IDs from the request (now supports multiple IDs)
+	msgIDs := req.MessageIds
+
+	// Collect per-message results
+	results := make([]*pb.NackMessageResult, 0, len(msgIDs))
+	var resultsMu sync.Mutex
+
+	// Call Nack on the reader
+	state.reader.Nack(
+		s.ctx,
+		msgIDs,
+		func(err error) {
+			// Nack handler - called when all nacks are processed
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+			}
+
+			if sendErr := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Nack{
+					Nack: &pb.NackResponse{
+						CorrelationId: req.CorrelationId,
+						Error:         errMsg,
+						Results:       results,
+					},
+				},
+			}); sendErr != nil {
+				s.l.Error("failed to send nack response", "err", sendErr)
+			}
 		},
-	})
+		func(msgID []byte, err error) {
+			// Individual message nack handler
+			var errMsg string
+			if err != nil {
+				errMsg = err.Error()
+				s.l.Error("nack message", "msgID", msgID, "err", err)
+			}
+
+			resultsMu.Lock()
+			results = append(results, &pb.NackMessageResult{
+				MessageId: msgID,
+				Error:     errMsg,
+			})
+			resultsMu.Unlock()
+		},
+	)
+
+	return nil
 }
 
 // getWriter retrieves or creates a writer for the given topic

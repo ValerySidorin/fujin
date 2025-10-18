@@ -10,7 +10,7 @@ import (
 	"time"
 
 	v1 "github.com/ValerySidorin/fujin/client/grpc/v1"
-	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
+	"github.com/ValerySidorin/fujin/client/models"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -40,18 +40,11 @@ func main() {
 	defer stream.Close()
 
 	// Subscribe to topic
-	subscriptionID, err := stream.Subscribe("sub", true, func(msg *pb.FujinResponse_Message) {
+	subscriptionID, err := stream.Subscribe("sub", true, func(msg models.Msg) {
 		fmt.Printf("📨 Received message:\n")
-		fmt.Printf("   Subscription ID: %d\n", msg.Message.CorrelationId)
-		fmt.Printf("   Topic: %s\n", msg.Message.Topic)
-		fmt.Printf("   Payload: %s\n", string(msg.Message.Payload))
-
-		if len(msg.Message.Headers) > 0 {
-			fmt.Printf("   Headers:\n")
-			for _, h := range msg.Message.Headers {
-				fmt.Printf("     %s: %s\n", string(h.Key), string(h.Value))
-			}
-		}
+		fmt.Printf("   Subscription ID: %d\n", msg.SubscriptionID)
+		fmt.Printf("   Message ID: %x\n", msg.MessageID)
+		fmt.Printf("   Payload: %s\n", string(msg.Payload))
 	})
 	if err != nil {
 		log.Fatalf("Failed to subscribe: %v", err)

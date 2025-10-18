@@ -1,6 +1,6 @@
 package v1
 
-import pb "github.com/ValerySidorin/fujin/public/grpc/v1"
+import "github.com/ValerySidorin/fujin/client/models"
 
 type Conn interface {
 	Connect(id string) (Stream, error)
@@ -9,8 +9,10 @@ type Conn interface {
 
 type Stream interface {
 	Produce(topic string, p []byte) error
-	Subscribe(topic string, autoCommit bool, handler func(msg *pb.FujinResponse_Message)) (uint32, error)
+	Subscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error)
 	Unsubscribe(subscriptionID uint32) error
+	Ack(subscriptionID uint32, messageIDs ...[]byte) (models.AckResult, error)
+	Nack(subscriptionID uint32, messageIDs ...[]byte) (models.NackResult, error)
 	Close() error
 }
 
