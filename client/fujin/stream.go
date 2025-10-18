@@ -300,20 +300,20 @@ func (s *Stream) Close() error {
 	return nil
 }
 
-func (s *Stream) ack(id []byte) (AckResponse, error) {
-	return s.sendAckCmd(byte(request.OP_CODE_ACK), id)
+func (s *Stream) ack(subID byte, id []byte) (AckResponse, error) {
+	return s.sendAckCmd(byte(request.OP_CODE_ACK), subID, id)
 }
 
-func (s *Stream) nack(id []byte) (AckResponse, error) {
-	return s.sendAckCmd(byte(request.OP_CODE_NACK), id)
+func (s *Stream) nack(subID byte, id []byte) (AckResponse, error) {
+	return s.sendAckCmd(byte(request.OP_CODE_NACK), subID, id)
 }
 
-func (s *Stream) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
+func (s *Stream) sendAckCmd(cmd byte, subID byte, msgID []byte) (AckResponse, error) {
 	if s.closed.Load() {
 		return AckResponse{}, ErrStreamClosed
 	}
 
-	buf := pool.Get(9)
+	buf := pool.Get(10)
 	defer pool.Put(buf)
 
 	ch := make(chan AckResponse, 1)
@@ -324,6 +324,7 @@ func (s *Stream) sendAckCmd(cmd byte, msgID []byte) (AckResponse, error) {
 
 	buf = append(buf, cmd)
 	buf = binary.BigEndian.AppendUint32(buf, correlationID)
+	buf = append(buf, subID)
 	buf = binary.BigEndian.AppendUint32(buf, 1)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msgID)))
 
@@ -593,6 +594,7 @@ func (s *Stream) parse(buf []byte) error {
 						Value:   s.ps.payloadBuf,
 						Headers: s.ps.ma.headers,
 						id:      s.ps.metaBuf,
+						subID:   s.ps.ma.sub.id,
 						s:       s,
 					}
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START
@@ -606,6 +608,7 @@ func (s *Stream) parse(buf []byte) error {
 						Value:   s.ps.payloadBuf,
 						Headers: s.ps.ma.headers,
 						id:      s.ps.metaBuf,
+						subID:   s.ps.ma.sub.id,
 						s:       s,
 					}
 					s.ps.metaBuf, s.ps.payloadBuf, s.ps.ma, s.ps.state = nil, nil, msgArg{}, OP_START

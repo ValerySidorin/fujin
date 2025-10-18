@@ -3,14 +3,14 @@ package v1
 import (
 	"sync/atomic"
 
-	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
+	"github.com/ValerySidorin/fujin/client/models"
 )
 
 // subscription implements the Subscription interface
 type subscription struct {
 	id      uint32
 	topic   string
-	handler func(msg *pb.FujinResponse_Message)
+	handler func(msg models.Msg)
 	stream  *stream
 	closed  atomic.Bool
 }

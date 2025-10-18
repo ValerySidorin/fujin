@@ -63,6 +63,7 @@ const (
 
 	OP_ACK
 	OP_ACK_CORRELATION_ID_ARG
+	OP_ACK_SUBSCRIPTION_ID_ARG
 	OP_ACK_ARG
 	OP_ACK_MSG_ID_TOPIC_ARG
 	OP_ACK_MSG_ID_TOPIC_PAYLOAD
@@ -71,6 +72,7 @@ const (
 
 	OP_NACK
 	OP_NACK_CORRELATION_ID_ARG
+	OP_NACK_SUBSCRIPTION_ID_ARG
 	OP_NACK_ARG
 	OP_NACK_MSG_ID_TOPIC_ARG
 	OP_NACK_MSG_ID_TOPIC_PAYLOAD
@@ -193,6 +195,7 @@ type fetchArgs struct {
 }
 
 type ackArgs struct {
+	subID        byte
 	currMsgIDLen uint32
 	msgIDsLen    uint32
 	msgIDsBuf    []byte
@@ -237,8 +240,6 @@ type handler struct {
 	fhMu                        sync.RWMutex
 
 	acker internal_reader.Reader
-
-	// response templates removed to prevent concurrent in-place mutations
 
 	disconnect func()
 
@@ -839,9 +840,12 @@ func (h *handler) handle(buf []byte) error {
 			}
 
 			if len(h.ps.ca.cID) >= fujin.Uint32Len {
-				h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
-				h.ps.state = OP_ACK_ARG
+				h.ps.state = OP_ACK_SUBSCRIPTION_ID_ARG
 			}
+		case OP_ACK_SUBSCRIPTION_ID_ARG:
+			h.ps.aa.subID = b
+			h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
+			h.ps.state = OP_ACK_ARG
 		case OP_ACK_ARG:
 			h.ps.aa.msgIDsBuf = append(h.ps.aa.msgIDsBuf, b)
 			if len(h.ps.aa.msgIDsBuf) >= fujin.Uint32Len {
@@ -870,24 +874,35 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					h.acker.Ack(h.ctx, h.ps.payloadsBuf,
-						func(err error) {
-							h.out.Lock()
-							if err != nil {
-								h.enqueueAckErrNoLock(h.ps.ca.cID, err)
-								return
-							}
-							h.enqueueAckSuccessNoLock(h.ps.ca.cID)
-						},
-						func(b []byte, err error) {
-							if err != nil {
-								h.enqueueAckMsgIDErrNoLock(b, err)
-								return
-							}
-							h.enqueueAckMsgIDSuccessNoLock(b)
-						},
-					)
-					h.out.Unlock()
+					// Find reader by subscription ID
+					h.sMu.Lock()
+					reader, exists := h.subscribers[h.ps.aa.subID]
+					h.sMu.Unlock()
+
+					if !exists {
+						h.out.Lock()
+						h.enqueueAckErrNoLock(h.ps.ca.cID, fmt.Errorf("subscription %d not found", h.ps.aa.subID))
+						h.out.Unlock()
+					} else {
+						reader.Ack(h.ctx, h.ps.payloadsBuf,
+							func(err error) {
+								h.out.Lock()
+								if err != nil {
+									h.enqueueAckErrNoLock(h.ps.ca.cID, err)
+									return
+								}
+								h.enqueueAckSuccessNoLock(h.ps.ca.cID)
+							},
+							func(b []byte, err error) {
+								if err != nil {
+									h.enqueueAckMsgIDErrNoLock(b, err)
+									return
+								}
+								h.enqueueAckMsgIDSuccessNoLock(b)
+							},
+						)
+						h.out.Unlock()
+					}
 					pool.Put(h.ps.ca.cID)
 					pool.Put(h.ps.aa.msgIDsBuf)
 					for _, payload := range h.ps.payloadsBuf {
@@ -923,9 +938,12 @@ func (h *handler) handle(buf []byte) error {
 			}
 
 			if len(h.ps.ca.cID) >= fujin.Uint32Len {
-				h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
-				h.ps.state = OP_NACK_ARG
+				h.ps.state = OP_NACK_SUBSCRIPTION_ID_ARG
 			}
+		case OP_NACK_SUBSCRIPTION_ID_ARG:
+			h.ps.aa.subID = b
+			h.ps.aa.msgIDsBuf = pool.Get(fujin.Uint32Len)
+			h.ps.state = OP_NACK_ARG
 		case OP_NACK_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= fujin.Uint32Len {
@@ -955,24 +973,35 @@ func (h *handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					h.acker.Nack(h.ctx, h.ps.payloadsBuf,
-						func(err error) {
-							h.out.Lock()
-							if err != nil {
-								h.enqueueNackErrNoLock(h.ps.ca.cID, err)
-								return
-							}
-							h.enqueueNackSuccessNoLock(h.ps.ca.cID)
-						},
-						func(b []byte, err error) {
-							if err != nil {
-								h.enqueueAckMsgIDErrNoLock(b, err)
-								return
-							}
-							h.enqueueAckMsgIDSuccessNoLock(b)
-						},
-					)
-					h.out.Unlock()
+					// Find reader by subscription ID
+					h.sMu.Lock()
+					reader, exists := h.subscribers[h.ps.aa.subID]
+					h.sMu.Unlock()
+
+					if !exists {
+						h.out.Lock()
+						h.enqueueNackErrNoLock(h.ps.ca.cID, fmt.Errorf("subscription %d not found", h.ps.aa.subID))
+						h.out.Unlock()
+					} else {
+						reader.Nack(h.ctx, h.ps.payloadsBuf,
+							func(err error) {
+								h.out.Lock()
+								if err != nil {
+									h.enqueueNackErrNoLock(h.ps.ca.cID, err)
+									return
+								}
+								h.enqueueNackSuccessNoLock(h.ps.ca.cID)
+							},
+							func(b []byte, err error) {
+								if err != nil {
+									h.enqueueAckMsgIDErrNoLock(b, err)
+									return
+								}
+								h.enqueueAckMsgIDSuccessNoLock(b)
+							},
+						)
+						h.out.Unlock()
+					}
 					pool.Put(h.ps.ca.cID)
 					for _, payload := range h.ps.payloadsBuf {
 						pool.Put(payload)
