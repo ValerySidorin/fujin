@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ValerySidorin/fujin/client/correlator"
+	"github.com/ValerySidorin/fujin/client/models"
 	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
 )
 
@@ -32,6 +33,8 @@ type stream struct {
 	produceCorrelator     *correlator.Correlator[error]
 	subscribeCorrelator   *correlator.Correlator[uint32]
 	unsubscribeCorrelator *correlator.Correlator[error]
+	ackCorrelator         *correlator.Correlator[models.AckResult]
+	nackCorrelator        *correlator.Correlator[models.NackResult]
 
 	// Subscriptions
 	subscriptions map[uint32]*subscription
@@ -65,6 +68,8 @@ func newStream(client pb.FujinServiceClient, streamID string, logger *slog.Logge
 		produceCorrelator:     correlator.New[error](),
 		subscribeCorrelator:   correlator.New[uint32](),
 		unsubscribeCorrelator: correlator.New[error](),
+		ackCorrelator:         correlator.New[models.AckResult](),
+		nackCorrelator:        correlator.New[models.NackResult](),
 	}
 
 	// Start the stream
@@ -178,18 +183,51 @@ func (s *stream) routeResponse(resp *pb.FujinResponse) {
 		}
 	case *pb.FujinResponse_Message:
 		// Route messages to subscription handlers
-		// Note: correlation_id in Message refers to subscription_id
 		s.subsMu.RLock()
-		if sub, exists := s.subscriptions[r.Message.CorrelationId]; exists {
-			sub.handler(r)
+		if sub, exists := s.subscriptions[r.Message.SubscriptionId]; exists {
+			sub.handler(models.Msg{
+				SubscriptionID: r.Message.SubscriptionId,
+				MessageID:      r.Message.MessageId,
+				Payload:        r.Message.Payload,
+			})
 		}
 		s.subsMu.RUnlock()
 	case *pb.FujinResponse_Ack:
-		// ACK responses - could be handled by a separate correlator if needed
-		s.logger.Debug("received ack response", "correlation_id", r.Ack.CorrelationId)
+		result := models.AckResult{}
+		if r.Ack.Error != "" {
+			result.Error = fmt.Errorf("ack error: %s", r.Ack.Error)
+		}
+		// Convert per-message results
+		if len(r.Ack.Results) > 0 {
+			result.MessageResults = make([]models.AckMessageResult, len(r.Ack.Results))
+			for i, res := range r.Ack.Results {
+				result.MessageResults[i] = models.AckMessageResult{
+					MessageID: res.MessageId,
+				}
+				if res.Error != "" {
+					result.MessageResults[i].Error = fmt.Errorf("%s", res.Error)
+				}
+			}
+		}
+		s.ackCorrelator.Send(r.Ack.CorrelationId, result)
 	case *pb.FujinResponse_Nack:
-		// NACK responses - could be handled by a separate correlator if needed
-		s.logger.Debug("received nack response", "correlation_id", r.Nack.CorrelationId)
+		result := models.NackResult{}
+		if r.Nack.Error != "" {
+			result.Error = fmt.Errorf("nack error: %s", r.Nack.Error)
+		}
+		// Convert per-message results
+		if len(r.Nack.Results) > 0 {
+			result.MessageResults = make([]models.NackMessageResult, len(r.Nack.Results))
+			for i, res := range r.Nack.Results {
+				result.MessageResults[i] = models.NackMessageResult{
+					MessageID: res.MessageId,
+				}
+				if res.Error != "" {
+					result.MessageResults[i].Error = fmt.Errorf("%s", res.Error)
+				}
+			}
+		}
+		s.nackCorrelator.Send(r.Nack.CorrelationId, result)
 	}
 }
 
@@ -198,7 +236,7 @@ func (s *stream) Produce(topic string, p []byte) error {
 	return s.produce(topic, p)
 }
 
-// produceWithHeaders sends a message with optional headers
+// produce sends a message to a topic
 func (s *stream) produce(topic string, p []byte) error {
 	if !s.connected.Load() {
 		return fmt.Errorf("stream not connected")
@@ -243,11 +281,11 @@ func (s *stream) produce(topic string, p []byte) error {
 }
 
 // Subscribe subscribes to a topic
-func (s *stream) Subscribe(topic string, autoCommit bool, handler func(msg *pb.FujinResponse_Message)) (uint32, error) {
+func (s *stream) Subscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error) {
 	return s.subscribe(topic, autoCommit, handler)
 }
 
-func (s *stream) subscribe(topic string, autoCommit bool, handler func(msg *pb.FujinResponse_Message)) (uint32, error) {
+func (s *stream) subscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error) {
 	if !s.connected.Load() {
 		return 0, fmt.Errorf("stream not connected")
 	}
@@ -322,10 +360,14 @@ func (s *stream) handleMessages(sub *subscription) {
 			return
 		case resp := <-s.responseCh:
 			if msgResp, ok := resp.Response.(*pb.FujinResponse_Message); ok {
-				if msgResp.Message.CorrelationId == sub.id {
+				if msgResp.Message.SubscriptionId == sub.id {
 					// Call the handler
 					func() {
-						sub.handler(msgResp)
+						sub.handler(models.Msg{
+							SubscriptionID: msgResp.Message.SubscriptionId,
+							MessageID:      msgResp.Message.MessageId,
+							Payload:        msgResp.Message.Payload,
+						})
 					}()
 				}
 			}
@@ -408,5 +450,109 @@ func (s *stream) Unsubscribe(subscriptionID uint32) error {
 	case <-s.ctx.Done():
 		s.unsubscribeCorrelator.Delete(correlationID)
 		return s.ctx.Err()
+	}
+}
+
+// Ack acknowledges one or more messages for a subscription
+func (s *stream) Ack(subscriptionID uint32, messageIDs ...[]byte) (models.AckResult, error) {
+	if !s.connected.Load() {
+		return models.AckResult{}, fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return models.AckResult{}, fmt.Errorf("stream is closed")
+	}
+
+	if len(messageIDs) == 0 {
+		return models.AckResult{}, fmt.Errorf("at least one message ID is required")
+	}
+
+	ch := make(chan models.AckResult, 1)
+	correlationID := s.ackCorrelator.Next(ch)
+
+	// Create ack request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Ack{
+			Ack: &pb.AckRequest{
+				CorrelationId:  correlationID,
+				MessageIds:     messageIDs,
+				SubscriptionId: subscriptionID,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.ackCorrelator.Delete(correlationID)
+		return models.AckResult{}, fmt.Errorf("failed to send ack request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case result := <-ch:
+		s.ackCorrelator.Delete(correlationID)
+		if result.Error != nil {
+			return result, result.Error
+		}
+		s.logger.Debug("ack successful", "subscription_id", subscriptionID, "message_count", len(messageIDs))
+		return result, nil
+	case <-time.After(10 * time.Second):
+		s.ackCorrelator.Delete(correlationID)
+		return models.AckResult{}, fmt.Errorf("ack timeout")
+	case <-s.ctx.Done():
+		s.ackCorrelator.Delete(correlationID)
+		return models.AckResult{}, s.ctx.Err()
+	}
+}
+
+// Nack negatively acknowledges one or more messages for a subscription
+func (s *stream) Nack(subscriptionID uint32, messageIDs ...[]byte) (models.NackResult, error) {
+	if !s.connected.Load() {
+		return models.NackResult{}, fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return models.NackResult{}, fmt.Errorf("stream is closed")
+	}
+
+	if len(messageIDs) == 0 {
+		return models.NackResult{}, fmt.Errorf("at least one message ID is required")
+	}
+
+	ch := make(chan models.NackResult, 1)
+	correlationID := s.nackCorrelator.Next(ch)
+
+	// Create nack request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Nack{
+			Nack: &pb.NackRequest{
+				CorrelationId:  correlationID,
+				MessageIds:     messageIDs,
+				SubscriptionId: subscriptionID,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.nackCorrelator.Delete(correlationID)
+		return models.NackResult{}, fmt.Errorf("failed to send nack request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case result := <-ch:
+		s.nackCorrelator.Delete(correlationID)
+		if result.Error != nil {
+			return result, result.Error
+		}
+		s.logger.Debug("nack successful", "subscription_id", subscriptionID, "message_count", len(messageIDs))
+		return result, nil
+	case <-time.After(10 * time.Second):
+		s.nackCorrelator.Delete(correlationID)
+		return models.NackResult{}, fmt.Errorf("nack timeout")
+	case <-s.ctx.Done():
+		s.nackCorrelator.Delete(correlationID)
+		return models.NackResult{}, s.ctx.Err()
 	}
 }

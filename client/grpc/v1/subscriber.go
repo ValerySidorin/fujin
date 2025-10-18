@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
+	"github.com/ValerySidorin/fujin/client/models"
 )
 
 // Subscriber provides high-performance message consumption
@@ -20,9 +20,9 @@ type Subscriber struct {
 	maxConcurrent int
 
 	// Message processing
-	messageCh     chan *pb.FujinResponse_Message
+	messageCh     chan models.Msg
 	workerPool    chan struct{}
-	handleMessage func(ctx context.Context, msg *pb.FujinResponse_Message) error
+	handleMessage func(ctx context.Context, msg models.Msg) error
 
 	// Context for cancellation
 	ctx    context.Context
@@ -68,9 +68,9 @@ func NewSubscriber(stream Stream, config *ConsumerConfig, logger *slog.Logger) *
 		stream:        stream,
 		logger:        logger.With("component", "subscriber"),
 		maxConcurrent: config.MaxConcurrent,
-		messageCh:     make(chan *pb.FujinResponse_Message, config.BufferSize),
+		messageCh:     make(chan models.Msg, config.BufferSize),
 		workerPool:    make(chan struct{}, config.MaxConcurrent),
-		handleMessage: func(ctx context.Context, msg *pb.FujinResponse_Message) error { return nil },
+		handleMessage: func(ctx context.Context, msg models.Msg) error { return nil },
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -85,9 +85,9 @@ func NewSubscriber(stream Stream, config *ConsumerConfig, logger *slog.Logger) *
 }
 
 // Subscribe subscribes to a topic with high-performance processing
-func (c *Subscriber) Subscribe(topic string, autoCommit bool, handler func(ctx context.Context, msg *pb.FujinResponse_Message) error) error {
+func (c *Subscriber) Subscribe(topic string, autoCommit bool, handler func(ctx context.Context, msg models.Msg) error) error {
 	// Create a wrapper handler that processes messages through the worker pool
-	wrapperHandler := func(msg *pb.FujinResponse_Message) {
+	wrapperHandler := func(msg models.Msg) {
 		select {
 		case c.messageCh <- msg:
 			// Message queued for processing
@@ -125,7 +125,7 @@ func (c *Subscriber) worker(workerID int) {
 }
 
 // processMessage processes a single message
-func (c *Subscriber) processMessage(workerID int, msg *pb.FujinResponse_Message) {
+func (c *Subscriber) processMessage(workerID int, msg models.Msg) {
 	c.activeWorkers.Add(1)
 	defer c.activeWorkers.Add(^uint32(0)) // Decrement
 
@@ -137,8 +137,7 @@ func (c *Subscriber) processMessage(workerID int, msg *pb.FujinResponse_Message)
 	if err := c.handleMessage(ctx, msg); err != nil {
 		c.logger.Error("message processing error",
 			"worker_id", workerID,
-			"subscription_id", msg.Message.CorrelationId,
-			"topic", msg.Message.Topic,
+			"subscription_id", msg.SubscriptionID,
 			"error", err)
 		c.errorCount.Add(1)
 	} else {

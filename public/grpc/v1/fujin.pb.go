@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Binary-safe header, matching [][]byte in native protocol.
+// Header
 type Header struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           []byte                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -180,13 +180,12 @@ func (x *ConnectResponse) GetError() string {
 	return ""
 }
 
-// Produce request with correlation ID for async response matching
+// Produce request
 type ProduceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
 	Message       []byte                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	Headers       []*Header              `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -242,14 +241,7 @@ func (x *ProduceRequest) GetMessage() []byte {
 	return nil
 }
 
-func (x *ProduceRequest) GetHeaders() []*Header {
-	if x != nil {
-		return x.Headers
-	}
-	return nil
-}
-
-// Produce response with correlation ID
+// Produce response
 type ProduceResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
@@ -308,7 +300,6 @@ type SubscribeRequest struct {
 	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
 	AutoCommit    bool                   `protobuf:"varint,3,opt,name=auto_commit,json=autoCommit,proto3" json:"auto_commit,omitempty"`
-	Headers       []*Header              `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -362,13 +353,6 @@ func (x *SubscribeRequest) GetAutoCommit() bool {
 		return x.AutoCommit
 	}
 	return false
-}
-
-func (x *SubscribeRequest) GetHeaders() []*Header {
-	if x != nil {
-		return x.Headers
-	}
-	return nil
 }
 
 // Subscribe response
@@ -540,14 +524,12 @@ func (x *UnsubscribeResponse) GetError() string {
 
 // Message delivery
 type Message struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
-	Topic         string                 `protobuf:"bytes,2,opt,name=topic,proto3" json:"topic,omitempty"`
-	Payload       []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
-	Headers       []*Header              `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty"`
-	DeliveryId    []byte                 `protobuf:"bytes,5,opt,name=delivery_id,json=deliveryId,proto3" json:"delivery_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SubscriptionId uint32                 `protobuf:"varint,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	MessageId      []byte                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Payload        []byte                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Message) Reset() {
@@ -580,18 +562,18 @@ func (*Message) Descriptor() ([]byte, []int) {
 	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *Message) GetCorrelationId() uint32 {
+func (x *Message) GetSubscriptionId() uint32 {
 	if x != nil {
-		return x.CorrelationId
+		return x.SubscriptionId
 	}
 	return 0
 }
 
-func (x *Message) GetTopic() string {
+func (x *Message) GetMessageId() []byte {
 	if x != nil {
-		return x.Topic
+		return x.MessageId
 	}
-	return ""
+	return nil
 }
 
 func (x *Message) GetPayload() []byte {
@@ -601,27 +583,14 @@ func (x *Message) GetPayload() []byte {
 	return nil
 }
 
-func (x *Message) GetHeaders() []*Header {
-	if x != nil {
-		return x.Headers
-	}
-	return nil
-}
-
-func (x *Message) GetDeliveryId() []byte {
-	if x != nil {
-		return x.DeliveryId
-	}
-	return nil
-}
-
 // Ack request
 type AckRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
-	MessageId     []byte                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId  uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	MessageIds     [][]byte               `protobuf:"bytes,2,rep,name=message_ids,json=messageIds,proto3" json:"message_ids,omitempty"`
+	SubscriptionId uint32                 `protobuf:"varint,3,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AckRequest) Reset() {
@@ -661,25 +630,147 @@ func (x *AckRequest) GetCorrelationId() uint32 {
 	return 0
 }
 
-func (x *AckRequest) GetMessageId() []byte {
+func (x *AckRequest) GetMessageIds() [][]byte {
+	if x != nil {
+		return x.MessageIds
+	}
+	return nil
+}
+
+func (x *AckRequest) GetSubscriptionId() uint32 {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return 0
+}
+
+// Ack response with per-message results
+type AckResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`     // General error
+	Results       []*AckMessageResult    `protobuf:"bytes,3,rep,name=results,proto3" json:"results,omitempty"` // Per-message results
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckResponse) Reset() {
+	*x = AckResponse{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckResponse) ProtoMessage() {}
+
+func (x *AckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckResponse.ProtoReflect.Descriptor instead.
+func (*AckResponse) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AckResponse) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+func (x *AckResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *AckResponse) GetResults() []*AckMessageResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+// Ack result for individual message
+type AckMessageResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     []byte                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"` // Error for this specific message (empty if success)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckMessageResult) Reset() {
+	*x = AckMessageResult{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckMessageResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckMessageResult) ProtoMessage() {}
+
+func (x *AckMessageResult) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckMessageResult.ProtoReflect.Descriptor instead.
+func (*AckMessageResult) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AckMessageResult) GetMessageId() []byte {
 	if x != nil {
 		return x.MessageId
 	}
 	return nil
 }
 
+func (x *AckMessageResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 // Nack request
 type NackRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
-	MessageId     []byte                 `protobuf:"bytes,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId  uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	MessageIds     [][]byte               `protobuf:"bytes,2,rep,name=message_ids,json=messageIds,proto3" json:"message_ids,omitempty"`
+	SubscriptionId uint32                 `protobuf:"varint,3,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NackRequest) Reset() {
 	*x = NackRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +782,7 @@ func (x *NackRequest) String() string {
 func (*NackRequest) ProtoMessage() {}
 
 func (x *NackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +795,7 @@ func (x *NackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NackRequest.ProtoReflect.Descriptor instead.
 func (*NackRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{11}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NackRequest) GetCorrelationId() uint32 {
@@ -714,11 +805,132 @@ func (x *NackRequest) GetCorrelationId() uint32 {
 	return 0
 }
 
-func (x *NackRequest) GetMessageId() []byte {
+func (x *NackRequest) GetMessageIds() [][]byte {
+	if x != nil {
+		return x.MessageIds
+	}
+	return nil
+}
+
+func (x *NackRequest) GetSubscriptionId() uint32 {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return 0
+}
+
+// Nack response with per-message results
+type NackResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`     // General error
+	Results       []*NackMessageResult   `protobuf:"bytes,3,rep,name=results,proto3" json:"results,omitempty"` // Per-message results
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NackResponse) Reset() {
+	*x = NackResponse{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NackResponse) ProtoMessage() {}
+
+func (x *NackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NackResponse.ProtoReflect.Descriptor instead.
+func (*NackResponse) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *NackResponse) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+func (x *NackResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *NackResponse) GetResults() []*NackMessageResult {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+// Nack result for individual message
+type NackMessageResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     []byte                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"` // Error for this specific message (empty if success)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NackMessageResult) Reset() {
+	*x = NackMessageResult{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NackMessageResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NackMessageResult) ProtoMessage() {}
+
+func (x *NackMessageResult) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NackMessageResult.ProtoReflect.Descriptor instead.
+func (*NackMessageResult) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *NackMessageResult) GetMessageId() []byte {
 	if x != nil {
 		return x.MessageId
 	}
 	return nil
+}
+
+func (x *NackMessageResult) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
 }
 
 // Empty response
@@ -732,7 +944,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -744,7 +956,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -757,7 +969,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{12}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Empty) GetCorrelationId() uint32 {
@@ -792,7 +1004,7 @@ type FujinRequest struct {
 
 func (x *FujinRequest) Reset() {
 	*x = FujinRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -804,7 +1016,7 @@ func (x *FujinRequest) String() string {
 func (*FujinRequest) ProtoMessage() {}
 
 func (x *FujinRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -817,7 +1029,7 @@ func (x *FujinRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FujinRequest.ProtoReflect.Descriptor instead.
 func (*FujinRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{13}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FujinRequest) GetRequest() isFujinRequest_Request {
@@ -940,7 +1152,7 @@ type FujinResponse struct {
 
 func (x *FujinResponse) Reset() {
 	*x = FujinResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -952,7 +1164,7 @@ func (x *FujinResponse) String() string {
 func (*FujinResponse) ProtoMessage() {}
 
 func (x *FujinResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -965,7 +1177,7 @@ func (x *FujinResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FujinResponse.ProtoReflect.Descriptor instead.
 func (*FujinResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{14}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *FujinResponse) GetResponse() isFujinResponse_Response {
@@ -1020,7 +1232,7 @@ func (x *FujinResponse) GetMessage() *Message {
 	return nil
 }
 
-func (x *FujinResponse) GetAck() *Empty {
+func (x *FujinResponse) GetAck() *AckResponse {
 	if x != nil {
 		if x, ok := x.Response.(*FujinResponse_Ack); ok {
 			return x.Ack
@@ -1029,7 +1241,7 @@ func (x *FujinResponse) GetAck() *Empty {
 	return nil
 }
 
-func (x *FujinResponse) GetNack() *Empty {
+func (x *FujinResponse) GetNack() *NackResponse {
 	if x != nil {
 		if x, ok := x.Response.(*FujinResponse_Nack); ok {
 			return x.Nack
@@ -1063,11 +1275,11 @@ type FujinResponse_Message struct {
 }
 
 type FujinResponse_Ack struct {
-	Ack *Empty `protobuf:"bytes,6,opt,name=ack,proto3,oneof"`
+	Ack *AckResponse `protobuf:"bytes,6,opt,name=ack,proto3,oneof"`
 }
 
 type FujinResponse_Nack struct {
-	Nack *Empty `protobuf:"bytes,7,opt,name=nack,proto3,oneof"`
+	Nack *NackResponse `protobuf:"bytes,7,opt,name=nack,proto3,oneof"`
 }
 
 func (*FujinResponse_Connect) isFujinResponse_Response() {}
@@ -1097,21 +1309,19 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"\tstream_id\x18\x02 \x01(\tR\bstreamId\"N\n" +
 	"\x0fConnectResponse\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\x93\x01\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"g\n" +
 	"\x0eProduceRequest\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\fR\amessage\x12*\n" +
-	"\aheaders\x18\x04 \x03(\v2\x10.fujin.v1.HeaderR\aheaders\"N\n" +
+	"\amessage\x18\x03 \x01(\fR\amessage\"N\n" +
 	"\x0fProduceResponse\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\x9c\x01\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"p\n" +
 	"\x10SubscribeRequest\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
 	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x1f\n" +
 	"\vauto_commit\x18\x03 \x01(\bR\n" +
-	"autoCommit\x12*\n" +
-	"\aheaders\x18\x04 \x03(\v2\x10.fujin.v1.HeaderR\aheaders\"y\n" +
+	"autoCommit\"y\n" +
 	"\x11SubscribeResponse\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\x12'\n" +
@@ -1121,23 +1331,39 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"\x0fsubscription_id\x18\x02 \x01(\rR\x0esubscriptionId\"R\n" +
 	"\x13UnsubscribeResponse\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xad\x01\n" +
-	"\aMessage\x12%\n" +
-	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
-	"\x05topic\x18\x02 \x01(\tR\x05topic\x12\x18\n" +
-	"\apayload\x18\x03 \x01(\fR\apayload\x12*\n" +
-	"\aheaders\x18\x04 \x03(\v2\x10.fujin.v1.HeaderR\aheaders\x12\x1f\n" +
-	"\vdelivery_id\x18\x05 \x01(\fR\n" +
-	"deliveryId\"R\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"k\n" +
+	"\aMessage\x12'\n" +
+	"\x0fsubscription_id\x18\x01 \x01(\rR\x0esubscriptionId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x02 \x01(\fR\tmessageId\x12\x18\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\"}\n" +
 	"\n" +
 	"AckRequest\x12%\n" +
-	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x1d\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x1f\n" +
+	"\vmessage_ids\x18\x02 \x03(\fR\n" +
+	"messageIds\x12'\n" +
+	"\x0fsubscription_id\x18\x03 \x01(\rR\x0esubscriptionId\"\x80\x01\n" +
+	"\vAckResponse\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x124\n" +
+	"\aresults\x18\x03 \x03(\v2\x1a.fujin.v1.AckMessageResultR\aresults\"G\n" +
+	"\x10AckMessageResult\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x02 \x01(\fR\tmessageId\"S\n" +
+	"message_id\x18\x01 \x01(\fR\tmessageId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"~\n" +
 	"\vNackRequest\x12%\n" +
-	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x1d\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x1f\n" +
+	"\vmessage_ids\x18\x02 \x03(\fR\n" +
+	"messageIds\x12'\n" +
+	"\x0fsubscription_id\x18\x03 \x01(\rR\x0esubscriptionId\"\x82\x01\n" +
+	"\fNackResponse\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x125\n" +
+	"\aresults\x18\x03 \x03(\v2\x1b.fujin.v1.NackMessageResultR\aresults\"H\n" +
+	"\x11NackMessageResult\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x02 \x01(\fR\tmessageId\"D\n" +
+	"message_id\x18\x01 \x01(\fR\tmessageId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"D\n" +
 	"\x05Empty\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\xda\x02\n" +
@@ -1148,15 +1374,15 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"\vunsubscribe\x18\x04 \x01(\v2\x1c.fujin.v1.UnsubscribeRequestH\x00R\vunsubscribe\x12(\n" +
 	"\x03ack\x18\x05 \x01(\v2\x14.fujin.v1.AckRequestH\x00R\x03ack\x12+\n" +
 	"\x04nack\x18\x06 \x01(\v2\x15.fujin.v1.NackRequestH\x00R\x04nackB\t\n" +
-	"\arequest\"\x84\x03\n" +
+	"\arequest\"\x91\x03\n" +
 	"\rFujinResponse\x125\n" +
 	"\aconnect\x18\x01 \x01(\v2\x19.fujin.v1.ConnectResponseH\x00R\aconnect\x125\n" +
 	"\aproduce\x18\x02 \x01(\v2\x19.fujin.v1.ProduceResponseH\x00R\aproduce\x12;\n" +
 	"\tsubscribe\x18\x03 \x01(\v2\x1b.fujin.v1.SubscribeResponseH\x00R\tsubscribe\x12A\n" +
 	"\vunsubscribe\x18\x04 \x01(\v2\x1d.fujin.v1.UnsubscribeResponseH\x00R\vunsubscribe\x12-\n" +
-	"\amessage\x18\x05 \x01(\v2\x11.fujin.v1.MessageH\x00R\amessage\x12#\n" +
-	"\x03ack\x18\x06 \x01(\v2\x0f.fujin.v1.EmptyH\x00R\x03ack\x12%\n" +
-	"\x04nack\x18\a \x01(\v2\x0f.fujin.v1.EmptyH\x00R\x04nackB\n" +
+	"\amessage\x18\x05 \x01(\v2\x11.fujin.v1.MessageH\x00R\amessage\x12)\n" +
+	"\x03ack\x18\x06 \x01(\v2\x15.fujin.v1.AckResponseH\x00R\x03ack\x12,\n" +
+	"\x04nack\x18\a \x01(\v2\x16.fujin.v1.NackResponseH\x00R\x04nackB\n" +
 	"\n" +
 	"\bresponse2M\n" +
 	"\fFujinService\x12=\n" +
@@ -1174,7 +1400,7 @@ func file_public_grpc_v1_fujin_proto_rawDescGZIP() []byte {
 	return file_public_grpc_v1_fujin_proto_rawDescData
 }
 
-var file_public_grpc_v1_fujin_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_public_grpc_v1_fujin_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_public_grpc_v1_fujin_proto_goTypes = []any{
 	(*Header)(nil),              // 0: fujin.v1.Header
 	(*ConnectRequest)(nil),      // 1: fujin.v1.ConnectRequest
@@ -1187,35 +1413,38 @@ var file_public_grpc_v1_fujin_proto_goTypes = []any{
 	(*UnsubscribeResponse)(nil), // 8: fujin.v1.UnsubscribeResponse
 	(*Message)(nil),             // 9: fujin.v1.Message
 	(*AckRequest)(nil),          // 10: fujin.v1.AckRequest
-	(*NackRequest)(nil),         // 11: fujin.v1.NackRequest
-	(*Empty)(nil),               // 12: fujin.v1.Empty
-	(*FujinRequest)(nil),        // 13: fujin.v1.FujinRequest
-	(*FujinResponse)(nil),       // 14: fujin.v1.FujinResponse
+	(*AckResponse)(nil),         // 11: fujin.v1.AckResponse
+	(*AckMessageResult)(nil),    // 12: fujin.v1.AckMessageResult
+	(*NackRequest)(nil),         // 13: fujin.v1.NackRequest
+	(*NackResponse)(nil),        // 14: fujin.v1.NackResponse
+	(*NackMessageResult)(nil),   // 15: fujin.v1.NackMessageResult
+	(*Empty)(nil),               // 16: fujin.v1.Empty
+	(*FujinRequest)(nil),        // 17: fujin.v1.FujinRequest
+	(*FujinResponse)(nil),       // 18: fujin.v1.FujinResponse
 }
 var file_public_grpc_v1_fujin_proto_depIdxs = []int32{
-	0,  // 0: fujin.v1.ProduceRequest.headers:type_name -> fujin.v1.Header
-	0,  // 1: fujin.v1.SubscribeRequest.headers:type_name -> fujin.v1.Header
-	0,  // 2: fujin.v1.Message.headers:type_name -> fujin.v1.Header
-	1,  // 3: fujin.v1.FujinRequest.connect:type_name -> fujin.v1.ConnectRequest
-	3,  // 4: fujin.v1.FujinRequest.produce:type_name -> fujin.v1.ProduceRequest
-	5,  // 5: fujin.v1.FujinRequest.subscribe:type_name -> fujin.v1.SubscribeRequest
-	7,  // 6: fujin.v1.FujinRequest.unsubscribe:type_name -> fujin.v1.UnsubscribeRequest
-	10, // 7: fujin.v1.FujinRequest.ack:type_name -> fujin.v1.AckRequest
-	11, // 8: fujin.v1.FujinRequest.nack:type_name -> fujin.v1.NackRequest
-	2,  // 9: fujin.v1.FujinResponse.connect:type_name -> fujin.v1.ConnectResponse
-	4,  // 10: fujin.v1.FujinResponse.produce:type_name -> fujin.v1.ProduceResponse
-	6,  // 11: fujin.v1.FujinResponse.subscribe:type_name -> fujin.v1.SubscribeResponse
-	8,  // 12: fujin.v1.FujinResponse.unsubscribe:type_name -> fujin.v1.UnsubscribeResponse
-	9,  // 13: fujin.v1.FujinResponse.message:type_name -> fujin.v1.Message
-	12, // 14: fujin.v1.FujinResponse.ack:type_name -> fujin.v1.Empty
-	12, // 15: fujin.v1.FujinResponse.nack:type_name -> fujin.v1.Empty
-	13, // 16: fujin.v1.FujinService.Stream:input_type -> fujin.v1.FujinRequest
-	14, // 17: fujin.v1.FujinService.Stream:output_type -> fujin.v1.FujinResponse
-	17, // [17:18] is the sub-list for method output_type
-	16, // [16:17] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	12, // 0: fujin.v1.AckResponse.results:type_name -> fujin.v1.AckMessageResult
+	15, // 1: fujin.v1.NackResponse.results:type_name -> fujin.v1.NackMessageResult
+	1,  // 2: fujin.v1.FujinRequest.connect:type_name -> fujin.v1.ConnectRequest
+	3,  // 3: fujin.v1.FujinRequest.produce:type_name -> fujin.v1.ProduceRequest
+	5,  // 4: fujin.v1.FujinRequest.subscribe:type_name -> fujin.v1.SubscribeRequest
+	7,  // 5: fujin.v1.FujinRequest.unsubscribe:type_name -> fujin.v1.UnsubscribeRequest
+	10, // 6: fujin.v1.FujinRequest.ack:type_name -> fujin.v1.AckRequest
+	13, // 7: fujin.v1.FujinRequest.nack:type_name -> fujin.v1.NackRequest
+	2,  // 8: fujin.v1.FujinResponse.connect:type_name -> fujin.v1.ConnectResponse
+	4,  // 9: fujin.v1.FujinResponse.produce:type_name -> fujin.v1.ProduceResponse
+	6,  // 10: fujin.v1.FujinResponse.subscribe:type_name -> fujin.v1.SubscribeResponse
+	8,  // 11: fujin.v1.FujinResponse.unsubscribe:type_name -> fujin.v1.UnsubscribeResponse
+	9,  // 12: fujin.v1.FujinResponse.message:type_name -> fujin.v1.Message
+	11, // 13: fujin.v1.FujinResponse.ack:type_name -> fujin.v1.AckResponse
+	14, // 14: fujin.v1.FujinResponse.nack:type_name -> fujin.v1.NackResponse
+	17, // 15: fujin.v1.FujinService.Stream:input_type -> fujin.v1.FujinRequest
+	18, // 16: fujin.v1.FujinService.Stream:output_type -> fujin.v1.FujinResponse
+	16, // [16:17] is the sub-list for method output_type
+	15, // [15:16] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_public_grpc_v1_fujin_proto_init() }
@@ -1223,7 +1452,7 @@ func file_public_grpc_v1_fujin_proto_init() {
 	if File_public_grpc_v1_fujin_proto != nil {
 		return
 	}
-	file_public_grpc_v1_fujin_proto_msgTypes[13].OneofWrappers = []any{
+	file_public_grpc_v1_fujin_proto_msgTypes[17].OneofWrappers = []any{
 		(*FujinRequest_Connect)(nil),
 		(*FujinRequest_Produce)(nil),
 		(*FujinRequest_Subscribe)(nil),
@@ -1231,7 +1460,7 @@ func file_public_grpc_v1_fujin_proto_init() {
 		(*FujinRequest_Ack)(nil),
 		(*FujinRequest_Nack)(nil),
 	}
-	file_public_grpc_v1_fujin_proto_msgTypes[14].OneofWrappers = []any{
+	file_public_grpc_v1_fujin_proto_msgTypes[18].OneofWrappers = []any{
 		(*FujinResponse_Connect)(nil),
 		(*FujinResponse_Produce)(nil),
 		(*FujinResponse_Subscribe)(nil),
@@ -1246,7 +1475,7 @@ func file_public_grpc_v1_fujin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_public_grpc_v1_fujin_proto_rawDesc), len(file_public_grpc_v1_fujin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

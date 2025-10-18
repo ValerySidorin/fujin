@@ -4,7 +4,7 @@ package fujin.v1;
 
 option go_package = "github.com/ValerySidorin/fujin/public/grpc/v1";
 
-// Binary-safe header, matching [][]byte in native protocol.
+// Header
 message Header {
   bytes key = 1;
   bytes value = 2;
@@ -22,15 +22,14 @@ message ConnectResponse {
   string error = 2;
 }
 
-// Produce request with correlation ID for async response matching
+// Produce request
 message ProduceRequest {
   uint32 correlation_id = 1;
   string topic = 2;
   bytes message = 3;
-  repeated Header headers = 4;
 }
 
-// Produce response with correlation ID
+// Produce response
 message ProduceResponse {
   uint32 correlation_id = 1;
   string error = 2;
@@ -41,7 +40,6 @@ message SubscribeRequest {
   uint32 correlation_id = 1;
   string topic = 2;
   bool auto_commit = 3;
-  repeated Header headers = 4;
 }
 
 // Subscribe response
@@ -65,23 +63,49 @@ message UnsubscribeResponse {
 
 // Message delivery
 message Message {
-  uint32 correlation_id = 1;
-  string topic = 2;
+  uint32 subscription_id = 1;
+  bytes message_id = 2;
   bytes payload = 3;
-  repeated Header headers = 4;
-  bytes delivery_id = 5;
 }
 
 // Ack request
 message AckRequest {
   uint32 correlation_id = 1;
-  bytes message_id = 2;
+  repeated bytes message_ids = 2;
+  uint32 subscription_id = 3;
+}
+
+// Ack response with per-message results
+message AckResponse {
+  uint32 correlation_id = 1;
+  string error = 2;  // General error
+  repeated AckMessageResult results = 3;  // Per-message results
+}
+
+// Ack result for individual message
+message AckMessageResult {
+  bytes message_id = 1;
+  string error = 2;  // Error for this specific message (empty if success)
 }
 
 // Nack request
 message NackRequest {
   uint32 correlation_id = 1;
-  bytes message_id = 2;
+  repeated bytes message_ids = 2;
+  uint32 subscription_id = 3;
+}
+
+// Nack response with per-message results
+message NackResponse {
+  uint32 correlation_id = 1;
+  string error = 2;  // General error
+  repeated NackMessageResult results = 3;  // Per-message results
+}
+
+// Nack result for individual message
+message NackMessageResult {
+  bytes message_id = 1;
+  string error = 2;  // Error for this specific message (empty if success)
 }
 
 // Empty response
@@ -116,7 +140,7 @@ message FujinResponse {
     SubscribeResponse subscribe = 3;
     UnsubscribeResponse unsubscribe = 4;
     Message message = 5;
-    Empty ack = 6;
-    Empty nack = 7;
+    AckResponse ack = 6;
+    NackResponse nack = 7;
   }
 }

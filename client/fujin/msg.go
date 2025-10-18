@@ -8,6 +8,7 @@ type Msg struct {
 	Value   []byte
 	Headers map[string]string
 	id      []byte
+	subID   byte
 	s       *Stream
 }
 
@@ -16,7 +17,7 @@ func (m *Msg) Ack() error {
 		return nil
 	}
 
-	resp, err := m.s.ack(m.id)
+	resp, err := m.s.ack(m.subID, m.id)
 	if err != nil {
 		return err
 	}
@@ -33,7 +34,7 @@ func (m *Msg) Nack() error {
 		return nil
 	}
 
-	resp, err := m.s.nack(m.id)
+	resp, err := m.s.nack(m.subID, m.id)
 	if err != nil {
 		return err
 	}

@@ -52,9 +52,6 @@ func main() {
 				CorrelationId: 2,
 				Topic:         "sub",
 				AutoCommit:    true,
-				Headers: []*pb.Header{
-					{Key: []byte("with_headers"), Value: []byte("true")},
-				},
 			},
 		},
 	}); err != nil {
@@ -94,19 +91,11 @@ func main() {
 
 		case *pb.FujinResponse_Message:
 			fmt.Printf("\n📨 Received message:\n")
-			fmt.Printf("   Subscription ID: %d\n", r.Message.CorrelationId)
-			fmt.Printf("   Topic: %s\n", r.Message.Topic)
+			fmt.Printf("   Subscription ID: %d\n", r.Message.SubscriptionId)
 			fmt.Printf("   Payload: %s\n", string(r.Message.Payload))
 
-			if len(r.Message.Headers) > 0 {
-				fmt.Printf("   Headers:\n")
-				for _, h := range r.Message.Headers {
-					fmt.Printf("     %s: %s\n", string(h.Key), string(h.Value))
-				}
-			}
-
-			if len(r.Message.DeliveryId) > 0 {
-				fmt.Printf("   Delivery ID: %x\n", r.Message.DeliveryId)
+			if len(r.Message.MessageId) > 0 {
+				fmt.Printf("   Message ID: %x\n", r.Message.MessageId)
 			}
 
 		case *pb.FujinResponse_Ack:
