@@ -39,18 +39,24 @@ func main() {
 	}
 	defer stream.Close()
 
-	// Subscribe to topic
-	subscriptionID, err := stream.Subscribe("sub", true, func(msg models.Msg) {
+	// Subscribe to topic with headers support using HSubscribe
+	subscriptionID, err := stream.HSubscribe("sub", true, func(msg models.Msg) {
 		fmt.Printf("📨 Received message:\n")
 		fmt.Printf("   Subscription ID: %d\n", msg.SubscriptionID)
 		fmt.Printf("   Message ID: %x\n", msg.MessageID)
 		fmt.Printf("   Payload: %s\n", string(msg.Payload))
+		if len(msg.Headers) > 0 {
+			fmt.Printf("   Headers:\n")
+			for k, v := range msg.Headers {
+				fmt.Printf("      %s: %s\n", k, v)
+			}
+		}
 	})
 	if err != nil {
-		log.Fatalf("Failed to subscribe: %v", err)
+		log.Fatalf("Failed to hsubscribe: %v", err)
 	}
 
-	fmt.Printf("✓ Subscribed to topic 'sub' with ID %d, waiting for messages...\n", subscriptionID)
+	fmt.Printf("✓ HSubscribed to topic 'sub' with ID %d, waiting for messages with headers...\n", subscriptionID)
 	fmt.Println("Press Ctrl+C to exit")
 
 	// Send some test messages
@@ -66,11 +72,26 @@ func main() {
 			case <-ticker.C:
 				message := fmt.Sprintf("Hello from simple producer at %s", time.Now().Format(time.RFC3339))
 
-				if err := stream.Produce("pub", []byte(message)); err != nil {
-					log.Printf("Failed to send message: %v", err)
+				// Alternate between regular Produce and HProduce with headers
+				if messageCount%2 == 0 {
+					if err := stream.Produce("pub", []byte(message)); err != nil {
+						log.Printf("Failed to send message: %v", err)
+					} else {
+						messageCount++
+						fmt.Printf("✓ Sent message %d (without headers)\n", messageCount)
+					}
 				} else {
-					messageCount++
-					fmt.Printf("✓ Sent message %d\n", messageCount)
+					headers := map[string]string{
+						"content-type": "text/plain",
+						"timestamp":    time.Now().Format(time.RFC3339),
+						"source":       "grpc-example",
+					}
+					if err := stream.HProduce("pub", []byte(message), headers); err != nil {
+						log.Printf("Failed to send message with headers: %v", err)
+					} else {
+						messageCount++
+						fmt.Printf("✓ Sent message %d (with headers)\n", messageCount)
+					}
 				}
 
 				// Unsubscribe after 10 messages

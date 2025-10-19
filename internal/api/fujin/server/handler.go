@@ -235,6 +235,7 @@ type handler struct {
 	sMu         sync.Mutex
 
 	cpool                       *connectors.Pool
+	fetchReaders                map[string]byte // topic -> subscription_id mapping for fetch implicit subscriptions
 	fetchMsgHandlers            map[string]map[bool]func(message []byte, topic string, args ...any)
 	fetchMsgWithHeadersHandlers map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any)
 	fhMu                        sync.RWMutex
@@ -264,6 +265,7 @@ func newHandler(
 		subIDPool:                   pool2.NewBytePool(),
 		subscribers:                 make(map[byte]internal_reader.Reader),
 		unsubFuncs:                  make(map[byte]func()),
+		fetchReaders:                make(map[string]byte),
 		fetchMsgHandlers:            make(map[string]map[bool]func(message []byte, topic string, args ...any)),
 		fetchMsgWithHeadersHandlers: make(map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any)),
 		cpool:                       connectors.NewPool(cman),
@@ -2032,7 +2034,34 @@ func (h *handler) hproduceTx(msg []byte) {
 }
 
 func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
-	header := pool.Get(6)[:0]
+	// Check if we already have a subscription_id for this topic (implicit subscription)
+	h.fhMu.Lock()
+	subID, exists := h.fetchReaders[topic]
+	if !exists {
+		// Create new implicit subscription
+		h.sMu.Lock()
+		var err error
+		subID, err = h.subIDPool.Get()
+		h.sMu.Unlock()
+		if err != nil {
+			h.fhMu.Unlock()
+			header := pool.Get(6)[:0]
+			op := byte(response.RESP_CODE_FETCH)
+			if h.ps.fa.headered {
+				op = byte(response.RESP_CODE_HFETCH)
+			}
+			header = append(header, op)
+			header = append(header, h.ps.ca.cID...)
+			header = append(header, response.ERR_CODE_YES)
+			h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+			pool.Put(header)
+			return
+		}
+		h.fetchReaders[topic] = subID
+	}
+	h.fhMu.Unlock()
+
+	header := pool.Get(7)[:0]
 	op := byte(response.RESP_CODE_FETCH)
 	if h.ps.fa.headered {
 		op = byte(response.RESP_CODE_HFETCH)
@@ -2040,8 +2069,9 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 	header = append(header, op)
 	header = append(header, h.ps.ca.cID...)
 	header = append(header, response.ERR_CODE_NO)
+	header = append(header, subID)
 
-	go func(headered bool) {
+	go func(headered bool, subscriptionID byte) {
 		fetcher, err := h.cpool.GetReader(topic, autoCommit)
 		if err != nil {
 			header[5] = response.ERR_CODE_YES
@@ -2049,6 +2079,13 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 			pool.Put(header)
 			return
 		}
+
+		// Store fetcher in subscribers map for ACK/NACK operations
+		h.sMu.Lock()
+		if _, exists := h.subscribers[subscriptionID]; !exists {
+			h.subscribers[subscriptionID] = fetcher
+		}
+		h.sMu.Unlock()
 
 		if headered {
 			fetcher.HFetch(h.ctx, n,
@@ -2098,7 +2135,7 @@ func (h *handler) fetch(topic string, autoCommit bool, n uint32) {
 		)
 		h.out.SignalFlush()
 		h.out.Unlock()
-	}(h.ps.fa.headered)
+	}(h.ps.fa.headered, subID)
 }
 
 func (h *handler) flushBufs() {

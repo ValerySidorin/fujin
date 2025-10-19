@@ -333,6 +333,8 @@ Client -> Server
 ## Description
 Client can send a `FETCH` command to the server to retrieve messages from the current stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
 
+On the first `FETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `FETCH` requests for the same topic reuse the same subscription.
+
 ## Syntax
 ##### Request
 `[7, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
@@ -345,13 +347,14 @@ where:
 | `msg response batch len` | The number of messages the server should send in response.           | uint32 |
 
 ##### Response
-`[10, <correlation id>, <error>, <msgs>]`  
+`[10, <correlation id>, <error>, <subscription_id>, <msgs>]`  
 where:
-| name             | description                                                          | type             |
-| ---------------- | -------------------------------------------------------------------- | ---------------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32           |
-| `error`          | An error.                                                            | string?          |
-| `msgs`           | Message batch.                                                       | [uint32]message  |
+| name              | description                                                          | type             |
+| ----------------- | -------------------------------------------------------------------- | ---------------- |
+| `correlation id`  | Correlation ID is used to match client request with server response. | uint32           |
+| `error`           | An error.                                                            | string?          |
+| `subscription_id` | Subscription ID for ACK/NACK operations (reused across fetches).    | byte             |
+| `msgs`            | Message batch.                                                       | [uint32]message  |
 
 ## HFETCH
 
@@ -360,6 +363,8 @@ Client -> Server
 ## Description
 `FETCH` with headers support.
 
+On the first `HFETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `HFETCH` requests for the same topic reuse the same subscription.
+
 ## Syntax
 ##### Request
 `[8, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
@@ -367,16 +372,19 @@ where:
 | name                     | description                                                          | type    |
 | ------------------------ | -------------------------------------------------------------------- | ------- |
 | `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
+| `auto commit`            | Fetch with auto commit.                                              | bool    |
+| `topic`                  | Topic to read from.                                                  | string  |
 | `msg response batch len` | The number of messages the server should send in response.           | uint32  |
 
 ##### Response
-`[11, <correlation id>, <error>, <msgs>]`  
+`[11, <correlation id>, <error>, <subscription_id>, <msgs>]`  
 where:
-| name             | description                                                          | type                                   |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32                                 |
-| `error`          | An error.                                                            | string?                                |
-| `msgs`           | Message with headers batch.                                          | [uint32]type{[uint16]string, message}  |
+| name              | description                                                          | type                                   |
+| ----------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| `correlation id`  | Correlation ID is used to match client request with server response. | uint32                                 |
+| `error`           | An error.                                                            | string?                                |
+| `subscription_id` | Subscription ID for ACK/NACK operations (reused across fetches).    | byte                                   |
+| `msgs`            | Message with headers batch.                                          | [uint32]type{[uint16]string, message}  |
 
 
 ### Examples

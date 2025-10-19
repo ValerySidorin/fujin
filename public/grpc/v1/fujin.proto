@@ -35,6 +35,20 @@ message ProduceResponse {
   string error = 2;
 }
 
+// HProduceRequest - produce with headers
+message HProduceRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  repeated Header headers = 3;
+  bytes message = 4;
+}
+
+// HProduceResponse
+message HProduceResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
 // Subscribe request
 message SubscribeRequest {
   uint32 correlation_id = 1;
@@ -44,6 +58,20 @@ message SubscribeRequest {
 
 // Subscribe response
 message SubscribeResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+  uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
+}
+
+// HSubscribe request - subscribe with headers support
+message HSubscribeRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bool auto_commit = 3;
+}
+
+// HSubscribe response
+message HSubscribeResponse {
   uint32 correlation_id = 1;
   string error = 2;
   uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
@@ -66,6 +94,59 @@ message Message {
   uint32 subscription_id = 1;
   bytes message_id = 2;
   bytes payload = 3;
+}
+
+// HMessage - message delivery with headers
+message HMessage {
+  uint32 subscription_id = 1;
+  bytes message_id = 2;
+  bytes payload = 3;
+  repeated Header headers = 4;
+}
+
+// FetchRequest - request a batch of messages (pull-based)
+message FetchRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bool auto_commit = 3;
+  uint32 batch_size = 4;  // Number of messages to fetch
+}
+
+// FetchResponse - response with a batch of messages
+message FetchResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+  uint32 subscription_id = 3;  // Subscription ID for ack/nack (reused across fetches)
+  repeated FetchMessage messages = 4;
+}
+
+// FetchMessage - message returned by Fetch
+message FetchMessage {
+  bytes message_id = 1;
+  bytes payload = 2;
+}
+
+// HFetchRequest - request a batch of messages with headers (pull-based)
+message HFetchRequest {
+  uint32 correlation_id = 1;
+  string topic = 2;
+  bool auto_commit = 3;
+  uint32 batch_size = 4;  // Number of messages to fetch
+}
+
+// HFetchResponse - response with a batch of messages with headers
+message HFetchResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+  uint32 subscription_id = 3;  // Subscription ID for ack/nack (reused across fetches)
+  repeated HFetchMessage messages = 4;
+}
+
+// HFetchMessage - message with headers returned by HFetch
+message HFetchMessage {
+  bytes message_id = 1;
+  bytes payload = 2;
+  repeated Header headers = 3;
 }
 
 // Ack request
@@ -105,12 +186,6 @@ message NackResponse {
 // Nack result for individual message
 message NackMessageResult {
   bytes message_id = 1;
-  string error = 2;  // Error for this specific message (empty if success)
-}
-
-// Empty response
-message Empty {
-  uint32 correlation_id = 1;
   string error = 2;
 }
 
@@ -129,6 +204,10 @@ message FujinRequest {
     UnsubscribeRequest unsubscribe = 4;
     AckRequest ack = 5;
     NackRequest nack = 6;
+    HProduceRequest hproduce = 7;
+    HSubscribeRequest hsubscribe = 8;
+    FetchRequest fetch = 9;
+    HFetchRequest hfetch = 10;
   }
 }
 
@@ -142,5 +221,10 @@ message FujinResponse {
     Message message = 5;
     AckResponse ack = 6;
     NackResponse nack = 7;
+    HProduceResponse hproduce = 8;
+    HMessage hmessage = 9;
+    HSubscribeResponse hsubscribe = 10;
+    FetchResponse fetch = 11;
+    HFetchResponse hfetch = 12;
   }
 }
