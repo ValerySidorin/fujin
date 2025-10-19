@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ValerySidorin/fujin/client/models"
@@ -16,25 +15,16 @@ type Subscriber struct {
 	stream Stream
 	logger *slog.Logger
 
-	// Consumer configuration
 	maxConcurrent int
 
-	// Message processing
 	messageCh     chan models.Msg
 	workerPool    chan struct{}
 	handleMessage func(ctx context.Context, msg models.Msg) error
 
-	// Context for cancellation
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// Wait group for goroutines
 	wg sync.WaitGroup
-
-	// Metrics
-	messageCount  atomic.Uint64
-	errorCount    atomic.Uint64
-	activeWorkers atomic.Uint32
 }
 
 // ConsumerConfig holds consumer configuration
@@ -96,7 +86,6 @@ func (c *Subscriber) Subscribe(topic string, autoCommit bool, handler func(ctx c
 		default:
 			// Buffer is full, drop message
 			c.logger.Warn("message buffer full, dropping message", "topic", topic)
-			c.errorCount.Add(1)
 		}
 	}
 
@@ -126,22 +115,14 @@ func (c *Subscriber) worker(workerID int) {
 
 // processMessage processes a single message
 func (c *Subscriber) processMessage(workerID int, msg models.Msg) {
-	c.activeWorkers.Add(1)
-	defer c.activeWorkers.Add(^uint32(0)) // Decrement
-
-	// Create context with timeout
 	ctx, cancel := context.WithTimeout(c.ctx, 30*time.Second)
 	defer cancel()
 
-	// Process message
 	if err := c.handleMessage(ctx, msg); err != nil {
 		c.logger.Error("message processing error",
 			"worker_id", workerID,
 			"subscription_id", msg.SubscriptionID,
 			"error", err)
-		c.errorCount.Add(1)
-	} else {
-		c.messageCount.Add(1)
 	}
 }
 
@@ -149,10 +130,8 @@ func (c *Subscriber) processMessage(workerID int, msg models.Msg) {
 func (c *Subscriber) Close() error {
 	c.cancel()
 
-	// Close message channel
 	close(c.messageCh)
 
-	// Wait for workers to finish
 	c.wg.Wait()
 
 	c.logger.Info("subscriber closed")

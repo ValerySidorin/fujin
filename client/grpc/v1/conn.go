@@ -33,7 +33,6 @@ func NewConn(addr string, logger *slog.Logger, opts ...grpc.DialOption) (Conn, e
 		streams: make(map[string]*stream),
 	}
 
-	// Connect to gRPC server
 	grpcConn, err := grpc.NewClient(addr, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to gRPC server: %w", err)
@@ -58,12 +57,10 @@ func (c *conn) Connect(id string) (Stream, error) {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 
-	// Check if stream already exists
 	if existingStream, exists := c.streams[id]; exists {
 		return existingStream, nil
 	}
 
-	// Create new stream
 	stream, err := newStream(c.client, id, c.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream: %w", err)
@@ -87,7 +84,6 @@ func (c *conn) Close() error {
 	c.streamsMu.Lock()
 	defer c.streamsMu.Unlock()
 
-	// Close all streams
 	for id, stream := range c.streams {
 		if err := stream.Close(); err != nil {
 			c.logger.Error("failed to close stream", "stream_id", id, "error", err)
@@ -95,7 +91,6 @@ func (c *conn) Close() error {
 	}
 	c.streams = make(map[string]*stream)
 
-	// Close gRPC connection
 	if c.grpcConn != nil {
 		if err := c.grpcConn.Close(); err != nil {
 			c.logger.Error("failed to close gRPC connection", "error", err)
