@@ -4,6 +4,7 @@ type Msg struct {
 	SubscriptionID uint32
 	MessageID      []byte
 	Payload        []byte
+	Headers        map[string]string
 }
 
 // AckResult contains the result of an ack operation
@@ -28,4 +29,11 @@ type NackResult struct {
 type NackMessageResult struct {
 	MessageID []byte
 	Error     error
+}
+
+// FetchResult contains the result of a fetch operation
+type FetchResult struct {
+	Error          error  // General error
+	SubscriptionID uint32 // Subscription ID for ack/nack
+	Messages       []Msg  // Fetched messages
 }
