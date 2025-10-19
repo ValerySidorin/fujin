@@ -715,8 +715,7 @@ func (s *Stream) parse(buf []byte) error {
 			switch b {
 			case byte(response.ERR_CODE_NO):
 				pool.Put(s.ps.ca.cID)
-				s.ps.argBuf = pool.Get(fujin.Uint32Len)
-				s.ps.state = OP_FETCH_N_ARG
+				s.ps.state = OP_FETCH_SUBSCRIPTION_ID_ARG
 				continue
 			case byte(response.ERR_CODE_YES):
 				s.ps.argBuf = pool.Get(fujin.Uint32Len)
@@ -725,6 +724,10 @@ func (s *Stream) parse(buf []byte) error {
 				s.quicStream.Close()
 				return ErrParseProto
 			}
+		case OP_FETCH_SUBSCRIPTION_ID_ARG:
+			s.ps.fa.subID = b
+			s.ps.argBuf = pool.Get(fujin.Uint32Len)
+			s.ps.state = OP_FETCH_N_ARG
 		case OP_FETCH_ERROR_PAYLOAD_ARG:
 			s.ps.argBuf = append(s.ps.argBuf, b)
 			if len(s.ps.argBuf) >= fujin.Uint32Len {
@@ -918,8 +921,7 @@ func (s *Stream) parse(buf []byte) error {
 			switch b {
 			case byte(response.ERR_CODE_NO):
 				pool.Put(s.ps.ca.cID)
-				s.ps.argBuf = pool.Get(fujin.Uint32Len)
-				s.ps.state = OP_FETCH_H_N_ARG
+				s.ps.state = OP_FETCH_H_SUBSCRIPTION_ID_ARG
 				continue
 			case byte(response.ERR_CODE_YES):
 				s.ps.argBuf = pool.Get(fujin.Uint32Len)
@@ -928,6 +930,10 @@ func (s *Stream) parse(buf []byte) error {
 				s.quicStream.Close()
 				return ErrParseProto
 			}
+		case OP_FETCH_H_SUBSCRIPTION_ID_ARG:
+			s.ps.fa.subID = b
+			s.ps.argBuf = pool.Get(fujin.Uint32Len)
+			s.ps.state = OP_FETCH_H_N_ARG
 		case OP_FETCH_H_ERROR_PAYLOAD_ARG:
 			s.ps.argBuf = append(s.ps.argBuf, b)
 			if len(s.ps.argBuf) >= fujin.Uint32Len {

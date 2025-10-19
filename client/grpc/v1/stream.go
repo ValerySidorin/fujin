@@ -7,11 +7,30 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/ValerySidorin/fujin/client/correlator"
 	"github.com/ValerySidorin/fujin/client/models"
 	pb "github.com/ValerySidorin/fujin/public/grpc/v1"
 )
+
+// stringToBytes converts string to []byte without allocation using unsafe.
+// The returned byte slice must not be modified as it shares underlying data with the string.
+func stringToBytes(s string) []byte {
+	if s == "" {
+		return nil
+	}
+	return unsafe.Slice(unsafe.StringData(s), len(s))
+}
+
+// bytesToString converts []byte to string without allocation using unsafe.
+// The byte slice must not be modified after calling this function.
+func bytesToString(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
 
 // stream implements the Stream interface
 type stream struct {
@@ -32,6 +51,9 @@ type stream struct {
 	// Correlators for different response types
 	produceCorrelator     *correlator.Correlator[error]
 	subscribeCorrelator   *correlator.Correlator[uint32]
+	hsubscribeCorrelator  *correlator.Correlator[uint32]
+	fetchCorrelator       *correlator.Correlator[models.FetchResult]
+	hfetchCorrelator      *correlator.Correlator[models.FetchResult]
 	unsubscribeCorrelator *correlator.Correlator[error]
 	ackCorrelator         *correlator.Correlator[models.AckResult]
 	nackCorrelator        *correlator.Correlator[models.NackResult]
@@ -67,6 +89,9 @@ func newStream(client pb.FujinServiceClient, streamID string, logger *slog.Logge
 		cancel:                cancel,
 		produceCorrelator:     correlator.New[error](),
 		subscribeCorrelator:   correlator.New[uint32](),
+		hsubscribeCorrelator:  correlator.New[uint32](),
+		fetchCorrelator:       correlator.New[models.FetchResult](),
+		hfetchCorrelator:      correlator.New[models.FetchResult](),
 		unsubscribeCorrelator: correlator.New[error](),
 		ackCorrelator:         correlator.New[models.AckResult](),
 		nackCorrelator:        correlator.New[models.NackResult](),
@@ -169,12 +194,63 @@ func (s *stream) routeResponse(resp *pb.FujinResponse) {
 		} else {
 			s.produceCorrelator.Send(r.Produce.CorrelationId, nil)
 		}
+	case *pb.FujinResponse_Hproduce:
+		if r.Hproduce.Error != "" {
+			s.produceCorrelator.Send(r.Hproduce.CorrelationId, fmt.Errorf("hproduce error: %s", r.Hproduce.Error))
+		} else {
+			s.produceCorrelator.Send(r.Hproduce.CorrelationId, nil)
+		}
 	case *pb.FujinResponse_Subscribe:
 		if r.Subscribe.Error != "" {
 			s.subscribeCorrelator.Send(r.Subscribe.CorrelationId, 0)
 		} else {
 			s.subscribeCorrelator.Send(r.Subscribe.CorrelationId, r.Subscribe.SubscriptionId)
 		}
+	case *pb.FujinResponse_Hsubscribe:
+		if r.Hsubscribe.Error != "" {
+			s.hsubscribeCorrelator.Send(r.Hsubscribe.CorrelationId, 0)
+		} else {
+			s.hsubscribeCorrelator.Send(r.Hsubscribe.CorrelationId, r.Hsubscribe.SubscriptionId)
+		}
+	case *pb.FujinResponse_Fetch:
+		result := models.FetchResult{
+			SubscriptionID: r.Fetch.SubscriptionId,
+			Messages:       make([]models.Msg, 0, len(r.Fetch.Messages)),
+		}
+		if r.Fetch.Error != "" {
+			result.Error = fmt.Errorf("fetch error: %s", r.Fetch.Error)
+		}
+		// Convert messages
+		for _, msg := range r.Fetch.Messages {
+			result.Messages = append(result.Messages, models.Msg{
+				SubscriptionID: r.Fetch.SubscriptionId,
+				MessageID:      msg.MessageId,
+				Payload:        msg.Payload,
+			})
+		}
+		s.fetchCorrelator.Send(r.Fetch.CorrelationId, result)
+	case *pb.FujinResponse_Hfetch:
+		result := models.FetchResult{
+			SubscriptionID: r.Hfetch.SubscriptionId,
+			Messages:       make([]models.Msg, 0, len(r.Hfetch.Messages)),
+		}
+		if r.Hfetch.Error != "" {
+			result.Error = fmt.Errorf("hfetch error: %s", r.Hfetch.Error)
+		}
+		// Convert messages with headers
+		for _, msg := range r.Hfetch.Messages {
+			headers := make(map[string]string, len(msg.Headers))
+			for _, h := range msg.Headers {
+				headers[bytesToString(h.Key)] = bytesToString(h.Value)
+			}
+			result.Messages = append(result.Messages, models.Msg{
+				SubscriptionID: r.Hfetch.SubscriptionId,
+				MessageID:      msg.MessageId,
+				Payload:        msg.Payload,
+				Headers:        headers,
+			})
+		}
+		s.hfetchCorrelator.Send(r.Hfetch.CorrelationId, result)
 	case *pb.FujinResponse_Unsubscribe:
 		if r.Unsubscribe.Error != "" {
 			s.unsubscribeCorrelator.Send(r.Unsubscribe.CorrelationId, fmt.Errorf("unsubscribe error: %s", r.Unsubscribe.Error))
@@ -189,6 +265,23 @@ func (s *stream) routeResponse(resp *pb.FujinResponse) {
 				SubscriptionID: r.Message.SubscriptionId,
 				MessageID:      r.Message.MessageId,
 				Payload:        r.Message.Payload,
+				Headers:        nil,
+			})
+		}
+		s.subsMu.RUnlock()
+	case *pb.FujinResponse_Hmessage:
+		// Route messages with headers to subscription handlers
+		s.subsMu.RLock()
+		if sub, exists := s.subscriptions[r.Hmessage.SubscriptionId]; exists {
+			headers := make(map[string]string, len(r.Hmessage.Headers))
+			for _, h := range r.Hmessage.Headers {
+				headers[bytesToString(h.Key)] = bytesToString(h.Value)
+			}
+			sub.handler(models.Msg{
+				SubscriptionID: r.Hmessage.SubscriptionId,
+				MessageID:      r.Hmessage.MessageId,
+				Payload:        r.Hmessage.Payload,
+				Headers:        headers,
 			})
 		}
 		s.subsMu.RUnlock()
@@ -280,6 +373,64 @@ func (s *stream) produce(topic string, p []byte) error {
 	}
 }
 
+// HProduce sends a message with headers to the specified topic
+func (s *stream) HProduce(topic string, p []byte, headers map[string]string) error {
+	return s.hproduce(topic, p, headers)
+}
+
+// hproduce sends a message with headers to a topic
+func (s *stream) hproduce(topic string, p []byte, headers map[string]string) error {
+	if !s.connected.Load() {
+		return fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return fmt.Errorf("stream is closed")
+	}
+
+	ch := make(chan error, 1)
+	correlationID := s.produceCorrelator.Next(ch)
+
+	protoHeaders := make([]*pb.Header, 0, len(headers))
+	for k, v := range headers {
+		protoHeaders = append(protoHeaders, &pb.Header{
+			Key:   stringToBytes(k),
+			Value: stringToBytes(v),
+		})
+	}
+
+	// Create hproduce request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Hproduce{
+			Hproduce: &pb.HProduceRequest{
+				CorrelationId: correlationID,
+				Topic:         topic,
+				Headers:       protoHeaders,
+				Message:       p,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.produceCorrelator.Delete(correlationID)
+		return fmt.Errorf("failed to send hproduce request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case err := <-ch:
+		s.produceCorrelator.Delete(correlationID)
+		return err
+	case <-time.After(10 * time.Second):
+		s.produceCorrelator.Delete(correlationID)
+		return fmt.Errorf("hproduce timeout")
+	case <-s.ctx.Done():
+		s.produceCorrelator.Delete(correlationID)
+		return s.ctx.Err()
+	}
+}
+
 // Subscribe subscribes to a topic
 func (s *stream) Subscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error) {
 	return s.subscribe(topic, autoCommit, handler)
@@ -347,6 +498,176 @@ func (s *stream) subscribe(topic string, autoCommit bool, handler func(msg model
 	case <-s.ctx.Done():
 		s.subscribeCorrelator.Delete(correlationID)
 		return 0, s.ctx.Err()
+	}
+}
+
+// HSubscribe subscribes to a topic with headers support
+func (s *stream) HSubscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error) {
+	return s.hsubscribe(topic, autoCommit, handler)
+}
+
+func (s *stream) hsubscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error) {
+	if !s.connected.Load() {
+		return 0, fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return 0, fmt.Errorf("stream is closed")
+	}
+
+	ch := make(chan uint32, 1)
+	correlationID := s.hsubscribeCorrelator.Next(ch)
+
+	// Create hsubscribe request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Hsubscribe{
+			Hsubscribe: &pb.HSubscribeRequest{
+				CorrelationId: correlationID,
+				Topic:         topic,
+				AutoCommit:    autoCommit,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.hsubscribeCorrelator.Delete(correlationID)
+		return 0, fmt.Errorf("failed to send hsubscribe request: %w", err)
+	}
+
+	// Wait for hsubscribe response
+	select {
+	case subscriptionID := <-ch:
+		s.hsubscribeCorrelator.Delete(correlationID)
+
+		if subscriptionID == 0 {
+			return 0, fmt.Errorf("hsubscribe failed")
+		}
+
+		// Create subscription
+		sub := &subscription{
+			id:      subscriptionID,
+			topic:   topic,
+			handler: handler,
+			stream:  s,
+		}
+
+		s.subsMu.Lock()
+		s.subscriptions[subscriptionID] = sub
+		s.subsMu.Unlock()
+
+		// Start message handler
+		s.wg.Add(1)
+		go s.handleMessages(sub)
+
+		s.logger.Info("hsubscribed to topic", "topic", topic, "subscription_id", subscriptionID)
+		return subscriptionID, nil
+	case <-time.After(10 * time.Second):
+		s.hsubscribeCorrelator.Delete(correlationID)
+		return 0, fmt.Errorf("hsubscribe timeout")
+	case <-s.ctx.Done():
+		s.hsubscribeCorrelator.Delete(correlationID)
+		return 0, s.ctx.Err()
+	}
+}
+
+// Fetch requests a batch of messages from a topic (pull-based)
+func (s *stream) Fetch(topic string, autoCommit bool, batchSize uint32) (models.FetchResult, error) {
+	return s.fetch(topic, autoCommit, batchSize)
+}
+
+// fetch sends a fetch request and waits for the response
+func (s *stream) fetch(topic string, autoCommit bool, batchSize uint32) (models.FetchResult, error) {
+	if !s.connected.Load() {
+		return models.FetchResult{}, fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return models.FetchResult{}, fmt.Errorf("stream is closed")
+	}
+
+	ch := make(chan models.FetchResult, 1)
+	correlationID := s.fetchCorrelator.Next(ch)
+
+	// Create fetch request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Fetch{
+			Fetch: &pb.FetchRequest{
+				CorrelationId: correlationID,
+				Topic:         topic,
+				AutoCommit:    autoCommit,
+				BatchSize:     batchSize,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.fetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, fmt.Errorf("failed to send fetch request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case result := <-ch:
+		s.fetchCorrelator.Delete(correlationID)
+		return result, result.Error
+	case <-time.After(10 * time.Second):
+		s.fetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, fmt.Errorf("fetch timeout")
+	case <-s.ctx.Done():
+		s.fetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, s.ctx.Err()
+	}
+}
+
+// HFetch requests a batch of messages with headers from a topic (pull-based)
+func (s *stream) HFetch(topic string, autoCommit bool, batchSize uint32) (models.FetchResult, error) {
+	return s.hfetch(topic, autoCommit, batchSize)
+}
+
+// hfetch sends an hfetch request and waits for the response
+func (s *stream) hfetch(topic string, autoCommit bool, batchSize uint32) (models.FetchResult, error) {
+	if !s.connected.Load() {
+		return models.FetchResult{}, fmt.Errorf("stream not connected")
+	}
+
+	if s.closed.Load() {
+		return models.FetchResult{}, fmt.Errorf("stream is closed")
+	}
+
+	ch := make(chan models.FetchResult, 1)
+	correlationID := s.hfetchCorrelator.Next(ch)
+
+	// Create hfetch request
+	req := &pb.FujinRequest{
+		Request: &pb.FujinRequest_Hfetch{
+			Hfetch: &pb.HFetchRequest{
+				CorrelationId: correlationID,
+				Topic:         topic,
+				AutoCommit:    autoCommit,
+				BatchSize:     batchSize,
+			},
+		},
+	}
+
+	// Send request
+	if err := s.grpcStream.Send(req); err != nil {
+		s.hfetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, fmt.Errorf("failed to send hfetch request: %w", err)
+	}
+
+	// Wait for response
+	select {
+	case result := <-ch:
+		s.hfetchCorrelator.Delete(correlationID)
+		return result, result.Error
+	case <-time.After(10 * time.Second):
+		s.hfetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, fmt.Errorf("hfetch timeout")
+	case <-s.ctx.Done():
+		s.hfetchCorrelator.Delete(correlationID)
+		return models.FetchResult{}, s.ctx.Err()
 	}
 }
 

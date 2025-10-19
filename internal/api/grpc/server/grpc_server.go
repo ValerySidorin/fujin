@@ -139,25 +139,23 @@ func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
 	ctx := stream.Context()
 
 	session := &streamSession{
-		stream:    stream,
-		cman:      s.cman,
-		l:         s.l,
-		ctx:       ctx,
-		writers:   make(map[string]writer.Writer),
-		readers:   make(map[byte]*readerState),
-		nextSubID: 0,
-		connected: false,
+		stream:       stream,
+		cman:         s.cman,
+		l:            s.l,
+		ctx:          ctx,
+		writers:      make(map[string]writer.Writer),
+		readers:      make(map[byte]*readerState),
+		fetchReaders: make(map[string]byte),
+		nextSubID:    0,
+		connected:    false,
 	}
 
-	// Start goroutines for receiving and sending
 	errCh := make(chan error, 2)
 
-	// Receiver goroutine
 	go func() {
 		errCh <- session.receiveLoop()
 	}()
 
-	// Wait for either error or context cancellation
 	select {
 	case <-ctx.Done():
 		session.cleanup()
@@ -178,20 +176,22 @@ type streamSession struct {
 	l      *slog.Logger
 	ctx    context.Context
 
-	mu        sync.RWMutex
-	sendMu    sync.Mutex
-	writers   map[string]writer.Writer
-	readers   map[byte]*readerState
-	nextSubID byte
-	streamID  string
-	connected bool
+	mu           sync.RWMutex
+	sendMu       sync.Mutex
+	writers      map[string]writer.Writer
+	readers      map[byte]*readerState
+	fetchReaders map[string]byte // topic -> subscription_id mapping for fetch implicit subscriptions
+	nextSubID    byte
+	streamID     string
+	connected    bool
 }
 
 type readerState struct {
-	reader     internal_reader.Reader
-	topic      string
-	autoCommit bool
-	cancel     context.CancelFunc
+	reader      internal_reader.Reader
+	topic       string
+	autoCommit  bool
+	withHeaders bool
+	cancel      context.CancelFunc
 }
 
 // receiveLoop handles incoming requests from client
@@ -219,8 +219,16 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 		return s.handleConnect(r.Connect)
 	case *pb.FujinRequest_Produce:
 		return s.handleProduce(r.Produce)
+	case *pb.FujinRequest_Hproduce:
+		return s.handleHProduce(r.Hproduce)
 	case *pb.FujinRequest_Subscribe:
 		return s.handleSubscribe(r.Subscribe)
+	case *pb.FujinRequest_Hsubscribe:
+		return s.handleHSubscribe(r.Hsubscribe)
+	case *pb.FujinRequest_Fetch:
+		return s.handleFetch(r.Fetch)
+	case *pb.FujinRequest_Hfetch:
+		return s.handleHFetch(r.Hfetch)
 	case *pb.FujinRequest_Unsubscribe:
 		return s.handleUnsubscribe(r.Unsubscribe)
 	case *pb.FujinRequest_Ack:
@@ -309,6 +317,63 @@ func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
 	return nil
 }
 
+// handleHProduce processes HPRODUCE request (produce with headers)
+func (s *streamSession) handleHProduce(req *pb.HProduceRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hproduce{
+				Hproduce: &pb.HProduceResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	w, err := s.getWriter(req.Topic)
+	if err != nil {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hproduce{
+				Hproduce: &pb.HProduceResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         err.Error(),
+				},
+			},
+		})
+	}
+
+	// Convert proto headers to [][]byte format (alternating key, value, key, value, ...)
+	var headersKV [][]byte
+	for _, h := range req.Headers {
+		headersKV = append(headersKV, h.Key, h.Value)
+	}
+
+	correlationID := req.CorrelationId
+
+	w.HProduce(
+		s.ctx, req.Message, headersKV,
+		func(writeErr error) {
+			var errMsg string
+			if writeErr != nil {
+				errMsg = writeErr.Error()
+			}
+
+			err := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hproduce{
+					Hproduce: &pb.HProduceResponse{
+						CorrelationId: correlationID,
+						Error:         errMsg,
+					},
+				},
+			})
+			if err != nil {
+				s.l.Error("send hproduce response", "err", err)
+			}
+		})
+
+	return nil
+}
+
 // handleSubscribe processes SUBSCRIBE request
 func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
 	if !s.connected {
@@ -356,10 +421,11 @@ func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
 	ctx, cancel := context.WithCancel(s.ctx)
 
 	state := &readerState{
-		reader:     r,
-		topic:      req.Topic,
-		autoCommit: req.AutoCommit,
-		cancel:     cancel,
+		reader:      r,
+		topic:       req.Topic,
+		autoCommit:  req.AutoCommit,
+		withHeaders: false,
+		cancel:      cancel,
 	}
 
 	s.mu.Lock()
@@ -381,6 +447,333 @@ func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
 	go s.subscribeLoop(ctx, subID, state)
 
 	return nil
+}
+
+// handleHSubscribe processes HSUBSCRIBE request (subscribe with headers)
+func (s *streamSession) handleHSubscribe(req *pb.HSubscribeRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hsubscribe{
+				Hsubscribe: &pb.HSubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "not connected",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	if s.nextSubID == 255 {
+		s.mu.Unlock()
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hsubscribe{
+				Hsubscribe: &pb.HSubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "maximum subscriptions reached (255)",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+	s.nextSubID++
+	subID := s.nextSubID
+	s.mu.Unlock()
+
+	r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
+	if err != nil {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hsubscribe{
+				Hsubscribe: &pb.HSubscribeResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          err.Error(),
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	ctx, cancel := context.WithCancel(s.ctx)
+
+	state := &readerState{
+		reader:      r,
+		topic:       req.Topic,
+		autoCommit:  req.AutoCommit,
+		withHeaders: true,
+		cancel:      cancel,
+	}
+
+	s.mu.Lock()
+	s.readers[subID] = state
+	s.mu.Unlock()
+
+	if err := s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Hsubscribe{
+			Hsubscribe: &pb.HSubscribeResponse{
+				CorrelationId:  req.CorrelationId,
+				Error:          "",
+				SubscriptionId: uint32(subID),
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	go s.subscribeLoop(ctx, subID, state)
+
+	return nil
+}
+
+// handleFetch processes FETCH request (pull-based message retrieval)
+func (s *streamSession) handleFetch(req *pb.FetchRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Fetch{
+				Fetch: &pb.FetchResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "not connected",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	subID, exists := s.fetchReaders[req.Topic]
+
+	if !exists {
+		if s.nextSubID == 255 {
+			s.mu.Unlock()
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Fetch{
+					Fetch: &pb.FetchResponse{
+						CorrelationId:  req.CorrelationId,
+						Error:          "maximum subscriptions reached (255)",
+						SubscriptionId: 0,
+					},
+				},
+			})
+		}
+		s.nextSubID++
+		subID = s.nextSubID
+
+		r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
+		if err != nil {
+			s.mu.Unlock()
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Fetch{
+					Fetch: &pb.FetchResponse{
+						CorrelationId:  req.CorrelationId,
+						Error:          err.Error(),
+						SubscriptionId: 0,
+					},
+				},
+			})
+		}
+
+		state := &readerState{
+			reader:      r,
+			topic:       req.Topic,
+			autoCommit:  req.AutoCommit,
+			withHeaders: false,
+		}
+		s.readers[subID] = state
+		s.fetchReaders[req.Topic] = subID
+	}
+	s.mu.Unlock()
+
+	s.mu.RLock()
+	state, exists := s.readers[subID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Fetch{
+				Fetch: &pb.FetchResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "reader not found",
+					SubscriptionId: uint32(subID),
+				},
+			},
+		})
+	}
+
+	var messages []*pb.FetchMessage
+	var msgIDBuf []byte
+	if !req.AutoCommit {
+		msgIDBuf = make([]byte, state.reader.MsgIDStaticArgsLen())
+	}
+
+	fetchErr := make(chan error, 1)
+
+	msgHandler := func(message []byte, topic string, args ...any) {
+		var msgID []byte
+		if !req.AutoCommit && len(args) > 0 {
+			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
+		}
+
+		messages = append(messages, &pb.FetchMessage{
+			MessageId: msgID,
+			Payload:   message,
+		})
+	}
+
+	fetchResponseHandler := func(n uint32, err error) {
+		fetchErr <- err
+	}
+
+	state.reader.Fetch(s.ctx, req.BatchSize, fetchResponseHandler, msgHandler)
+	err := <-fetchErr
+
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Fetch{
+			Fetch: &pb.FetchResponse{
+				CorrelationId:  req.CorrelationId,
+				Error:          errMsg,
+				SubscriptionId: uint32(subID),
+				Messages:       messages,
+			},
+		},
+	})
+}
+
+// handleHFetch processes HFETCH request (pull-based message retrieval with headers)
+func (s *streamSession) handleHFetch(req *pb.HFetchRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hfetch{
+				Hfetch: &pb.HFetchResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "not connected",
+					SubscriptionId: 0,
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	subID, exists := s.fetchReaders[req.Topic]
+
+	if !exists {
+		if s.nextSubID == 255 {
+			s.mu.Unlock()
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hfetch{
+					Hfetch: &pb.HFetchResponse{
+						CorrelationId:  req.CorrelationId,
+						Error:          "maximum subscriptions reached (255)",
+						SubscriptionId: 0,
+					},
+				},
+			})
+		}
+		s.nextSubID++
+		subID = s.nextSubID
+
+		r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
+		if err != nil {
+			s.mu.Unlock()
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hfetch{
+					Hfetch: &pb.HFetchResponse{
+						CorrelationId:  req.CorrelationId,
+						Error:          err.Error(),
+						SubscriptionId: 0,
+					},
+				},
+			})
+		}
+
+		state := &readerState{
+			reader:      r,
+			topic:       req.Topic,
+			autoCommit:  req.AutoCommit,
+			withHeaders: true,
+		}
+		s.readers[subID] = state
+		s.fetchReaders[req.Topic] = subID
+	}
+	s.mu.Unlock()
+
+	// Get reader
+	s.mu.RLock()
+	state, exists := s.readers[subID]
+	s.mu.RUnlock()
+
+	if !exists {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hfetch{
+				Hfetch: &pb.HFetchResponse{
+					CorrelationId:  req.CorrelationId,
+					Error:          "reader not found",
+					SubscriptionId: uint32(subID),
+				},
+			},
+		})
+	}
+
+	var messages []*pb.HFetchMessage
+	var msgIDBuf []byte
+	if !req.AutoCommit {
+		msgIDBuf = make([]byte, state.reader.MsgIDStaticArgsLen())
+	}
+
+	fetchErr := make(chan error, 1)
+
+	hmsgHandler := func(message []byte, topic string, hs [][]byte, args ...any) {
+		var msgID []byte
+		if !req.AutoCommit && len(args) > 0 {
+			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
+		}
+
+		// Convert headers from [][]byte to []*pb.Header
+		var protoHeaders []*pb.Header
+		for i := 0; i < len(hs); i += 2 {
+			key := hs[i]
+			var val []byte
+			if i+1 < len(hs) {
+				val = hs[i+1]
+			}
+			protoHeaders = append(protoHeaders, &pb.Header{
+				Key:   key,
+				Value: val,
+			})
+		}
+
+		messages = append(messages, &pb.HFetchMessage{
+			MessageId: msgID,
+			Payload:   message,
+			Headers:   protoHeaders,
+		})
+	}
+
+	fetchResponseHandler := func(n uint32, err error) {
+		fetchErr <- err
+	}
+
+	state.reader.HFetch(s.ctx, req.BatchSize, fetchResponseHandler, hmsgHandler)
+	err := <-fetchErr
+
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Hfetch{
+			Hfetch: &pb.HFetchResponse{
+				CorrelationId:  req.CorrelationId,
+				Error:          errMsg,
+				SubscriptionId: uint32(subID),
+				Messages:       messages,
+			},
+		},
+	})
 }
 
 // handleUnsubscribe processes UNSUBSCRIBE request
@@ -412,7 +805,15 @@ func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
 		})
 	}
 
-	state.cancel()
+	// Remove from fetchReaders if this is a fetch subscription
+	topic := state.topic
+	if fetchSubID, isFetch := s.fetchReaders[topic]; isFetch && fetchSubID == subID {
+		delete(s.fetchReaders, topic)
+	}
+
+	if state.cancel != nil {
+		state.cancel()
+	}
 	delete(s.readers, subID)
 	s.mu.Unlock()
 
@@ -442,36 +843,86 @@ func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *re
 		msgIDBuf = make([]byte, state.reader.MsgIDStaticArgsLen())
 	}
 
-	msgHandler := func(message []byte, topic string, args ...any) {
-		var msgID []byte
-		if !state.autoCommit && len(args) > 0 {
-			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-		}
-
-		if err := s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Message{
-				Message: &pb.Message{
-					SubscriptionId: uint32(subID),
-					MessageId:      msgID,
-					Payload:        message,
-				},
-			},
-		}); err != nil {
-			s.l.Error("failed to send message", "sub_id", subID, "err", err)
-		}
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			err := state.reader.Subscribe(ctx, msgHandler)
-			if err != nil && ctx.Err() == nil {
-				s.l.Error("subscribe error", "sub_id", subID, "err", err)
+	if state.withHeaders {
+		hmsgHandler := func(message []byte, topic string, hs [][]byte, args ...any) {
+			var msgID []byte
+			if !state.autoCommit && len(args) > 0 {
+				msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
 			}
-			if ctx.Err() != nil {
+
+			var protoHeaders []*pb.Header
+			for i := 0; i < len(hs); i += 2 {
+				key := hs[i]
+				var val []byte
+				if i+1 < len(hs) {
+					val = hs[i+1]
+				}
+				protoHeaders = append(protoHeaders, &pb.Header{
+					Key:   key,
+					Value: val,
+				})
+			}
+
+			if err := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hmessage{
+					Hmessage: &pb.HMessage{
+						SubscriptionId: uint32(subID),
+						MessageId:      msgID,
+						Payload:        message,
+						Headers:        protoHeaders,
+					},
+				},
+			}); err != nil {
+				s.l.Error("failed to send hmessage", "sub_id", subID, "err", err)
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				err := state.reader.HSubscribe(ctx, hmsgHandler)
+				if err != nil && ctx.Err() == nil {
+					s.l.Error("hsubscribe error", "sub_id", subID, "err", err)
+				}
+				if ctx.Err() != nil {
+					return
+				}
+			}
+		}
+	} else {
+		msgHandler := func(message []byte, topic string, args ...any) {
+			var msgID []byte
+			if !state.autoCommit && len(args) > 0 {
+				msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
+			}
+
+			if err := s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Message{
+					Message: &pb.Message{
+						SubscriptionId: uint32(subID),
+						MessageId:      msgID,
+						Payload:        message,
+					},
+				},
+			}); err != nil {
+				s.l.Error("failed to send message", "sub_id", subID, "err", err)
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				err := state.reader.Subscribe(ctx, msgHandler)
+				if err != nil && ctx.Err() == nil {
+					s.l.Error("subscribe error", "sub_id", subID, "err", err)
+				}
+				if ctx.Err() != nil {
+					return
+				}
 			}
 		}
 	}
@@ -490,7 +941,6 @@ func (s *streamSession) handleAck(req *pb.AckRequest) error {
 		})
 	}
 
-	// Convert subscription_id to byte (as per native protocol)
 	subID := byte(req.SubscriptionId)
 
 	s.mu.RLock()
@@ -508,19 +958,15 @@ func (s *streamSession) handleAck(req *pb.AckRequest) error {
 		})
 	}
 
-	// Use message IDs from the request (now supports multiple IDs)
 	msgIDs := req.MessageIds
 
-	// Collect per-message results
 	results := make([]*pb.AckMessageResult, 0, len(msgIDs))
 	var resultsMu sync.Mutex
 
-	// Call Ack on the reader
 	state.reader.Ack(
 		s.ctx,
 		msgIDs,
 		func(err error) {
-			// Ack handler - called when all acks are processed
 			var errMsg string
 			if err != nil {
 				errMsg = err.Error()
@@ -539,7 +985,6 @@ func (s *streamSession) handleAck(req *pb.AckRequest) error {
 			}
 		},
 		func(msgID []byte, err error) {
-			// Individual message ack handler
 			var errMsg string
 			if err != nil {
 				errMsg = err.Error()
@@ -571,7 +1016,6 @@ func (s *streamSession) handleNack(req *pb.NackRequest) error {
 		})
 	}
 
-	// Convert subscription_id to byte (as per native protocol)
 	subID := byte(req.SubscriptionId)
 
 	s.mu.RLock()
@@ -589,19 +1033,15 @@ func (s *streamSession) handleNack(req *pb.NackRequest) error {
 		})
 	}
 
-	// Use message IDs from the request (now supports multiple IDs)
 	msgIDs := req.MessageIds
 
-	// Collect per-message results
 	results := make([]*pb.NackMessageResult, 0, len(msgIDs))
 	var resultsMu sync.Mutex
 
-	// Call Nack on the reader
 	state.reader.Nack(
 		s.ctx,
 		msgIDs,
 		func(err error) {
-			// Nack handler - called when all nacks are processed
 			var errMsg string
 			if err != nil {
 				errMsg = err.Error()
@@ -620,7 +1060,6 @@ func (s *streamSession) handleNack(req *pb.NackRequest) error {
 			}
 		},
 		func(msgID []byte, err error) {
-			// Individual message nack handler
 			var errMsg string
 			if err != nil {
 				errMsg = err.Error()
@@ -683,8 +1122,13 @@ func (s *streamSession) cleanup() {
 
 	// Cancel all readers
 	for _, state := range s.readers {
-		state.cancel()
+		if state.cancel != nil {
+			state.cancel()
+		}
 		state.reader.Close()
 	}
 	s.readers = make(map[byte]*readerState)
+
+	// Clear fetch readers mapping
+	s.fetchReaders = make(map[string]byte)
 }
