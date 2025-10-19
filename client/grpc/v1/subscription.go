@@ -23,7 +23,6 @@ func (s *subscription) Close() error {
 
 	s.closed.Store(true)
 
-	// Remove from stream's subscriptions
 	s.stream.subsMu.Lock()
 	delete(s.stream.subscriptions, s.id)
 	s.stream.subsMu.Unlock()

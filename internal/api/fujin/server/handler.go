@@ -223,7 +223,7 @@ type handler struct {
 	pingStream   bool
 
 	// producer
-	writerID             string
+	streamID             string
 	nonTxSessionWriters  map[string]writer.Writer
 	currentTxWriter      writer.Writer
 	currentTxWriterTopic string
@@ -309,7 +309,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 						if h.currentTxWriter != nil {
 							_ = h.currentTxWriter.RollbackTx(h.ctx)
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.streamID)
 							h.currentTxWriter = nil
 						}
 						h.cpool.Close()
@@ -1148,7 +1148,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.streamID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -1190,7 +1190,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.streamID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -1393,7 +1393,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.streamID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -1435,7 +1435,7 @@ func (h *handler) handle(buf []byte) error {
 						}
 					} else {
 						var err error // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (success/failure)
-						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.writerID)
+						currentTxWriter, err := h.cman.GetWriter(h.ps.pa.topic, h.streamID)
 						if err != nil {
 							h.l.Error("get writer", "err", err)
 							h.enqueueWriteErrResponse(err)
@@ -1570,7 +1570,7 @@ func (h *handler) handle(buf []byte) error {
 							h.ps.ca.cID, h.ps.state = nil, OP_START // We are keeping transaction opened here?
 							continue
 						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
+						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.streamID)
 						h.currentTxWriter = nil
 					}
 					h.enqueueTxCommitSuccess(h.ps.ca.cID)
@@ -1638,13 +1638,13 @@ func (h *handler) handle(buf []byte) error {
 					if h.currentTxWriter != nil {
 						if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
 							h.enqueueTxRollbackErr(h.ps.ca.cID, err)
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
+							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.streamID)
 							pool.Put(h.ps.ca.cID)
 							// We are not keeping tx opened here after rollback error
 							h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, STREAM_STATE_CONNECTED, OP_START
 							continue
 						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.writerID)
+						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic, h.streamID)
 						h.currentTxWriter = nil
 					}
 					h.enqueueTxRollbackSuccess(h.ps.ca.cID)
@@ -1715,7 +1715,7 @@ func (h *handler) handle(buf []byte) error {
 				if len(h.ps.argBuf) >= int(h.ps.cna.streamIDLen) {
 					h.ps.cna.streamID = string(h.ps.argBuf)
 					pool.Put(h.ps.argBuf)
-					h.writerID = h.ps.cna.streamID
+					h.streamID = h.ps.cna.streamID
 					h.ps.argBuf, h.ps.cna, h.ps.state = nil, connectArgs{}, OP_START
 				}
 
