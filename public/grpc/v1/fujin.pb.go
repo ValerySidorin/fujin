@@ -416,6 +416,300 @@ func (x *HProduceResponse) GetError() string {
 	return ""
 }
 
+// BeginTxRequest - begin transaction
+type BeginTxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginTxRequest) Reset() {
+	*x = BeginTxRequest{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginTxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginTxRequest) ProtoMessage() {}
+
+func (x *BeginTxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginTxRequest.ProtoReflect.Descriptor instead.
+func (*BeginTxRequest) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BeginTxRequest) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+// BeginTxResponse
+type BeginTxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginTxResponse) Reset() {
+	*x = BeginTxResponse{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginTxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginTxResponse) ProtoMessage() {}
+
+func (x *BeginTxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginTxResponse.ProtoReflect.Descriptor instead.
+func (*BeginTxResponse) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BeginTxResponse) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+func (x *BeginTxResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// CommitTxRequest - commit transaction
+type CommitTxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitTxRequest) Reset() {
+	*x = CommitTxRequest{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitTxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitTxRequest) ProtoMessage() {}
+
+func (x *CommitTxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitTxRequest.ProtoReflect.Descriptor instead.
+func (*CommitTxRequest) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CommitTxRequest) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+// CommitTxResponse
+type CommitTxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitTxResponse) Reset() {
+	*x = CommitTxResponse{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitTxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitTxResponse) ProtoMessage() {}
+
+func (x *CommitTxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitTxResponse.ProtoReflect.Descriptor instead.
+func (*CommitTxResponse) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CommitTxResponse) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+func (x *CommitTxResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// RollbackTxRequest - rollback transaction
+type RollbackTxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RollbackTxRequest) Reset() {
+	*x = RollbackTxRequest{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RollbackTxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RollbackTxRequest) ProtoMessage() {}
+
+func (x *RollbackTxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RollbackTxRequest.ProtoReflect.Descriptor instead.
+func (*RollbackTxRequest) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RollbackTxRequest) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+// RollbackTxResponse
+type RollbackTxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RollbackTxResponse) Reset() {
+	*x = RollbackTxResponse{}
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RollbackTxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RollbackTxResponse) ProtoMessage() {}
+
+func (x *RollbackTxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RollbackTxResponse.ProtoReflect.Descriptor instead.
+func (*RollbackTxResponse) Descriptor() ([]byte, []int) {
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RollbackTxResponse) GetCorrelationId() uint32 {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return 0
+}
+
+func (x *RollbackTxResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 // Subscribe request
 type SubscribeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -428,7 +722,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[7]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -440,7 +734,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[7]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -453,7 +747,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{7}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SubscribeRequest) GetCorrelationId() uint32 {
@@ -489,7 +783,7 @@ type SubscribeResponse struct {
 
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[8]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -501,7 +795,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[8]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -514,7 +808,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{8}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SubscribeResponse) GetCorrelationId() uint32 {
@@ -550,7 +844,7 @@ type HSubscribeRequest struct {
 
 func (x *HSubscribeRequest) Reset() {
 	*x = HSubscribeRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[9]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -562,7 +856,7 @@ func (x *HSubscribeRequest) String() string {
 func (*HSubscribeRequest) ProtoMessage() {}
 
 func (x *HSubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[9]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -575,7 +869,7 @@ func (x *HSubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HSubscribeRequest.ProtoReflect.Descriptor instead.
 func (*HSubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{9}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *HSubscribeRequest) GetCorrelationId() uint32 {
@@ -611,7 +905,7 @@ type HSubscribeResponse struct {
 
 func (x *HSubscribeResponse) Reset() {
 	*x = HSubscribeResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[10]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -623,7 +917,7 @@ func (x *HSubscribeResponse) String() string {
 func (*HSubscribeResponse) ProtoMessage() {}
 
 func (x *HSubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[10]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +930,7 @@ func (x *HSubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HSubscribeResponse.ProtoReflect.Descriptor instead.
 func (*HSubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{10}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *HSubscribeResponse) GetCorrelationId() uint32 {
@@ -671,7 +965,7 @@ type UnsubscribeRequest struct {
 
 func (x *UnsubscribeRequest) Reset() {
 	*x = UnsubscribeRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -683,7 +977,7 @@ func (x *UnsubscribeRequest) String() string {
 func (*UnsubscribeRequest) ProtoMessage() {}
 
 func (x *UnsubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[11]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -696,7 +990,7 @@ func (x *UnsubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeRequest.ProtoReflect.Descriptor instead.
 func (*UnsubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{11}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *UnsubscribeRequest) GetCorrelationId() uint32 {
@@ -724,7 +1018,7 @@ type UnsubscribeResponse struct {
 
 func (x *UnsubscribeResponse) Reset() {
 	*x = UnsubscribeResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +1030,7 @@ func (x *UnsubscribeResponse) String() string {
 func (*UnsubscribeResponse) ProtoMessage() {}
 
 func (x *UnsubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[12]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +1043,7 @@ func (x *UnsubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeResponse.ProtoReflect.Descriptor instead.
 func (*UnsubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{12}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UnsubscribeResponse) GetCorrelationId() uint32 {
@@ -778,7 +1072,7 @@ type Message struct {
 
 func (x *Message) Reset() {
 	*x = Message{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -790,7 +1084,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[13]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -803,7 +1097,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{13}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Message) GetSubscriptionId() uint32 {
@@ -840,7 +1134,7 @@ type HMessage struct {
 
 func (x *HMessage) Reset() {
 	*x = HMessage{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -852,7 +1146,7 @@ func (x *HMessage) String() string {
 func (*HMessage) ProtoMessage() {}
 
 func (x *HMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[14]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -865,7 +1159,7 @@ func (x *HMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HMessage.ProtoReflect.Descriptor instead.
 func (*HMessage) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{14}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *HMessage) GetSubscriptionId() uint32 {
@@ -897,8 +1191,6 @@ func (x *HMessage) GetHeaders() []*Header {
 }
 
 // FetchRequest - request a batch of messages (pull-based)
-// Creates an implicit subscription on first fetch to a topic.
-// Subsequent fetches to the same topic reuse the same subscription.
 type FetchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
@@ -911,7 +1203,7 @@ type FetchRequest struct {
 
 func (x *FetchRequest) Reset() {
 	*x = FetchRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +1215,7 @@ func (x *FetchRequest) String() string {
 func (*FetchRequest) ProtoMessage() {}
 
 func (x *FetchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[15]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1228,7 @@ func (x *FetchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchRequest.ProtoReflect.Descriptor instead.
 func (*FetchRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{15}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *FetchRequest) GetCorrelationId() uint32 {
@@ -968,7 +1260,6 @@ func (x *FetchRequest) GetBatchSize() uint32 {
 }
 
 // FetchResponse - response with a batch of messages
-// Returns subscription_id on first fetch, which is reused for ack/nack.
 type FetchResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId  uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
@@ -981,7 +1272,7 @@ type FetchResponse struct {
 
 func (x *FetchResponse) Reset() {
 	*x = FetchResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -993,7 +1284,7 @@ func (x *FetchResponse) String() string {
 func (*FetchResponse) ProtoMessage() {}
 
 func (x *FetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[16]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1006,7 +1297,7 @@ func (x *FetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchResponse.ProtoReflect.Descriptor instead.
 func (*FetchResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{16}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *FetchResponse) GetCorrelationId() uint32 {
@@ -1037,7 +1328,7 @@ func (x *FetchResponse) GetMessages() []*FetchMessage {
 	return nil
 }
 
-// FetchMessage - message returned by Fetch (without subscription_id)
+// FetchMessage - message returned by Fetch
 type FetchMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MessageId     []byte                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
@@ -1048,7 +1339,7 @@ type FetchMessage struct {
 
 func (x *FetchMessage) Reset() {
 	*x = FetchMessage{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1351,7 @@ func (x *FetchMessage) String() string {
 func (*FetchMessage) ProtoMessage() {}
 
 func (x *FetchMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[17]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1364,7 @@ func (x *FetchMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchMessage.ProtoReflect.Descriptor instead.
 func (*FetchMessage) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{17}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *FetchMessage) GetMessageId() []byte {
@@ -1091,8 +1382,6 @@ func (x *FetchMessage) GetPayload() []byte {
 }
 
 // HFetchRequest - request a batch of messages with headers (pull-based)
-// Creates an implicit subscription on first fetch to a topic.
-// Subsequent fetches to the same topic reuse the same subscription.
 type HFetchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
@@ -1105,7 +1394,7 @@ type HFetchRequest struct {
 
 func (x *HFetchRequest) Reset() {
 	*x = HFetchRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1406,7 @@ func (x *HFetchRequest) String() string {
 func (*HFetchRequest) ProtoMessage() {}
 
 func (x *HFetchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[18]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1419,7 @@ func (x *HFetchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HFetchRequest.ProtoReflect.Descriptor instead.
 func (*HFetchRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{18}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *HFetchRequest) GetCorrelationId() uint32 {
@@ -1162,7 +1451,6 @@ func (x *HFetchRequest) GetBatchSize() uint32 {
 }
 
 // HFetchResponse - response with a batch of messages with headers
-// Returns subscription_id on first fetch, which is reused for ack/nack.
 type HFetchResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CorrelationId  uint32                 `protobuf:"varint,1,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
@@ -1175,7 +1463,7 @@ type HFetchResponse struct {
 
 func (x *HFetchResponse) Reset() {
 	*x = HFetchResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[19]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1187,7 +1475,7 @@ func (x *HFetchResponse) String() string {
 func (*HFetchResponse) ProtoMessage() {}
 
 func (x *HFetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[19]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1200,7 +1488,7 @@ func (x *HFetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HFetchResponse.ProtoReflect.Descriptor instead.
 func (*HFetchResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{19}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *HFetchResponse) GetCorrelationId() uint32 {
@@ -1231,7 +1519,7 @@ func (x *HFetchResponse) GetMessages() []*HFetchMessage {
 	return nil
 }
 
-// HFetchMessage - message with headers returned by HFetch (without subscription_id)
+// HFetchMessage - message with headers returned by HFetch
 type HFetchMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	MessageId     []byte                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
@@ -1243,7 +1531,7 @@ type HFetchMessage struct {
 
 func (x *HFetchMessage) Reset() {
 	*x = HFetchMessage{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[20]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1255,7 +1543,7 @@ func (x *HFetchMessage) String() string {
 func (*HFetchMessage) ProtoMessage() {}
 
 func (x *HFetchMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[20]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1268,7 +1556,7 @@ func (x *HFetchMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HFetchMessage.ProtoReflect.Descriptor instead.
 func (*HFetchMessage) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{20}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *HFetchMessage) GetMessageId() []byte {
@@ -1304,7 +1592,7 @@ type AckRequest struct {
 
 func (x *AckRequest) Reset() {
 	*x = AckRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[21]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1316,7 +1604,7 @@ func (x *AckRequest) String() string {
 func (*AckRequest) ProtoMessage() {}
 
 func (x *AckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[21]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1329,7 +1617,7 @@ func (x *AckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckRequest.ProtoReflect.Descriptor instead.
 func (*AckRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{21}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AckRequest) GetCorrelationId() uint32 {
@@ -1365,7 +1653,7 @@ type AckResponse struct {
 
 func (x *AckResponse) Reset() {
 	*x = AckResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[22]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1377,7 +1665,7 @@ func (x *AckResponse) String() string {
 func (*AckResponse) ProtoMessage() {}
 
 func (x *AckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[22]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1390,7 +1678,7 @@ func (x *AckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckResponse.ProtoReflect.Descriptor instead.
 func (*AckResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{22}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *AckResponse) GetCorrelationId() uint32 {
@@ -1425,7 +1713,7 @@ type AckMessageResult struct {
 
 func (x *AckMessageResult) Reset() {
 	*x = AckMessageResult{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[23]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1437,7 +1725,7 @@ func (x *AckMessageResult) String() string {
 func (*AckMessageResult) ProtoMessage() {}
 
 func (x *AckMessageResult) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[23]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1450,7 +1738,7 @@ func (x *AckMessageResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckMessageResult.ProtoReflect.Descriptor instead.
 func (*AckMessageResult) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{23}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *AckMessageResult) GetMessageId() []byte {
@@ -1479,7 +1767,7 @@ type NackRequest struct {
 
 func (x *NackRequest) Reset() {
 	*x = NackRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[24]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1491,7 +1779,7 @@ func (x *NackRequest) String() string {
 func (*NackRequest) ProtoMessage() {}
 
 func (x *NackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[24]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1504,7 +1792,7 @@ func (x *NackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NackRequest.ProtoReflect.Descriptor instead.
 func (*NackRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{24}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *NackRequest) GetCorrelationId() uint32 {
@@ -1540,7 +1828,7 @@ type NackResponse struct {
 
 func (x *NackResponse) Reset() {
 	*x = NackResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[25]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1840,7 @@ func (x *NackResponse) String() string {
 func (*NackResponse) ProtoMessage() {}
 
 func (x *NackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[25]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1853,7 @@ func (x *NackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NackResponse.ProtoReflect.Descriptor instead.
 func (*NackResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{25}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *NackResponse) GetCorrelationId() uint32 {
@@ -1600,7 +1888,7 @@ type NackMessageResult struct {
 
 func (x *NackMessageResult) Reset() {
 	*x = NackMessageResult{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[26]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1612,7 +1900,7 @@ func (x *NackMessageResult) String() string {
 func (*NackMessageResult) ProtoMessage() {}
 
 func (x *NackMessageResult) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[26]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1625,7 +1913,7 @@ func (x *NackMessageResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NackMessageResult.ProtoReflect.Descriptor instead.
 func (*NackMessageResult) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{26}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *NackMessageResult) GetMessageId() []byte {
@@ -1657,6 +1945,9 @@ type FujinRequest struct {
 	//	*FujinRequest_Hsubscribe
 	//	*FujinRequest_Fetch
 	//	*FujinRequest_Hfetch
+	//	*FujinRequest_BeginTx
+	//	*FujinRequest_CommitTx
+	//	*FujinRequest_RollbackTx
 	Request       isFujinRequest_Request `protobuf_oneof:"request"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1664,7 +1955,7 @@ type FujinRequest struct {
 
 func (x *FujinRequest) Reset() {
 	*x = FujinRequest{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[27]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1676,7 +1967,7 @@ func (x *FujinRequest) String() string {
 func (*FujinRequest) ProtoMessage() {}
 
 func (x *FujinRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[27]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1689,7 +1980,7 @@ func (x *FujinRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FujinRequest.ProtoReflect.Descriptor instead.
 func (*FujinRequest) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{27}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *FujinRequest) GetRequest() isFujinRequest_Request {
@@ -1789,6 +2080,33 @@ func (x *FujinRequest) GetHfetch() *HFetchRequest {
 	return nil
 }
 
+func (x *FujinRequest) GetBeginTx() *BeginTxRequest {
+	if x != nil {
+		if x, ok := x.Request.(*FujinRequest_BeginTx); ok {
+			return x.BeginTx
+		}
+	}
+	return nil
+}
+
+func (x *FujinRequest) GetCommitTx() *CommitTxRequest {
+	if x != nil {
+		if x, ok := x.Request.(*FujinRequest_CommitTx); ok {
+			return x.CommitTx
+		}
+	}
+	return nil
+}
+
+func (x *FujinRequest) GetRollbackTx() *RollbackTxRequest {
+	if x != nil {
+		if x, ok := x.Request.(*FujinRequest_RollbackTx); ok {
+			return x.RollbackTx
+		}
+	}
+	return nil
+}
+
 type isFujinRequest_Request interface {
 	isFujinRequest_Request()
 }
@@ -1833,6 +2151,18 @@ type FujinRequest_Hfetch struct {
 	Hfetch *HFetchRequest `protobuf:"bytes,10,opt,name=hfetch,proto3,oneof"`
 }
 
+type FujinRequest_BeginTx struct {
+	BeginTx *BeginTxRequest `protobuf:"bytes,11,opt,name=begin_tx,json=beginTx,proto3,oneof"`
+}
+
+type FujinRequest_CommitTx struct {
+	CommitTx *CommitTxRequest `protobuf:"bytes,12,opt,name=commit_tx,json=commitTx,proto3,oneof"`
+}
+
+type FujinRequest_RollbackTx struct {
+	RollbackTx *RollbackTxRequest `protobuf:"bytes,13,opt,name=rollback_tx,json=rollbackTx,proto3,oneof"`
+}
+
 func (*FujinRequest_Connect) isFujinRequest_Request() {}
 
 func (*FujinRequest_Produce) isFujinRequest_Request() {}
@@ -1853,6 +2183,12 @@ func (*FujinRequest_Fetch) isFujinRequest_Request() {}
 
 func (*FujinRequest_Hfetch) isFujinRequest_Request() {}
 
+func (*FujinRequest_BeginTx) isFujinRequest_Request() {}
+
+func (*FujinRequest_CommitTx) isFujinRequest_Request() {}
+
+func (*FujinRequest_RollbackTx) isFujinRequest_Request() {}
+
 // Union type for all responses
 type FujinResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1870,6 +2206,9 @@ type FujinResponse struct {
 	//	*FujinResponse_Hsubscribe
 	//	*FujinResponse_Fetch
 	//	*FujinResponse_Hfetch
+	//	*FujinResponse_BeginTx
+	//	*FujinResponse_CommitTx
+	//	*FujinResponse_RollbackTx
 	Response      isFujinResponse_Response `protobuf_oneof:"response"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1877,7 +2216,7 @@ type FujinResponse struct {
 
 func (x *FujinResponse) Reset() {
 	*x = FujinResponse{}
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[28]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1889,7 +2228,7 @@ func (x *FujinResponse) String() string {
 func (*FujinResponse) ProtoMessage() {}
 
 func (x *FujinResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_public_grpc_v1_fujin_proto_msgTypes[28]
+	mi := &file_public_grpc_v1_fujin_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1902,7 +2241,7 @@ func (x *FujinResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FujinResponse.ProtoReflect.Descriptor instead.
 func (*FujinResponse) Descriptor() ([]byte, []int) {
-	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{28}
+	return file_public_grpc_v1_fujin_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *FujinResponse) GetResponse() isFujinResponse_Response {
@@ -2020,6 +2359,33 @@ func (x *FujinResponse) GetHfetch() *HFetchResponse {
 	return nil
 }
 
+func (x *FujinResponse) GetBeginTx() *BeginTxResponse {
+	if x != nil {
+		if x, ok := x.Response.(*FujinResponse_BeginTx); ok {
+			return x.BeginTx
+		}
+	}
+	return nil
+}
+
+func (x *FujinResponse) GetCommitTx() *CommitTxResponse {
+	if x != nil {
+		if x, ok := x.Response.(*FujinResponse_CommitTx); ok {
+			return x.CommitTx
+		}
+	}
+	return nil
+}
+
+func (x *FujinResponse) GetRollbackTx() *RollbackTxResponse {
+	if x != nil {
+		if x, ok := x.Response.(*FujinResponse_RollbackTx); ok {
+			return x.RollbackTx
+		}
+	}
+	return nil
+}
+
 type isFujinResponse_Response interface {
 	isFujinResponse_Response()
 }
@@ -2072,6 +2438,18 @@ type FujinResponse_Hfetch struct {
 	Hfetch *HFetchResponse `protobuf:"bytes,12,opt,name=hfetch,proto3,oneof"`
 }
 
+type FujinResponse_BeginTx struct {
+	BeginTx *BeginTxResponse `protobuf:"bytes,13,opt,name=begin_tx,json=beginTx,proto3,oneof"`
+}
+
+type FujinResponse_CommitTx struct {
+	CommitTx *CommitTxResponse `protobuf:"bytes,14,opt,name=commit_tx,json=commitTx,proto3,oneof"`
+}
+
+type FujinResponse_RollbackTx struct {
+	RollbackTx *RollbackTxResponse `protobuf:"bytes,15,opt,name=rollback_tx,json=rollbackTx,proto3,oneof"`
+}
+
 func (*FujinResponse_Connect) isFujinResponse_Response() {}
 
 func (*FujinResponse_Produce) isFujinResponse_Response() {}
@@ -2095,6 +2473,12 @@ func (*FujinResponse_Hsubscribe) isFujinResponse_Response() {}
 func (*FujinResponse_Fetch) isFujinResponse_Response() {}
 
 func (*FujinResponse_Hfetch) isFujinResponse_Response() {}
+
+func (*FujinResponse_BeginTx) isFujinResponse_Response() {}
+
+func (*FujinResponse_CommitTx) isFujinResponse_Response() {}
+
+func (*FujinResponse_RollbackTx) isFujinResponse_Response() {}
 
 var File_public_grpc_v1_fujin_proto protoreflect.FileDescriptor
 
@@ -2123,6 +2507,21 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"\aheaders\x18\x03 \x03(\v2\x10.fujin.v1.HeaderR\aheaders\x12\x18\n" +
 	"\amessage\x18\x04 \x01(\fR\amessage\"O\n" +
 	"\x10HProduceResponse\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"7\n" +
+	"\x0eBeginTxRequest\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\"N\n" +
+	"\x0fBeginTxResponse\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"8\n" +
+	"\x0fCommitTxRequest\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\"O\n" +
+	"\x10CommitTxResponse\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\":\n" +
+	"\x11RollbackTxRequest\x12%\n" +
+	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\"Q\n" +
+	"\x12RollbackTxResponse\x12%\n" +
 	"\x0ecorrelation_id\x18\x01 \x01(\rR\rcorrelationId\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"p\n" +
 	"\x10SubscribeRequest\x12%\n" +
@@ -2219,7 +2618,7 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"\x11NackMessageResult\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\fR\tmessageId\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xb5\x04\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xe6\x05\n" +
 	"\fFujinRequest\x124\n" +
 	"\aconnect\x18\x01 \x01(\v2\x18.fujin.v1.ConnectRequestH\x00R\aconnect\x124\n" +
 	"\aproduce\x18\x02 \x01(\v2\x18.fujin.v1.ProduceRequestH\x00R\aproduce\x12:\n" +
@@ -2233,8 +2632,12 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	"hsubscribe\x12.\n" +
 	"\x05fetch\x18\t \x01(\v2\x16.fujin.v1.FetchRequestH\x00R\x05fetch\x121\n" +
 	"\x06hfetch\x18\n" +
-	" \x01(\v2\x17.fujin.v1.HFetchRequestH\x00R\x06hfetchB\t\n" +
-	"\arequest\"\xa2\x05\n" +
+	" \x01(\v2\x17.fujin.v1.HFetchRequestH\x00R\x06hfetch\x125\n" +
+	"\bbegin_tx\x18\v \x01(\v2\x18.fujin.v1.BeginTxRequestH\x00R\abeginTx\x128\n" +
+	"\tcommit_tx\x18\f \x01(\v2\x19.fujin.v1.CommitTxRequestH\x00R\bcommitTx\x12>\n" +
+	"\vrollback_tx\x18\r \x01(\v2\x1b.fujin.v1.RollbackTxRequestH\x00R\n" +
+	"rollbackTxB\t\n" +
+	"\arequest\"\xd6\x06\n" +
 	"\rFujinResponse\x125\n" +
 	"\aconnect\x18\x01 \x01(\v2\x19.fujin.v1.ConnectResponseH\x00R\aconnect\x125\n" +
 	"\aproduce\x18\x02 \x01(\v2\x19.fujin.v1.ProduceResponseH\x00R\aproduce\x12;\n" +
@@ -2250,7 +2653,11 @@ const file_public_grpc_v1_fujin_proto_rawDesc = "" +
 	" \x01(\v2\x1c.fujin.v1.HSubscribeResponseH\x00R\n" +
 	"hsubscribe\x12/\n" +
 	"\x05fetch\x18\v \x01(\v2\x17.fujin.v1.FetchResponseH\x00R\x05fetch\x122\n" +
-	"\x06hfetch\x18\f \x01(\v2\x18.fujin.v1.HFetchResponseH\x00R\x06hfetchB\n" +
+	"\x06hfetch\x18\f \x01(\v2\x18.fujin.v1.HFetchResponseH\x00R\x06hfetch\x126\n" +
+	"\bbegin_tx\x18\r \x01(\v2\x19.fujin.v1.BeginTxResponseH\x00R\abeginTx\x129\n" +
+	"\tcommit_tx\x18\x0e \x01(\v2\x1a.fujin.v1.CommitTxResponseH\x00R\bcommitTx\x12?\n" +
+	"\vrollback_tx\x18\x0f \x01(\v2\x1c.fujin.v1.RollbackTxResponseH\x00R\n" +
+	"rollbackTxB\n" +
 	"\n" +
 	"\bresponse2M\n" +
 	"\fFujinService\x12=\n" +
@@ -2268,7 +2675,7 @@ func file_public_grpc_v1_fujin_proto_rawDescGZIP() []byte {
 	return file_public_grpc_v1_fujin_proto_rawDescData
 }
 
-var file_public_grpc_v1_fujin_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_public_grpc_v1_fujin_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_public_grpc_v1_fujin_proto_goTypes = []any{
 	(*Header)(nil),              // 0: fujin.v1.Header
 	(*ConnectRequest)(nil),      // 1: fujin.v1.ConnectRequest
@@ -2277,66 +2684,78 @@ var file_public_grpc_v1_fujin_proto_goTypes = []any{
 	(*ProduceResponse)(nil),     // 4: fujin.v1.ProduceResponse
 	(*HProduceRequest)(nil),     // 5: fujin.v1.HProduceRequest
 	(*HProduceResponse)(nil),    // 6: fujin.v1.HProduceResponse
-	(*SubscribeRequest)(nil),    // 7: fujin.v1.SubscribeRequest
-	(*SubscribeResponse)(nil),   // 8: fujin.v1.SubscribeResponse
-	(*HSubscribeRequest)(nil),   // 9: fujin.v1.HSubscribeRequest
-	(*HSubscribeResponse)(nil),  // 10: fujin.v1.HSubscribeResponse
-	(*UnsubscribeRequest)(nil),  // 11: fujin.v1.UnsubscribeRequest
-	(*UnsubscribeResponse)(nil), // 12: fujin.v1.UnsubscribeResponse
-	(*Message)(nil),             // 13: fujin.v1.Message
-	(*HMessage)(nil),            // 14: fujin.v1.HMessage
-	(*FetchRequest)(nil),        // 15: fujin.v1.FetchRequest
-	(*FetchResponse)(nil),       // 16: fujin.v1.FetchResponse
-	(*FetchMessage)(nil),        // 17: fujin.v1.FetchMessage
-	(*HFetchRequest)(nil),       // 18: fujin.v1.HFetchRequest
-	(*HFetchResponse)(nil),      // 19: fujin.v1.HFetchResponse
-	(*HFetchMessage)(nil),       // 20: fujin.v1.HFetchMessage
-	(*AckRequest)(nil),          // 21: fujin.v1.AckRequest
-	(*AckResponse)(nil),         // 22: fujin.v1.AckResponse
-	(*AckMessageResult)(nil),    // 23: fujin.v1.AckMessageResult
-	(*NackRequest)(nil),         // 24: fujin.v1.NackRequest
-	(*NackResponse)(nil),        // 25: fujin.v1.NackResponse
-	(*NackMessageResult)(nil),   // 26: fujin.v1.NackMessageResult
-	(*FujinRequest)(nil),        // 27: fujin.v1.FujinRequest
-	(*FujinResponse)(nil),       // 28: fujin.v1.FujinResponse
+	(*BeginTxRequest)(nil),      // 7: fujin.v1.BeginTxRequest
+	(*BeginTxResponse)(nil),     // 8: fujin.v1.BeginTxResponse
+	(*CommitTxRequest)(nil),     // 9: fujin.v1.CommitTxRequest
+	(*CommitTxResponse)(nil),    // 10: fujin.v1.CommitTxResponse
+	(*RollbackTxRequest)(nil),   // 11: fujin.v1.RollbackTxRequest
+	(*RollbackTxResponse)(nil),  // 12: fujin.v1.RollbackTxResponse
+	(*SubscribeRequest)(nil),    // 13: fujin.v1.SubscribeRequest
+	(*SubscribeResponse)(nil),   // 14: fujin.v1.SubscribeResponse
+	(*HSubscribeRequest)(nil),   // 15: fujin.v1.HSubscribeRequest
+	(*HSubscribeResponse)(nil),  // 16: fujin.v1.HSubscribeResponse
+	(*UnsubscribeRequest)(nil),  // 17: fujin.v1.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil), // 18: fujin.v1.UnsubscribeResponse
+	(*Message)(nil),             // 19: fujin.v1.Message
+	(*HMessage)(nil),            // 20: fujin.v1.HMessage
+	(*FetchRequest)(nil),        // 21: fujin.v1.FetchRequest
+	(*FetchResponse)(nil),       // 22: fujin.v1.FetchResponse
+	(*FetchMessage)(nil),        // 23: fujin.v1.FetchMessage
+	(*HFetchRequest)(nil),       // 24: fujin.v1.HFetchRequest
+	(*HFetchResponse)(nil),      // 25: fujin.v1.HFetchResponse
+	(*HFetchMessage)(nil),       // 26: fujin.v1.HFetchMessage
+	(*AckRequest)(nil),          // 27: fujin.v1.AckRequest
+	(*AckResponse)(nil),         // 28: fujin.v1.AckResponse
+	(*AckMessageResult)(nil),    // 29: fujin.v1.AckMessageResult
+	(*NackRequest)(nil),         // 30: fujin.v1.NackRequest
+	(*NackResponse)(nil),        // 31: fujin.v1.NackResponse
+	(*NackMessageResult)(nil),   // 32: fujin.v1.NackMessageResult
+	(*FujinRequest)(nil),        // 33: fujin.v1.FujinRequest
+	(*FujinResponse)(nil),       // 34: fujin.v1.FujinResponse
 }
 var file_public_grpc_v1_fujin_proto_depIdxs = []int32{
 	0,  // 0: fujin.v1.HProduceRequest.headers:type_name -> fujin.v1.Header
 	0,  // 1: fujin.v1.HMessage.headers:type_name -> fujin.v1.Header
-	17, // 2: fujin.v1.FetchResponse.messages:type_name -> fujin.v1.FetchMessage
-	20, // 3: fujin.v1.HFetchResponse.messages:type_name -> fujin.v1.HFetchMessage
+	23, // 2: fujin.v1.FetchResponse.messages:type_name -> fujin.v1.FetchMessage
+	26, // 3: fujin.v1.HFetchResponse.messages:type_name -> fujin.v1.HFetchMessage
 	0,  // 4: fujin.v1.HFetchMessage.headers:type_name -> fujin.v1.Header
-	23, // 5: fujin.v1.AckResponse.results:type_name -> fujin.v1.AckMessageResult
-	26, // 6: fujin.v1.NackResponse.results:type_name -> fujin.v1.NackMessageResult
+	29, // 5: fujin.v1.AckResponse.results:type_name -> fujin.v1.AckMessageResult
+	32, // 6: fujin.v1.NackResponse.results:type_name -> fujin.v1.NackMessageResult
 	1,  // 7: fujin.v1.FujinRequest.connect:type_name -> fujin.v1.ConnectRequest
 	3,  // 8: fujin.v1.FujinRequest.produce:type_name -> fujin.v1.ProduceRequest
-	7,  // 9: fujin.v1.FujinRequest.subscribe:type_name -> fujin.v1.SubscribeRequest
-	11, // 10: fujin.v1.FujinRequest.unsubscribe:type_name -> fujin.v1.UnsubscribeRequest
-	21, // 11: fujin.v1.FujinRequest.ack:type_name -> fujin.v1.AckRequest
-	24, // 12: fujin.v1.FujinRequest.nack:type_name -> fujin.v1.NackRequest
+	13, // 9: fujin.v1.FujinRequest.subscribe:type_name -> fujin.v1.SubscribeRequest
+	17, // 10: fujin.v1.FujinRequest.unsubscribe:type_name -> fujin.v1.UnsubscribeRequest
+	27, // 11: fujin.v1.FujinRequest.ack:type_name -> fujin.v1.AckRequest
+	30, // 12: fujin.v1.FujinRequest.nack:type_name -> fujin.v1.NackRequest
 	5,  // 13: fujin.v1.FujinRequest.hproduce:type_name -> fujin.v1.HProduceRequest
-	9,  // 14: fujin.v1.FujinRequest.hsubscribe:type_name -> fujin.v1.HSubscribeRequest
-	15, // 15: fujin.v1.FujinRequest.fetch:type_name -> fujin.v1.FetchRequest
-	18, // 16: fujin.v1.FujinRequest.hfetch:type_name -> fujin.v1.HFetchRequest
-	2,  // 17: fujin.v1.FujinResponse.connect:type_name -> fujin.v1.ConnectResponse
-	4,  // 18: fujin.v1.FujinResponse.produce:type_name -> fujin.v1.ProduceResponse
-	8,  // 19: fujin.v1.FujinResponse.subscribe:type_name -> fujin.v1.SubscribeResponse
-	12, // 20: fujin.v1.FujinResponse.unsubscribe:type_name -> fujin.v1.UnsubscribeResponse
-	13, // 21: fujin.v1.FujinResponse.message:type_name -> fujin.v1.Message
-	22, // 22: fujin.v1.FujinResponse.ack:type_name -> fujin.v1.AckResponse
-	25, // 23: fujin.v1.FujinResponse.nack:type_name -> fujin.v1.NackResponse
-	6,  // 24: fujin.v1.FujinResponse.hproduce:type_name -> fujin.v1.HProduceResponse
-	14, // 25: fujin.v1.FujinResponse.hmessage:type_name -> fujin.v1.HMessage
-	10, // 26: fujin.v1.FujinResponse.hsubscribe:type_name -> fujin.v1.HSubscribeResponse
-	16, // 27: fujin.v1.FujinResponse.fetch:type_name -> fujin.v1.FetchResponse
-	19, // 28: fujin.v1.FujinResponse.hfetch:type_name -> fujin.v1.HFetchResponse
-	27, // 29: fujin.v1.FujinService.Stream:input_type -> fujin.v1.FujinRequest
-	28, // 30: fujin.v1.FujinService.Stream:output_type -> fujin.v1.FujinResponse
-	30, // [30:31] is the sub-list for method output_type
-	29, // [29:30] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	15, // 14: fujin.v1.FujinRequest.hsubscribe:type_name -> fujin.v1.HSubscribeRequest
+	21, // 15: fujin.v1.FujinRequest.fetch:type_name -> fujin.v1.FetchRequest
+	24, // 16: fujin.v1.FujinRequest.hfetch:type_name -> fujin.v1.HFetchRequest
+	7,  // 17: fujin.v1.FujinRequest.begin_tx:type_name -> fujin.v1.BeginTxRequest
+	9,  // 18: fujin.v1.FujinRequest.commit_tx:type_name -> fujin.v1.CommitTxRequest
+	11, // 19: fujin.v1.FujinRequest.rollback_tx:type_name -> fujin.v1.RollbackTxRequest
+	2,  // 20: fujin.v1.FujinResponse.connect:type_name -> fujin.v1.ConnectResponse
+	4,  // 21: fujin.v1.FujinResponse.produce:type_name -> fujin.v1.ProduceResponse
+	14, // 22: fujin.v1.FujinResponse.subscribe:type_name -> fujin.v1.SubscribeResponse
+	18, // 23: fujin.v1.FujinResponse.unsubscribe:type_name -> fujin.v1.UnsubscribeResponse
+	19, // 24: fujin.v1.FujinResponse.message:type_name -> fujin.v1.Message
+	28, // 25: fujin.v1.FujinResponse.ack:type_name -> fujin.v1.AckResponse
+	31, // 26: fujin.v1.FujinResponse.nack:type_name -> fujin.v1.NackResponse
+	6,  // 27: fujin.v1.FujinResponse.hproduce:type_name -> fujin.v1.HProduceResponse
+	20, // 28: fujin.v1.FujinResponse.hmessage:type_name -> fujin.v1.HMessage
+	16, // 29: fujin.v1.FujinResponse.hsubscribe:type_name -> fujin.v1.HSubscribeResponse
+	22, // 30: fujin.v1.FujinResponse.fetch:type_name -> fujin.v1.FetchResponse
+	25, // 31: fujin.v1.FujinResponse.hfetch:type_name -> fujin.v1.HFetchResponse
+	8,  // 32: fujin.v1.FujinResponse.begin_tx:type_name -> fujin.v1.BeginTxResponse
+	10, // 33: fujin.v1.FujinResponse.commit_tx:type_name -> fujin.v1.CommitTxResponse
+	12, // 34: fujin.v1.FujinResponse.rollback_tx:type_name -> fujin.v1.RollbackTxResponse
+	33, // 35: fujin.v1.FujinService.Stream:input_type -> fujin.v1.FujinRequest
+	34, // 36: fujin.v1.FujinService.Stream:output_type -> fujin.v1.FujinResponse
+	36, // [36:37] is the sub-list for method output_type
+	35, // [35:36] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_public_grpc_v1_fujin_proto_init() }
@@ -2344,7 +2763,7 @@ func file_public_grpc_v1_fujin_proto_init() {
 	if File_public_grpc_v1_fujin_proto != nil {
 		return
 	}
-	file_public_grpc_v1_fujin_proto_msgTypes[27].OneofWrappers = []any{
+	file_public_grpc_v1_fujin_proto_msgTypes[33].OneofWrappers = []any{
 		(*FujinRequest_Connect)(nil),
 		(*FujinRequest_Produce)(nil),
 		(*FujinRequest_Subscribe)(nil),
@@ -2355,8 +2774,11 @@ func file_public_grpc_v1_fujin_proto_init() {
 		(*FujinRequest_Hsubscribe)(nil),
 		(*FujinRequest_Fetch)(nil),
 		(*FujinRequest_Hfetch)(nil),
+		(*FujinRequest_BeginTx)(nil),
+		(*FujinRequest_CommitTx)(nil),
+		(*FujinRequest_RollbackTx)(nil),
 	}
-	file_public_grpc_v1_fujin_proto_msgTypes[28].OneofWrappers = []any{
+	file_public_grpc_v1_fujin_proto_msgTypes[34].OneofWrappers = []any{
 		(*FujinResponse_Connect)(nil),
 		(*FujinResponse_Produce)(nil),
 		(*FujinResponse_Subscribe)(nil),
@@ -2369,6 +2791,9 @@ func file_public_grpc_v1_fujin_proto_init() {
 		(*FujinResponse_Hsubscribe)(nil),
 		(*FujinResponse_Fetch)(nil),
 		(*FujinResponse_Hfetch)(nil),
+		(*FujinResponse_BeginTx)(nil),
+		(*FujinResponse_CommitTx)(nil),
+		(*FujinResponse_RollbackTx)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2376,7 +2801,7 @@ func file_public_grpc_v1_fujin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_public_grpc_v1_fujin_proto_rawDesc), len(file_public_grpc_v1_fujin_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   29,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

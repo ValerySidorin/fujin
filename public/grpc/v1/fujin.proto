@@ -49,6 +49,39 @@ message HProduceResponse {
   string error = 2;
 }
 
+// BeginTxRequest - begin transaction
+message BeginTxRequest {
+  uint32 correlation_id = 1;
+}
+
+// BeginTxResponse
+message BeginTxResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// CommitTxRequest - commit transaction
+message CommitTxRequest {
+  uint32 correlation_id = 1;
+}
+
+// CommitTxResponse
+message CommitTxResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// RollbackTxRequest - rollback transaction
+message RollbackTxRequest {
+  uint32 correlation_id = 1;
+}
+
+// RollbackTxResponse
+message RollbackTxResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
 // Subscribe request
 message SubscribeRequest {
   uint32 correlation_id = 1;
@@ -208,6 +241,9 @@ message FujinRequest {
     HSubscribeRequest hsubscribe = 8;
     FetchRequest fetch = 9;
     HFetchRequest hfetch = 10;
+    BeginTxRequest begin_tx = 11;
+    CommitTxRequest commit_tx = 12;
+    RollbackTxRequest rollback_tx = 13;
   }
 }
 
@@ -226,5 +262,8 @@ message FujinResponse {
     HSubscribeResponse hsubscribe = 10;
     FetchResponse fetch = 11;
     HFetchResponse hfetch = 12;
+    BeginTxResponse begin_tx = 13;
+    CommitTxResponse commit_tx = 14;
+    RollbackTxResponse rollback_tx = 15;
   }
 }

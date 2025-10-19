@@ -184,6 +184,11 @@ type streamSession struct {
 	nextSubID    byte
 	streamID     string
 	connected    bool
+
+	// Transaction state
+	inTx                 bool
+	currentTxWriter      writer.Writer
+	currentTxWriterTopic string // Original topic used to get the writer (for PutWriter)
 }
 
 type readerState struct {
@@ -221,6 +226,12 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 		return s.handleProduce(r.Produce)
 	case *pb.FujinRequest_Hproduce:
 		return s.handleHProduce(r.Hproduce)
+	case *pb.FujinRequest_BeginTx:
+		return s.handleBeginTx(r.BeginTx)
+	case *pb.FujinRequest_CommitTx:
+		return s.handleCommitTx(r.CommitTx)
+	case *pb.FujinRequest_RollbackTx:
+		return s.handleRollbackTx(r.RollbackTx)
 	case *pb.FujinRequest_Subscribe:
 		return s.handleSubscribe(r.Subscribe)
 	case *pb.FujinRequest_Hsubscribe:
@@ -279,16 +290,73 @@ func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
 		})
 	}
 
-	w, err := s.getWriter(req.Topic)
-	if err != nil {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Produce{
-				Produce: &pb.ProduceResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         err.Error(),
+	// Use transaction writer if in transaction
+	s.mu.Lock()
+	inTx := s.inTx
+	if inTx {
+		// Get or create transactional writer
+		if s.currentTxWriter == nil {
+			w, err := s.cman.GetWriter(req.Topic, s.streamID)
+			if err != nil {
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Produce{
+						Produce: &pb.ProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         err.Error(),
+						},
+					},
+				})
+			}
+			if err := w.BeginTx(s.ctx); err != nil {
+				s.cman.PutWriter(w, req.Topic, s.streamID)
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Produce{
+						Produce: &pb.ProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         err.Error(),
+						},
+					},
+				})
+			}
+			s.currentTxWriter = w
+			s.currentTxWriterTopic = req.Topic
+		} else {
+			// Check if the new topic has the same endpoint as current transactional writer
+			if !s.cman.WriterMatchEndpoint(s.currentTxWriter, req.Topic) {
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Produce{
+						Produce: &pb.ProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         "transaction cannot span different broker endpoints",
+						},
+					},
+				})
+			}
+		}
+	}
+	s.mu.Unlock()
+
+	var w writer.Writer
+	var err error
+	if inTx {
+		s.mu.RLock()
+		w = s.currentTxWriter
+		s.mu.RUnlock()
+	} else {
+		w, err = s.getWriter(req.Topic)
+		if err != nil {
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Produce{
+					Produce: &pb.ProduceResponse{
+						CorrelationId: req.CorrelationId,
+						Error:         err.Error(),
+					},
 				},
-			},
-		})
+			})
+		}
 	}
 
 	correlationID := req.CorrelationId
@@ -330,16 +398,73 @@ func (s *streamSession) handleHProduce(req *pb.HProduceRequest) error {
 		})
 	}
 
-	w, err := s.getWriter(req.Topic)
-	if err != nil {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hproduce{
-				Hproduce: &pb.HProduceResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         err.Error(),
+	// Use transaction writer if in transaction
+	s.mu.Lock()
+	inTx := s.inTx
+	if inTx {
+		// Get or create transactional writer
+		if s.currentTxWriter == nil {
+			w, err := s.cman.GetWriter(req.Topic, s.streamID)
+			if err != nil {
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Hproduce{
+						Hproduce: &pb.HProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         err.Error(),
+						},
+					},
+				})
+			}
+			if err := w.BeginTx(s.ctx); err != nil {
+				s.cman.PutWriter(w, req.Topic, s.streamID)
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Hproduce{
+						Hproduce: &pb.HProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         err.Error(),
+						},
+					},
+				})
+			}
+			s.currentTxWriter = w
+			s.currentTxWriterTopic = req.Topic
+		} else {
+			// Check if the new topic has the same endpoint as current transactional writer
+			if !s.cman.WriterMatchEndpoint(s.currentTxWriter, req.Topic) {
+				s.mu.Unlock()
+				return s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Hproduce{
+						Hproduce: &pb.HProduceResponse{
+							CorrelationId: req.CorrelationId,
+							Error:         "transaction cannot span different broker endpoints",
+						},
+					},
+				})
+			}
+		}
+	}
+	s.mu.Unlock()
+
+	var w writer.Writer
+	var err error
+	if inTx {
+		s.mu.RLock()
+		w = s.currentTxWriter
+		s.mu.RUnlock()
+	} else {
+		w, err = s.getWriter(req.Topic)
+		if err != nil {
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hproduce{
+					Hproduce: &pb.HProduceResponse{
+						CorrelationId: req.CorrelationId,
+						Error:         err.Error(),
+					},
 				},
-			},
-		})
+			})
+		}
 	}
 
 	// Convert proto headers to [][]byte format (alternating key, value, key, value, ...)
@@ -372,6 +497,150 @@ func (s *streamSession) handleHProduce(req *pb.HProduceRequest) error {
 		})
 
 	return nil
+}
+
+// handleBeginTx processes BEGIN TX request
+func (s *streamSession) handleBeginTx(req *pb.BeginTxRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_BeginTx{
+				BeginTx: &pb.BeginTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.inTx {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_BeginTx{
+				BeginTx: &pb.BeginTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "transaction already in progress",
+				},
+			},
+		})
+	}
+
+	// Flush all non-transactional writers
+	for topic, w := range s.writers {
+		w.Flush(s.ctx)
+		s.cman.PutWriter(w, topic, s.streamID)
+	}
+	s.writers = make(map[string]writer.Writer)
+
+	s.inTx = true
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_BeginTx{
+			BeginTx: &pb.BeginTxResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         "",
+			},
+		},
+	})
+}
+
+// handleCommitTx processes COMMIT TX request
+func (s *streamSession) handleCommitTx(req *pb.CommitTxRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_CommitTx{
+				CommitTx: &pb.CommitTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.inTx {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_CommitTx{
+				CommitTx: &pb.CommitTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "no transaction in progress",
+				},
+			},
+		})
+	}
+
+	var errMsg string
+	if s.currentTxWriter != nil {
+		if err := s.currentTxWriter.CommitTx(s.ctx); err != nil {
+			errMsg = err.Error()
+		}
+		s.cman.PutWriter(s.currentTxWriter, s.currentTxWriterTopic, s.streamID)
+		s.currentTxWriter = nil
+		s.currentTxWriterTopic = ""
+	}
+
+	s.inTx = false
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_CommitTx{
+			CommitTx: &pb.CommitTxResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errMsg,
+			},
+		},
+	})
+}
+
+// handleRollbackTx processes ROLLBACK TX request
+func (s *streamSession) handleRollbackTx(req *pb.RollbackTxRequest) error {
+	if !s.connected {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_RollbackTx{
+				RollbackTx: &pb.RollbackTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "not connected",
+				},
+			},
+		})
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.inTx {
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_RollbackTx{
+				RollbackTx: &pb.RollbackTxResponse{
+					CorrelationId: req.CorrelationId,
+					Error:         "no transaction in progress",
+				},
+			},
+		})
+	}
+
+	var errMsg string
+	if s.currentTxWriter != nil {
+		if err := s.currentTxWriter.RollbackTx(s.ctx); err != nil {
+			errMsg = err.Error()
+		}
+		s.cman.PutWriter(s.currentTxWriter, s.currentTxWriterTopic, s.streamID)
+		s.currentTxWriter = nil
+		s.currentTxWriterTopic = ""
+	}
+
+	s.inTx = false
+
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_RollbackTx{
+			RollbackTx: &pb.RollbackTxResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errMsg,
+			},
+		},
+	})
 }
 
 // handleSubscribe processes SUBSCRIBE request

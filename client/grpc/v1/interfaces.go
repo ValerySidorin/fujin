@@ -10,6 +10,9 @@ type Conn interface {
 type Stream interface {
 	Produce(topic string, p []byte) error
 	HProduce(topic string, p []byte, headers map[string]string) error
+	BeginTx() error
+	CommitTx() error
+	RollbackTx() error
 	Subscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error)
 	HSubscribe(topic string, autoCommit bool, handler func(msg models.Msg)) (uint32, error)
 	Fetch(topic string, autoCommit bool, batchSize uint32) (models.FetchResult, error)
