@@ -17,8 +17,8 @@ type protoReader struct {
 	r *bufio.Reader
 }
 
-func newProtoReader(conn net.Conn) *protoReader {
-	return &protoReader{r: bufio.NewReaderSize(conn, 64*1024)}
+func newProtoReader(reader io.Reader) *protoReader {
+	return &protoReader{r: bufio.NewReaderSize(reader, 64*1024)}
 }
 
 // readExact reads exactly n bytes from the reader.
@@ -165,7 +165,7 @@ func (p *protoReader) readSubscribeResp() (cID uint32, subID byte, err error) {
 
 // fetchedMsg represents a single message from a FETCH response.
 type fetchedMsg struct {
-	MsgID   []byte // non-nil only if autoCommit=false
+	MsgID   []byte   // non-nil only if autoCommit=false
 	Headers [][]byte // non-nil only for HFETCH
 	Payload []byte
 }
@@ -518,30 +518,30 @@ func (p *protoReader) readTxResp(expectedCode v1.RespCode) (cID uint32, err erro
 
 // --- Command builders ---
 
-func buildProduceCmd(cID uint32, topic, payload string) []byte {
+func buildProduceCmd(cID uint32, route, payload string) []byte {
 	cmd := []byte{byte(v1.OP_CODE_PRODUCE)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	cmd = binary.BigEndian.AppendUint32(cmd, uint32(len(payload)))
 	cmd = append(cmd, payload...)
 	return cmd
 }
 
-func buildHProduceCmd(cID uint32, topic string, headers [][2]string, payload string) []byte {
+func buildHProduceCmd(cID uint32, route string, headers [][2]string, payload string) []byte {
 	cmd := []byte{byte(v1.OP_CODE_HPRODUCE)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	cmd = binary.BigEndian.AppendUint16(cmd, uint16(len(headers)*2))
-	for _, h := range headers {
-		cmd = appendFujinString(cmd, h[0])
-		cmd = appendFujinString(cmd, h[1])
+	for _, header := range headers {
+		cmd = appendFujinString(cmd, header[0])
+		cmd = appendFujinString(cmd, header[1])
 	}
 	cmd = binary.BigEndian.AppendUint32(cmd, uint32(len(payload)))
 	cmd = append(cmd, payload...)
 	return cmd
 }
 
-func buildSubscribeCmd2(cID uint32, autoCommit bool, topic string) []byte {
+func buildSubscribeCmd2(cID uint32, autoCommit bool, route string) []byte {
 	cmd := []byte{byte(v1.OP_CODE_SUBSCRIBE)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
 	if autoCommit {
@@ -549,11 +549,11 @@ func buildSubscribeCmd2(cID uint32, autoCommit bool, topic string) []byte {
 	} else {
 		cmd = append(cmd, 0)
 	}
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	return cmd
 }
 
-func buildHSubscribeCmd(cID uint32, autoCommit bool, topic string) []byte {
+func buildHSubscribeCmd(cID uint32, autoCommit bool, route string) []byte {
 	cmd := []byte{byte(v1.OP_CODE_HSUBSCRIBE)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
 	if autoCommit {
@@ -561,11 +561,11 @@ func buildHSubscribeCmd(cID uint32, autoCommit bool, topic string) []byte {
 	} else {
 		cmd = append(cmd, 0)
 	}
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	return cmd
 }
 
-func buildFetchCmd2(cID uint32, autoCommit bool, topic string, n uint32) []byte {
+func buildFetchCmd2(cID uint32, autoCommit bool, route string, n uint32) []byte {
 	cmd := []byte{byte(v1.OP_CODE_FETCH)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
 	if autoCommit {
@@ -573,12 +573,12 @@ func buildFetchCmd2(cID uint32, autoCommit bool, topic string, n uint32) []byte 
 	} else {
 		cmd = append(cmd, 0)
 	}
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	cmd = binary.BigEndian.AppendUint32(cmd, n)
 	return cmd
 }
 
-func buildHFetchCmd(cID uint32, autoCommit bool, topic string, n uint32) []byte {
+func buildHFetchCmd(cID uint32, autoCommit bool, route string, n uint32) []byte {
 	cmd := []byte{byte(v1.OP_CODE_HFETCH)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
 	if autoCommit {
@@ -586,7 +586,7 @@ func buildHFetchCmd(cID uint32, autoCommit bool, topic string, n uint32) []byte 
 	} else {
 		cmd = append(cmd, 0)
 	}
-	cmd = appendFujinString(cmd, topic)
+	cmd = appendFujinString(cmd, route)
 	cmd = binary.BigEndian.AppendUint32(cmd, n)
 	return cmd
 }
@@ -615,9 +615,30 @@ func buildNackCmd(cID uint32, subID byte, msgIDs [][]byte) []byte {
 	return cmd
 }
 
-func buildTxBeginCmd(cID uint32) []byte {
+func buildTxBeginCmd(cID uint32, route string) []byte {
 	cmd := []byte{byte(v1.OP_CODE_TX_BEGIN)}
 	cmd = binary.BigEndian.AppendUint32(cmd, cID)
+	return appendFujinString(cmd, route)
+}
+
+func buildTxProduceCmd(cID uint32, payload string) []byte {
+	cmd := []byte{byte(v1.OP_CODE_TX_PRODUCE)}
+	cmd = binary.BigEndian.AppendUint32(cmd, cID)
+	cmd = binary.BigEndian.AppendUint32(cmd, uint32(len(payload)))
+	cmd = append(cmd, payload...)
+	return cmd
+}
+
+func buildTxHProduceCmd(cID uint32, headers [][2]string, payload string) []byte {
+	cmd := []byte{byte(v1.OP_CODE_TX_HPRODUCE)}
+	cmd = binary.BigEndian.AppendUint32(cmd, cID)
+	cmd = binary.BigEndian.AppendUint16(cmd, uint16(len(headers)*2))
+	for _, header := range headers {
+		cmd = appendFujinString(cmd, header[0])
+		cmd = appendFujinString(cmd, header[1])
+	}
+	cmd = binary.BigEndian.AppendUint32(cmd, uint32(len(payload)))
+	cmd = append(cmd, payload...)
 	return cmd
 }
 

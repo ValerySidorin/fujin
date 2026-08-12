@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-packed-1B-b256.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-packed-1B-b256.bench │
+                                                                            │                                                      sec/op                                                      │                                         sec/op                                           vs base                │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                                        22.99µ ± 2%                                                                               33.32µ ± 2%  +44.90% (p=0.000 n=10)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-packed-1B-b256.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-packed-1B-b256.bench │
+                                                                            │                                                       B/s                                                        │                                           B/s                                            vs base                │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                                      10.619Mi ± 2%                                                                              7.324Mi ± 2%  -31.03% (p=0.000 n=10)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-packed-1B-b256.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-packed-1B-b256.bench │
+                                                                            │                                                     p99-sec                                                      │                                         p99-sec                                          vs base                │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                                        1.026m ± 3%                                                                               1.705m ± 3%  +66.25% (p=0.000 n=10)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-packed-1B-b256.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-packed-1B-b256.bench │
+                                                                            │                                                       B/op                                                       │                                          B/op                                           vs base                 │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                                       49.21Ki ± 0%                                                                            113.45Ki ± 0%  +130.53% (p=0.000 n=10)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-packed-1B-b256.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-packed-1B-b256.bench │
+                                                                            │                                                    allocs/op                                                     │                                        allocs/op                                         vs base                │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                                        2.066k ± 0%                                                                               2.322k ± 0%  +12.39% (p=0.000 n=10)

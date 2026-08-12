@@ -43,15 +43,15 @@ func newNSQConnector(config any, l *slog.Logger) (connector.Connector, error) {
 }
 
 // NewReader creates a reader from configuration
-func (n *nsqConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := n.config.Clients[name]
+func (n *nsqConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := n.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("nsq: client not found by name: %s", name)
+		return nil, fmt.Errorf("nsq: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         n.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: n.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateReader(); err != nil {
@@ -62,15 +62,15 @@ func (n *nsqConnector) NewReader(config any, name string, autoCommit bool, l *sl
 }
 
 // NewWriter creates a writer from configuration
-func (n *nsqConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := n.config.Clients[name]
+func (n *nsqConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := n.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("nsq: client not found by name: %s", name)
+		return nil, fmt.Errorf("nsq: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         n.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: n.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateWriter(); err != nil {

@@ -4,21 +4,15 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"log/slog"
-	"maps"
 	"sync"
 	"time"
 	"unsafe"
 
-	pool2 "github.com/fujin-io/fujin/internal/common/pool"
-	"github.com/fujin-io/fujin/internal/connectors"
+	"github.com/fujin-io/fujin/internal/core"
 	"github.com/fujin-io/fujin/internal/proto/pool"
-	"github.com/fujin-io/fujin/internal/proto/response/server"
 	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/connector/config"
-	bmw "github.com/fujin-io/fujin/public/plugins/middleware/bind"
-	bmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/bind/config"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/session"
 )
@@ -55,11 +49,16 @@ const (
 	OP_PRODUCE_H_MSG_ARG
 	OP_PRODUCE_H_MSG_PAYLOAD
 
+	OP_TX_PRODUCE
+	OP_TX_PRODUCE_CORRELATION_ID_ARG
+	OP_TX_PRODUCE_H
+	OP_TX_PRODUCE_H_CORRELATION_ID_ARG
+
 	OP_SUBSCRIBE
 	OP_SUBSCRIBE_CORRELATION_ID_ARG
 	OP_SUBSCRIBE_AUTO_COMMIT_ARG
-	OP_SUBSCRIBE_TOPIC_ARG
-	OP_SUBSCRIBE_TOPIC_PAYLOAD
+	OP_SUBSCRIBE_ROUTE_ARG
+	OP_SUBSCRIBE_ROUTE_PAYLOAD
 
 	OP_UNSUBSCRIBE
 	OP_UNSUBSCRIBE_CORRELATION_ID_ARG
@@ -68,8 +67,8 @@ const (
 	OP_FETCH
 	OP_FETCH_CORRELATION_ID_ARG
 	OP_FETCH_AUTO_COMMIT_ARG
-	OP_FETCH_TOPIC_ARG
-	OP_FETCH_TOPIC_PAYLOAD
+	OP_FETCH_ROUTE_ARG
+	OP_FETCH_ROUTE_PAYLOAD
 	OP_FETCH_N_ARG
 
 	OP_ACK
@@ -92,64 +91,26 @@ const (
 
 	OP_BEGIN_TX
 	OP_BEGIN_TX_CORRELATION_ID_ARG
-
-	OP_BEGIN_TX_FAIL
-	OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG
-
+	OP_BEGIN_TX_ROUTE_ARG
+	OP_BEGIN_TX_ROUTE_PAYLOAD
 	OP_COMMIT_TX
 	OP_COMMIT_TX_CORRELATION_ID_ARG
 
-	OP_COMMIT_TX_FAIL
-	OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG
-
 	OP_ROLLBACK_TX
 	OP_ROLLBACK_TX_CORRELATION_ID_ARG
-
-	OP_ROLLBACK_TX_FAIL
-	OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG
-
-	OP_PRODUCE_TX
-	OP_PRODUCE_TX_CORRELATION_ID_ARG
-	OP_PRODUCE_TX_ARG
-	OP_PRODUCE_TX_MSG_ARG
-	OP_PRODUCE_TX_MSG_PAYLOAD
-
-	OP_PRODUCE_H_TX
-	OP_PRODUCE_H_TX_CORRELATION_ID_ARG
-	OP_PRODUCE_H_TX_ARG
-	OP_PRODUCE_H_TX_HEADERS_COUNT_ARG
-	OP_PRODUCE_H_TX_HEADER_STR_LEN_ARG
-	OP_PRODUCE_H_TX_HEADER_STR_PAYLOAD
-	OP_PRODUCE_H_TX_MSG_ARG
-	OP_PRODUCE_H_TX_MSG_PAYLOAD
 )
 
 var (
-	ErrClose                        = errors.New("close")
-	ErrParseProto                   = errors.New("parse proto")
-	ErrFetchArgNotProvided = errors.New("fetch arg not provided")
-	ErrInvalidReaderType            = errors.New("invalid reader type")
-	ErrReaderNameSizeArgNotProvided = errors.New("reader name size arg not provided")
-
-	ErrWriteTopicArgEmpty    = errors.New("write topic arg is empty")
-	ErrWriteMsgSizeArgEmpty  = errors.New("write size arg not provided")
-	ErrWriteTopicLenArgEmpty = errors.New("writer topic len arg not provided")
+	ErrClose                   = errors.New("close")
+	ErrParseProto              = errors.New("parse proto")
+	ErrFetchArgNotProvided     = errors.New("fetch arg not provided")
+	ErrInvalidReaderType       = errors.New("invalid reader type")
+	ErrRouteSizeArgNotProvided = errors.New("route size arg not provided")
+	ErrWriteRouteArgEmpty      = errors.New("write route arg is empty")
+	ErrWriteMsgSizeArgEmpty    = errors.New("write size arg not provided")
+	ErrWriteRouteLenArgEmpty   = errors.New("writer route len arg not provided")
 
 	ErrConnectReaderIsAutoCommitArgInvalid = errors.New("connect reader is auto commit arg invalid")
-
-	ErrInvalidTxState = errors.New("invalid tx state")
-)
-
-var (
-// removed templates; build response buffers per call to avoid races
-)
-
-type sessionState byte
-
-const (
-	STREAM_STATE_BIND sessionState = iota
-	STREAM_STATE_CONNECTED
-	STREAM_STATE_CONNECTED_IN_TX
 )
 
 type parseState struct {
@@ -163,12 +124,13 @@ type parseState struct {
 	ba  bindArgs
 	pa  produceArgs
 	pma produceMsgArgs
+	ta  txArgs
 
 	sa subscribeArgs
 	aa ackArgs
 	fa fetchArgs
 
-	// headered produce args
+	// Headered produce args.
 	ha headerArgs
 }
 
@@ -177,17 +139,24 @@ type correlationIDArg struct {
 }
 
 type produceArgs struct {
-	topicLen uint32
-	topic    string
+	routeLen      uint32
+	route         string
+	transactional bool
+	headered      bool
 }
 
 type produceMsgArgs struct {
 	size uint32
 }
 
+type txArgs struct {
+	routeLen uint32
+	route    string
+}
+
 type subscribeArgs struct {
-	topicLen   uint32
-	topic      string
+	routeLen   uint32
+	route      string
 	autoCommit bool
 	headered   bool
 }
@@ -209,8 +178,8 @@ type bindArgs struct {
 
 type fetchArgs struct {
 	autoCommit bool
-	topicLen   uint32
-	topic      string
+	routeLen   uint32
+	route      string
 	headered   bool
 }
 
@@ -229,45 +198,26 @@ type headerArgs struct {
 }
 
 type Handler struct {
-	ctx             context.Context
-	out             *Outbound
-	str             session.Stream
-	baseConfig         config.ConnectorsConfig
-	baseConfigProvider func() config.ConnectorsConfig
-	connectorConfig config.ConnectorConfig
-	cman            *connectors.ManagerV2 // Created during BIND
+	ctx  context.Context
+	out  *Outbound
+	str  session.Stream
+	core *core.Core
 
-	ps           *parseState
-	sessionState sessionState
+	ps                *parseState
+	fetchBufsMu       sync.Mutex
+	fetchBufs         *bufsLease
+	fetches           sync.WaitGroup
+	produceResponseMu sync.Mutex
+	produceResponse   *produceResponse
 
 	// ping
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	pingStream   bool
 
-	// producer
-	nonTxSessionWriters  map[string]connector.WriteCloser
-	currentTxWriter      connector.WriteCloser
-	currentTxWriterTopic string
-	connected            bool // Whether BIND has been called
-
-	// subscriber
-	subIDPool   *pool2.BytePool
-	subscribers map[byte]connector.ReadCloser
-	unsubFuncs  map[byte]func()
-	sMu         sync.Mutex
-
-	fetchReaders                map[string]map[bool]byte // topic -> subscription_id mapping for fetch implicit subscriptions
-	fetchMsgHandlers            map[string]map[bool]func(message []byte, topic string, args ...any)
-	fetchMsgWithHeadersHandlers map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any)
-	fhMu                        sync.RWMutex
-
-	acker connector.ReadCloser
-
 	disconnect     func()
 	disconnectOnce sync.Once
 
-	wg       sync.WaitGroup
 	stopRead bool
 	closed   chan struct{}
 
@@ -282,24 +232,17 @@ func NewHandler(
 	out *Outbound, str session.Stream, l *slog.Logger,
 ) *Handler {
 	h := &Handler{
-		ctx:                         ctx,
-		baseConfig:                  baseConfig,
-		baseConfigProvider:          baseConfigProvider,
-		pingInterval:                pingInterval,
-		pingTimeout:                 pingTimeout,
-		subIDPool:                   pool2.NewBytePool(),
-		subscribers:                 make(map[byte]connector.ReadCloser),
-		unsubFuncs:                  make(map[byte]func()),
-		fetchReaders:                make(map[string]map[bool]byte),
-		fetchMsgHandlers:            make(map[string]map[bool]func(message []byte, topic string, args ...any)),
-		fetchMsgWithHeadersHandlers: make(map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any)),
-		l:                           l,
-		out:                         out,
-		str:                         str,
-		ps:                          &parseState{},
-		disconnect:                  func() {},
-		sessionState:                STREAM_STATE_BIND,
-		closed:                      make(chan struct{}),
+		ctx:          ctx,
+		core:         core.New(ctx, baseConfig, baseConfigProvider, l),
+		pingInterval: pingInterval,
+		pingTimeout:  pingTimeout,
+		pingStream:   pingStream,
+		l:            l,
+		out:          out,
+		str:          str,
+		ps:           &parseState{},
+		disconnect:   func() {},
+		closed:       make(chan struct{}),
 	}
 
 	if pingStream {
@@ -320,8 +263,8 @@ func (h *Handler) handle(buf []byte) error {
 		b = buf[i]
 		switch h.ps.state {
 		case OP_START:
-			switch h.sessionState {
-			case STREAM_STATE_BIND:
+			switch h.core.State() {
+			case core.StateUnbound:
 				switch b {
 				case byte(v1.OP_CODE_BIND):
 					h.ps.state = OP_BIND_CONNECTOR_NAME_LEN
@@ -335,25 +278,19 @@ func (h *Handler) handle(buf []byte) error {
 				default:
 					return ErrParseProto
 				}
-			case STREAM_STATE_CONNECTED:
-				if !h.connected {
-					// Not initialized, reject command
-					return ErrParseProto
-				}
+			case core.StateConnected:
 				switch b {
-				// writer cmds
 				case byte(v1.OP_CODE_PRODUCE):
 					h.ps.state = OP_PRODUCE
 				case byte(v1.OP_CODE_HPRODUCE):
+					h.ps.pa.headered = true
 					h.ps.state = OP_PRODUCE_H
 				case byte(v1.OP_CODE_TX_BEGIN):
 					h.ps.state = OP_BEGIN_TX
-					h.sessionState = STREAM_STATE_CONNECTED_IN_TX
 				case byte(v1.OP_CODE_TX_COMMIT):
-					h.ps.state = OP_COMMIT_TX_FAIL
+					h.ps.state = OP_COMMIT_TX
 				case byte(v1.OP_CODE_TX_ROLLBACK):
-					h.ps.state = OP_ROLLBACK_TX_FAIL
-				// reader cmds
+					h.ps.state = OP_ROLLBACK_TX
 				case byte(v1.OP_CODE_FETCH):
 					h.ps.state = OP_FETCH
 				case byte(v1.OP_CODE_HFETCH):
@@ -370,7 +307,6 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.state = OP_SUBSCRIBE
 				case byte(v1.OP_CODE_UNSUBSCRIBE):
 					h.ps.state = OP_UNSUBSCRIBE
-				// common cmds
 				case byte(v1.OP_CODE_DISCONNECT):
 					return ErrClose
 				case byte(v1.RESP_CODE_PONG):
@@ -380,24 +316,29 @@ func (h *Handler) handle(buf []byte) error {
 				default:
 					return ErrParseProto
 				}
-			case STREAM_STATE_CONNECTED_IN_TX:
-				if !h.connected {
-					// Not initialized, reject command
-					return ErrParseProto
-				}
+			case core.StateInTransaction:
 				switch b {
-				case byte(v1.OP_CODE_PRODUCE):
-					h.ps.state = OP_PRODUCE_TX
+				case byte(v1.OP_CODE_TX_PRODUCE):
+					h.ps.pa.transactional = true
+					h.ps.state = OP_TX_PRODUCE
+				case byte(v1.OP_CODE_TX_HPRODUCE):
+					h.ps.pa.transactional = true
+					h.ps.pa.headered = true
+					h.ps.state = OP_TX_PRODUCE_H
 				case byte(v1.OP_CODE_TX_BEGIN):
-					h.ps.state = OP_BEGIN_TX_FAIL
-					h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+					h.ps.state = OP_BEGIN_TX
 				case byte(v1.OP_CODE_TX_COMMIT):
 					h.ps.state = OP_COMMIT_TX
 				case byte(v1.OP_CODE_TX_ROLLBACK):
 					h.ps.state = OP_ROLLBACK_TX
-					// reader cmds
 				case byte(v1.OP_CODE_FETCH):
 					h.ps.state = OP_FETCH
+				case byte(v1.OP_CODE_HFETCH):
+					h.ps.fa.headered = true
+					h.ps.state = OP_FETCH
+				case byte(v1.OP_CODE_HSUBSCRIBE):
+					h.ps.sa.headered = true
+					h.ps.state = OP_SUBSCRIBE
 				case byte(v1.OP_CODE_ACK):
 					h.ps.state = OP_ACK
 				case byte(v1.OP_CODE_NACK):
@@ -406,7 +347,6 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.state = OP_SUBSCRIBE
 				case byte(v1.OP_CODE_UNSUBSCRIBE):
 					h.ps.state = OP_UNSUBSCRIBE
-				// common cmds
 				case byte(v1.OP_CODE_DISCONNECT):
 					return ErrClose
 				case byte(v1.RESP_CODE_PONG):
@@ -415,6 +355,39 @@ func (h *Handler) handle(buf []byte) error {
 					}
 				default:
 					return ErrParseProto
+				}
+			case core.StateClosed:
+				return ErrParseProto
+			}
+		case OP_TX_PRODUCE, OP_TX_PRODUCE_H:
+			h.ps.ca.cID = pool.Get(v1.Uint32Len)
+			h.ps.ca.cID = append(h.ps.ca.cID, b)
+			if h.ps.state == OP_TX_PRODUCE_H {
+				h.ps.state = OP_TX_PRODUCE_H_CORRELATION_ID_ARG
+			} else {
+				h.ps.state = OP_TX_PRODUCE_CORRELATION_ID_ARG
+			}
+		case OP_TX_PRODUCE_CORRELATION_ID_ARG, OP_TX_PRODUCE_H_CORRELATION_ID_ARG:
+			toCopy := v1.Uint32Len - len(h.ps.ca.cID)
+			avail := len(buf) - i
+			if avail < toCopy {
+				toCopy = avail
+			}
+			if toCopy > 0 {
+				start := len(h.ps.ca.cID)
+				h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
+				copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
+				i = (i + toCopy) - 1
+			} else {
+				h.ps.ca.cID = append(h.ps.ca.cID, b)
+			}
+			if len(h.ps.ca.cID) >= v1.Uint32Len {
+				h.ps.argBuf = nil
+				if h.ps.pa.headered {
+					h.ps.ha = headerArgs{}
+					h.ps.state = OP_PRODUCE_H_HEADERS_COUNT_ARG
+				} else {
+					h.ps.state = OP_PRODUCE_MSG_ARG
 				}
 			}
 		case OP_PRODUCE:
@@ -443,12 +416,12 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.state = OP_PRODUCE_ARG
 			}
 		case OP_PRODUCE_ARG:
-			if h.ps.pa.topicLen != 0 {
+			if h.ps.pa.routeLen != 0 {
 				if h.ps.argBuf == nil {
-					h.ps.argBuf = pool.Get(int(h.ps.pa.topicLen))
+					h.ps.argBuf = pool.Get(int(h.ps.pa.routeLen))
 				}
 
-				toCopy := int(h.ps.pa.topicLen) - len(h.ps.argBuf)
+				toCopy := int(h.ps.pa.routeLen) - len(h.ps.argBuf)
 				avail := len(buf) - i
 
 				if avail < toCopy {
@@ -464,9 +437,9 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.argBuf = append(h.ps.argBuf, b)
 				}
 
-				if len(h.ps.argBuf) >= int(h.ps.pa.topicLen) {
-					if err := h.parseWriteTopicArg(); err != nil {
-						h.l.Error("parse write topic arg", "err", err)
+				if len(h.ps.argBuf) >= int(h.ps.pa.routeLen) {
+					if err := h.parseWriteRouteArg(); err != nil {
+						h.l.Error("parse write route arg", "err", err)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
 						pool.Put(h.ps.argBuf)
@@ -495,9 +468,9 @@ func (h *Handler) handle(buf []byte) error {
 			}
 
 			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if h.ps.pa.topicLen == 0 {
-					if err := h.parseWriteTopicLenArg(); err != nil {
-						h.l.Error("parse write topic len arg", "err", err)
+				if h.ps.pa.routeLen == 0 {
+					if err := h.parseWriteRouteLenArg(); err != nil {
+						h.l.Error("parse write route len arg", "err", err)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
 						pool.Put(h.ps.argBuf)
@@ -547,21 +520,7 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				}
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if _, ok := h.nonTxSessionWriters[h.ps.pa.topic]; !ok {
-						w, err := h.cman.GetWriter(h.ps.pa.topic)
-						if err != nil {
-							h.l.Error("get writer", "err", err)
-							h.enqueueWriteErrResponse(err)
-							pool.Put(h.ps.ca.cID)
-							pool.Put(h.ps.payloadBuf)
-							h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-							continue
-						}
-
-						h.nonTxSessionWriters[h.ps.pa.topic] = w
-					}
-
-					h.produce(h.nonTxSessionWriters[h.ps.pa.topic], h.ps.payloadBuf)
+					h.produce(h.ps.payloadBuf, nil)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
@@ -569,19 +528,7 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if _, ok := h.nonTxSessionWriters[h.ps.pa.topic]; !ok {
-						w, err := h.cman.GetWriter(h.ps.pa.topic)
-						if err != nil {
-							h.l.Error("get writer", "err", err)
-							h.enqueueWriteErrResponse(err)
-							pool.Put(h.ps.ca.cID)
-							pool.Put(h.ps.payloadBuf)
-							h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-							continue
-						}
-						h.nonTxSessionWriters[h.ps.pa.topic] = w
-					}
-					h.produce(h.nonTxSessionWriters[h.ps.pa.topic], h.ps.payloadBuf)
+					h.produce(h.ps.payloadBuf, nil)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
@@ -609,11 +556,11 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.state = OP_PRODUCE_H_ARG
 			}
 		case OP_PRODUCE_H_ARG:
-			if h.ps.pa.topicLen != 0 {
+			if h.ps.pa.routeLen != 0 {
 				if h.ps.argBuf == nil {
-					h.ps.argBuf = pool.Get(int(h.ps.pa.topicLen))
+					h.ps.argBuf = pool.Get(int(h.ps.pa.routeLen))
 				}
-				toCopy := int(h.ps.pa.topicLen) - len(h.ps.argBuf)
+				toCopy := int(h.ps.pa.routeLen) - len(h.ps.argBuf)
 				avail := len(buf) - i
 				if avail < toCopy {
 					toCopy = avail
@@ -626,9 +573,9 @@ func (h *Handler) handle(buf []byte) error {
 				} else {
 					h.ps.argBuf = append(h.ps.argBuf, b)
 				}
-				if len(h.ps.argBuf) >= int(h.ps.pa.topicLen) {
-					if err := h.parseWriteTopicArg(); err != nil {
-						h.l.Error("parse write topic arg", "err", err)
+				if len(h.ps.argBuf) >= int(h.ps.pa.routeLen) {
+					if err := h.parseWriteRouteArg(); err != nil {
+						h.l.Error("parse write route arg", "err", err)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
 						pool.Put(h.ps.argBuf)
@@ -659,9 +606,9 @@ func (h *Handler) handle(buf []byte) error {
 			}
 
 			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if h.ps.pa.topicLen == 0 {
-					if err := h.parseWriteTopicLenArg(); err != nil {
-						h.l.Error("parse write topic len arg", "err", err)
+				if h.ps.pa.routeLen == 0 {
+					if err := h.parseWriteRouteLenArg(); err != nil {
+						h.l.Error("parse write route len arg", "err", err)
 						h.enqueueWriteErrResponse(err)
 						pool.Put(h.ps.ca.cID)
 						pool.Put(h.ps.argBuf)
@@ -685,7 +632,7 @@ func (h *Handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= 2 {
 				h.ps.ha.count = binary.BigEndian.Uint16(h.ps.argBuf[:2])
 				pool.Put(h.ps.argBuf)
-				h.ps.ha.read, h.ps.ha.headersKV, h.ps.argBuf = 0, nil, nil
+				h.ps.ha.read, h.ps.ha.headersKV, h.ps.argBuf = 0, [][]byte{}, nil
 				if h.ps.ha.count == 0 {
 					h.ps.state = OP_PRODUCE_H_MSG_ARG
 					continue
@@ -764,21 +711,7 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				}
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if _, ok := h.nonTxSessionWriters[h.ps.pa.topic]; !ok {
-						w, err := h.cman.GetWriter(h.ps.pa.topic)
-						if err != nil {
-							h.l.Error("get writer", "err", err)
-							h.enqueueWriteErrResponse(err)
-							pool.Put(h.ps.ca.cID)
-							pool.Put(h.ps.payloadBuf)
-							h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-							continue
-						}
-
-						h.nonTxSessionWriters[h.ps.pa.topic] = w
-					}
-
-					h.hproduce(h.nonTxSessionWriters[h.ps.pa.topic], h.ps.payloadBuf)
+					h.produce(h.ps.payloadBuf, h.ps.ha.headersKV)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
@@ -786,19 +719,7 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if _, ok := h.nonTxSessionWriters[h.ps.pa.topic]; !ok {
-						w, err := h.cman.GetWriter(h.ps.pa.topic)
-						if err != nil {
-							h.l.Error("get writer", "err", err)
-							h.enqueueWriteErrResponse(err)
-							pool.Put(h.ps.ca.cID)
-							pool.Put(h.ps.payloadBuf)
-							h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-							continue
-						}
-						h.nonTxSessionWriters[h.ps.pa.topic] = w
-					}
-					h.hproduce(h.nonTxSessionWriters[h.ps.pa.topic], h.ps.payloadBuf)
+					h.produce(h.ps.payloadBuf, h.ps.ha.headersKV)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
@@ -835,20 +756,20 @@ func (h *Handler) handle(buf []byte) error {
 				pool.Put(h.ps.ca.cID)
 				return err
 			}
-			h.ps.state = OP_FETCH_TOPIC_ARG
+			h.ps.state = OP_FETCH_ROUTE_ARG
 			h.ps.argBuf = pool.Get(v1.Uint32Len)
-		case OP_FETCH_TOPIC_ARG:
+		case OP_FETCH_ROUTE_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= v1.Uint32Len {
-				h.ps.fa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf)
+				h.ps.fa.routeLen = binary.BigEndian.Uint32(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
-				h.ps.argBuf = pool.Get(int(h.ps.fa.topicLen))
-				h.ps.state = OP_FETCH_TOPIC_PAYLOAD
+				h.ps.argBuf = pool.Get(int(h.ps.fa.routeLen))
+				h.ps.state = OP_FETCH_ROUTE_PAYLOAD
 			}
-		case OP_FETCH_TOPIC_PAYLOAD:
+		case OP_FETCH_ROUTE_PAYLOAD:
 			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= int(h.ps.fa.topicLen) {
-				h.ps.fa.topic = string(h.ps.argBuf)
+			if len(h.ps.argBuf) >= int(h.ps.fa.routeLen) {
+				h.ps.fa.route = string(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
 				h.ps.argBuf = pool.Get(v1.Uint32Len)
 				h.ps.state = OP_FETCH_N_ARG
@@ -859,7 +780,7 @@ func (h *Handler) handle(buf []byte) error {
 				n := binary.BigEndian.Uint32(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
 				h.ps.argBuf = nil
-				h.fetch(h.ps.fa.topic, h.ps.fa.autoCommit, n)
+				h.fetch(h.ps.fa.route, h.ps.fa.autoCommit, n)
 				pool.Put(h.ps.ca.cID)
 				h.ps.ca.cID, h.ps.state = nil, OP_START
 			}
@@ -896,8 +817,8 @@ func (h *Handler) handle(buf []byte) error {
 			if len(h.ps.aa.msgIDsBuf) >= v1.Uint32Len {
 				h.ps.aa.msgIDsLen = binary.BigEndian.Uint32(h.ps.aa.msgIDsBuf)
 				if h.ps.aa.msgIDsLen == 0 {
-					h.enqueueAckSuccess(h.ps.ca.cID)
-					pool.Put(h.ps.ca.cID)
+					cID := h.ps.ca.cID
+					h.ack(false, h.ps.aa.subID, nil, cID)
 					pool.Put(h.ps.aa.msgIDsBuf)
 					h.ps.ca.cID, h.ps.aa, h.ps.state = nil, ackArgs{}, OP_START
 					continue
@@ -919,41 +840,10 @@ func (h *Handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					// Find reader by subscription ID
-					h.sMu.Lock()
-					reader, exists := h.subscribers[h.ps.aa.subID]
-					h.sMu.Unlock()
-
-					if !exists {
-						h.out.Lock()
-						h.enqueueAckErrNoLock(h.ps.ca.cID, fmt.Errorf("subscription %d not found", h.ps.aa.subID))
-						h.out.Unlock()
-					} else {
-						reader.Ack(h.ctx, h.ps.payloadsBuf,
-							func(err error) {
-								h.out.Lock()
-								if err != nil {
-									h.enqueueAckErrNoLock(h.ps.ca.cID, err)
-									return
-								}
-								h.enqueueAckSuccessNoLock(h.ps.ca.cID)
-							},
-							func(b []byte, err error) {
-								if err != nil {
-									h.enqueueAckMsgIDErrNoLock(b, err)
-									return
-								}
-								h.enqueueAckMsgIDSuccessNoLock(b)
-							},
-						)
-						h.out.Unlock()
-					}
-					pool.Put(h.ps.ca.cID)
+					msgIDs := h.ps.payloadsBuf
+					cID := h.ps.ca.cID
+					h.ack(false, h.ps.aa.subID, msgIDs, cID)
 					pool.Put(h.ps.aa.msgIDsBuf)
-					for _, payload := range h.ps.payloadsBuf {
-						pool.Put(payload)
-					}
-					PutBufs(h.ps.payloadsBuf)
 					h.ps.argBuf, h.ps.payloadBuf, h.ps.payloadsBuf, h.ps.ca.cID, h.ps.aa, h.ps.state = nil, nil, nil, nil, ackArgs{}, OP_START
 					continue
 				} else {
@@ -990,18 +880,18 @@ func (h *Handler) handle(buf []byte) error {
 			h.ps.aa.msgIDsBuf = pool.Get(v1.Uint32Len)
 			h.ps.state = OP_NACK_ARG
 		case OP_NACK_ARG:
-			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= v1.Uint32Len {
-				h.ps.aa.msgIDsLen = binary.BigEndian.Uint32(h.ps.argBuf)
+			h.ps.aa.msgIDsBuf = append(h.ps.aa.msgIDsBuf, b)
+			if len(h.ps.aa.msgIDsBuf) >= v1.Uint32Len {
+				h.ps.aa.msgIDsLen = binary.BigEndian.Uint32(h.ps.aa.msgIDsBuf)
 				if h.ps.aa.msgIDsLen == 0 {
-					pool.Put(h.ps.argBuf)
-					h.enqueueNackSuccess(h.ps.ca.cID)
-					pool.Put(h.ps.ca.cID)
-					h.ps.argBuf, h.ps.ca.cID, h.ps.aa, h.ps.state = nil, nil, ackArgs{}, OP_START
+					cID := h.ps.ca.cID
+					h.ack(true, h.ps.aa.subID, nil, cID)
+					pool.Put(h.ps.aa.msgIDsBuf)
+					h.ps.ca.cID, h.ps.aa, h.ps.state = nil, ackArgs{}, OP_START
 					continue
 				}
 				h.ps.payloadsBuf = GetBufs()
-				pool.Put(h.ps.argBuf)
+				pool.Put(h.ps.aa.msgIDsBuf)
 				h.ps.argBuf = pool.Get(v1.Uint32Len)
 				h.ps.state = OP_NACK_MSG_ID_ARG
 			}
@@ -1018,40 +908,9 @@ func (h *Handler) handle(buf []byte) error {
 			if len(h.ps.payloadBuf) >= int(h.ps.aa.currMsgIDLen) {
 				h.ps.payloadsBuf = append(h.ps.payloadsBuf, h.ps.payloadBuf)
 				if len(h.ps.payloadsBuf) >= int(h.ps.aa.msgIDsLen) {
-					// Find reader by subscription ID
-					h.sMu.Lock()
-					reader, exists := h.subscribers[h.ps.aa.subID]
-					h.sMu.Unlock()
-
-					if !exists {
-						h.out.Lock()
-						h.enqueueNackErrNoLock(h.ps.ca.cID, fmt.Errorf("subscription %d not found", h.ps.aa.subID))
-						h.out.Unlock()
-					} else {
-						reader.Nack(h.ctx, h.ps.payloadsBuf,
-							func(err error) {
-								h.out.Lock()
-								if err != nil {
-									h.enqueueNackErrNoLock(h.ps.ca.cID, err)
-									return
-								}
-								h.enqueueNackSuccessNoLock(h.ps.ca.cID)
-							},
-							func(b []byte, err error) {
-								if err != nil {
-									h.enqueueAckMsgIDErrNoLock(b, err)
-									return
-								}
-								h.enqueueAckMsgIDSuccessNoLock(b)
-							},
-						)
-						h.out.Unlock()
-					}
-					pool.Put(h.ps.ca.cID)
-					for _, payload := range h.ps.payloadsBuf {
-						pool.Put(payload)
-					}
-					PutBufs(h.ps.payloadsBuf)
+					msgIDs := h.ps.payloadsBuf
+					cID := h.ps.ca.cID
+					h.ack(true, h.ps.aa.subID, msgIDs, cID)
 					h.ps.argBuf, h.ps.payloadBuf, h.ps.payloadsBuf, h.ps.ca.cID, h.ps.aa, h.ps.state = nil, nil, nil, nil, ackArgs{}, OP_START
 					continue
 				} else {
@@ -1059,164 +918,11 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.state = OP_NACK_MSG_ID_ARG
 				}
 			}
-		case OP_PRODUCE_TX:
+		case OP_BEGIN_TX:
 			h.ps.ca.cID = pool.Get(v1.Uint32Len)
 			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_TX_CORRELATION_ID_ARG
-		case OP_PRODUCE_TX_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := v1.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					h.ps.argBuf = pool.Get(v1.Uint32Len)
-					h.ps.state = OP_PRODUCE_TX_ARG
-				}
-			} else {
-				h.ps.ca.cID = pool.Get(v1.Uint32Len)
-				h.ps.ca.cID = append(h.ps.ca.cID, b)
-			}
-		case OP_PRODUCE_TX_ARG:
-			if h.ps.pa.topicLen != 0 {
-				if h.ps.argBuf == nil {
-					h.ps.argBuf = pool.Get(int(h.ps.pa.topicLen))
-				}
-
-				toCopy := int(h.ps.pa.topicLen) - len(h.ps.argBuf)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.argBuf)
-					h.ps.argBuf = h.ps.argBuf[:start+toCopy]
-					copy(h.ps.argBuf[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.argBuf = append(h.ps.argBuf, b)
-				}
-
-				if len(h.ps.argBuf) >= int(h.ps.pa.topicLen) {
-					if err := h.parseWriteTopicArg(); err != nil {
-						h.l.Error("parse write topic arg", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.argBuf)
-						return err
-					}
-					pool.Put(h.ps.argBuf)
-					h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_TX_MSG_ARG
-				}
-				continue
-			}
-
-			h.ps.argBuf = append(h.ps.argBuf, b)
-
-			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if h.ps.pa.topicLen == 0 {
-					if err := h.parseWriteTopicLenArg(); err != nil {
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.argBuf)
-						return err
-					}
-					pool.Put(h.ps.argBuf)
-					h.ps.argBuf = nil
-					continue
-				}
-
-				// this should not happen ever
-				panic("unreachable")
-			}
-		case OP_PRODUCE_TX_MSG_ARG:
-			if h.ps.argBuf == nil {
-				h.ps.argBuf = pool.Get(v1.Uint32Len)
-				h.ps.argBuf = append(h.ps.argBuf, b)
-				continue
-			}
-			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if err := h.parseWriteMsgSizeArg(); err != nil {
-					h.l.Error("parse write msg size arg", "err", err)
-					h.enqueueWriteErrResponse(err)
-					pool.Put(h.ps.ca.cID)
-					pool.Put(h.ps.argBuf)
-					return err
-				}
-				pool.Put(h.ps.argBuf)
-				h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_TX_MSG_PAYLOAD
-			}
-		case OP_PRODUCE_TX_MSG_PAYLOAD:
-			if h.ps.payloadBuf != nil {
-				toCopy := int(h.ps.pma.size) - len(h.ps.payloadBuf)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.payloadBuf)
-					h.ps.payloadBuf = h.ps.payloadBuf[:start+toCopy]
-					copy(h.ps.payloadBuf[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.payloadBuf = append(h.ps.payloadBuf, b)
-				}
-
-				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if err := h.ensureTxWriter(); err != nil {
-						h.l.Error("ensure tx writer", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.payloadBuf)
-						h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-						continue
-					}
-
-					h.produce(h.currentTxWriter, h.ps.payloadBuf)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-				}
-			} else {
-				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
-				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
-
-				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if err := h.ensureTxWriter(); err != nil {
-						h.l.Error("ensure tx writer", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.payloadBuf)
-						h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-						continue
-					}
-
-					h.produce(h.currentTxWriter, h.ps.payloadBuf)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-				}
-			}
-		case OP_PRODUCE_H_TX:
-			h.ps.ca.cID = pool.Get(v1.Uint32Len)
-			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_PRODUCE_H_TX_CORRELATION_ID_ARG
-		case OP_PRODUCE_H_TX_CORRELATION_ID_ARG:
+			h.ps.state = OP_BEGIN_TX_CORRELATION_ID_ARG
+		case OP_BEGIN_TX_CORRELATION_ID_ARG:
 			toCopy := v1.Uint32Len - len(h.ps.ca.cID)
 			avail := len(buf) - i
 			if avail < toCopy {
@@ -1232,260 +938,47 @@ func (h *Handler) handle(buf []byte) error {
 			}
 			if len(h.ps.ca.cID) >= v1.Uint32Len {
 				h.ps.argBuf = pool.Get(v1.Uint32Len)
-				h.ps.state = OP_PRODUCE_H_TX_ARG
+				h.ps.state = OP_BEGIN_TX_ROUTE_ARG
 			}
-		case OP_PRODUCE_H_TX_ARG:
-			if h.ps.pa.topicLen != 0 {
-				if h.ps.argBuf == nil {
-					h.ps.argBuf = pool.Get(int(h.ps.pa.topicLen))
-				}
-				toCopy := int(h.ps.pa.topicLen) - len(h.ps.argBuf)
-				avail := len(buf) - i
-				if avail < toCopy {
-					toCopy = avail
-				}
-				if toCopy > 0 {
-					start := len(h.ps.argBuf)
-					h.ps.argBuf = h.ps.argBuf[:start+toCopy]
-					copy(h.ps.argBuf[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.argBuf = append(h.ps.argBuf, b)
-				}
-				if len(h.ps.argBuf) >= int(h.ps.pa.topicLen) {
-					if err := h.parseWriteTopicArg(); err != nil {
-						h.l.Error("parse write topic arg", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.argBuf)
-						return err
-					}
-					pool.Put(h.ps.argBuf)
-					// init header args
-					h.ps.ha = headerArgs{}
-					h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_H_TX_HEADERS_COUNT_ARG
-				}
-				continue
-			}
+		case OP_BEGIN_TX_ROUTE_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if h.ps.pa.topicLen == 0 {
-					if err := h.parseWriteTopicLenArg(); err != nil {
-						h.l.Error("parse write topic len arg", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.argBuf)
-						return err
-					}
-					pool.Put(h.ps.argBuf)
-					h.ps.argBuf = nil
+				h.ps.ta.routeLen = binary.BigEndian.Uint32(h.ps.argBuf[:v1.Uint32Len])
+				pool.Put(h.ps.argBuf)
+				h.ps.argBuf = nil
+				if h.ps.ta.routeLen == 0 {
+					h.enqueueTxBeginErr(h.ps.ca.cID, ErrRouteSizeArgNotProvided)
+					pool.Put(h.ps.ca.cID)
+					h.ps.ca.cID, h.ps.ta, h.ps.state = nil, txArgs{}, OP_START
 					continue
 				}
-				h.enqueueWriteErrResponse(ErrParseProto)
-				pool.Put(h.ps.ca.cID)
-				pool.Put(h.ps.argBuf)
-				h.ps.argBuf, h.ps.ca.cID, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-				continue
+				h.ps.payloadBuf = pool.Get(int(h.ps.ta.routeLen))
+				h.ps.state = OP_BEGIN_TX_ROUTE_PAYLOAD
 			}
-		case OP_PRODUCE_H_TX_HEADERS_COUNT_ARG:
-			if h.ps.argBuf == nil {
-				h.ps.argBuf = pool.Get(2)
-			}
-			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= 2 {
-				h.ps.ha.count = binary.BigEndian.Uint16(h.ps.argBuf[:2])
-				pool.Put(h.ps.argBuf)
-				h.ps.ha.read, h.ps.ha.headersKV, h.ps.argBuf = 0, nil, nil
-				if h.ps.ha.count == 0 {
-					h.ps.state = OP_PRODUCE_H_TX_MSG_ARG
-					continue
-				}
-				h.ps.state = OP_PRODUCE_H_TX_HEADER_STR_LEN_ARG
-			}
-		case OP_PRODUCE_H_TX_HEADER_STR_LEN_ARG:
-			if h.ps.argBuf == nil {
-				h.ps.argBuf = pool.Get(v1.Uint32Len)
-			}
-			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= v1.Uint32Len {
-				h.ps.ha.currStrLn = binary.BigEndian.Uint32(h.ps.argBuf[:v1.Uint32Len])
-				pool.Put(h.ps.argBuf)
-				h.ps.argBuf = pool.Get(int(h.ps.ha.currStrLn))
-				h.ps.state = OP_PRODUCE_H_TX_HEADER_STR_PAYLOAD
-			}
-		case OP_PRODUCE_H_TX_HEADER_STR_PAYLOAD:
-			toCopy := int(h.ps.ha.currStrLn) - len(h.ps.argBuf)
+		case OP_BEGIN_TX_ROUTE_PAYLOAD:
+			toCopy := int(h.ps.ta.routeLen) - len(h.ps.payloadBuf)
 			avail := len(buf) - i
 			if avail < toCopy {
 				toCopy = avail
 			}
 			if toCopy > 0 {
-				start := len(h.ps.argBuf)
-				h.ps.argBuf = h.ps.argBuf[:start+toCopy]
-				copy(h.ps.argBuf[start:], buf[i:i+toCopy])
+				start := len(h.ps.payloadBuf)
+				h.ps.payloadBuf = h.ps.payloadBuf[:start+toCopy]
+				copy(h.ps.payloadBuf[start:], buf[i:i+toCopy])
 				i = (i + toCopy) - 1
 			} else {
-				h.ps.argBuf = append(h.ps.argBuf, b)
-			}
-			if len(h.ps.argBuf) >= int(h.ps.ha.currStrLn) {
-				// store as raw bytes slice in order (k1, v1, ...)
-				// trim to exact length before storing
-				b := make([]byte, len(h.ps.argBuf))
-				copy(b, h.ps.argBuf)
-				h.ps.ha.headersKV = append(h.ps.ha.headersKV, b)
-				pool.Put(h.ps.argBuf)
-				h.ps.argBuf = nil
-				h.ps.ha.read++
-				if h.ps.ha.read >= h.ps.ha.count { // count is total number of strings
-					h.ps.state = OP_PRODUCE_H_TX_MSG_ARG
-					continue
-				}
-				h.ps.state = OP_PRODUCE_H_TX_HEADER_STR_LEN_ARG
-			}
-		case OP_PRODUCE_H_TX_MSG_ARG:
-			if h.ps.argBuf == nil {
-				h.ps.argBuf = pool.Get(v1.Uint32Len)
-			}
-			h.ps.argBuf = append(h.ps.argBuf, b)
-			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if err := h.parseWriteMsgSizeArg(); err != nil {
-					h.l.Error("parse write msg size arg", "err", err)
-					h.enqueueWriteErrResponse(err)
-					pool.Put(h.ps.ca.cID)
-					pool.Put(h.ps.argBuf)
-					return err
-				}
-				pool.Put(h.ps.argBuf)
-				h.ps.argBuf, h.ps.state = nil, OP_PRODUCE_H_TX_MSG_PAYLOAD
-			}
-		case OP_PRODUCE_H_TX_MSG_PAYLOAD:
-			if h.ps.payloadBuf != nil {
-				toCopy := int(h.ps.pma.size) - len(h.ps.payloadBuf)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.payloadBuf)
-					h.ps.payloadBuf = h.ps.payloadBuf[:start+toCopy]
-					copy(h.ps.payloadBuf[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.payloadBuf = append(h.ps.payloadBuf, b)
-				}
-
-				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if err := h.ensureTxWriter(); err != nil {
-						h.l.Error("ensure tx writer", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.payloadBuf)
-						h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-						continue
-					}
-
-					h.hproduce(h.currentTxWriter, h.ps.payloadBuf)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-				}
-			} else {
-				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
-
-				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
-					if err := h.ensureTxWriter(); err != nil {
-						h.l.Error("ensure tx writer", "err", err)
-						h.enqueueWriteErrResponse(err)
-						pool.Put(h.ps.ca.cID)
-						pool.Put(h.ps.payloadBuf)
-						h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-						continue
-					}
-
-					h.hproduce(h.currentTxWriter, h.ps.payloadBuf)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
-				}
 			}
-		case OP_BEGIN_TX:
-			h.ps.ca.cID = pool.Get(v1.Uint32Len)
-			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_BEGIN_TX_CORRELATION_ID_ARG
-		case OP_BEGIN_TX_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := v1.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
+			if len(h.ps.payloadBuf) >= int(h.ps.ta.routeLen) {
+				h.ps.ta.route = string(h.ps.payloadBuf)
+				if err := h.core.Begin(h.ps.ta.route); err != nil {
+					h.enqueueTxBeginErr(h.ps.ca.cID, err)
 				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					if err := h.flushWriters(); err != nil {
-						h.enqueueTxBeginErr(h.ps.ca.cID, err)
-						h.l.Error("begin tx", "err", err)
-						pool.Put(h.ps.ca.cID)
-						h.ps.ca.cID, h.ps.state = nil, OP_START
-						continue
-					}
-
 					h.enqueueTxBeginSuccess(h.ps.ca.cID)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.sessionState, h.ps.state = nil, STREAM_STATE_CONNECTED_IN_TX, OP_START
 				}
-			} else {
-				h.ps.ca.cID = pool.Get(v1.Uint32Len)
-				h.ps.ca.cID = append(h.ps.ca.cID, b)
-			}
-		case OP_BEGIN_TX_FAIL:
-			h.ps.ca.cID = pool.Get(v1.Uint32Len)
-			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG
-		case OP_BEGIN_TX_FAIL_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := v1.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					if err := h.flushWriters(); err != nil {
-						h.enqueueTxBeginErr(h.ps.ca.cID, err)
-						h.l.Error("begin tx", "err", err)
-						pool.Put(h.ps.ca.cID)
-						h.ps.ca.cID, h.ps.state = nil, OP_START
-						continue
-					}
-
-					h.enqueueTxBeginErr(h.ps.ca.cID, ErrInvalidTxState)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.ps.state = nil, OP_START
-				}
-			} else {
-				h.ps.ca.cID = pool.Get(v1.Uint32Len)
-				h.ps.ca.cID = append(h.ps.ca.cID, b)
+				pool.Put(h.ps.ca.cID)
+				pool.Put(h.ps.payloadBuf)
+				h.ps.ca.cID, h.ps.payloadBuf, h.ps.ta, h.ps.state = nil, nil, txArgs{}, OP_START
 			}
 		case OP_COMMIT_TX:
 			h.ps.ca.cID = pool.Get(v1.Uint32Len)
@@ -1510,49 +1003,11 @@ func (h *Handler) handle(buf []byte) error {
 				}
 
 				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					if h.currentTxWriter != nil {
-						if err := h.currentTxWriter.CommitTx(h.ctx); err != nil {
-							h.enqueueTxCommitErr(h.ps.ca.cID, err)
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic)
-							pool.Put(h.ps.ca.cID)
-							h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, STREAM_STATE_CONNECTED, OP_START
-							continue
-						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic)
-						h.currentTxWriter = nil
+					if err := h.core.Commit(); err != nil {
+						h.enqueueTxCommitErr(h.ps.ca.cID, err)
+					} else {
+						h.enqueueTxCommitSuccess(h.ps.ca.cID)
 					}
-					h.enqueueTxCommitSuccess(h.ps.ca.cID)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.sessionState, h.ps.state = nil, STREAM_STATE_CONNECTED, OP_START
-				}
-			} else {
-				h.ps.ca.cID = pool.Get(v1.Uint32Len)
-				h.ps.ca.cID = append(h.ps.ca.cID, b)
-			}
-		case OP_COMMIT_TX_FAIL:
-			h.ps.ca.cID = pool.Get(v1.Uint32Len)
-			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG
-		case OP_COMMIT_TX_FAIL_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := v1.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					h.enqueueTxCommitErr(h.ps.ca.cID, ErrInvalidTxState)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.state = nil, OP_START
 				}
@@ -1583,50 +1038,11 @@ func (h *Handler) handle(buf []byte) error {
 				}
 
 				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					if h.currentTxWriter != nil {
-						if err := h.currentTxWriter.RollbackTx(h.ctx); err != nil {
-							h.enqueueTxRollbackErr(h.ps.ca.cID, err)
-							h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic)
-							pool.Put(h.ps.ca.cID)
-							// We are not keeping tx opened here after rollback error
-							h.ps.ca.cID, h.currentTxWriter, h.sessionState, h.ps.state = nil, nil, STREAM_STATE_CONNECTED, OP_START
-							continue
-						}
-						h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic)
-						h.currentTxWriter = nil
+					if err := h.core.Rollback(); err != nil {
+						h.enqueueTxRollbackErr(h.ps.ca.cID, err)
+					} else {
+						h.enqueueTxRollbackSuccess(h.ps.ca.cID)
 					}
-					h.enqueueTxRollbackSuccess(h.ps.ca.cID)
-					pool.Put(h.ps.ca.cID)
-					h.ps.ca.cID, h.sessionState, h.ps.state = nil, STREAM_STATE_CONNECTED, OP_START
-				}
-			} else {
-				h.ps.ca.cID = pool.Get(v1.Uint32Len)
-				h.ps.ca.cID = append(h.ps.ca.cID, b)
-			}
-		case OP_ROLLBACK_TX_FAIL:
-			h.ps.ca.cID = pool.Get(v1.Uint32Len)
-			h.ps.ca.cID = append(h.ps.ca.cID, b)
-			h.ps.state = OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG
-		case OP_ROLLBACK_TX_FAIL_CORRELATION_ID_ARG:
-			if h.ps.ca.cID != nil {
-				toCopy := v1.Uint32Len - len(h.ps.ca.cID)
-				avail := len(buf) - i
-
-				if avail < toCopy {
-					toCopy = avail
-				}
-
-				if toCopy > 0 {
-					start := len(h.ps.ca.cID)
-					h.ps.ca.cID = h.ps.ca.cID[:start+toCopy]
-					copy(h.ps.ca.cID[start:], buf[i:i+toCopy])
-					i = (i + toCopy) - 1
-				} else {
-					h.ps.ca.cID = append(h.ps.ca.cID, b)
-				}
-
-				if len(h.ps.ca.cID) >= v1.Uint32Len {
-					h.enqueueTxRollbackErr(h.ps.ca.cID, ErrInvalidTxState)
 					pool.Put(h.ps.ca.cID)
 					h.ps.ca.cID, h.ps.state = nil, OP_START
 				}
@@ -1662,11 +1078,6 @@ func (h *Handler) handle(buf []byte) error {
 			if len(h.ps.argBuf) >= int(h.ps.ba.connectorNameLen) {
 				h.ps.ba.connectorNameValue = string(h.ps.argBuf)
 				pool.Put(h.ps.argBuf)
-				cfg := h.baseConfig
-				if h.baseConfigProvider != nil {
-					cfg = h.baseConfigProvider()
-				}
-				h.connectorConfig = cfg[h.ps.ba.connectorNameValue]
 				h.ps.state = OP_BIND_META_COUNT
 				h.ps.argBuf = pool.Get(v1.Uint16Len)
 			}
@@ -1891,22 +1302,22 @@ func (h *Handler) handle(buf []byte) error {
 			}
 
 			h.ps.argBuf = pool.Get(v1.Uint32Len)
-			h.ps.state = OP_SUBSCRIBE_TOPIC_ARG
-		case OP_SUBSCRIBE_TOPIC_ARG:
+			h.ps.state = OP_SUBSCRIBE_ROUTE_ARG
+		case OP_SUBSCRIBE_ROUTE_ARG:
 			h.ps.argBuf = append(h.ps.argBuf, b)
 			if len(h.ps.argBuf) >= v1.Uint32Len {
-				if err := h.parseSubscribeTopicLenArg(); err != nil {
+				if err := h.parseSubscribeRouteLenArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
 					enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, v1.ERR_CODE_YES, err)
 					return err
 				}
 				pool.Put(h.ps.argBuf)
-				h.ps.payloadBuf = pool.Get(int(h.ps.sa.topicLen))
-				h.ps.argBuf, h.ps.state = nil, OP_SUBSCRIBE_TOPIC_PAYLOAD
+				h.ps.payloadBuf = pool.Get(int(h.ps.sa.routeLen))
+				h.ps.argBuf, h.ps.state = nil, OP_SUBSCRIBE_ROUTE_PAYLOAD
 			}
-		case OP_SUBSCRIBE_TOPIC_PAYLOAD:
-			toCopy := int(h.ps.sa.topicLen) - len(h.ps.payloadBuf)
+		case OP_SUBSCRIBE_ROUTE_PAYLOAD:
+			toCopy := int(h.ps.sa.routeLen) - len(h.ps.payloadBuf)
 			avail := len(buf) - i
 
 			if avail < toCopy {
@@ -1922,64 +1333,52 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 			}
 
-			if len(h.ps.payloadBuf) >= int(h.ps.sa.topicLen) {
+			if len(h.ps.payloadBuf) >= int(h.ps.sa.routeLen) {
 				h.ps.state = OP_START
-				h.ps.sa.topic = string(h.ps.payloadBuf)
+				h.ps.sa.route = string(h.ps.payloadBuf)
 				pool.Put(h.ps.payloadBuf)
 
-				subID, err := h.subIDPool.Get()
-				if err != nil {
-					enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, v1.ERR_CODE_YES, err)
-					return fmt.Errorf("get sub id: %w", err)
-				}
-				r, err := h.cman.GetReader(h.ps.sa.topic, h.ps.sa.autoCommit)
-				if err != nil {
-					pErr := h.subIDPool.Put(subID)
-					if pErr != nil {
-						h.l.Error("put sub id", "err", pErr)
-					}
-					enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, v1.ERR_CODE_YES, err)
-					return fmt.Errorf("get reader: %w", err)
-				}
-
-				h.sMu.Lock()
-				h.subscribers[subID] = r
-				h.sMu.Unlock()
-
+				headered := h.ps.sa.headered
 				code := v1.RESP_CODE_SUBSCRIBE
-				if h.ps.sa.headered {
+				if headered {
 					code = v1.RESP_CODE_HSUBSCRIBE
 				}
-				enqueueSubscribeSuccess(h.out, code, h.ps.ca.cID, subID)
-				pool.Put(h.ps.ca.cID)
-				h.wg.Add(1)
-				go func(headered bool) {
-					ctx, cancel := context.WithCancel(h.ctx)
-					unsub := sync.OnceFunc(func() {
-						cancel()
-						r.Close()
-						err := h.subIDPool.Put(subID)
-						if err != nil {
-							h.l.Error("put sub id", "err", err)
+				ready := func(subscriptionID byte) error {
+					enqueueSubscribeSuccess(h.out, code, h.ps.ca.cID, subscriptionID)
+					return nil
+				}
+				handlers := core.SubscriptionMessageHandlers{}
+				if headered {
+					handlers.MessageWithHeaders = func(subscriptionID byte, reader connector.Reader) func([]byte, string, [][]byte, ...any) {
+						if reader.AutoCommit() {
+							return func(payload []byte, _ string, headers [][]byte, _ ...any) {
+								enqueueAutoCommitSubscriptionMessage(h.out, subscriptionID, true, payload, headers)
+							}
 						}
-						delete(h.unsubFuncs, subID)
-					})
-					h.sMu.Lock()
-					h.unsubFuncs[subID] = unsub
-					h.sMu.Unlock()
-					if headered {
-						h.hsubscribe(ctx, subID, r)
-					} else {
-						h.subscribe(ctx, subID, r)
+						return func(payload []byte, topic string, headers [][]byte, args ...any) {
+							enqueueSubscriptionMessage(h.out, subscriptionID, reader, true, payload, topic, headers, args...)
+						}
 					}
-					h.sMu.Lock()
-					unsub()
-					h.sMu.Unlock()
-
-					h.wg.Done()
-				}(h.ps.sa.headered)
-
-				h.ps.payloadBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
+				} else {
+					handlers.Message = func(subscriptionID byte, reader connector.Reader) func([]byte, string, ...any) {
+						if reader.AutoCommit() {
+							return func(payload []byte, _ string, _ ...any) {
+								enqueueAutoCommitSubscriptionMessage(h.out, subscriptionID, false, payload, nil)
+							}
+						}
+						return func(payload []byte, topic string, args ...any) {
+							enqueueSubscriptionMessage(h.out, subscriptionID, reader, false, payload, topic, nil, args...)
+						}
+					}
+				}
+				err := h.core.Subscribe(h.ps.sa.route, h.ps.sa.autoCommit, headered, ready, handlers, func(err error) {
+					h.l.Error("subscribe retry", "route", h.ps.sa.route, "err", err)
+				})
+				if err != nil {
+					enqueueSubscribeErr(h.out, h.ps.ca.cID, code, v1.ERR_CODE_YES, err)
+				}
+				pool.Put(h.ps.ca.cID)
+				h.ps.ca.cID, h.ps.payloadBuf, h.ps.sa, h.ps.state = nil, nil, subscribeArgs{}, OP_START
 				continue
 			}
 		case OP_UNSUBSCRIBE:
@@ -2007,12 +1406,8 @@ func (h *Handler) handle(buf []byte) error {
 				h.ps.state = OP_UNSUBSCRIBE_SUB_ID_ARG
 			}
 		case OP_UNSUBSCRIBE_SUB_ID_ARG:
-			h.sMu.Lock()
-			if unsub, ok := h.unsubFuncs[b]; ok {
-				unsub()
-			}
-			h.sMu.Unlock()
-			enqueueUnsubscribeSuccess(h.out, h.ps.ca.cID)
+			err := h.core.Unsubscribe(b)
+			enqueueUnsubscribeResponse(h.out, h.ps.ca.cID, err)
 			pool.Put(h.ps.ca.cID)
 			h.ps.ca.cID, h.ps.state = nil, OP_START
 		default:
@@ -2023,92 +1418,142 @@ func (h *Handler) handle(buf []byte) error {
 	return nil
 }
 
-// handleBind processes BIND command and creates Manager with config overrides
+// handleBind delegates connector selection, middleware, overrides, and cleanup to Session Core.
 func (h *Handler) handleBind(meta map[string]string, configOverrides map[string]string) error {
-	if h.connected {
-		// Already initialized, ignore
-		return fmt.Errorf("already initialized")
-	}
-
-	// Process bind middlewares
-	overrides := make(map[string]string, len(configOverrides))
-	maps.Copy(overrides, configOverrides)
-
-	// Convert bind middleware configs
-	bindMiddlewareConfigs := make([]bmwconfig.Config, 0, len(h.connectorConfig.BindMiddlewares))
-	bindMiddlewareConfigs = append(bindMiddlewareConfigs, h.connectorConfig.BindMiddlewares...)
-
+	err := h.core.Bind(h.ps.ba.connectorNameValue, meta, configOverrides)
 	buf := pool.Get(2)[:2]
 	buf[0] = byte(v1.RESP_CODE_BIND)
 	buf[1] = v1.ERR_CODE_NO
-
-	// Process bind middlewares
-	if len(bindMiddlewareConfigs) > 0 {
-		if err := bmw.Chain(h.ctx, meta, bindMiddlewareConfigs, h.l); err != nil {
-			h.l.Warn("bind middleware rejected", "connector", h.ps.ba.connectorNameValue, "err", err)
-			buf[1] = v1.ERR_CODE_YES
-			errBuf := errProtoBuf(err)
-			h.out.EnqueueProtoMulti(buf, errBuf)
-			pool.Put(buf)
-			pool.Put(errBuf)
-			return nil
-		}
-	}
-
-	// Apply config overrides if provided (may have been modified by middlewares)
-	modifiedConfig := h.connectorConfig
-	if len(overrides) > 0 {
-		modifiedConfigForOverride, err := connectors.ApplyOverrides(h.connectorConfig, overrides)
-		if err != nil {
-			buf[1] = v1.ERR_CODE_YES
-			errBuf := errProtoBuf(err)
-			h.out.EnqueueProtoMulti(buf, errBuf)
-			pool.Put(buf)
-			pool.Put(errBuf)
-			return nil
-		} else {
-			modifiedConfig = modifiedConfigForOverride
-		}
+	if err != nil {
+		buf[1] = v1.ERR_CODE_YES
+		errBuf := errProtoBuf(err)
+		h.out.EnqueueProtoMulti(buf, errBuf)
+		pool.Put(buf)
+		pool.Put(errBuf)
+		return nil
 	}
 
 	h.out.EnqueueProtoMulti(buf)
 	pool.Put(buf)
-
-	// Create a new Manager with the modified configuration
-	h.cman = connectors.NewManagerV2(modifiedConfig, h.ps.ba.connectorNameValue, h.l)
-	h.nonTxSessionWriters = make(map[string]connector.WriteCloser)
-	h.connected = true
-	h.sessionState = STREAM_STATE_CONNECTED
-
-	// Setup disconnect handler
 	h.disconnect = func() {
-		for pub, w := range h.nonTxSessionWriters {
-			w.Flush(h.ctx)
-			h.cman.PutWriter(w, pub)
-		}
-		if h.currentTxWriter != nil {
-			_ = h.currentTxWriter.RollbackTx(h.ctx)
-			h.cman.PutWriter(h.currentTxWriter, h.currentTxWriterTopic)
-			h.currentTxWriter = nil
-		}
-		h.sMu.Lock()
-		for _, unsub := range h.unsubFuncs {
-			unsub()
-		}
-		h.sMu.Unlock()
-
-		// Wait for all pending goroutines (subscribe + fetch) before closing resources
-		h.wg.Wait()
-
-		if h.cman != nil {
-			h.cman.Close()
+		h.fetches.Wait()
+		if err := h.core.Close(); err != nil {
+			h.l.Error("close session", "err", err)
 		}
 		h.out.EnqueueProto(v1.DISCONNECT_RESP)
 	}
-
 	return nil
 }
 
+type ackResponse struct {
+	h          *Handler
+	op         byte
+	messageIDs [][]byte
+	cID        []byte
+	remaining  int
+	handlers   core.AckResultHandlers
+}
+
+var ackResponses = sync.Pool{
+	New: func() any {
+		return new(ackResponse)
+	},
+}
+
+func (r *ackResponse) onResult(err error) {
+	r.h.out.Lock()
+	header := pool.Get(6)
+	header = append(header, r.op)
+	header = append(header, r.cID...)
+	if err != nil {
+		header = append(header, v1.ERR_CODE_YES)
+		r.h.out.QueueOutboundNoLock(header)
+		errBuf := errProtoBuf(err)
+		r.h.out.QueueOutboundNoLock(errBuf)
+		pool.Put(errBuf)
+		r.h.out.SignalFlush()
+		r.h.out.Unlock()
+		pool.Put(header)
+		r.release()
+		return
+	}
+
+	header = append(header, v1.ERR_CODE_NO)
+	r.h.out.QueueOutboundNoLock(header)
+	countBuf := pool.Get(v1.Uint32Len)
+	countBuf = binary.BigEndian.AppendUint32(countBuf, uint32(r.remaining))
+	r.h.out.QueueOutboundNoLock(countBuf)
+	r.h.out.SignalFlush()
+	pool.Put(countBuf)
+	pool.Put(header)
+	if r.remaining == 0 {
+		r.h.out.Unlock()
+		r.release()
+	}
+}
+
+func (r *ackResponse) onMessage(messageID []byte, err error) {
+	lenBuf := pool.Get(v1.Uint32Len)
+	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(messageID)))
+	r.h.out.QueueOutboundNoLock(lenBuf)
+	r.h.out.QueueOutboundNoLock(messageID)
+	pool.Put(lenBuf)
+	flag := pool.Get(1)
+	if err == nil {
+		flag = append(flag, v1.ERR_CODE_NO)
+		r.h.out.QueueOutboundNoLock(flag)
+	} else {
+		flag = append(flag, v1.ERR_CODE_YES)
+		r.h.out.QueueOutboundNoLock(flag)
+		errBuf := errProtoBuf(err)
+		r.h.out.QueueOutboundNoLock(errBuf)
+		pool.Put(errBuf)
+	}
+	pool.Put(flag)
+	r.h.out.SignalFlush()
+
+	r.remaining--
+	if r.remaining == 0 {
+		r.h.out.Unlock()
+		r.release()
+	}
+}
+
+func (r *ackResponse) release() {
+	pool.Put(r.cID)
+	for _, messageID := range r.messageIDs {
+		pool.Put(messageID)
+	}
+	if r.messageIDs != nil {
+		PutBufs(r.messageIDs)
+	}
+	r.h, r.messageIDs, r.cID = nil, nil, nil
+	r.op, r.remaining = 0, 0
+	ackResponses.Put(r)
+}
+
+func (h *Handler) ack(nack bool, subscriptionID byte, messageIDs [][]byte, cID []byte) {
+	op := byte(v1.RESP_CODE_ACK)
+	if nack {
+		op = byte(v1.RESP_CODE_NACK)
+	}
+	response := ackResponses.Get().(*ackResponse)
+	if response.handlers.Result == nil {
+		response.handlers.Result = response.onResult
+		response.handlers.Message = response.onMessage
+	}
+	response.h, response.op, response.messageIDs, response.cID = h, op, messageIDs, cID
+	response.remaining = len(messageIDs)
+	var err error
+	if nack {
+		err = h.core.Nack(subscriptionID, messageIDs, response.handlers)
+	} else {
+		err = h.core.Ack(subscriptionID, messageIDs, response.handlers)
+	}
+	if err != nil {
+		response.onResult(err)
+	}
+}
 func (h *Handler) writePing() {
 	t := time.NewTicker(h.pingInterval)
 	defer t.Stop()
@@ -2123,219 +1568,245 @@ func (h *Handler) writePing() {
 	}
 }
 
-func (h *Handler) subscribe(ctx context.Context, subID byte, r connector.ReadCloser) {
-	msgHandler := h.subEnqueueMsgFunc(h.out, subID, r)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			err := r.Subscribe(ctx, msgHandler)
-			if err != nil {
-				h.l.Error("subscribe", "err", err)
-				time.Sleep(1 * time.Second)
-			}
-		}
-	}
+type produceResponse struct {
+	h        *Handler
+	message  []byte
+	response []byte
+	callback func(error)
 }
 
-func (h *Handler) hsubscribe(ctx context.Context, subID byte, r connector.ReadCloser) {
-	msgHandler := h.subEnqueueMsgFuncWithHeaders(h.out, subID, r)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			err := r.SubscribeWithHeaders(ctx, msgHandler)
-			if err != nil {
-				h.l.Error("subscribe with headers", "err", err)
-				time.Sleep(1 * time.Second)
-			}
-		}
+func (h *Handler) getProduceResponse() *produceResponse {
+	h.produceResponseMu.Lock()
+	response := h.produceResponse
+	h.produceResponse = nil
+	h.produceResponseMu.Unlock()
+	if response == nil {
+		response = &produceResponse{h: h}
+		response.callback = response.respond
 	}
+	return response
 }
 
-func (h *Handler) ensureTxWriter() error {
-	if h.currentTxWriter != nil {
-		return nil
+func (h *Handler) putProduceResponse(response *produceResponse) {
+	h.produceResponseMu.Lock()
+	if h.produceResponse == nil {
+		h.produceResponse = response
 	}
-	w, err := h.cman.GetWriter(h.ps.pa.topic)
+	h.produceResponseMu.Unlock()
+}
+
+func (r *produceResponse) respond(err error) {
+	pool.Put(r.message)
 	if err != nil {
-		return err
+		r.response[5] = v1.ERR_CODE_YES
+		errBuf := errProtoBuf(err)
+		r.h.out.EnqueueProtoMulti(r.response, errBuf)
+		pool.Put(errBuf)
+	} else {
+		r.h.out.EnqueueProto(r.response)
 	}
-	if err := w.BeginTx(h.ctx); err != nil {
-		h.cman.PutWriter(w, h.ps.pa.topic)
-		return err
-	}
-	h.currentTxWriter, h.currentTxWriterTopic = w, h.ps.pa.topic
-	return nil
+	pool.Put(r.response)
+	r.message, r.response = nil, nil
+	r.h.putProduceResponse(r)
 }
 
-func (h *Handler) produce(w connector.Writer, msg []byte) {
-	buf := pool.Get(6) // 1 byte (resp op code) + 4 bytes (request id) + 1 byte (err no/err yes)
-	successResp := server.ProduceResponseSuccess(buf, h.ps.ca.cID)
-	w.Produce(
-		h.ctx, msg,
-		func(err error) {
-			pool.Put(msg)
-			if err != nil {
-				h.l.Error("produce", "err", err)
-
-				successResp[5] = v1.ERR_CODE_YES
-				errProtoBuf := errProtoBuf(err)
-				h.out.EnqueueProtoMulti(successResp, errProtoBuf)
-				pool.Put(errProtoBuf)
-				pool.Put(buf)
-				return
-			}
-			h.out.EnqueueProto(successResp)
-			pool.Put(buf)
-		})
-}
-
-func (h *Handler) hproduce(w connector.Writer, msg []byte) {
+func (h *Handler) produce(msg []byte, headers [][]byte) {
+	op := h.writeResponseCode()
+	response := h.getProduceResponse()
 	buf := pool.Get(6)
-	hdr := buf[:0]
-	hdr = append(hdr, byte(v1.RESP_CODE_HPRODUCE))
-	hdr = append(hdr, h.ps.ca.cID...)
-	hdr = append(hdr, v1.ERR_CODE_NO)
-	w.HProduce(
-		h.ctx, msg, h.ps.ha.headersKV,
-		func(err error) {
-			pool.Put(msg)
-			if err != nil {
-				h.l.Error("hproduce", "err", err)
-				hdr[5] = v1.ERR_CODE_YES
-				errProto := errProtoBuf(err)
-				h.out.EnqueueProtoMulti(hdr, errProto)
-				pool.Put(errProto)
-				pool.Put(buf)
-				return
-			}
-			h.out.EnqueueProto(hdr)
-			pool.Put(buf)
-		})
+	buf = append(buf, byte(op))
+	buf = append(buf, h.ps.ca.cID...)
+	buf = append(buf, v1.ERR_CODE_NO)
+	response.h, response.message, response.response = h, msg, buf
+
+	var err error
+	if h.ps.pa.transactional {
+		err = h.core.TxProduce(msg, headers, response.callback)
+	} else {
+		err = h.core.Produce(h.ps.pa.route, msg, headers, response.callback)
+	}
+	if err != nil {
+		response.respond(err)
+	}
 }
 
-func (h *Handler) fetch(topic string, autoCommit bool, n uint32) {
-	// Check if we already have a subscription_id for this topic (implicit subscription)
-	h.fhMu.Lock()
-	topicReaders, exists := h.fetchReaders[topic]
-	if !exists {
-		topicReaders = make(map[bool]byte, 2)
-		h.fetchReaders[topic] = topicReaders
+func (h *Handler) writeResponseCode() v1.RespCode {
+	switch {
+	case h.ps.pa.transactional && h.ps.pa.headered:
+		return v1.RESP_CODE_TX_HPRODUCE
+	case h.ps.pa.transactional:
+		return v1.RESP_CODE_TX_PRODUCE
+	case h.ps.pa.headered:
+		return v1.RESP_CODE_HPRODUCE
+	default:
+		return v1.RESP_CODE_PRODUCE
 	}
-	subID, exists := topicReaders[autoCommit]
-	if !exists {
-		// Create new implicit subscription
-		h.sMu.Lock()
-		var err error
-		subID, err = h.subIDPool.Get()
-		h.sMu.Unlock()
-		if err != nil {
-			h.fhMu.Unlock()
-			header := pool.Get(6)[:0]
-			op := byte(v1.RESP_CODE_FETCH)
-			if h.ps.fa.headered {
-				op = byte(v1.RESP_CODE_HFETCH)
-			}
-			header = append(header, op)
-			header = append(header, h.ps.ca.cID...)
-			header = append(header, v1.ERR_CODE_YES)
-			h.out.EnqueueProtoMulti(header, errProtoBuf(err))
-			pool.Put(header)
-			return
-		}
-		h.fetchReaders[topic][autoCommit] = subID
+}
+
+func (h *Handler) fetch(route string, autoCommit bool, n uint32) {
+	headered := h.ps.fa.headered
+	op := v1.RESP_CODE_FETCH
+	if headered {
+		op = v1.RESP_CODE_HFETCH
 	}
-	h.fhMu.Unlock()
-
-	header := pool.Get(6)[:0]
-	op := byte(v1.RESP_CODE_FETCH)
-	if h.ps.fa.headered {
-		op = byte(v1.RESP_CODE_HFETCH)
-	}
-	header = append(header, op)
-	header = append(header, h.ps.ca.cID...)
-	header = append(header, v1.ERR_CODE_NO)
-	// header = append(header, subID)
-
-	h.wg.Add(1)
-	go func(headered bool, subscriptionID byte) {
-		defer h.wg.Done()
-		h.sMu.Lock()
-		fetcher, ok := h.subscribers[subscriptionID]
-		h.sMu.Unlock()
-		if !ok {
-			var err error
-			fetcher, err = h.cman.GetReader(topic, autoCommit)
-			if err != nil {
-				header[5] = v1.ERR_CODE_YES
-				h.out.EnqueueProtoMulti(header, errProtoBuf(err))
-				pool.Put(header)
-				return
-			}
-		}
-
-		// Store fetcher in subscribers map for ACK/NACK operations
-		h.sMu.Lock()
-		if _, exists := h.subscribers[subscriptionID]; !exists {
-			h.subscribers[subscriptionID] = fetcher
-		}
-		h.sMu.Unlock()
-
+	correlationID := binary.BigEndian.Uint32(h.ps.ca.cID)
+	messages := h.getFetchBufs(int(n) + 1)
+	header := pool.Get(11)[:11]
+	header[0] = byte(op)
+	binary.BigEndian.PutUint32(header[1:5], correlationID)
+	header[5] = v1.ERR_CODE_NO
+	messages.bufs = append(messages.bufs, header)
+	flush := func(subscriptionID byte, count uint32, fetchErr error) {
 		h.out.Lock()
-		if headered {
-			fetcher.FetchWithHeaders(h.ctx, n,
-				func(n uint32, err error) {
-					if err != nil {
-						header[5] = v1.ERR_CODE_YES
-						h.out.QueueOutboundNoLock(header)
-						h.out.QueueOutboundNoLock(errProtoBuf(err))
-						pool.Put(header)
-						return
-					}
-
-					h.out.QueueOutboundNoLock(header)
-					pool.Put(header)
-					h.out.QueueOutboundByteNoLock(subID)
-					count := pool.Get(v1.Uint32Len)
-					count = binary.BigEndian.AppendUint32(count, n)
-					h.out.QueueOutboundNoLock(count)
-					pool.Put(count)
-				},
-				h.fetchEnqueueMsgFuncWithHeaders(h.out, fetcher, topic, autoCommit),
-			)
-			h.out.SignalFlush()
-			h.out.Unlock()
-			return
+		if fetchErr != nil {
+			for _, messageBuf := range messages.bufs {
+				pool.Put(messageBuf)
+			}
+			header := pool.Get(6)[:0]
+			header = append(header, byte(op))
+			header = binary.BigEndian.AppendUint32(header, correlationID)
+			header = append(header, v1.ERR_CODE_YES)
+			errBuf := errProtoBuf(fetchErr)
+			h.out.QueueOutboundOwnedMultiNoLock(header, errBuf)
+		} else {
+			header[6] = subscriptionID
+			binary.BigEndian.PutUint32(header[7:11], count)
+			h.out.QueueOutboundOwnedMultiNoLock(messages.bufs...)
 		}
-
-		fetcher.Fetch(h.ctx, n,
-			func(n uint32, err error) {
-				if err != nil {
-					header[5] = v1.ERR_CODE_YES
-					h.out.QueueOutboundNoLock(header)
-					h.out.QueueOutboundNoLock(errProtoBuf(err))
-					pool.Put(header)
-					return
-				}
-
-				h.out.QueueOutboundNoLock(header)
-				pool.Put(header)
-				h.out.QueueOutboundByteNoLock(subID)
-				count := pool.Get(v1.Uint32Len)
-				count = binary.BigEndian.AppendUint32(count, n)
-				h.out.QueueOutboundNoLock(count)
-				pool.Put(count)
-			},
-			h.fetchEnqueueMsgFunc(h.out, fetcher, topic, autoCommit),
-		)
 		h.out.SignalFlush()
 		h.out.Unlock()
-	}(h.ps.fa.headered, subID)
+		h.putFetchBufs(messages)
+	}
+	h.fetches.Add(1)
+	go func() {
+		defer h.fetches.Done()
+		handlers := core.FetchMessageHandlers{}
+		switch {
+		case autoCommit && headered:
+			handlers.AutoCommitWithHeaders = func(payload []byte, _ string, headers [][]byte, _ ...any) {
+				appendAutoCommitHFetchMessage(messages, payload, headers)
+			}
+		case autoCommit:
+			handlers.AutoCommit = func(payload []byte, _ string, _ ...any) {
+				appendAutoCommitFetchMessage(messages, payload)
+			}
+		default:
+			handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, messageTopic string, headers [][]byte, args ...any) {
+				appendFetchMessage(messages, reader, false, headered, payload, messageTopic, headers, args...)
+			}
+		}
+		subscriptionID, count, fetchErr := h.core.Fetch(route, autoCommit, headered, n, handlers)
+		flush(subscriptionID, count, fetchErr)
+	}()
 }
 
+func appendAutoCommitFetchMessage(messages *bufsLease, payload []byte) {
+	size := uint32(len(payload))
+	var prefix [v1.Uint32Len]byte
+	binary.BigEndian.PutUint32(prefix[:], size)
+	appendFetchBytes(messages, prefix[:])
+	appendFetchBytes(messages, payload)
+}
+
+func appendAutoCommitHFetchMessage(messages *bufsLease, payload []byte, headers [][]byte) {
+	var count [v1.Uint16Len]byte
+	binary.BigEndian.PutUint16(count[:], uint16(len(headers)))
+	appendFetchBytes(messages, count[:])
+	for _, header := range headers {
+		var size [v1.Uint32Len]byte
+		binary.BigEndian.PutUint32(size[:], uint32(len(header)))
+		appendFetchBytes(messages, size[:])
+		appendFetchBytes(messages, header)
+	}
+	var size [v1.Uint32Len]byte
+	binary.BigEndian.PutUint32(size[:], uint32(len(payload)))
+	appendFetchBytes(messages, size[:])
+	appendFetchBytes(messages, payload)
+}
+
+func appendFetchBytes(messages *bufsLease, data []byte) {
+	for len(data) > 0 {
+		if len(messages.bufs) == 0 || len(messages.bufs[len(messages.bufs)-1]) == cap(messages.bufs[len(messages.bufs)-1]) {
+			size := len(data)
+			if len(messages.bufs) > 0 && cap(messages.bufs[len(messages.bufs)-1]) == pool.SIZE_LARGE {
+				size = pool.SIZE_LARGE
+			}
+			messages.bufs = append(messages.bufs, pool.Get(max(size, pool.SIZE_TINY)))
+		}
+		buffer := &messages.bufs[len(messages.bufs)-1]
+		n := min(len(data), cap(*buffer)-len(*buffer))
+		*buffer = append(*buffer, data[:n]...)
+		data = data[n:]
+	}
+}
+
+func appendFetchMessage(
+	messages *bufsLease,
+	reader connector.Reader,
+	autoCommit bool,
+	headered bool,
+	payload []byte,
+	topic string,
+	headers [][]byte,
+	args ...any,
+) {
+	headersSize := 0
+	if headered {
+		for _, header := range headers {
+			headersSize += v1.Uint32Len + len(header)
+		}
+	}
+	messageIDSize := 0
+	if !autoCommit {
+		messageIDSize = len(topic) + reader.MsgIDArgsLen()
+	}
+	size := len(payload) + v1.Uint32Len + headersSize
+	if headered {
+		size += v1.Uint16Len
+	}
+	if !autoCommit {
+		size += v1.Uint32Len + messageIDSize
+	}
+	ensureFetchBufferCapacity(messages, size)
+	buffer := &messages.bufs[len(messages.bufs)-1]
+	*buffer = encodeFetchMessage(*buffer, reader, autoCommit, headered, payload, topic, headers, messageIDSize, args...)
+}
+
+func encodeFetchMessage(
+	buffer []byte,
+	reader connector.Reader,
+	autoCommit bool,
+	headered bool,
+	payload []byte,
+	topic string,
+	headers [][]byte,
+	messageIDSize int,
+	args ...any,
+) []byte {
+	if headered {
+		buffer = binary.BigEndian.AppendUint16(buffer, uint16(len(headers)))
+		for _, header := range headers {
+			buffer = binary.BigEndian.AppendUint32(buffer, uint32(len(header)))
+			buffer = append(buffer, header...)
+		}
+	}
+	if !autoCommit {
+		buffer = binary.BigEndian.AppendUint32(buffer, uint32(messageIDSize))
+		buffer = reader.EncodeMsgID(buffer, topic, args...)
+	}
+	buffer = binary.BigEndian.AppendUint32(buffer, uint32(len(payload)))
+	return append(buffer, payload...)
+}
+
+func ensureFetchBufferCapacity(messages *bufsLease, size int) {
+	if len(messages.bufs) > 0 {
+		last := messages.bufs[len(messages.bufs)-1]
+		if cap(last)-len(last) >= size {
+			return
+		}
+	}
+	messages.bufs = append(messages.bufs, pool.Get(max(size, pool.SIZE_TINY)))
+}
 func (h *Handler) flushBufs() {
 	if h.ps.ca.cID != nil {
 		pool.Put(h.ps.ca.cID)
@@ -2347,12 +1818,14 @@ func (h *Handler) flushBufs() {
 	}
 	if h.ps.payloadBuf != nil {
 		pool.Put(h.ps.payloadBuf)
+		h.ps.payloadBuf = nil
 	}
 	if h.ps.payloadsBuf != nil {
 		for _, buf := range h.ps.payloadsBuf {
 			pool.Put(buf)
 		}
 		PutBufs(h.ps.payloadsBuf)
+		h.ps.payloadsBuf = nil
 	}
 }
 
@@ -2362,21 +1835,19 @@ func (h *Handler) close() {
 	close(h.closed)
 }
 
-func (h *Handler) parseWriteTopicLenArg() error {
-	h.ps.pa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf[0:v1.Uint32Len])
-	if h.ps.pa.topicLen == 0 {
-		return ErrWriteTopicLenArgEmpty
+func (h *Handler) parseWriteRouteLenArg() error {
+	h.ps.pa.routeLen = binary.BigEndian.Uint32(h.ps.argBuf[0:v1.Uint32Len])
+	if h.ps.pa.routeLen == 0 {
+		return ErrWriteRouteLenArgEmpty
 	}
-
 	return nil
 }
 
-func (h *Handler) parseWriteTopicArg() error {
-	h.ps.pa.topic = string(h.ps.argBuf)
-	if h.ps.pa.topic == "" {
-		return ErrWriteTopicArgEmpty
+func (h *Handler) parseWriteRouteArg() error {
+	h.ps.pa.route = string(h.ps.argBuf)
+	if h.ps.pa.route == "" {
+		return ErrWriteRouteArgEmpty
 	}
-
 	return nil
 }
 
@@ -2385,35 +1856,22 @@ func (h *Handler) parseWriteMsgSizeArg() error {
 	if h.ps.pma.size == 0 {
 		return ErrWriteMsgSizeArgEmpty
 	}
-
 	return nil
 }
 
-func (h *Handler) parseSubscribeTopicLenArg() error {
-	h.ps.sa.topicLen = binary.BigEndian.Uint32(h.ps.argBuf[0:v1.Uint32Len])
-	if h.ps.sa.topicLen == 0 {
-		return ErrReaderNameSizeArgNotProvided
+func (h *Handler) parseSubscribeRouteLenArg() error {
+	h.ps.sa.routeLen = binary.BigEndian.Uint32(h.ps.argBuf[0:v1.Uint32Len])
+	if h.ps.sa.routeLen == 0 {
+		return ErrRouteSizeArgNotProvided
 	}
-
-	return nil
-}
-
-func (h *Handler) flushWriters() error {
-	for _, sw := range h.nonTxSessionWriters {
-		// TODO: on flush err return fail
-		if err := sw.Flush(h.ctx); err != nil {
-			return fmt.Errorf("flush: %w", err)
-		}
-	}
-
 	return nil
 }
 
 func (h *Handler) enqueueWriteErrResponse(err error) {
 	errPayload := err.Error()
 	errLen := len(errPayload)
-	buf := pool.Get(10 + errLen) // resp code produce (1) + request id (4) + err code (1) + err (4 + errLen)
-	buf = append(buf, byte(v1.RESP_CODE_PRODUCE))
+	buf := pool.Get(10 + errLen)
+	buf = append(buf, byte(h.writeResponseCode()))
 	buf = append(buf, h.ps.ca.cID...)
 	buf = append(buf, v1.ERR_CODE_YES)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
@@ -2424,107 +1882,6 @@ func (h *Handler) enqueueWriteErrResponse(err error) {
 
 func (h *Handler) enqueueStop() {
 	h.out.EnqueueProto(v1.STOP_REQ)
-}
-
-func (h *Handler) enqueueAckSuccess(cID []byte) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_ACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
-	count := pool.Get(v1.Uint32Len)
-	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
-	h.out.EnqueueProtoMulti(header, count)
-	pool.Put(header)
-	pool.Put(count)
-}
-
-func (h *Handler) enqueueAckSuccessNoLock(cID []byte) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_ACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
-	count := pool.Get(v1.Uint32Len)
-	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
-	h.out.QueueOutboundNoLock(header)
-	h.out.QueueOutboundNoLock(count)
-	h.out.SignalFlush()
-	pool.Put(header)
-	pool.Put(count)
-}
-
-func (h *Handler) enqueueAckErrNoLock(cID []byte, err error) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_ACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_YES)
-	h.out.QueueOutboundNoLock(header)
-	h.out.QueueOutboundNoLock(errProtoBuf(err))
-	h.out.SignalFlush()
-	pool.Put(header)
-}
-
-func (h *Handler) enqueueAckMsgIDSuccessNoLock(msgID []byte) {
-	lenBuf := pool.Get(v1.Uint32Len)
-	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(msgID)))
-	okFlag := pool.Get(1)
-	okFlag = append(okFlag, v1.ERR_CODE_NO)
-	h.out.QueueOutboundNoLock(lenBuf)
-	h.out.QueueOutboundNoLock(msgID)
-	h.out.QueueOutboundNoLock(okFlag)
-	h.out.SignalFlush()
-	pool.Put(lenBuf)
-	pool.Put(okFlag)
-}
-
-func (h *Handler) enqueueAckMsgIDErrNoLock(msgID []byte, err error) {
-	lenBuf := pool.Get(v1.Uint32Len)
-	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(msgID)))
-	errFlag := pool.Get(1)
-	errFlag = append(errFlag, v1.ERR_CODE_YES)
-	h.out.QueueOutboundNoLock(lenBuf)
-	h.out.QueueOutboundNoLock(msgID)
-	h.out.QueueOutboundNoLock(errFlag)
-	h.out.QueueOutboundNoLock(errProtoBuf(err))
-	h.out.SignalFlush()
-	pool.Put(lenBuf)
-	pool.Put(errFlag)
-}
-
-func (h *Handler) enqueueNackSuccess(cID []byte) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_NACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
-	count := pool.Get(v1.Uint32Len)
-	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
-	h.out.EnqueueProtoMulti(header, count)
-	pool.Put(header)
-	pool.Put(count)
-}
-
-func (h *Handler) enqueueNackSuccessNoLock(cID []byte) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_NACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
-	count := pool.Get(v1.Uint32Len)
-	count = binary.BigEndian.AppendUint32(count, h.ps.aa.msgIDsLen)
-	h.out.QueueOutboundNoLock(header)
-	h.out.QueueOutboundNoLock(count)
-	h.out.SignalFlush()
-	pool.Put(header)
-	pool.Put(count)
-}
-
-func (h *Handler) enqueueNackErrNoLock(cID []byte, err error) {
-	header := pool.Get(6)
-	header = append(header, byte(v1.RESP_CODE_NACK))
-	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_YES)
-	h.out.QueueOutboundNoLock(header)
-	h.out.QueueOutboundNoLock(errProtoBuf(err))
-	h.out.SignalFlush()
-	pool.Put(header)
 }
 
 func (h *Handler) enqueueTxBeginSuccess(cID []byte) {
@@ -2590,226 +1947,94 @@ func enqueueSubscribeSuccess(out *Outbound, code v1.RespCode, cID []byte, subID 
 	pool.Put(sbuf)
 }
 
-func enqueueUnsubscribeSuccess(out *Outbound, cID []byte) {
-	// TODO: add template
-	sbuf := pool.Get(v1.Uint32Len)
-	sbuf = append(sbuf, byte(v1.RESP_CODE_UNSUBSCRIBE))
-	sbuf = append(sbuf, cID...)
-	sbuf = append(sbuf, v1.ERR_CODE_NO)
-	out.EnqueueProto(sbuf)
-	pool.Put(sbuf)
-}
-
-func (h *Handler) subEnqueueMsgFunc(
-	out *Outbound, subID byte, r connector.ReadCloser,
-) func(message []byte, topic string, args ...any) {
-	staticArgsLen := r.MsgIDArgsLen()
-	constBufLen := staticArgsLen + 6 // cmd(1) + subID(1) + msgLen(4)
-	if !r.AutoCommit() {
-		constBufLen += 4 // msgIDLen(4)
-	}
-
-	if r.AutoCommit() {
-		return func(message []byte, topic string, args ...any) {
-			resp := v1.RESP_CODE_MSG
-			buf := pool.Get(len(message) + constBufLen)
-			buf = append(buf, byte(resp))
-			buf = append(buf, subID)
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.EnqueueProto(buf)
-			pool.Put(buf)
-		}
-	}
-
-	return func(message []byte, topic string, args ...any) {
-		// In v1 we don't send headers; only optional msg-id metadata
-		resp := v1.RESP_CODE_MSG
-		buf := pool.Get(len(message) + len(topic) + constBufLen)
-		buf = append(buf, byte(resp))
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)+staticArgsLen))
-		buf = r.EncodeMsgID(buf, topic, args...)
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-		buf = append(buf, message...)
+func enqueueUnsubscribeResponse(out *Outbound, cID []byte, err error) {
+	buf := pool.Get(6)
+	buf = append(buf, byte(v1.RESP_CODE_UNSUBSCRIBE))
+	buf = append(buf, cID...)
+	if err == nil {
+		buf = append(buf, v1.ERR_CODE_NO)
 		out.EnqueueProto(buf)
 		pool.Put(buf)
+		return
 	}
+	buf = append(buf, v1.ERR_CODE_YES)
+	errBuf := errProtoBuf(err)
+	out.EnqueueProtoMulti(buf, errBuf)
+	pool.Put(buf)
+	pool.Put(errBuf)
 }
 
-func (h *Handler) subEnqueueMsgFuncWithHeaders(
-	out *Outbound, subID byte, r connector.ReadCloser,
-) func(message []byte, topic string, hs [][]byte, args ...any) {
-	staticArgsLen := r.MsgIDArgsLen()
-	constBufLen := staticArgsLen + 8 // cmd(1) + subID(1) + headersLen(2) + msgLen(4)
-	if !r.AutoCommit() {
-		constBufLen += 4
+func enqueueSubscriptionMessage(
+	out *Outbound,
+	subscriptionID byte,
+	reader connector.Reader,
+	headered bool,
+	payload []byte,
+	topic string,
+	headers [][]byte,
+	args ...any,
+) {
+	if reader.AutoCommit() {
+		enqueueAutoCommitSubscriptionMessage(out, subscriptionID, headered, payload, headers)
+		return
 	}
 
-	if r.AutoCommit() {
-		return func(message []byte, topic string, hs [][]byte, args ...any) {
-			resp := v1.RESP_CODE_HMSG
-			headersCount := uint16(len(hs))
-			headersSize := 0
-			for i := 0; i < len(hs); i += 1 {
-				headersSize += 4 + len(hs[i])
-			}
-			buf := pool.Get(headersSize + len(message) + constBufLen)
-			buf = append(buf, byte(resp))
-			buf = append(buf, subID)
-			buf = binary.BigEndian.AppendUint16(buf, headersCount)
-			for i := 0; i < len(hs); i += 1 {
-				buf = binary.BigEndian.AppendUint32(buf, uint32(len(hs[i])))
-				buf = append(buf, hs[i]...)
-			}
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.EnqueueProto(buf)
-			pool.Put(buf)
-		}
-	}
+	messageIDSize := len(topic) + reader.MsgIDArgsLen()
+	capacity := subscriptionFrameSize(headered, payload, headers) + v1.Uint32Len + messageIDSize
+	buf := pool.Get(capacity)
+	buf = appendSubscriptionFramePrefix(buf, subscriptionID, headered, headers)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(messageIDSize))
+	buf = reader.EncodeMsgID(buf, topic, args...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
+	buf = append(buf, payload...)
+	out.EnqueueProto(buf)
+	pool.Put(buf)
+}
 
-	return func(message []byte, topic string, hs [][]byte, args ...any) {
-		resp := v1.RESP_CODE_HMSG
-		headersCount := uint16(len(hs))
-		headersSize := 0
-		for i := 0; i < len(hs); i += 1 {
-			headersSize += 4 + len(hs[i])
-		}
-		buf := pool.Get(headersSize + len(message) + constBufLen)
-		buf = append(buf, byte(resp))
-		buf = append(buf, subID)
-		buf = binary.BigEndian.AppendUint16(buf, headersCount)
-		for i := 0; i < len(hs); i += 1 {
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(hs[i])))
-			buf = append(buf, hs[i]...)
-		}
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)+staticArgsLen))
-		buf = r.EncodeMsgID(buf, topic, args...)
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-		buf = append(buf, message...)
+func enqueueAutoCommitSubscriptionMessage(out *Outbound, subscriptionID byte, headered bool, payload []byte, headers [][]byte) {
+	capacity := subscriptionFrameSize(headered, payload, headers)
+	if headered && capacity <= pool.SIZE_TINY {
+		var stack [pool.SIZE_TINY]byte
+		buf := appendSubscriptionFramePrefix(stack[:0], subscriptionID, headered, headers)
+		buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
+		buf = append(buf, payload...)
 		out.EnqueueProto(buf)
-		pool.Put(buf)
+		return
 	}
+
+	buf := pool.Get(capacity)
+	buf = appendSubscriptionFramePrefix(buf, subscriptionID, headered, headers)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
+	buf = append(buf, payload...)
+	out.EnqueueProto(buf)
+	pool.Put(buf)
 }
 
-func (h *Handler) fetchEnqueueMsgFunc(
-	out *Outbound, r connector.ReadCloser, topic string, autoCommit bool,
-) func(message []byte, topic string, args ...any) {
-	staticArgsLen := r.MsgIDArgsLen()
-	constBufLen := staticArgsLen + 4 // msgLen(4)
-	if !autoCommit {
-		constBufLen += 4
-	}
-
-	h.fhMu.RLock()
-	mh := h.fetchMsgHandlers[topic][autoCommit]
-	h.fhMu.RUnlock()
-	if mh != nil {
-		return mh
-	}
-
-	h.fhMu.Lock()
-	defer h.fhMu.Unlock()
-
-	mhm, ok := h.fetchMsgHandlers[topic]
-	if !ok {
-		mhm = make(map[bool]func(message []byte, topic string, args ...any))
-		h.fetchMsgHandlers[topic] = mhm
-	}
-
-	switch autoCommit {
-	case true:
-		mh = func(message []byte, topic string, args ...any) {
-			buf := pool.Get(len(message) + constBufLen)
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.QueueOutboundNoLock(buf)
-			pool.Put(buf)
-		}
-	default:
-		mh = func(message []byte, topic string, args ...any) {
-			buf := pool.Get(len(message) + len(topic) + constBufLen)
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)+staticArgsLen))
-			buf = r.EncodeMsgID(buf, topic, args...)
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.QueueOutboundNoLock(buf)
-			pool.Put(buf)
+func subscriptionFrameSize(headered bool, payload []byte, headers [][]byte) int {
+	size := 2 + v1.Uint32Len + len(payload)
+	if headered {
+		size += v1.Uint16Len
+		for _, header := range headers {
+			size += v1.Uint32Len + len(header)
 		}
 	}
-
-	mhm[autoCommit] = mh
-	return mh
+	return size
 }
 
-func (h *Handler) fetchEnqueueMsgFuncWithHeaders(
-	out *Outbound, r connector.ReadCloser, topic string, autoCommit bool,
-) func(message []byte, topic string, hs [][]byte, args ...any) {
-	staticArgsLen := r.MsgIDArgsLen()
-	constBufLen := staticArgsLen + 6 // headersLen(2) + msgLen(4)
-	if !autoCommit {
-		constBufLen += 4
+func appendSubscriptionFramePrefix(buf []byte, subscriptionID byte, headered bool, headers [][]byte) []byte {
+	op := v1.RESP_CODE_MSG
+	if headered {
+		op = v1.RESP_CODE_HMSG
 	}
-
-	h.fhMu.RLock()
-	mh := h.fetchMsgWithHeadersHandlers[topic][autoCommit]
-	h.fhMu.RUnlock()
-	if mh != nil {
-		return mh
-	}
-
-	h.fhMu.Lock()
-	defer h.fhMu.Unlock()
-
-	mhm, ok := h.fetchMsgWithHeadersHandlers[topic]
-	if !ok {
-		mhm = make(map[bool]func(message []byte, topic string, hs [][]byte, args ...any))
-		h.fetchMsgWithHeadersHandlers[topic] = mhm
-	}
-
-	switch autoCommit {
-	case true:
-		mh = func(message []byte, topic string, hs [][]byte, args ...any) {
-			headersCount := uint16(len(hs))
-			headersSize := 0
-			for i := 0; i < len(hs); i += 1 {
-				headersSize += 4 + len(hs[i])
-			}
-			buf := pool.Get(headersSize + len(message) + constBufLen)
-			buf = binary.BigEndian.AppendUint16(buf, headersCount)
-			for i := 0; i < len(hs); i += 1 {
-				buf = binary.BigEndian.AppendUint32(buf, uint32(len(hs[i])))
-				buf = append(buf, hs[i]...)
-			}
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.QueueOutboundNoLock(buf)
-			pool.Put(buf)
-		}
-	default:
-		mh = func(message []byte, topic string, hs [][]byte, args ...any) {
-			headersCount := uint16(len(hs))
-			headersSize := 0
-			for i := 0; i < len(hs); i += 1 {
-				headersSize += 4 + len(hs[i])
-			}
-			buf := pool.Get(headersSize + len(message) + constBufLen)
-			buf = binary.BigEndian.AppendUint16(buf, headersCount)
-			for i := 0; i < len(hs); i += 1 {
-				buf = binary.BigEndian.AppendUint32(buf, uint32(len(hs[i])))
-				buf = append(buf, hs[i]...)
-			}
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)+staticArgsLen))
-			buf = r.EncodeMsgID(buf, topic, args...)
-			buf = binary.BigEndian.AppendUint32(buf, uint32(len(message)))
-			buf = append(buf, message...)
-			out.QueueOutboundNoLock(buf)
-			pool.Put(buf)
+	buf = append(buf, byte(op), subscriptionID)
+	if headered {
+		buf = binary.BigEndian.AppendUint16(buf, uint16(len(headers)))
+		for _, header := range headers {
+			buf = binary.BigEndian.AppendUint32(buf, uint32(len(header)))
+			buf = append(buf, header...)
 		}
 	}
-
-	mhm[autoCommit] = mh
-	return mh
+	return buf
 }
 
 func enqueueSubscribeErr(out *Outbound, cID []byte, respCode v1.RespCode, errCode v1.ErrCode, err error) {

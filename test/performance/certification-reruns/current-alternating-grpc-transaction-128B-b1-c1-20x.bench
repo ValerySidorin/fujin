@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105559 ns/op	   1.21 MB/s	    183167 p99-ns	    3825 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    106552 ns/op	   1.20 MB/s	    198542 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105510 ns/op	   1.21 MB/s	    185000 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105820 ns/op	   1.21 MB/s	    199958 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    106009 ns/op	   1.21 MB/s	    201834 p99-ns	    3825 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105546 ns/op	   1.21 MB/s	    194208 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105625 ns/op	   1.21 MB/s	    186959 p99-ns	    3823 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105328 ns/op	   1.22 MB/s	    186292 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    107240 ns/op	   1.19 MB/s	    222583 p99-ns	    3823 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    108943 ns/op	   1.17 MB/s	    232667 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    106140 ns/op	   1.21 MB/s	    205000 p99-ns	    3823 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105781 ns/op	   1.21 MB/s	    196917 p99-ns	    3825 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105874 ns/op	   1.21 MB/s	    202959 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    104760 ns/op	   1.22 MB/s	    191416 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    106145 ns/op	   1.21 MB/s	    209292 p99-ns	    3823 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105411 ns/op	   1.21 MB/s	    200791 p99-ns	    3823 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105935 ns/op	   1.21 MB/s	    202500 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105296 ns/op	   1.22 MB/s	    187958 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105759 ns/op	   1.21 MB/s	    189792 p99-ns	    3824 B/op	     126 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8	10000	    105601 ns/op	   1.21 MB/s	    202625 p99-ns	    3823 B/op	     126 allocs/op

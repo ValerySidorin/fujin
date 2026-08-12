@@ -1,0 +1,66 @@
+seconds to write full buf to quic stream: 0.00011025
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_Nop_QUIC-8     	       1	     15583 ns/op	   1.09 MB/s	  525528 B/op	      23 allocs/op
+seconds to write full buf to quic stream: 4.7333e-05
+Benchmark_Produce_32BPayload_Nop_QUIC-8    	       1	       333.0 ns/op	 144.14 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.0001005
+Benchmark_Produce_128BPayload_Nop_QUIC-8   	       1	       166.0 ns/op	 867.47 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 4.5875e-05
+Benchmark_Produce_256BPayload_Nop_QUIC-8   	       1	       125.0 ns/op	2176.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.0458e-05
+Benchmark_Produce_1KBPayload_Nop_QUIC-8    	       1	       334.0 ns/op	3113.77 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000123667
+Benchmark_Produce_4KBPayload_Nop_QUIC-8    	       1	       584.0 ns/op	7041.10 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 6.9167e-05
+Benchmark_Produce_8KBPayload_Nop_QUIC-8    	       1	       583.0 ns/op	14078.90 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000544
+Benchmark_Produce_32KBPayload_Nop_QUIC-8   	       1	      1291 ns/op	25394.27 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.004006375
+Benchmark_Produce_1MBPayload_Nop_QUIC-8    	       1	   3917209 ns/op	 267.69 MB/s	 2455328 B/op	    8768 allocs/op
+seconds to write full buf to tcp conn: 5.5417e-05
+Benchmark_Produce_1BPayload_Nop_TCP-8      	       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.9916e-05
+Benchmark_Produce_32BPayload_Nop_TCP-8     	       1	       125.0 ns/op	 384.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.9917e-05
+Benchmark_Produce_128BPayload_Nop_TCP-8    	       1	       208.0 ns/op	 692.31 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.9625e-05
+Benchmark_Produce_256BPayload_Nop_TCP-8    	       1	       167.0 ns/op	1628.74 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 5.2208e-05
+Benchmark_Produce_1KBPayload_Nop_TCP-8     	       1	       208.0 ns/op	5000.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.3291e-05
+Benchmark_Produce_4KBPayload_Nop_TCP-8     	       1	       166.0 ns/op	24771.08 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 5.8875e-05
+Benchmark_Produce_8KBPayload_Nop_TCP-8     	       1	       542.0 ns/op	15143.91 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.7583e-05
+Benchmark_Produce_32KBPayload_Nop_TCP-8    	       1	      1000 ns/op	32784.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 0.000545292
+Benchmark_Produce_1MBPayload_Nop_TCP-8     	       1	    520000 ns/op	2016.52 MB/s	 1574040 B/op	       5 allocs/op
+seconds to write full buf to unix conn: 4.9084e-05
+Benchmark_Produce_1BPayload_Nop_Unix-8     	       1	       167.0 ns/op	 101.80 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.3583e-05
+Benchmark_Produce_32BPayload_Nop_Unix-8    	       1	       166.0 ns/op	 289.16 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.0458e-05
+Benchmark_Produce_128BPayload_Nop_Unix-8   	       1	       167.0 ns/op	 862.28 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 4.4958e-05
+Benchmark_Produce_256BPayload_Nop_Unix-8   	       1	       125.0 ns/op	2176.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.2e-05
+Benchmark_Produce_1KBPayload_Nop_Unix-8    	       1	       167.0 ns/op	6227.54 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.0333e-05
+Benchmark_Produce_4KBPayload_Nop_Unix-8    	       1	       250.0 ns/op	16448.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 8.5416e-05
+Benchmark_Produce_8KBPayload_Nop_Unix-8    	       1	       416.0 ns/op	19730.77 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 0.000107208
+Benchmark_Produce_32KBPayload_Nop_Unix-8   	       1	       958.0 ns/op	34221.29 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 0.001444417
+Benchmark_Produce_1MBPayload_Nop_Unix-8    	       1	   1419791 ns/op	 738.55 MB/s	 1574040 B/op	       6 allocs/op
+seconds to write full buf to quic stream: 4.7583e-05
+Benchmark_Fetch_Nop_QUIC-8                 	       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 5.0709e-05
+Benchmark_Fetch_Nop_TCP-8                  	       1	       125.0 ns/op	 136.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 4.8333e-05
+Benchmark_Fetch_Nop_Unix-8                 	       1	       125.0 ns/op	 136.00 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.130s

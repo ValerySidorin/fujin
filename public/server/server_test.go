@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"sync"
 	"testing"
+	"time"
 
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 )
@@ -72,3 +74,73 @@ func TestReloadConnectors_Concurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestReadyForConnectionsWaitsForGRPC(t *testing.T) {
+	grpc := newLifecycleGRPCServer()
+	s := &Server{grpcServer: grpc}
+	result := make(chan bool, 1)
+	go func() {
+		result <- s.ReadyForConnections(time.Second)
+	}()
+
+	select {
+	case <-result:
+		t.Fatal("server reported ready before gRPC was ready")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	close(grpc.ready)
+	select {
+	case ready := <-result:
+		if !ready {
+			t.Fatal("server did not report ready after gRPC became ready")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("server readiness did not observe gRPC")
+	}
+}
+
+func TestDoneWaitsForGRPC(t *testing.T) {
+	grpc := newLifecycleGRPCServer()
+	s := &Server{grpcServer: grpc}
+	done := s.Done()
+
+	select {
+	case <-done:
+		t.Fatal("server reported done before gRPC stopped")
+	case <-time.After(10 * time.Millisecond):
+	}
+
+	close(grpc.done)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("server completion did not observe gRPC")
+	}
+}
+
+type lifecycleGRPCServer struct {
+	ready chan struct{}
+	done  chan struct{}
+}
+
+func newLifecycleGRPCServer() *lifecycleGRPCServer {
+	return &lifecycleGRPCServer{
+		ready: make(chan struct{}),
+		done:  make(chan struct{}),
+	}
+}
+
+func (s *lifecycleGRPCServer) ListenAndServe(context.Context) error { return nil }
+func (s *lifecycleGRPCServer) Stop()                                {}
+
+func (s *lifecycleGRPCServer) ReadyForConnections(timeout time.Duration) bool {
+	select {
+	case <-s.ready:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+func (s *lifecycleGRPCServer) Done() <-chan struct{} { return s.done }

@@ -43,15 +43,15 @@ func newRESPPubSubConnector(config any, l *slog.Logger) (connector.Connector, er
 }
 
 // NewReader creates a reader from configuration
-func (p *pubsubRueidisConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := p.config.Clients[name]
+func (p *pubsubRueidisConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := p.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("resp_pubsub: client not found by name: %s", name)
+		return nil, fmt.Errorf("resp_pubsub: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         p.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: p.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateReader(); err != nil {
@@ -62,15 +62,15 @@ func (p *pubsubRueidisConnector) NewReader(config any, name string, autoCommit b
 }
 
 // NewWriter creates a writer from configuration
-func (p *pubsubRueidisConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := p.config.Clients[name]
+func (p *pubsubRueidisConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := p.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("resp_pubsub: client not found by name: %s", name)
+		return nil, fmt.Errorf("resp_pubsub: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         p.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: p.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateWriter(); err != nil {

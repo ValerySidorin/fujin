@@ -104,7 +104,6 @@ func (i *inbound) waitAndDisconnect() {
 
 func (i *inbound) close() {
 	i.closeRead()
-	i.h.wg.Wait()
 	i.h.out.Close()
 	<-i.h.closed
 	i.h.flushBufs()

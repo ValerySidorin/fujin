@@ -16,7 +16,7 @@ connectors:
         broker_url: tcp://localhost:1883
         keep_alive: 2s
         disconnect_timeout: 5s
-      clients:
+      routes:
         pub:
           client_id: fujin_pub
           topic: my_topic

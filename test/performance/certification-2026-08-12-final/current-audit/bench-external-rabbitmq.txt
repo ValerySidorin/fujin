@@ -1,0 +1,37 @@
+===== compose up rc=0 =====
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container rabbitmq  Creating
+ Container rabbitmq  Created
+ Container rabbitmq  Starting
+ Container rabbitmq  Started
+ Container rabbitmq  Waiting
+ Container rabbitmq  Healthy
+
+===== go benchmark rc=0 =====
+time=2026-08-12T15:27:02.512+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:897 msg="Server started"
+time=2026-08-12T15:27:02.512+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+seconds to write full buf to quic stream: 7.9584e-05
+time=2026-08-12T15:27:02.584+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:27:02.584+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	       1	     16584 ns/op	   1.03 MB/s	    1312 B/op	      27 allocs/op
+time=2026-08-12T15:27:02.585+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:27:02.585+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:897 msg="Server started"
+seconds to write full buf to quic stream: 0.000268958
+time=2026-08-12T15:27:02.607+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:27:02.607+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	       1	      1625 ns/op	20174.77 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.561s
+
+===== compose down rc=0 =====
+ Container rabbitmq  Stopping
+ Container rabbitmq  Stopped
+ Container rabbitmq  Removing
+ Container rabbitmq  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	"github.com/fujin-io/fujin/public/plugins/transport"
@@ -34,6 +35,16 @@ func (w *GRPCServerWrapper) ListenAndServe(ctx context.Context) error {
 // Stop gracefully stops the gRPC server
 func (w *GRPCServerWrapper) Stop() {
 	w.server.Stop()
+}
+
+// ReadyForConnections waits until the gRPC listener is serving.
+func (w *GRPCServerWrapper) ReadyForConnections(timeout time.Duration) bool {
+	return w.server.ReadyForConnections(timeout)
+}
+
+// Done is closed after the gRPC server stops.
+func (w *GRPCServerWrapper) Done() <-chan struct{} {
+	return w.server.Done()
 }
 
 // SetBaseConfigProvider implements transport.HotReloadable.

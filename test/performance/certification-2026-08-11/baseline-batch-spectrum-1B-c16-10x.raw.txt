@@ -1,0 +1,1025 @@
+time=2026-08-11T19:00:28.881+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:28.881+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:28.881+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:28.881+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.002+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.002+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	      9662 ns/op	   0.10 MB/s	    195041 p99-ns	    1547 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:29.121+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.235+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.235+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.235+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.235+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.236+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.236+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.236+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.236+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.354+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.354+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.354+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.354+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     10005 ns/op	   0.10 MB/s	    236875 p99-ns	    1528 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:29.354+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.355+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.355+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.355+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.471+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.471+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.471+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.471+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.472+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.472+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.472+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.472+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     10146 ns/op	   0.10 MB/s	    197666 p99-ns	    1535 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.589+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.590+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.589+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.704+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.704+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.704+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.704+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.705+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.705+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.705+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.705+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.823+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.823+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.823+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.823+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	      9652 ns/op	   0.10 MB/s	    175875 p99-ns	    1536 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:29.824+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.824+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.824+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.824+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:29.938+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:29.938+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:29.938+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:29.938+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:29.939+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:29.939+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:29.939+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:29.939+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.056+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.056+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.056+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.056+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	      9187 ns/op	   0.11 MB/s	    191875 p99-ns	    1524 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:30.057+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.057+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.057+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.057+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.171+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.171+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.171+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.171+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.172+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.172+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.172+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.172+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.289+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.289+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.289+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.289+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     11567 ns/op	   0.09 MB/s	    215042 p99-ns	    1523 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:30.290+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.290+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.290+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.290+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.404+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.404+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.404+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.404+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.405+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.405+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.405+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.405+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.521+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.521+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.521+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	      9654 ns/op	   0.10 MB/s	    197250 p99-ns	    1536 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:30.521+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.522+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.522+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.522+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.522+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.636+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.636+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.636+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.636+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     10195 ns/op	   0.10 MB/s	    204750 p99-ns	    1520 B/op	      41 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:30.753+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.753+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.867+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.868+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.868+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:30.985+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:30.985+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:30.985+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:30.985+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     10045 ns/op	   0.10 MB/s	    228916 p99-ns	    1514 B/op	      40 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=1/concurrency=16-8         	time=2026-08-11T19:00:30.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:30.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:30.986+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:30.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.099+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.099+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.220+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.220+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.220+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13419 ns/op	   0.07 MB/s	    273708 p99-ns	    1523 B/op	      41 allocs/op
+time=2026-08-11T19:00:31.220+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.221+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:31.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.338+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.338+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.338+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.338+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.456+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.456+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.456+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:31.456+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     13465 ns/op	   2.38 MB/s	    257667 p99-ns	    9036 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:31.457+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:31.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.573+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.690+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.690+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.690+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13736 ns/op	   2.33 MB/s	    331583 p99-ns	    9047 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:31.690+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.691+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.805+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.805+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.805+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:31.805+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.806+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.806+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.806+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.806+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:31.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:31.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:31.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13670 ns/op	   2.34 MB/s	    319042 p99-ns	    9029 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:31.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:31.926+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:31.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:31.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:31.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.047+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.163+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.163+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.164+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     12488 ns/op	   2.56 MB/s	    224583 p99-ns	    9034 B/op	     144 allocs/op
+time=2026-08-11T19:00:32.164+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:32.164+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.164+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.164+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.164+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.277+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.277+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.277+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.277+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.278+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.278+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.278+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.278+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.395+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.395+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.395+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13248 ns/op	   2.42 MB/s	    310625 p99-ns	    9084 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:32.395+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.396+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.396+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.396+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.396+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.510+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.510+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.510+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.510+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.511+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.511+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.511+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.511+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13009 ns/op	   2.46 MB/s	    293000 p99-ns	    9032 B/op	     143 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:32.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.629+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.747+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.747+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.747+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.747+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.748+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.866+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.866+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.866+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.866+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     11109 ns/op	   2.88 MB/s	    234167 p99-ns	    9026 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:32.867+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.867+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:32.867+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.867+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.981+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:32.981+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:32.981+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:32.981+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:32.982+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:32.982+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:32.982+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:32.982+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.105+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.105+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.105+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13863 ns/op	   2.31 MB/s	    325417 p99-ns	    9023 B/op	     143 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:33.105+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.106+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.106+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.106+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.106+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.223+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.223+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.223+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:33.223+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.224+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.224+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.224+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.224+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.342+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.342+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.342+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     17187 ns/op	   1.86 MB/s	    307125 p99-ns	    9029 B/op	     144 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8        	time=2026-08-11T19:00:33.343+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.344+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.344+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.344+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.344+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:33.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.458+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.575+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.575+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.575+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     13227 ns/op	   2.42 MB/s	    263791 p99-ns	    9024 B/op	     143 allocs/op
+time=2026-08-11T19:00:33.575+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.576+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.576+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.576+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.576+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.691+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:33.692+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.693+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.693+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.693+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.693+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.817+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.817+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.817+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     55550 ns/op	   4.61 MB/s	   1732500 p99-ns	   62085 B/op	     820 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:33.817+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.818+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.818+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.818+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.818+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:33.933+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:33.933+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:33.933+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:33.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:33.934+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:33.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:33.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:33.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     39164 ns/op	   6.54 MB/s	   1277583 p99-ns	   61873 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.055+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.055+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:34.170+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.170+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.292+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.292+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.292+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     44160 ns/op	   5.80 MB/s	   1325584 p99-ns	   61955 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:34.292+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.293+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.293+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.293+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.293+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.407+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.407+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.408+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.529+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.529+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.529+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     40860 ns/op	   6.27 MB/s	   1431333 p99-ns	   61642 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:34.529+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.530+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.530+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.530+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.530+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.647+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.647+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.647+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:34.647+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.648+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.648+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.648+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.648+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.770+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.770+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.770+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.770+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     52062 ns/op	   4.92 MB/s	   1651875 p99-ns	   61742 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:34.771+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.771+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.771+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:34.771+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.885+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:34.885+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:34.885+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:34.886+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:34.886+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:34.886+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:34.886+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:34.886+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.011+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.011+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.011+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     49916 ns/op	   5.13 MB/s	   1799667 p99-ns	   61925 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:35.011+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.012+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.012+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.012+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.012+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.128+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.128+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.128+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.128+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.129+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.129+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.129+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.129+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.250+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.250+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.250+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.251+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     44785 ns/op	   5.72 MB/s	   1751667 p99-ns	   61688 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:35.251+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.251+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.251+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.251+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.365+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.365+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.365+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.365+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.366+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.366+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.366+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.366+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     50326 ns/op	   5.09 MB/s	   1846083 p99-ns	   61673 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.489+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.489+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.602+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.602+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.603+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.603+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.603+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.603+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.603+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.603+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.725+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.725+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.725+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.725+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     42056 ns/op	   6.09 MB/s	   1207625 p99-ns	   62084 B/op	     819 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8       	time=2026-08-11T19:00:35.726+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.726+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.726+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.726+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.840+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.841+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.841+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:35.841+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.842+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.842+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:35.842+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.842+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.963+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:35.963+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:35.963+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     43707 ns/op	   5.86 MB/s	   1673834 p99-ns	   61826 B/op	     819 allocs/op
+time=2026-08-11T19:00:35.963+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:35.964+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:35.964+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:35.964+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:35.964+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.083+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.083+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.083+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:36.083+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:36.084+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.084+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.084+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.084+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.205+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.205+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.205+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.205+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	      9150 ns/op	   0.11 MB/s	    209000 p99-ns	    1906 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:36.206+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.206+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.206+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.206+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.320+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.320+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.320+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.320+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:36.321+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.321+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.321+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.321+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     10339 ns/op	   0.10 MB/s	    213834 p99-ns	    1918 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.437+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.437+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.438+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.552+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.552+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.552+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:36.552+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.553+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.553+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.553+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.553+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.671+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.671+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.671+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:36.671+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     12287 ns/op	   0.08 MB/s	    214250 p99-ns	    1905 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:36.672+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.672+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.672+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.672+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.785+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.785+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.785+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.785+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:36.786+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.786+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.786+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:36.786+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.904+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:36.904+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:36.904+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     10253 ns/op	   0.10 MB/s	    236833 p99-ns	    1895 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:36.904+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:36.905+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:36.905+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:36.905+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:36.905+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.019+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.020+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.020+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.145+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.145+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.145+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     12730 ns/op	   0.08 MB/s	    278666 p99-ns	    1909 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:37.145+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.146+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.146+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.146+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.146+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.261+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.261+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.261+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.261+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.262+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.262+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.262+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.262+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.378+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.378+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.378+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	      8564 ns/op	   0.12 MB/s	    163500 p99-ns	    1885 B/op	      46 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:37.378+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.379+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.379+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.379+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.379+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.497+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.497+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.497+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.497+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.613+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.613+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.613+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.613+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	      9139 ns/op	   0.11 MB/s	    189542 p99-ns	    1901 B/op	      46 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:37.614+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.732+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.732+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.732+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.732+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.849+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.849+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.849+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	      8607 ns/op	   0.12 MB/s	    201750 p99-ns	    1900 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:37.849+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.850+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.850+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.850+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.850+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:37.965+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:37.965+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:37.965+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:37.965+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:37.966+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:37.966+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:37.966+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:37.966+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     11541 ns/op	   0.09 MB/s	    220000 p99-ns	    1895 B/op	      47 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=1/concurrency=16-8        	time=2026-08-11T19:00:38.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.089+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.089+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.089+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.089+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.209+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.209+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.209+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:38.209+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.210+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.210+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.210+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.210+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.328+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.328+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.328+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.328+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     10132 ns/op	   0.10 MB/s	    214625 p99-ns	    1906 B/op	      47 allocs/op
+time=2026-08-11T19:00:38.329+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.329+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.329+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.329+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.444+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.444+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.444+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:38.444+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.445+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.445+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.445+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.445+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.564+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.564+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.564+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:38.564+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     24173 ns/op	   1.32 MB/s	   1080083 p99-ns	   17712 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:38.565+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.565+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.565+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.565+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:38.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.683+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.683+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.683+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.683+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     24434 ns/op	   1.31 MB/s	   1261208 p99-ns	   17792 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:38.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.809+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.809+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:38.809+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.809+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:38.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:38.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:38.925+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:38.926+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:38.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:38.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:38.926+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     24864 ns/op	   1.29 MB/s	   1164959 p99-ns	   17708 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:39.047+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.047+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.162+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.162+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.162+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:39.162+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.163+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.163+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.163+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.163+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.282+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.282+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.282+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     22421 ns/op	   1.43 MB/s	   1072791 p99-ns	   17941 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:39.282+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.283+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.283+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.283+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.283+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.396+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.397+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.397+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:39.397+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.397+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.397+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.397+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.398+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     22350 ns/op	   1.43 MB/s	    730250 p99-ns	   17761 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:39.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.516+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.516+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.516+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.516+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.629+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:39.630+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.630+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.630+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.630+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     24542 ns/op	   1.30 MB/s	   1367750 p99-ns	   17770 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:39.748+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.749+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.749+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.749+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.749+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.864+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.864+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.864+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.864+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:39.865+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.865+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:39.865+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.865+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:39.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:39.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     25167 ns/op	   1.27 MB/s	   1092083 p99-ns	   17853 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:39.986+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:39.987+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:39.987+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:39.987+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:39.987+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.100+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.100+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.100+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:40.100+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.101+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.101+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.101+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.101+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     22169 ns/op	   1.44 MB/s	   1169542 p99-ns	   17997 B/op	     332 allocs/op
+time=2026-08-11T19:00:40.221+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:40.222+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.222+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.222+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.222+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.336+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.336+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.336+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:40.336+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.337+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.337+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.457+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     28432 ns/op	   1.13 MB/s	   1544167 p99-ns	   17793 B/op	     332 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8       	time=2026-08-11T19:00:40.458+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.458+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.572+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:40.573+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.573+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.692+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.692+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.692+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:40.693+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     25950 ns/op	   1.23 MB/s	   1133125 p99-ns	   17837 B/op	     332 allocs/op
+time=2026-08-11T19:00:40.694+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.694+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.694+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.694+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:40.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.808+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:40.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:40.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:40.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:40.934+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     87837 ns/op	   2.91 MB/s	   2960583 p99-ns	  134701 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:40.935+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:40.935+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:40.935+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:40.935+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.049+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.049+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.049+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:41.049+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.050+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.050+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.050+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.050+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.178+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.178+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.178+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.178+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     86588 ns/op	   2.96 MB/s	   3255291 p99-ns	  135576 B/op	    2358 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:41.179+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.179+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.179+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.179+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:41.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.295+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.295+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.295+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.295+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.421+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.421+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.421+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:41.421+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     85361 ns/op	   3.00 MB/s	   2480125 p99-ns	  135232 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:41.422+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.422+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.422+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.422+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.536+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.536+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.536+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:41.536+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.537+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.537+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.537+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.537+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.663+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.663+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.663+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.663+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     83598 ns/op	   3.06 MB/s	   3445583 p99-ns	  134857 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:41.664+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.664+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.664+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.664+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.779+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.779+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.779+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:41.779+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.780+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.780+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.780+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.780+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:41.908+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:41.908+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:41.908+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     81993 ns/op	   3.12 MB/s	   3161542 p99-ns	  133856 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:41.908+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:41.909+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:41.909+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:41.909+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:41.909+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.023+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.023+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.157+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.157+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.157+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.157+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     85899 ns/op	   2.98 MB/s	   2831334 p99-ns	  134061 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:42.158+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.158+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.158+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.158+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.272+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.272+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.398+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.398+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.398+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     79899 ns/op	   3.20 MB/s	   3233041 p99-ns	  134168 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:42.398+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.399+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.399+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.399+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.399+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.514+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.514+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.514+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.514+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.515+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.515+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     84400 ns/op	   3.03 MB/s	   2852167 p99-ns	  134842 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:42.641+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.641+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.756+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.756+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.756+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.756+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.757+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.757+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.757+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.757+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+     100	     82428 ns/op	   3.11 MB/s	   2400000 p99-ns	  134238 B/op	    2357 allocs/op
+Benchmark_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8      	time=2026-08-11T19:00:42.882+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:42.882+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.995+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:178 msg="grpc server stopped" server=grpc
+time=2026-08-11T19:00:42.996+03:00 level=WARN source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:142 msg="tls not configured, this is not recommended for production environment" server=grpc
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T19:00:42.996+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:70 msg="grpc server started" server=grpc addr=:4849
+time=2026-08-11T19:00:43.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T19:00:43.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/internal/transport/grpc/v1/server/grpc_server.go:175 msg="shutting down grpc server" server=grpc
+time=2026-08-11T19:00:43.121+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+     100	     85555 ns/op	   2.99 MB/s	   2739334 p99-ns	  134734 B/op	    2358 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	14.718s

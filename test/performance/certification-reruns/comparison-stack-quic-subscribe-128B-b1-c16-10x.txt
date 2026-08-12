@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                               │ /Users/mak/src/fujin/test/performance/certification-reruns/a-stack-quic-subscribe-128B-b1-c16-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-stack-quic-subscribe-128B-b1-c16-10x.bench │
+                                                                               │                                                 sec/op                                                  │                                        sec/op                                          vs base          │
+_Session_Subscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8                                                                                               1.449µ ± 1%                                                                             1.454µ ± 1%  ~ (p=0.725 n=10)
+
+                                                                               │ /Users/mak/src/fujin/test/performance/certification-reruns/a-stack-quic-subscribe-128B-b1-c16-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-stack-quic-subscribe-128B-b1-c16-10x.bench │
+                                                                               │                                                   B/s                                                   │                                          B/s                                           vs base          │
+_Session_Subscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8                                                                                              84.24Mi ± 1%                                                                            83.97Mi ± 1%  ~ (p=0.684 n=10)
+
+                                                                               │ /Users/mak/src/fujin/test/performance/certification-reruns/a-stack-quic-subscribe-128B-b1-c16-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-stack-quic-subscribe-128B-b1-c16-10x.bench │
+                                                                               │                                                 p99-sec                                                 │                                        p99-sec                                         vs base          │
+_Session_Subscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8                                                                                               209.2µ ± 4%                                                                             212.9µ ± 5%  ~ (p=0.436 n=10)
+
+                                                                               │ /Users/mak/src/fujin/test/performance/certification-reruns/a-stack-quic-subscribe-128B-b1-c16-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-stack-quic-subscribe-128B-b1-c16-10x.bench │
+                                                                               │                                                  B/op                                                   │                                         B/op                                           vs base          │
+_Session_Subscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8                                                                                                475.5 ± 1%                                                                              476.5 ± 1%  ~ (p=0.467 n=10)
+
+                                                                               │ /Users/mak/src/fujin/test/performance/certification-reruns/a-stack-quic-subscribe-128B-b1-c16-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-stack-quic-subscribe-128B-b1-c16-10x.bench │
+                                                                               │                                                allocs/op                                                │                                      allocs/op                                       vs base            │
+_Session_Subscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8                                                                                                5.000 ± 0%                                                                            5.000 ± 0%  ~ (p=1.000 n=10) ¹
+¹ all samples are equal

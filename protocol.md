@@ -82,12 +82,12 @@ Additionally, the server can be configured to ping opened streams. This helps to
 ### Direction
 Client -> Server
 ### Description
-Before producing messages, the client must open a stream (QUIC stream or TCP connection) and send a `BIND` command to the server. This command binds the session to a connector and optionally applies configuration overrides to connector settings. The `BIND` command must be sent before any other commands (except `PING`/`PONG`).
+Before producing messages, the client must open a stream (QUIC stream or TCP connection) and send a `BIND` command to the server. This command binds the session to a connector and optionally applies configuration overrides to connector settings. The `BIND` command must be sent before any other commands except `PING`/`PONG`.
 
 The `BIND` command includes:
-- `connector_name`: The name of the connector to bind to (e.g., `kafka_connector`)
-- `meta`: Optional metadata key-value pairs that can be used by bind middleware plugins (e.g., for authentication)
-- `config_overrides`: Optional configuration overrides that allow dynamic modification of connector settings at runtime
+- `connector_name`: the connector configuration name (for example, `kafka_connector`)
+- `meta`: optional metadata key-value pairs consumed by bind middleware
+- `config_overrides`: optional overrides using configuration paths such as `routes.orders.transactional_id`
 
 ### Syntax
 ##### Request
@@ -109,162 +109,154 @@ Where `meta` and `config_overrides` are arrays of key-value pairs, each pair rep
 ### Examples
 - `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 0]` -> `[16, 0]` (BIND with connector name "kafka_connector", no meta, no overrides)
 - `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 1, 0, 0, 0, 7, 97, 112, 105, 95, 107, 101, 121, 0, 0, 0, 16, 109, 121, 45, 115, 101, 99, 114, 101, 116, 45, 107, 101, 121, 45, 49, 50, 51, 0, 0]` -> `[16, 0]` (BIND with connector name "kafka_connector", one meta pair: `api_key` = `my-secret-key-123`, no overrides)
-- `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 25, 119, 114, 105, 116, 101, 114, 46, 112, 117, 98, 46, 116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 97, 108, 95, 105, 100, 0, 0, 0, 15, 109, 121, 45, 116, 120, 45, 105, 100, 45, 49, 50, 51, 52, 53]` -> `[16, 0]` (BIND with connector name "kafka_connector", no meta, one override: `writer.pub.transactional_id` = `my-tx-id-12345`)
+- A BIND override path selects a Fujin route, for example `routes.pub.transactional_id`; the broker-native destination remains inside that route's connector settings.
 
 ## PRODUCE
 
 ### Direction
 Client -> Server
+
 ### Description
-Sends a message to the specified topic. This must be sent on the same stream where the `BIND` command was previously issued.
+Sends one non-transactional message through a configured Fujin route. `route` is a key under the bound connector's `settings.routes` map; it is not necessarily a broker topic. `PRODUCE` is rejected while a transaction is active.
+
 ### Syntax
 ##### Request
-`[2, <correlation id>, <topic>, <message>]`  
-where:
-| name             | description                                                               | type                      |
-| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
-| `topic`          | The target topic for the message.                                         | string                    |
-| `message`        | The message content.                                                      | [uint32]byte              |
+`[2, <correlation id>, <route>, <message>]`
+
+| name             | description                                                               | type         |
+| ---------------- | ------------------------------------------------------------------------- | ------------ |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32       |
+| `route`          | Fujin route name resolved by the bound connector.                         | string       |
+| `message`        | Message content.                                                          | [uint32]byte |
+
 ##### Response
-`[3, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type   |
-| ---------------- | ------------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
-### Examples
-- `[2, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[3, 0, 1, 1, 1, 0]`
+`[3, <correlation id>, <error>]`
 
 ## HPRODUCE
 
 ### Direction
 Client -> Server
+
 ### Description
-Sends a message with headers to the specified topic. This must be sent on the same stream where the `BIND` command was previously issued.
+Header-aware form of `PRODUCE`. It is also non-transactional and rejected while a transaction is active.
+
 ### Syntax
 ##### Request
-`[3, <correlation id>, <topic>, <headers>, <message>]`  
-where:
-| name             | description                                                               | type                      |
-| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
-| `topic`          | The target topic for the message.                                         | string                    |
-| `headers`        | Optional headers for the message.                                         | [uint16]string            |
-| `message`        | The message content.                                                      | [uint32]byte              |
-##### Response
-`[4, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type   |
-| ---------------- | ------------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
-### Examples
-- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[4, 0, 1, 1, 1, 0]`
+`[3, <correlation id>, <route>, <headers>, <message>]`
 
+| name             | description                                                               | type           |
+| ---------------- | ------------------------------------------------------------------------- | -------------- |
+| `correlation id` | Correlation ID used to match the client request with the server response. | uint32         |
+| `route`          | Fujin route name resolved by the bound connector.                         | string         |
+| `headers`        | Header key/value strings in connector order.                              | [uint16]string |
+| `message`        | Message content.                                                          | [uint32]byte   |
+
+##### Response
+`[4, <correlation id>, <error>]`
 
 ## BEGIN TX
+
 ### Direction
 Client -> Server
 
 ### Description
-Begins transaction. Must be sent on the same stream where the `BIND` command was sent previously. For Kafka transactions, `transactional_id` should be configured via `BIND` command's config overrides (e.g., `clients.client1.transactional_id`).
+Eagerly acquires the writer for one route and invokes the connector's transaction begin operation before returning success. A transaction is restricted to this route. For Kafka, configure `transactional_id` in that route, optionally through a BIND override such as `routes.orders.transactional_id`.
 
 ### Syntax
 ##### Request
-`[4, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-##### Response
-`[3, <correlation id>, <error>]`  
-where:
+`[4, <correlation id>, <route>]`
+
 | name             | description                                                               | type   |
 | ---------------- | ------------------------------------------------------------------------- | ------ |
 | `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
+| `route`          | Route whose writer owns the transaction.                                  | string |
 
-### Examples
-- `[4, 0, 0, 0, 1]` -> `[3, 0, 0, 0, 1, 0]`
+##### Response
+`[5, <correlation id>, <error>]`
 
 ## COMMIT TX
+
 ### Direction
 Client -> Server
 
 ### Description
-Commits transaction. Must be sent on the same stream where the `BIND` command was sent previously.
+Flushes and commits the active transaction, then returns its route writer to the connector pool.
 
 ### Syntax
 ##### Request
-`[5, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-##### Response
-`[4, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type    |
-| ---------------- | ------------------------------------------------------------------------- | ------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
-| `error`          | An error.                                                                 | string? |
+`[5, <correlation id>]`
 
-### Examples
-- `[5, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
+##### Response
+`[6, <correlation id>, <error>]`
 
 ## ROLLBACK TX
+
 ### Direction
 Client -> Server
 
 ### Description
-Rolls back transaction. Must be sent on the same stream where the `BIND` command was sent previously.
+Rolls back the active transaction and returns its route writer to the connector pool.
 
 ### Syntax
 ##### Request
-`[6, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
+`[6, <correlation id>]`
+
 ##### Response
-`[5, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type    |
-| ---------------- | ------------------------------------------------------------------------- | ------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
-| `error`          | An error.                                                                 | string? |
+`[7, <correlation id>, <error>]`
 
-### Examples
-- `[6, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
+## TX_PRODUCE
 
+### Direction
+Client -> Server
+
+### Description
+Sends a message through the route selected by `BEGIN TX`. The request does not carry a route, so a transaction cannot switch destinations mid-flight.
+
+### Syntax
+##### Request
+`[15, <correlation id>, <message>]`
+
+##### Response
+`[17, <correlation id>, <error>]`
+
+## TX_HPRODUCE
+
+### Direction
+Client -> Server
+
+### Description
+Header-aware form of `TX_PRODUCE`.
+
+### Syntax
+##### Request
+`[16, <correlation id>, <headers>, <message>]`
+
+##### Response
+`[18, <correlation id>, <error>]`
+
+Normal `PRODUCE`/`HPRODUCE` opcodes are not transaction message commands. Clients must use `TX_PRODUCE` or `TX_HPRODUCE` after `BEGIN TX`.
 ## SUBSCRIBE
 
 ### Direction
 Client -> Server
+
 ### Description
-Client initiates a subscription to a topic. Messages will be sent by the server on the same stream opened by the client. Message distribution is handled by the underlying broker.
+Creates a push reader for a configured route. Messages are delivered on the same session stream. The route resolves to broker-specific reader settings such as Kafka topics, a NATS subject, or a RabbitMQ queue binding.
 
 ### Syntax
 ##### Request
-`[11, <correlation id>, <auto commit>, <topic>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-| `auto commit`    | Subscribe with auto commit.                                          | bool   |
-| `topic`          | Topic to read from.                                                  | string |
-##### Response
-`[1, <correlation id>, <error>, <subscription id>]`  
-where:
-| name              | description                                                          |  type   |
-| ----------------- | -------------------------------------------------------------------- | ------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  |
-| `error`           | An error.                                                            | string? |
-| `subscription id` | Subscription ID.                                                     | byte    |
+`[11, <correlation id>, <auto commit>, <route>]`
 
-### Examples
-- `[11, 0, 0, 0, 1, 1, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0, 0, 1, 0, 5]`
+| name              | description                                                          | type   |
+| ----------------- | -------------------------------------------------------------------- | ------ |
+| `correlation id`  | Correlation ID used to match client request with server response.    | uint32 |
+| `auto commit`     | Whether the connector reader automatically commits deliveries.       | bool   |
+| `route`           | Fujin route name resolved by the bound connector.                    | string |
+
+##### Response
+`[1, <correlation id>, <error>, <subscription id>]`
+
+The `HSUBSCRIBE` request uses opcode `12`, the same route fields, and response opcode `2`; delivered messages use `HMSG`.
 ## MSG
 
 ### Direction
@@ -303,7 +295,7 @@ where:
 ### Direction
 Client -> Server
 ### Description
-If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
+If auto commit is disabled for the selected route, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
 ### Syntax
 ##### Request
 `[9, <correlation id>, <subscription id>, <msg ids>]`  
@@ -358,20 +350,20 @@ where:
 ### Direction
 Client -> Server
 ## Description
-Client can send a `FETCH` command to the server to retrieve messages from the current stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
+Client can send a `FETCH` command to retrieve a batch through a configured route. The underlying broker determines whether fetch blocks, returns a partial batch, or returns zero messages. Not all connectors implement `FETCH`; push subscription is the alternative.
 
-On the first `FETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `FETCH` requests for the same topic reuse the same subscription.
+On the first `FETCH` request for a `(route, auto commit, header mode)` tuple, the server creates an implicit reader and assigns a `subscription_id`. Subsequent equivalent requests reuse that reader.
 
 ## Syntax
 ##### Request
-`[7, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
-where:
+`[7, <correlation id>, <auto commit>, <route>, <msg response batch len>]`
+
 | name                     | description                                                          | type   |
 | ------------------------ | -------------------------------------------------------------------- | ------ |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32 |
+| `correlation id`         | Correlation ID used to match client request with server response.    | uint32 |
 | `auto commit`            | Fetch with auto commit.                                              | bool   |
-| `topic`                  | Topic to read from.                                                  | string |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32 |
+| `route`                  | Fujin route name resolved by the bound connector.                    | string |
+| `msg response batch len` | Maximum number of messages requested.                                | uint32 |
 
 ##### Response
 `[10, <correlation id>, <error>, <subscription_id>, <msgs>]`  
@@ -388,20 +380,20 @@ where:
 ### Direction
 Client -> Server
 ## Description
-`FETCH` with headers support.
+`FETCH` with header-aware message encoding.
 
-On the first `HFETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `HFETCH` requests for the same topic reuse the same subscription.
+The implicit reader cache is keyed by `(route, auto commit, header mode)`, so `FETCH` and `HFETCH` do not share a reader.
 
 ## Syntax
 ##### Request
-`[8, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
-where:
-| name                     | description                                                          | type    |
-| ------------------------ | -------------------------------------------------------------------- | ------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
-| `auto commit`            | Fetch with auto commit.                                              | bool    |
-| `topic`                  | Topic to read from.                                                  | string  |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
+`[8, <correlation id>, <auto commit>, <route>, <msg response batch len>]`
+
+| name                     | description                                                          | type   |
+| ------------------------ | -------------------------------------------------------------------- | ------ |
+| `correlation id`         | Correlation ID used to match client request with server response.    | uint32 |
+| `auto commit`            | Fetch with auto commit.                                              | bool   |
+| `route`                  | Fujin route name resolved by the bound connector.                    | string |
+| `msg response batch len` | Maximum number of messages requested.                                | uint32 |
 
 ##### Response
 `[11, <correlation id>, <error>, <subscription_id>, <msgs>]`  

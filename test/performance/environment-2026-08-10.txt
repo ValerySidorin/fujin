@@ -1,0 +1,12 @@
+GOMAXPROCS=8
+build_tags=fujin,grpc
+baseline=/tmp/fujin-baseline-7a75cbe
+current=/Users/mak/src/fujin
+date=2026-08-10T23:21:02+0300
+uname=Darwin MacBook-Air-mak.local 24.6.0 Darwin Kernel Version 24.6.0: Mon Jul 14 11:30:51 PDT 2025; root:xnu-11417.140.69~1/RELEASE_ARM64_T8112 arm64
+os=ProductName:		macOS | ProductVersion:		15.6.1 | BuildVersion:		24G90
+go=go version go1.26.1 darwin/arm64
+cpu=Apple M2
+logical_cpus=8
+power=Now drawing from 'Battery Power' |  -InternalBattery-0 (id=24772707)	81%; discharging; 10:50 remaining present: true
+thermal=Note: No thermal warning level has been recorded | Note: No performance warning level has been recorded | Note: No CPU power status has been recorded

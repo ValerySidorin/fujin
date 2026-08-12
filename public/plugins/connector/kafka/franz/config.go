@@ -31,7 +31,7 @@ type CommonSettings struct {
 	TLS         pconfig.TLSConfig `yaml:"tls"`
 }
 
-type ClientSpecificSettings struct {
+type RouteSettings struct {
 	// reader settings
 	ConsumeTopics        []string       `yaml:"consume_topics"`
 	Group                string         `yaml:"group"`
@@ -51,19 +51,19 @@ type ClientSpecificSettings struct {
 }
 
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
@@ -72,7 +72,7 @@ func (c *Config) Validate() error {
 		return util.ValidationErr("brokers not defined")
 	}
 
-	for _, c := range c.Clients {
+	for _, c := range c.Routes {
 		if len(c.ConsumeTopics) <= 0 && c.ProduceTopic == "" {
 			return util.ValidationErr("consume topic or produce topic must be defined")
 		}

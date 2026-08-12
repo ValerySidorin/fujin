@@ -47,7 +47,7 @@ var DefaultTestConfigWithNats = serverconfig.Config{
 				Common: nats_core.CommonSettings{
 					URL: "nats://localhost:4222",
 				},
-				Clients: map[string]nats_core.ClientSpecificSettings{
+				Routes: map[string]nats_core.RouteSettings{
 					"client1": {
 						Subject: "my_subject",
 					},

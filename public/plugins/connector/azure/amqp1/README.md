@@ -11,7 +11,7 @@ connectors:
   my_azure:
     type: azure_amqp1
     settings:
-      clients:
+      routes:
         writer:
           conn:
             addr: amqps://my-namespace.servicebus.windows.net

@@ -14,30 +14,27 @@ import (
 type ManagerV2 struct {
 	conf          connectorconfig.ConnectorConfig
 	connectorName string
-	cpools        map[string]*pool.Pool // a map of client pools grouped by client name
-	cmu           sync.RWMutex
+	routePools    map[string]*pool.Pool
+	mu            sync.RWMutex
 	l             *slog.Logger
 }
 
 func NewManagerV2(conf connectorconfig.ConnectorConfig, connectorName string, l *slog.Logger) *ManagerV2 {
-	cman := &ManagerV2{
+	return &ManagerV2{
 		conf:          conf,
 		connectorName: connectorName,
-		cpools:        make(map[string]*pool.Pool),
-
-		l: l,
+		routePools:    make(map[string]*pool.Pool),
+		l:             l,
 	}
-
-	return cman
 }
 
-func (m *ManagerV2) GetReader(name string, autoCommit bool) (connector.ReadCloser, error) {
-	r, err := connector.NewReader(m.conf, name, autoCommit, m.l)
+func (m *ManagerV2) GetReader(route string, autoCommit bool) (connector.ReadCloser, error) {
+	r, err := connector.NewReader(m.conf, route, autoCommit, m.l)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
-	// Apply connector middlewares
+	// Apply connector middlewares.
 	if len(m.conf.ConnectorMiddlewares) > 0 {
 		wrapped, err := cmw.ChainReader(r, m.connectorName, m.conf.ConnectorMiddlewares, m.l)
 		if err != nil {
@@ -60,17 +57,17 @@ func (d *decoratedReadCloser) Close() error {
 	return d.closer.Close()
 }
 
-func (m *ManagerV2) GetWriter(name string) (connector.WriteCloser, error) {
-	m.cmu.RLock()
-	p, ok := m.cpools[name]
-	m.cmu.RUnlock()
+func (m *ManagerV2) GetWriter(route string) (connector.WriteCloser, error) {
+	m.mu.RLock()
+	p, ok := m.routePools[route]
+	m.mu.RUnlock()
 
 	if !ok {
-		m.cmu.Lock()
-		defer m.cmu.Unlock()
+		m.mu.Lock()
+		defer m.mu.Unlock()
 
-		// Double-check after acquiring write lock
-		if p, ok = m.cpools[name]; ok {
+		// Double-check after acquiring write lock.
+		if p, ok = m.routePools[route]; ok {
 			w, err := p.Get()
 			if err != nil {
 				return nil, fmt.Errorf("get writer: %w", err)
@@ -79,12 +76,12 @@ func (m *ManagerV2) GetWriter(name string) (connector.WriteCloser, error) {
 		}
 
 		p = pool.NewPool(func() (any, error) {
-			w, err := connector.NewWriter(m.conf, name, m.l)
+			w, err := connector.NewWriter(m.conf, route, m.l)
 			if err != nil {
 				return nil, err
 			}
 
-			// Apply connector middlewares
+			// Apply connector middlewares.
 			if len(m.conf.ConnectorMiddlewares) > 0 {
 				wrapped, err := cmw.ChainWriter(w, m.connectorName, m.conf.ConnectorMiddlewares, m.l)
 				if err != nil {
@@ -96,7 +93,7 @@ func (m *ManagerV2) GetWriter(name string) (connector.WriteCloser, error) {
 
 			return w, nil
 		})
-		m.cpools[name] = p
+		m.routePools[route] = p
 	}
 
 	w, err := p.Get()
@@ -117,23 +114,23 @@ func (d *decoratedWriteCloser) Close() error {
 	return d.closer.Close()
 }
 
-func (m *ManagerV2) PutWriter(c connector.WriteCloser, name string) {
-	m.cmu.RLock()
-	p, ok := m.cpools[name]
-	m.cmu.RUnlock()
+func (m *ManagerV2) PutWriter(w connector.WriteCloser, route string) {
+	m.mu.RLock()
+	p, ok := m.routePools[route]
+	m.mu.RUnlock()
 
 	if !ok {
-		c.Close()
+		w.Close()
 		return
 	}
 
-	p.Put(c)
+	p.Put(w)
 }
 
 func (m *ManagerV2) Close() {
-	m.cmu.Lock()
-	defer m.cmu.Unlock()
-	for _, p := range m.cpools {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, p := range m.routePools {
 		p.Close()
 	}
 }

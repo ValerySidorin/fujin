@@ -1,0 +1,44 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6022 ns/op	  21.25 MB/s	   1843375 p99-ns	   28315 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6135 ns/op	  20.86 MB/s	   1870416 p99-ns	   28324 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6015 ns/op	  21.28 MB/s	   1808667 p99-ns	   28315 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5992 ns/op	  21.36 MB/s	   1805875 p99-ns	   28324 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5958 ns/op	  21.48 MB/s	   1789458 p99-ns	   28316 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6030 ns/op	  21.23 MB/s	   1844791 p99-ns	   28321 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6234 ns/op	  20.53 MB/s	   2059000 p99-ns	   28314 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6129 ns/op	  20.89 MB/s	   1982292 p99-ns	   28325 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5915 ns/op	  21.64 MB/s	   1734208 p99-ns	   28315 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6006 ns/op	  21.31 MB/s	   1812458 p99-ns	   28323 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6029 ns/op	  21.23 MB/s	   1828584 p99-ns	   28321 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6027 ns/op	  21.24 MB/s	   1785125 p99-ns	   28325 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5974 ns/op	  21.43 MB/s	   1781291 p99-ns	   28314 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6030 ns/op	  21.23 MB/s	   1791167 p99-ns	   28323 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5948 ns/op	  21.52 MB/s	   1770625 p99-ns	   28312 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5986 ns/op	  21.38 MB/s	   1783208 p99-ns	   28320 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5939 ns/op	  21.55 MB/s	   1755792 p99-ns	   28319 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6045 ns/op	  21.17 MB/s	   1835292 p99-ns	   28321 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6006 ns/op	  21.31 MB/s	   1813000 p99-ns	   28314 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5992 ns/op	  21.36 MB/s	   1792167 p99-ns	   28328 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6337 ns/op	  20.20 MB/s	   2090583 p99-ns	   28318 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5966 ns/op	  21.45 MB/s	   1814458 p99-ns	   28325 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5885 ns/op	  21.75 MB/s	   1765959 p99-ns	   28321 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6475 ns/op	  19.77 MB/s	   1977625 p99-ns	   28327 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      9000 ns/op	  14.22 MB/s	   3873459 p99-ns	   28321 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6008 ns/op	  21.30 MB/s	   1809750 p99-ns	   28323 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5908 ns/op	  21.66 MB/s	   1779083 p99-ns	   28312 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6031 ns/op	  21.22 MB/s	   1823292 p99-ns	   28323 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6576 ns/op	  19.46 MB/s	   1967000 p99-ns	   28317 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6184 ns/op	  20.70 MB/s	   1890750 p99-ns	   28319 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5917 ns/op	  21.63 MB/s	   1791167 p99-ns	   28314 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5963 ns/op	  21.47 MB/s	   1812042 p99-ns	   28320 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5910 ns/op	  21.66 MB/s	   1769333 p99-ns	   28314 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6051 ns/op	  21.15 MB/s	   1810291 p99-ns	   28321 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5895 ns/op	  21.71 MB/s	   1738875 p99-ns	   28309 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6135 ns/op	  20.86 MB/s	   1934584 p99-ns	   28321 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6166 ns/op	  20.76 MB/s	   1947000 p99-ns	   28317 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6045 ns/op	  21.17 MB/s	   1829667 p99-ns	   28326 B/op	      28 allocs/op
+Benchmark_Session_Ack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      5993 ns/op	  21.36 MB/s	   1789416 p99-ns	   28316 B/op	      26 allocs/op
+Benchmark_Session_Nack_Native/transport=quic/payload=128B/batch=1/concurrency=128-8	100000	      6051 ns/op	  21.15 MB/s	   1847875 p99-ns	   28315 B/op	      28 allocs/op

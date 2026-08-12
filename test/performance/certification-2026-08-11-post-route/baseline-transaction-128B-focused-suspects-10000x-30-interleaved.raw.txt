@@ -1,0 +1,89 @@
+PASS
+ok  	github.com/fujin-io/fujin/test	0.778s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.493s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.557s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.520s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.491s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.488s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.512s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.501s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.497s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.461s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.468s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.450s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.429s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.523s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.562s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.512s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.575s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.514s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.515s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.507s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.517s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.494s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.426s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.458s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.562s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.654s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.485s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.493s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.453s
+
+PASS
+ok  	github.com/fujin-io/fujin/test	0.442s

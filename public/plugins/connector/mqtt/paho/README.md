@@ -16,7 +16,7 @@ connectors:
         keep_alive: 30
         connect_timeout: 10s
         disconnect_timeout: 5s
-      clients:
+      routes:
         pub:
           client_id: fujin_pub
           topic: my/topic

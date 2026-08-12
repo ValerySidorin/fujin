@@ -27,8 +27,6 @@ import (
 	mqtt "github.com/fujin-io/fujin/public/plugins/connector/mqtt/paho"
 	"github.com/fujin-io/fujin/public/plugins/connector/nats/core"
 	"github.com/fujin-io/fujin/public/plugins/connector/nats/jetstream"
-	natsgo "github.com/nats-io/nats.go"
-	natsjs "github.com/nats-io/nats.go/jetstream"
 	"github.com/fujin-io/fujin/public/plugins/connector/nsq"
 	"github.com/fujin-io/fujin/public/plugins/connector/rabbitmq/amqp09"
 	redis_config "github.com/fujin-io/fujin/public/plugins/connector/redis/rueidis/config"
@@ -37,6 +35,8 @@ import (
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	"github.com/fujin-io/fujin/public/server"
 	"github.com/fujin-io/fujin/public/server/config"
+	natsgo "github.com/nats-io/nats.go"
+	natsjs "github.com/nats-io/nats.go/jetstream"
 	"github.com/quic-go/quic-go"
 )
 
@@ -74,16 +74,24 @@ func MakeGenConfig(msgSize int) connector_config.ConnectorsConfig {
 	}
 }
 
-func RunServerWithGenQUIC(ctx context.Context, msgSize int) *server.Server {
-	return RunServer(ctx, MakeConfigWithQUIC(MakeGenConfig(msgSize)))
+func makeBoundedGenConfig(msgSize int, subscribeLimit uint64) connector_config.ConnectorsConfig {
+	config := MakeGenConfig(msgSize)
+	connectorConfig := config["connector"]
+	connectorConfig.Settings = GenConfig{MsgSize: msgSize, SubscribeLimit: subscribeLimit}
+	config["connector"] = connectorConfig
+	return config
 }
 
-func RunServerWithGenTCP(ctx context.Context, msgSize int) *server.Server {
-	return RunServer(ctx, MakeConfigWithTCP(MakeGenConfig(msgSize)))
+func RunServerWithGenQUIC(ctx context.Context, msgSize int, subscribeLimit uint64) *server.Server {
+	return RunServer(ctx, MakeConfigWithQUIC(makeBoundedGenConfig(msgSize, subscribeLimit)))
 }
 
-func RunServerWithGenUnix(ctx context.Context, msgSize int) *server.Server {
-	return RunServer(ctx, MakeConfigWithUnix(MakeGenConfig(msgSize)))
+func RunServerWithGenTCP(ctx context.Context, msgSize int, subscribeLimit uint64) *server.Server {
+	return RunServer(ctx, MakeConfigWithTCP(makeBoundedGenConfig(msgSize, subscribeLimit)))
+}
+
+func RunServerWithGenUnix(ctx context.Context, msgSize int, subscribeLimit uint64) *server.Server {
+	return RunServer(ctx, MakeConfigWithUnix(makeBoundedGenConfig(msgSize, subscribeLimit)))
 }
 
 var DefaultTestConfigWithKafka3BrokersQUIC = MakeConfigWithQUIC(connector_config.ConnectorsConfig{
@@ -93,7 +101,7 @@ var DefaultTestConfigWithKafka3BrokersQUIC = MakeConfigWithQUIC(connector_config
 			Common: kafka.CommonSettings{
 				Brokers: []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			},
-			Clients: map[string]kafka.ClientSpecificSettings{
+			Routes: map[string]kafka.RouteSettings{
 				"sub": {
 					ConsumeTopics:          []string{"my_pub_topic"},
 					Group:                  "fujin",
@@ -116,7 +124,7 @@ var DefaultTestConfigWithNatsQUIC = MakeConfigWithQUIC(connector_config.Connecto
 			Common: core.CommonSettings{
 				URL: "nats://localhost:4222",
 			},
-			Clients: map[string]core.ClientSpecificSettings{
+			Routes: map[string]core.RouteSettings{
 				"pub": {
 					Subject: "my_subject",
 				},
@@ -132,17 +140,19 @@ var DefaultTestConfigWithAMQP091QUIC = MakeConfigWithQUIC(connector_config.Conne
 	"connector": {
 		Type: "rabbitmq_amqp09",
 		Settings: amqp09.Config{
-			Clients: map[string]amqp09.ClientSpecificSettings{
+			Routes: map[string]amqp09.RouteSettings{
 				"pub": {
 					Conn: amqp09.ConnConfig{
 						URL: "amqp://guest:guest@localhost",
 					},
 					Exchange: amqp09.ExchangeConfig{
-						Name: "events",
-						Kind: "fanout",
+						Name:    "events",
+						Kind:    "fanout",
+						Durable: true,
 					},
 					Queue: amqp09.QueueConfig{
-						Name: "my_queue",
+						Name:    "my_queue",
+						Durable: true,
 					},
 					QueueBind: amqp09.QueueBindConfig{
 						RoutingKey: "my_routing_key",
@@ -156,11 +166,13 @@ var DefaultTestConfigWithAMQP091QUIC = MakeConfigWithQUIC(connector_config.Conne
 						URL: "amqp://guest:guest@localhost",
 					},
 					Exchange: amqp09.ExchangeConfig{
-						Name: "events",
-						Kind: "fanout",
+						Name:    "events",
+						Kind:    "fanout",
+						Durable: true,
 					},
 					Queue: amqp09.QueueConfig{
-						Name: "my_queue",
+						Name:    "my_queue",
+						Durable: true,
 					},
 					QueueBind: amqp09.QueueBindConfig{
 						RoutingKey: "my_routing_key",
@@ -178,7 +190,7 @@ var DefaultTestConfigWithAMQP10QUIC = MakeConfigWithQUIC(connector_config.Connec
 	"connector": {
 		Type: "azure_amqp1",
 		Settings: amqp1.Config{
-			Clients: map[string]amqp1.ClientSpecificSettings{
+			Routes: map[string]amqp1.RouteSettings{
 				"pub": {
 					Conn: amqp1.ConnConfig{
 						Addr: "amqp://artemis:artemis@localhost:61616",
@@ -214,7 +226,7 @@ var DefaultTestConfigWithRedisPubSubQUIC = MakeConfigWithQUIC(connector_config.C
 					Linger:    5 * time.Millisecond,
 				},
 			},
-			Clients: map[string]pubsub.ClientSpecificSettings{
+			Routes: map[string]pubsub.RouteSettings{
 				"pub": {
 					Channel: "channel",
 				},
@@ -240,7 +252,7 @@ var DefaultTestConfigWithRedisStreamsQUIC = MakeConfigWithQUIC(connector_config.
 					Linger:    5 * time.Millisecond,
 				},
 			},
-			Clients: map[string]streams.ClientSpecificSettings{
+			Routes: map[string]streams.RouteSettings{
 				"pub": {
 					Stream: "stream",
 				},
@@ -271,7 +283,7 @@ var DefaultTestConfigWithMQTTQUIC = MakeConfigWithQUIC(connector_config.Connecto
 				DisconnectTimeout: 5 * time.Second,
 				ConnectTimeout:    300 * time.Second,
 			},
-			Clients: map[string]mqtt.ClientSpecificSettings{
+			Routes: map[string]mqtt.RouteSettings{
 				"pub": {
 					ClientID:      "fujin_pub",
 					Topic:         "my_topic",
@@ -308,7 +320,7 @@ var DefaultTestConfigWithNSQQUIC = MakeConfigWithQUIC(connector_config.Connector
 				Address:   "localhost:4150",
 				Addresses: []string{"localhost:4150"},
 			},
-			Clients: map[string]nsq.ClientSpecificSettings{
+			Routes: map[string]nsq.RouteSettings{
 				"pub": {
 					Topic: "my_topic",
 					Pool: nsq.PoolConfig{
@@ -330,7 +342,6 @@ var DefaultTestConfigWithNSQQUIC = MakeConfigWithQUIC(connector_config.Connector
 func RunDefaultServerWithNopQUIC(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithNopQUIC)
 }
-
 
 func RunDefaultServerWithKafka3BrokersQUIC(ctx context.Context) *server.Server {
 	return RunServer(ctx, DefaultTestConfigWithKafka3BrokersQUIC)
@@ -384,7 +395,7 @@ var DefaultTestConfigWithKafka3BrokersTCP = MakeConfigWithTCP(connector_config.C
 			Common: kafka.CommonSettings{
 				Brokers: []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			},
-			Clients: map[string]kafka.ClientSpecificSettings{
+			Routes: map[string]kafka.RouteSettings{
 				"sub": {
 					ConsumeTopics:          []string{"my_pub_topic"},
 					Group:                  "fujin",
@@ -406,7 +417,7 @@ var DefaultTestConfigWithKafka3BrokersTCP = MakeConfigWithTCP(connector_config.C
 			Common: kafka.CommonSettings{
 				Brokers: []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			},
-			Clients: map[string]kafka.ClientSpecificSettings{
+			Routes: map[string]kafka.RouteSettings{
 				"sub": {
 					ConsumeTopics:          []string{"my_pub_topic"},
 					Group:                  "fujin_ack",
@@ -426,7 +437,7 @@ var DefaultTestConfigWithKafka3BrokersTCP = MakeConfigWithTCP(connector_config.C
 			Common: kafka.CommonSettings{
 				Brokers: []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			},
-			Clients: map[string]kafka.ClientSpecificSettings{
+			Routes: map[string]kafka.RouteSettings{
 				"sub": {
 					ConsumeTopics:          []string{"my_pub_topic"},
 					Group:                  "fujin_nack",
@@ -449,7 +460,7 @@ var DefaultTestConfigWithNatsTCP = MakeConfigWithTCP(connector_config.Connectors
 			Common: core.CommonSettings{
 				URL: "nats://localhost:4222",
 			},
-			Clients: map[string]core.ClientSpecificSettings{
+			Routes: map[string]core.RouteSettings{
 				"pub": {
 					Subject: "my_subject",
 				},
@@ -469,7 +480,7 @@ var DefaultTestConfigWithNatsJetstreamTCP = MakeConfigWithTCP(connector_config.C
 				URL:    "nats://localhost:4222",
 				Stream: "e2e_stream",
 			},
-			Clients: map[string]jetstream.ClientSpecificSettings{
+			Routes: map[string]jetstream.RouteSettings{
 				"pub": {
 					Subject: "e2e.subject",
 				},
@@ -488,7 +499,7 @@ var DefaultTestConfigWithNatsJetstreamTCP = MakeConfigWithTCP(connector_config.C
 				URL:    "nats://localhost:4222",
 				Stream: "e2e_stream",
 			},
-			Clients: map[string]jetstream.ClientSpecificSettings{
+			Routes: map[string]jetstream.RouteSettings{
 				"pub": {
 					Subject: "e2e.subject",
 				},
@@ -506,7 +517,7 @@ var DefaultTestConfigWithNatsJetstreamTCP = MakeConfigWithTCP(connector_config.C
 				URL:    "nats://localhost:4222",
 				Stream: "e2e_stream",
 			},
-			Clients: map[string]jetstream.ClientSpecificSettings{
+			Routes: map[string]jetstream.RouteSettings{
 				"pub": {
 					Subject: "e2e.subject",
 				},
@@ -523,17 +534,19 @@ var DefaultTestConfigWithAMQP091TCP = MakeConfigWithTCP(connector_config.Connect
 	"connector": {
 		Type: "rabbitmq_amqp09",
 		Settings: amqp09.Config{
-			Clients: map[string]amqp09.ClientSpecificSettings{
+			Routes: map[string]amqp09.RouteSettings{
 				"pub": {
 					Conn: amqp09.ConnConfig{
 						URL: "amqp://guest:guest@localhost",
 					},
 					Exchange: amqp09.ExchangeConfig{
-						Name: "events",
-						Kind: "fanout",
+						Name:    "events",
+						Kind:    "fanout",
+						Durable: true,
 					},
 					Queue: amqp09.QueueConfig{
-						Name: "my_queue",
+						Name:    "my_queue",
+						Durable: true,
 					},
 					QueueBind: amqp09.QueueBindConfig{
 						RoutingKey: "my_routing_key",
@@ -547,11 +560,13 @@ var DefaultTestConfigWithAMQP091TCP = MakeConfigWithTCP(connector_config.Connect
 						URL: "amqp://guest:guest@localhost",
 					},
 					Exchange: amqp09.ExchangeConfig{
-						Name: "events",
-						Kind: "fanout",
+						Name:    "events",
+						Kind:    "fanout",
+						Durable: true,
 					},
 					Queue: amqp09.QueueConfig{
-						Name: "my_queue",
+						Name:    "my_queue",
+						Durable: true,
 					},
 					QueueBind: amqp09.QueueBindConfig{
 						RoutingKey: "my_routing_key",
@@ -569,7 +584,7 @@ var DefaultTestConfigWithAMQP10TCP = MakeConfigWithTCP(connector_config.Connecto
 	"connector": {
 		Type: "azure_amqp1",
 		Settings: amqp1.Config{
-			Clients: map[string]amqp1.ClientSpecificSettings{
+			Routes: map[string]amqp1.RouteSettings{
 				"pub": {
 					Conn: amqp1.ConnConfig{
 						Addr: "amqp://artemis:artemis@localhost:61616",
@@ -605,7 +620,7 @@ var DefaultTestConfigWithRedisPubSubTCP = MakeConfigWithTCP(connector_config.Con
 					Linger:    5 * time.Millisecond,
 				},
 			},
-			Clients: map[string]pubsub.ClientSpecificSettings{
+			Routes: map[string]pubsub.RouteSettings{
 				"pub": {
 					Channel: "channel",
 				},
@@ -631,7 +646,7 @@ var DefaultTestConfigWithRedisStreamsTCP = MakeConfigWithTCP(connector_config.Co
 					Linger:    5 * time.Millisecond,
 				},
 			},
-			Clients: map[string]streams.ClientSpecificSettings{
+			Routes: map[string]streams.RouteSettings{
 				"pub": {
 					Stream: "stream",
 				},
@@ -662,7 +677,7 @@ var DefaultTestConfigWithMQTTTCP = MakeConfigWithTCP(connector_config.Connectors
 				DisconnectTimeout: 5 * time.Second,
 				ConnectTimeout:    300 * time.Second,
 			},
-			Clients: map[string]mqtt.ClientSpecificSettings{
+			Routes: map[string]mqtt.RouteSettings{
 				"pub": {
 					ClientID:      "fujin_pub",
 					Topic:         "my_topic",
@@ -699,7 +714,7 @@ var DefaultTestConfigWithNSQTCP = MakeConfigWithTCP(connector_config.ConnectorsC
 				Address:   "localhost:4150",
 				Addresses: []string{"localhost:4150"},
 			},
-			Clients: map[string]nsq.ClientSpecificSettings{
+			Routes: map[string]nsq.RouteSettings{
 				"pub": {
 					Topic: "my_topic",
 					Pool: nsq.PoolConfig{
@@ -811,7 +826,7 @@ var DefaultTestConfigWithKafka3BrokersUnix = MakeConfigWithUnix(connector_config
 			Common: kafka.CommonSettings{
 				Brokers: []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			},
-			Clients: map[string]kafka.ClientSpecificSettings{
+			Routes: map[string]kafka.RouteSettings{
 				"sub": {
 					ConsumeTopics:          []string{"my_pub_topic"},
 					Group:                  "fujin",
@@ -871,7 +886,11 @@ func drainTCPConn(b *testing.B, conn net.Conn, ch chan int) {
 }
 
 func RunServer(ctx context.Context, conf config.Config) *server.Server {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	output := io.Writer(os.Stdout)
+	if os.Getenv("FUJIN_BENCH_QUIET") != "" {
+		output = io.Discard
+	}
+	logger := slog.New(slog.NewTextHandler(output, &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelDebug,
 	}))
@@ -957,24 +976,20 @@ func drainStream(b *testing.B, str *quic.Stream, ch chan int) {
 
 func handlePing(str *quic.Stream) {
 	defer str.Close()
-	var pingBuf [1]byte
+	_ = respondToPing(str)
+}
 
-	n, err := str.Read(pingBuf[:])
-	if err == io.EOF {
-		if n != 0 {
-			if pingBuf[0] != byte(v1.OP_CODE_PING) {
-				return
-			}
-		}
-		pingBuf[0] = byte(v1.RESP_CODE_PONG)
-		if _, err := str.Write(pingBuf[:]); err != nil {
-			return
-		}
-		return
+func respondToPing(str io.ReadWriter) error {
+	var pingBuf [1]byte
+	if _, err := io.ReadFull(str, pingBuf[:]); err != nil {
+		return err
 	}
-	if err != nil {
-		return
+	if pingBuf[0] != byte(v1.OP_CODE_PING) {
+		return fmt.Errorf("unexpected ping opcode %d", pingBuf[0])
 	}
+	pingBuf[0] = byte(v1.RESP_CODE_PONG)
+	_, err := str.Write(pingBuf[:])
+	return err
 }
 
 func generateTLSConfig() *tls.Config {

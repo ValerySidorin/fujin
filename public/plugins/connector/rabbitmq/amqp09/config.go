@@ -73,15 +73,15 @@ type PublishConfig struct {
 	AppId           string `yaml:"app_id"`
 }
 
-// CommonSettings contains settings shared across all clients
+// CommonSettings contains settings shared across all routes.
 type CommonSettings struct {
 	// Common connection settings can be added here if needed
-	// For now, connection settings are per-client
+	// For now, connection settings are per-route.
 }
 
-// ClientSpecificSettings contains settings specific to a client
-// A client can be either a reader or a writer
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+// A route can be either a reader or a writer.
+type RouteSettings struct {
 	// Connection settings
 	Conn ConnConfig `yaml:"conn"`
 
@@ -103,50 +103,50 @@ type ClientSpecificSettings struct {
 	Nack    *NackConfig    `yaml:"nack,omitempty"`
 }
 
-// Config is the top-level configuration structure
+// Config is the top-level configuration structure.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
 func (c *Config) Validate() error {
-	if len(c.Clients) == 0 {
-		return util.ValidationErr("at least one client must be defined")
+	if len(c.Routes) == 0 {
+		return util.ValidationErr("at least one route must be defined")
 	}
 
-	for name, client := range c.Clients {
-		if client.Conn.URL == "" {
-			return util.ValidationErr(fmt.Sprintf("client %q: url is not defined", name))
+	for name, route := range c.Routes {
+		if route.Conn.URL == "" {
+			return util.ValidationErr(fmt.Sprintf("route %q: url is not defined", name))
 		}
 
-		if client.Exchange.Name == "" {
-			return util.ValidationErr(fmt.Sprintf("client %q: exchange.name is not defined", name))
+		if route.Exchange.Name == "" {
+			return util.ValidationErr(fmt.Sprintf("route %q: exchange.name is not defined", name))
 		}
 
-		if client.Exchange.Kind == "" {
-			return util.ValidationErr(fmt.Sprintf("client %q: exchange.kind is not defined", name))
+		if route.Exchange.Kind == "" {
+			return util.ValidationErr(fmt.Sprintf("route %q: exchange.kind is not defined", name))
 		}
 
-		if client.Queue.Name == "" {
-			return util.ValidationErr(fmt.Sprintf("client %q: queue.name is not defined", name))
+		if route.Queue.Name == "" {
+			return util.ValidationErr(fmt.Sprintf("route %q: queue.name is not defined", name))
 		}
 
-		// Client must have either publish (writer) or consume (reader)
-		if client.Publish == nil && client.Consume == nil {
-			return util.ValidationErr(fmt.Sprintf("client %q: must have either publish (writer) or consume (reader) configured", name))
+		// Route must have either publish (writer) or consume (reader).
+		if route.Publish == nil && route.Consume == nil {
+			return util.ValidationErr(fmt.Sprintf("route %q: must have either publish (writer) or consume (reader) configured", name))
 		}
 	}
 

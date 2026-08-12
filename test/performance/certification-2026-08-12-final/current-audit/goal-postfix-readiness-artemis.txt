@@ -1,0 +1,110 @@
+=== config ===
+
+=== up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container artemis  Creating
+ Container artemis  Created
+ Container artemis  Starting
+ Container artemis  Started
+ Container artemis  Waiting
+ Container artemis  Healthy
+
+wait_seconds=6.7
+health=healthy
+
+=== benchmark ===
+seconds to write full buf to quic stream: 0.000153375
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	       1	     21375 ns/op	   0.80 MB/s	     608 B/op	      12 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 6.8291e-05
+       1	      5583 ns/op	   3.04 MB/s	     208 B/op	       4 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.1125e-05
+       1	       209.0 ns/op	  81.34 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.8708e-05
+       1	       416.0 ns/op	  40.87 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.5834e-05
+       1	       125.0 ns/op	 136.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.2291e-05
+       1	       291.0 ns/op	  58.42 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.6375e-05
+       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 0.000181583
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.8083e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.6208e-05
+       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 7.2208e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.7875e-05
+       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 8.7292e-05
+       1	       292.0 ns/op	  58.22 MB/s	    1568 B/op	       8 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.9291e-05
+       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.825e-05
+       1	       291.0 ns/op	  58.42 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.5958e-05
+       1	       375.0 ns/op	  45.33 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 4.7792e-05
+       1	       375.0 ns/op	  45.33 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.0917e-05
+       1	       291.0 ns/op	  58.42 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.075e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_ArtemisMQ_QUIC-8     	seconds to write full buf to quic stream: 5.0958e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000159125
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	       1	      1375 ns/op	23842.91 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000183333
+       1	      1916 ns/op	17110.65 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000237
+       1	      1750 ns/op	18733.71 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000178042
+       1	      1458 ns/op	22485.60 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000323084
+       1	      1833 ns/op	17885.43 MB/s	     184 B/op	       3 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000244917
+       1	      1166 ns/op	28116.64 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.00020475
+       1	      1959 ns/op	16735.07 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000157208
+       1	      1334 ns/op	24575.71 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000166708
+       1	      2208 ns/op	14847.83 MB/s	      72 B/op	       2 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000173625
+       1	      1291 ns/op	25394.27 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000276792
+       1	      2959 ns/op	11079.42 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.0004315
+       1	      2292 ns/op	14303.66 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000193458
+       1	      1375 ns/op	23842.91 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.0001805
+       1	      1500 ns/op	21856.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000188375
+       1	      1417 ns/op	23136.20 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000652875
+       1	      3750 ns/op	8742.40 MB/s	    1288 B/op	       5 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.0002325
+       1	      1333 ns/op	24594.15 MB/s	     208 B/op	       4 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000248791
+       1	      1292 ns/op	25374.61 MB/s	      64 B/op	       1 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000414458
+       1	      2542 ns/op	12896.93 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_ArtemisMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000248625
+       1	      1833 ns/op	17885.43 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	3.380s
+
+=== down ===
+ Container artemis  Stopping
+ Container artemis  Stopped
+ Container artemis  Removing
+ Container artemis  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

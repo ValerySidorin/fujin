@@ -41,27 +41,27 @@ func newJetStreamConnector(config any, l *slog.Logger) (connector.Connector, err
 	}, nil
 }
 
-func (c *jetStreamConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := c.config.Clients[name]
+func (c *jetStreamConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := c.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("nats_jetstream: client not found by name: %s", name)
+		return nil, fmt.Errorf("nats_jetstream: route not found: %s", route)
 	}
 
 	return NewReader(ConnectorConfig{
-		CommonSettings:         c.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: c.config.Common,
+		RouteSettings:  routeConf,
 	}, autoCommit, l)
 }
 
-func (c *jetStreamConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := c.config.Clients[name]
+func (c *jetStreamConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := c.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("nats_jetstream: client not found by name: %s", name)
+		return nil, fmt.Errorf("nats_jetstream: route not found: %s", route)
 	}
 
 	return NewWriter(ConnectorConfig{
-		CommonSettings:         c.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: c.config.Common,
+		RouteSettings:  routeConf,
 	}, l)
 }
 

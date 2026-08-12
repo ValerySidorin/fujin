@@ -1,0 +1,59 @@
+{
+  "date": "2026-08-12",
+  "gomaxprocs": 8,
+  "benchtime": "1x",
+  "groups": [
+    {
+      "group": "legacy-nop",
+      "declared": 30,
+      "executed": 30,
+      "missing": [],
+      "rc": 0,
+      "seconds": 1.85,
+      "ok": true,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-audit-bench-legacy-nop.txt"
+    },
+    {
+      "group": "legacy-gen-subscribe",
+      "declared": 15,
+      "executed": 15,
+      "missing": [],
+      "rc": 0,
+      "seconds": 1.56,
+      "ok": true,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-audit-bench-legacy-gen-subscribe.txt"
+    },
+    {
+      "group": "legacy-grpc",
+      "declared": 12,
+      "executed": 12,
+      "missing": [],
+      "rc": 0,
+      "seconds": 4.03,
+      "ok": true,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-audit-bench-legacy-grpc.txt"
+    },
+    {
+      "group": "session-matrix",
+      "declared": 18,
+      "executed": 18,
+      "missing": [],
+      "rc": 0,
+      "seconds": 27.51,
+      "ok": true,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-audit-bench-session-matrix.txt"
+    },
+    {
+      "group": "micro",
+      "declared": 8,
+      "executed": 8,
+      "missing": [],
+      "rc": 0,
+      "seconds": 0.67,
+      "ok": true,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-audit-bench-micro.txt"
+    }
+  ],
+  "self_contained_top_level": 83,
+  "all_passed": true
+}

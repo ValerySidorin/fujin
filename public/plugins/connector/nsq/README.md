@@ -15,7 +15,7 @@ connectors:
         address: localhost:4150
         addresses: [localhost:4150]
         lookupd_addresses: [localhost:4161]
-      clients:
+      routes:
         pub:
           topic: my_topic
         sub:

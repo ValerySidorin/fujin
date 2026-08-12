@@ -11,7 +11,7 @@ connectors:
   my_rabbit:
     type: rabbitmq_amqp09
     settings:
-      clients:
+      routes:
         writer:
           conn:
             url: amqp://guest:guest@localhost:5672/

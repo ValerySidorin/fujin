@@ -1,0 +1,88 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                              │ test/performance/certification-reruns/baseline-tcp-unix-fetch-fixed.bench │ test/performance/certification-reruns/current-unix-fetch-32KiB-boundary-packed10x.txt │
+                                                                              │                                  sec/op                                   │                            sec/op                             vs base                 │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                     11.07µ ± 80%
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                    14.80µ ± 19%
+_Session_Fetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                  142.9µ ±  7%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                    5.429µ ± 27%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                   11.38µ ± 12%
+_Session_Fetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                 457.9µ ±  4%                                                    447.7µ ± 1%       ~ (p=0.063 n=10)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                    9.944µ ± 91%
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                   27.32µ ±  9%
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                 149.9µ ±  5%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                   7.906µ ± 22%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                  24.78µ ±  8%
+_Session_HFetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                449.7µ ±  2%                                                    452.2µ ± 1%       ~ (p=0.165 n=10)
+geomean                                                                                                                                      33.99µ                                                          450.0µ       -0.84%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                                              │ test/performance/certification-reruns/baseline-tcp-unix-fetch-fixed.bench │ test/performance/certification-reruns/current-unix-fetch-32KiB-boundary-packed10x.txt │
+                                                                              │                                    B/s                                    │                             B/s                               vs base                 │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                    2.937Mi ± 64%
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                   16.49Mi ± 16%
+_Session_Fetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                 6.835Gi ±  7%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                   5.622Mi ± 36%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                  21.46Mi ± 14%
+_Session_Fetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                2.133Gi ±  5%                                                   2.181Gi ± 1%       ~ (p=0.063 n=10)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                   3.195Mi ± 50%
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                  8.941Mi ±  8%
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                6.514Gi ±  5%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                  3.862Mi ± 28%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                 9.851Mi ±  9%
+_Session_HFetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                               2.172Gi ±  2%                                                   2.160Gi ± 1%       ~ (p=0.165 n=10)
+geomean                                                                                                                                     57.97Mi                                                         2.170Gi       +0.85%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                                              │ test/performance/certification-reruns/baseline-tcp-unix-fetch-fixed.bench │ test/performance/certification-reruns/current-unix-fetch-32KiB-boundary-packed10x.txt │
+                                                                              │                                  p99-sec                                  │                           p99-sec                             vs base                 │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                    238.8µ ± 102%
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                   577.1µ ±  20%
+_Session_Fetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                 5.554m ±  10%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                   159.5µ ±  23%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                  502.4µ ±  13%
+_Session_Fetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                7.901m ±   4%                                                    7.874m ± 3%       ~ (p=0.579 n=10)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                   249.7µ ± 126%
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                  1.013m ±  31%
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                6.134m ±  12%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                  335.8µ ±  30%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                 1.014m ±  18%
+_Session_HFetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                               7.769m ±   3%                                                    7.955m ± 1%       ~ (p=0.105 n=10)
+geomean                                                                                                                                     1.059m                                                           7.914m       +1.02%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                                              │ test/performance/certification-reruns/baseline-tcp-unix-fetch-fixed.bench │ test/performance/certification-reruns/current-unix-fetch-32KiB-boundary-packed10x.txt │
+                                                                              │                                   B/op                                    │                             B/op                              vs base                 │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                     3.247Ki ± 1%
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                    21.65Ki ± 0%
+_Session_Fetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                  1.036Mi ± 3%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                    3.245Ki ± 0%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                   21.65Ki ± 0%
+_Session_Fetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                 1.021Mi ± 0%                                                   1.013Mi ± 0%  -0.80% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                    6.848Ki ± 1%
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                   48.75Ki ± 0%
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                 1.042Mi ± 3%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                   6.876Ki ± 1%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                  49.72Ki ± 1%
+_Session_HFetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                1.027Mi ± 0%                                                   1.015Mi ± 0%  -1.13% (p=0.000 n=10)
+geomean                                                                                                                                      54.60Ki                                                        1.014Mi       -0.97%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                                              │ test/performance/certification-reruns/baseline-tcp-unix-fetch-fixed.bench │ test/performance/certification-reruns/current-unix-fetch-32KiB-boundary-packed10x.txt │
+                                                                              │                                 allocs/op                                 │                          allocs/op                            vs base                 │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                       75.00 ± 0%
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                      525.0 ± 0%
+_Session_Fetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                    83.00 ± 1%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                      75.00 ± 0%
+_Session_Fetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                     525.0 ± 0%
+_Session_Fetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                   82.00 ± 1%                                                     81.00 ± 0%  -1.22% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                      269.0 ± 0%
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                    2.065k ± 0%
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                   275.5 ± 1%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                     269.0 ± 0%
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                   2.067k ± 0%
+_Session_HFetch_Native/transport=unix/payload=32KiB/batch=32/concurrency=16-8                                                                  274.0 ± 0%                                                     273.0 ± 0%  -0.36% (p=0.000 n=10)
+geomean                                                                                                                                        281.4                                                          148.7       -0.79%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable

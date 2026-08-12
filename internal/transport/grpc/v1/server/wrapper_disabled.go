@@ -4,10 +4,10 @@ package server
 
 import (
 	"context"
-	"log/slog"
-
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
+	"log/slog"
+	"time"
 )
 
 // GRPCServerWrapper wraps the gRPC server to implement the GRPCServer interface
@@ -31,4 +31,14 @@ func (w *GRPCServerWrapper) ListenAndServe(ctx context.Context) error {
 // Stop gracefully stops the gRPC server (stub version)
 func (w *GRPCServerWrapper) Stop() {
 	w.server.Stop()
+}
+
+// ReadyForConnections reports that the unavailable gRPC server is not ready.
+func (w *GRPCServerWrapper) ReadyForConnections(timeout time.Duration) bool {
+	return w.server.ReadyForConnections(timeout)
+}
+
+// Done is closed after the disabled server exits.
+func (w *GRPCServerWrapper) Done() <-chan struct{} {
+	return w.server.Done()
 }

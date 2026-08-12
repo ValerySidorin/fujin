@@ -65,8 +65,10 @@ func Get(sz int) []byte {
 		return poolSmall.Get().(*[SIZE_SMALL]byte)[:0]
 	case sz <= SIZE_MEDIUM:
 		return poolMedium.Get().(*[SIZE_MEDIUM]byte)[:0]
-	default:
+	case sz <= SIZE_LARGE:
 		return poolLarge.Get().(*[SIZE_LARGE]byte)[:0]
+	default:
+		return make([]byte, 0, sz)
 	}
 }
 

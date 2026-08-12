@@ -1,0 +1,114 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                               │ test/performance/baseline-fast.bench │ test/performance/current-fast-certified.bench │
+                                                                               │                sec/op                │         sec/op          vs base               │
+_Session_Produce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                               22.25µ ±  3%             21.95µ ±  1%       ~ (p=0.190 n=10)
+_Session_HProduce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                              22.26µ ±  2%             22.35µ ±  1%       ~ (p=0.315 n=10)
+_Session_Fetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                 23.04µ ±  1%             22.35µ ±  1%  -3.00% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                23.34µ ±  1%             22.71µ ±  1%  -2.69% (p=0.002 n=10)
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                             131.6n ± 15%             133.3n ± 16%       ~ (p=0.529 n=10)
+_Session_HSubscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                            252.4n ± 20%             262.0n ±  9%       ~ (p=0.631 n=10)
+_Session_Ack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                   21.91µ ±  4%             22.03µ ±  1%       ~ (p=0.393 n=10)
+_Session_Nack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                  22.07µ ±  2%             22.18µ ±  1%       ~ (p=0.448 n=10)
+_Session_Transaction_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                           64.96µ ±  1%             65.09µ ±  1%       ~ (p=0.218 n=10)
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8                                               42.79µ ±  3%             43.98µ ±  3%       ~ (p=0.143 n=10)
+_Session_HProduce_GRPC/payload=128B/batch=1/concurrency=1-8                                              43.83µ ± 14%             44.64µ ±  6%       ~ (p=0.393 n=10)
+_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                 42.44µ ± 16%             44.38µ ±  9%       ~ (p=0.393 n=10)
+_Session_HFetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                44.66µ ±  3%             44.39µ ± 12%       ~ (p=0.971 n=10)
+_Session_Subscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                             1.365µ ± 27%             1.447µ ± 19%       ~ (p=0.912 n=10)
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                            1.692µ ± 19%             1.778µ ± 20%       ~ (p=0.971 n=10)
+_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1-8                                                   44.67µ ±  4%             45.12µ ±  4%       ~ (p=0.436 n=10)
+_Session_Nack_GRPC/payload=128B/batch=1/concurrency=1-8                                                  43.42µ ±  3%             43.75µ ±  6%       ~ (p=0.436 n=10)
+_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8                                           104.2µ ±  2%             107.0µ ± 10%  +2.70% (p=0.043 n=10)
+geomean                                                                                                  14.06µ                   14.24µ        +1.30%
+
+                                                                               │ test/performance/baseline-fast.bench │ test/performance/current-fast-certified.bench │
+                                                                               │                 B/s                  │          B/s            vs base               │
+_Session_Produce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                              5.488Mi ±  3%            5.560Mi ±  1%       ~ (p=0.239 n=10)
+_Session_HProduce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                             5.479Mi ±  2%            5.465Mi ±  1%       ~ (p=0.362 n=10)
+_Session_Fetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                5.298Mi ±  1%            5.460Mi ±  1%  +3.06% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                               5.231Mi ±  1%            5.374Mi ±  2%  +2.73% (p=0.002 n=10)
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                            928.4Mi ± 17%            918.0Mi ± 14%       ~ (p=0.529 n=10)
+_Session_HSubscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                           484.1Mi ± 16%            466.1Mi ±  9%       ~ (p=0.631 n=10)
+_Session_Ack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                  5.574Mi ±  4%            5.541Mi ±  1%       ~ (p=0.402 n=10)
+_Session_Nack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                 5.531Mi ±  2%            5.503Mi ±  1%       ~ (p=0.468 n=10)
+_Session_Transaction_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                          1.879Mi ±  1%            1.879Mi ±  1%       ~ (p=0.432 n=10)
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8                                              2.856Mi ±  3%            2.775Mi ±  3%       ~ (p=0.100 n=10)
+_Session_HProduce_GRPC/payload=128B/batch=1/concurrency=1-8                                             2.785Mi ± 12%            2.732Mi ±  6%       ~ (p=0.342 n=10)
+_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                2.880Mi ± 14%            2.747Mi ±  8%       ~ (p=0.361 n=10)
+_Session_HFetch_GRPC/payload=128B/batch=1/concurrency=1-8                                               2.732Mi ±  3%            2.751Mi ± 11%       ~ (p=0.986 n=10)
+_Session_Subscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                            89.50Mi ± 21%            84.57Mi ± 23%       ~ (p=0.912 n=10)
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                           72.32Mi ± 16%            68.67Mi ± 26%       ~ (p=0.971 n=10)
+_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1-8                                                  2.732Mi ±  4%            2.708Mi ±  4%       ~ (p=0.446 n=10)
+_Session_Nack_GRPC/payload=128B/batch=1/concurrency=1-8                                                 2.813Mi ±  3%            2.789Mi ±  6%       ~ (p=0.403 n=10)
+_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8                                          1.173Mi ±  2%            1.140Mi ±  9%  -2.85% (p=0.041 n=10)
+geomean                                                                                                 8.686Mi                  8.573Mi        -1.30%
+
+                                                                               │ test/performance/baseline-fast.bench │ test/performance/current-fast-certified.bench │
+                                                                               │               p99-sec                │        p99-sec          vs base               │
+_Session_Produce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                              38.77µ ±  16%            35.92µ ±  12%       ~ (p=0.247 n=10)
+_Session_HProduce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                             35.40µ ±   7%            36.17µ ±   6%       ~ (p=0.271 n=10)
+_Session_Fetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                36.23µ ±  23%            35.06µ ±  10%       ~ (p=0.172 n=10)
+_Session_HFetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                               36.85µ ±   8%            34.94µ ±  25%       ~ (p=0.315 n=10)
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                            437.5n ±  14%            500.0n ±  25%       ~ (p=0.090 n=10)
+_Session_HSubscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                           687.0n ± 130%            708.5n ±  47%       ~ (p=0.838 n=10)
+_Session_Ack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                  35.17µ ±  15%            34.10µ ±  13%       ~ (p=0.481 n=10)
+_Session_Nack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                 35.02µ ±  20%            38.10µ ±  14%       ~ (p=0.393 n=10)
+_Session_Transaction_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                          94.58µ ±   4%            90.44µ ±   9%       ~ (p=0.305 n=10)
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8                                              85.77µ ±  12%            87.56µ ±  11%       ~ (p=0.481 n=10)
+_Session_HProduce_GRPC/payload=128B/batch=1/concurrency=1-8                                             88.65µ ±  17%            93.00µ ±  10%       ~ (p=0.739 n=10)
+_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                90.15µ ±  21%            92.19µ ±  11%       ~ (p=0.971 n=10)
+_Session_HFetch_GRPC/payload=128B/batch=1/concurrency=1-8                                               89.15µ ±  11%           100.17µ ±  14%       ~ (p=0.089 n=10)
+_Session_Subscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                            4.355µ ± 175%            5.230µ ±  90%       ~ (p=0.643 n=10)
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                           6.438µ ± 128%            6.458µ ± 100%       ~ (p=0.853 n=10)
+_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1-8                                                  90.60µ ±  11%            91.60µ ±   6%       ~ (p=0.684 n=10)
+_Session_Nack_GRPC/payload=128B/batch=1/concurrency=1-8                                                 84.79µ ±   6%            91.94µ ±  12%       ~ (p=0.089 n=10)
+_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8                                          147.7µ ±  26%            158.1µ ±  80%       ~ (p=0.063 n=10)
+geomean                                                                                                 28.17µ                   29.10µ         +3.31%
+
+                                                                               │ test/performance/baseline-fast.bench │ test/performance/current-fast-certified.bench │
+                                                                               │                 B/op                 │         B/op           vs base                │
+_Session_Produce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                152.5 ±  0%             153.0 ±  1%        ~ (p=0.450 n=10)
+_Session_HProduce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                               262.0 ±  0%             262.0 ±  0%        ~ (p=1.000 n=10)
+_Session_Fetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                  569.0 ±  0%             385.0 ±  0%  -32.34% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                 668.0 ±  0%             482.0 ±  0%  -27.84% (p=0.000 n=10)
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                              177.0 ± 13%             180.5 ± 13%        ~ (p=0.926 n=10)
+_Session_HSubscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                             328.0 ± 12%             314.5 ± 16%        ~ (p=0.724 n=10)
+_Session_Ack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                    174.0 ±  1%             142.0 ±  1%  -18.39% (p=0.000 n=10)
+_Session_Nack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                   185.0 ±  0%             153.0 ±  1%  -17.30% (p=0.000 n=10)
+_Session_Transaction_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                            256.5 ±  0%             257.0 ±  0%        ~ (p=0.650 n=10)
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8                                              1.556Ki ±  0%           1.556Ki ±  0%        ~ (p=0.361 n=10)
+_Session_HProduce_GRPC/payload=128B/batch=1/concurrency=1-8                                             1.837Ki ±  0%           1.836Ki ±  0%        ~ (p=0.593 n=10)
+_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                2.033Ki ±  0%           1.884Ki ±  0%   -7.35% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=128B/batch=1/concurrency=1-8                                               2.386Ki ±  0%           2.255Ki ±  0%   -5.49% (p=0.000 n=10)
+_Session_Subscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                              968.5 ±  2%             973.0 ±  4%        ~ (p=0.670 n=10)
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                           1.324Ki ±  3%           1.318Ki ±  2%        ~ (p=0.927 n=10)
+_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1-8                                                  1.547Ki ±  0%           1.445Ki ±  0%   -6.60% (p=0.000 n=10)
+_Session_Nack_GRPC/payload=128B/batch=1/concurrency=1-8                                                 1.547Ki ±  0%           1.445Ki ±  0%   -6.57% (p=0.000 n=10)
+_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8                                          3.778Ki ±  0%           3.731Ki ±  0%   -1.24% (p=0.000 n=10)
+geomean                                                                                                   694.6                   642.3         -7.53%
+
+                                                                               │ test/performance/baseline-fast.bench │ test/performance/current-fast-certified.bench │
+                                                                               │              allocs/op               │      allocs/op       vs base                  │
+_Session_Produce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                 5.000 ± 0%            5.000 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_HProduce_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                9.000 ± 0%            9.000 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_Fetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                   13.00 ± 0%            12.00 ± 0%   -7.69% (p=0.000 n=10)
+_Session_HFetch_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                  19.00 ± 0%            18.00 ± 0%   -5.26% (p=0.000 n=10)
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                               2.000 ± 0%            2.000 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_HSubscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                              8.000 ± 0%            8.000 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_Ack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                    10.000 ± 0%            8.000 ± 0%  -20.00% (p=0.000 n=10)
+_Session_Nack_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                    12.00 ± 0%            10.00 ± 0%  -16.67% (p=0.000 n=10)
+_Session_Transaction_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                             11.00 ± 0%            11.00 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8                                                 44.00 ± 0%            44.00 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_HProduce_GRPC/payload=128B/batch=1/concurrency=1-8                                                49.00 ± 0%            49.00 ± 0%        ~ (p=1.000 n=10) ¹
+_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                   52.00 ± 0%            49.00 ± 0%   -5.77% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=128B/batch=1/concurrency=1-8                                                  58.00 ± 0%            55.00 ± 0%   -5.17% (p=0.000 n=10)
+_Session_Subscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                               16.00 ± 6%            16.00 ± 6%        ~ (p=0.466 n=10)
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=1-8                                              21.50 ± 2%            22.00 ± 5%        ~ (p=0.266 n=10)
+_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1-8                                                     52.00 ± 0%            49.00 ± 0%   -5.77% (p=0.000 n=10)
+_Session_Nack_GRPC/payload=128B/batch=1/concurrency=1-8                                                    52.00 ± 0%            49.00 ± 0%   -5.77% (p=0.000 n=10)
+_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8                                             127.0 ± 0%            126.0 ± 0%   -0.79% (p=0.000 n=10)
+geomean                                                                                                    19.59                 18.78        -4.11%
+¹ all samples are equal

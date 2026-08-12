@@ -43,36 +43,36 @@ func NewRabbitMQAMQP09Connector(config any, l *slog.Logger) (connector.Connector
 }
 
 // NewReader creates a reader from configuration
-func (a *rabbitmqAMQP09Connector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := a.config.Clients[name]
+func (a *rabbitmqAMQP09Connector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := a.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client not found by name: %s", name)
+		return nil, fmt.Errorf("rabbitmq_amqp09: route not found: %s", route)
 	}
 
-	if clientConf.Consume == nil {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client %q is not configured as a reader (consume not defined)", name)
+	if routeConf.Consume == nil {
+		return nil, fmt.Errorf("rabbitmq_amqp09: route %q is not configured as a reader (consume not defined)", route)
 	}
 
 	return NewReader(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: a.config.Common,
+		RouteSettings:  routeConf,
 	}, autoCommit, l)
 }
 
 // NewWriter creates a writer from configuration
-func (a *rabbitmqAMQP09Connector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := a.config.Clients[name]
+func (a *rabbitmqAMQP09Connector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := a.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client not found by name: %s", name)
+		return nil, fmt.Errorf("rabbitmq_amqp09: route not found: %s", route)
 	}
 
-	if clientConf.Publish == nil {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client %q is not configured as a writer (publish not defined)", name)
+	if routeConf.Publish == nil {
+		return nil, fmt.Errorf("rabbitmq_amqp09: route %q is not configured as a writer (publish not defined)", route)
 	}
 
 	return NewWriter(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: a.config.Common,
+		RouteSettings:  routeConf,
 	}, l)
 }
 

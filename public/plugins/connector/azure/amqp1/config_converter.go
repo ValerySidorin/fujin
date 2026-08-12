@@ -10,7 +10,7 @@ import (
 // convertConfigValue converts and validates a configuration value for AMQP10
 // This function handles both reader and writer settings
 func convertConfigValue(settingPath string, value string) (any, error) {
-	// Normalize the path (remove "clients.client_name." prefix if present)
+	// Normalize the path by removing the "routes.<name>." prefix when present.
 	settingName := normalizePath(settingPath)
 
 	switch settingName {
@@ -98,16 +98,12 @@ func convertConfigValue(settingPath string, value string) (any, error) {
 	}
 }
 
-// normalizePath removes the "clients.client_name." prefix from the path if present
-// and returns the normalized setting name
+// normalizePath removes the "routes.<name>." prefix from a setting path.
 func normalizePath(path string) string {
-	// Remove "clients." prefix if present
-	if strings.HasPrefix(path, "clients.") {
-		// Find the next dot after "clients."
-		idx := strings.Index(path[8:], ".")
-		if idx != -1 {
-			// Return everything after "clients.client_name."
-			return path[8+idx+1:]
+	if strings.HasPrefix(path, "routes.") {
+		parts := strings.SplitN(path, ".", 3)
+		if len(parts) >= 3 {
+			return parts[2]
 		}
 	}
 	return path

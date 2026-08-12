@@ -1,0 +1,129 @@
+{
+  "date": "2026-08-12",
+  "gomaxprocs": 8,
+  "build_tags": "fujin,grpc",
+  "groups": [
+    {
+      "group": "micro",
+      "rc": 0,
+      "seconds": 0.44,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-micro.txt",
+      "ok": true
+    },
+    {
+      "group": "legacy-nop",
+      "rc": 0,
+      "seconds": 2.01,
+      "top_level": 31,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-legacy-nop.txt",
+      "ok": true
+    },
+    {
+      "group": "legacy-gen-subscribe",
+      "rc": 0,
+      "seconds": 1.59,
+      "top_level": 15,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-legacy-gen-subscribe.txt",
+      "ok": true
+    },
+    {
+      "group": "legacy-grpc",
+      "rc": 0,
+      "seconds": 4.09,
+      "top_level": 12,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-legacy-grpc.txt",
+      "ok": true
+    },
+    {
+      "group": "session-matrix",
+      "rc": 0,
+      "seconds": 27.7,
+      "top_level": 18,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-session-matrix.txt",
+      "ok": true
+    },
+    {
+      "group": "external-kafka",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 23.8,
+      "top_level": 24,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-kafka.txt",
+      "ok": true
+    },
+    {
+      "group": "external-nats",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 4.76,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-nats.txt",
+      "ok": true
+    },
+    {
+      "group": "external-rabbitmq",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 4.84,
+      "top_level": 2,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-rabbitmq.txt",
+      "ok": true
+    },
+    {
+      "group": "external-artemis",
+      "up": 0,
+      "rc": 1,
+      "down": 0,
+      "seconds": 2.53,
+      "top_level": 0,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-artemis.txt",
+      "ok": false
+    },
+    {
+      "group": "external-redis-pubsub",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 4.03,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-redis-pubsub.txt",
+      "ok": true
+    },
+    {
+      "group": "external-redis-streams",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 4.49,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-redis-streams.txt",
+      "ok": true
+    },
+    {
+      "group": "external-mqtt",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 5.29,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-mqtt.txt",
+      "ok": true
+    },
+    {
+      "group": "external-nsq",
+      "up": 0,
+      "rc": 0,
+      "down": 0,
+      "seconds": 4.48,
+      "top_level": 8,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/final-bench-external-nsq.txt",
+      "ok": true
+    }
+  ],
+  "all_passed": false,
+  "top_level_total": 150
+}

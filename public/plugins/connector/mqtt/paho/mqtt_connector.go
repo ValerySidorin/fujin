@@ -43,28 +43,28 @@ func newMQTTPahoConnector(config any, l *slog.Logger) (connector.Connector, erro
 }
 
 // NewReader creates a reader from configuration
-func (m *mqttPahoConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := m.config.Clients[name]
+func (m *mqttPahoConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := m.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("mqtt: client not found by name: %s", name)
+		return nil, fmt.Errorf("mqtt: route not found: %s", route)
 	}
 
 	return NewReader(ConnectorConfig{
-		CommonSettings:         m.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: m.config.Common,
+		RouteSettings:  routeConf,
 	}, autoCommit, l)
 }
 
 // NewWriter creates a writer from configuration
-func (m *mqttPahoConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := m.config.Clients[name]
+func (m *mqttPahoConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := m.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("mqtt: client not found by name: %s", name)
+		return nil, fmt.Errorf("mqtt: route not found: %s", route)
 	}
 
 	return NewWriter(ConnectorConfig{
-		CommonSettings:         m.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: m.config.Common,
+		RouteSettings:  routeConf,
 	}, l)
 }
 

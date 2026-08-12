@@ -43,28 +43,28 @@ func newKafkaFranzConnector(config any, l *slog.Logger) (connector.Connector, er
 }
 
 // NewReader creates a reader from configuration
-func (k *kafkaFranzConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := k.config.Clients[name]
+func (k *kafkaFranzConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := k.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("kafka_franz: client not found by name: %s", name)
+		return nil, fmt.Errorf("kafka_franz: route not found: %s", route)
 	}
 
 	return NewConnector(ConnectorConfig{
-		CommonSettings:         k.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: k.config.Common,
+		RouteSettings:  routeConf,
 	}, autoCommit, l)
 }
 
 // NewWriter creates a writer from configuration
-func (k *kafkaFranzConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := k.config.Clients[name]
+func (k *kafkaFranzConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := k.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("kafka_franz: client not found by name: %s", name)
+		return nil, fmt.Errorf("kafka_franz: route not found: %s", route)
 	}
 
 	return NewConnector(ConnectorConfig{
-		CommonSettings:         k.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: k.config.Common,
+		RouteSettings:  routeConf,
 	}, false, l)
 }
 

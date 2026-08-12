@@ -13,7 +13,7 @@ connectors:
     settings:
       common:
         url: nats://localhost:4222
-      clients:
+      routes:
         pub:
           subject: my_subject
         sub:

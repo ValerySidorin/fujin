@@ -1,0 +1,159 @@
+===== compose up rc=0 =====
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container nsqlookupd  Creating
+ Container nsqlookupd  Created
+ Container nsqadmin  Creating
+ Container nsqd  Creating
+ Container nsqd  Created
+ Container nsqadmin  Created
+ Container nsqlookupd  Starting
+ Container nsqlookupd  Started
+ Container nsqadmin  Starting
+ Container nsqd  Starting
+ Container nsqadmin  Started
+ Container nsqd  Started
+ Container nsqd  Waiting
+ Container nsqadmin  Waiting
+ Container nsqlookupd  Waiting
+ Container nsqd  Healthy
+ Container nsqadmin  Healthy
+ Container nsqlookupd  Healthy
+
+===== go benchmark rc=0 =====
+time=2026-08-12T15:59:40.388+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:59:40.388+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+seconds to write full buf to quic stream: 8.225e-05
+2026/08/12 15:59:40 INF    1 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    1 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    1 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    1 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    1 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    1 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    1 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.442+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.442+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_NSQ_QUIC-8     	       1	     15375 ns/op	   1.11 MB/s	    1536 B/op	      22 allocs/op
+time=2026-08-12T15:59:40.443+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.443+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 4.3083e-05
+2026/08/12 15:59:40 INF    2 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    2 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    2 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    2 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    2 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    2 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    2 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.532+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.532+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_32BPayload_NSQ_QUIC-8    	       1	      1917 ns/op	  25.04 MB/s	      64 B/op	       1 allocs/op
+time=2026-08-12T15:59:40.534+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.534+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+2026/08/12 15:59:40 INF    1 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 15:59:40 INF    1 (localhost:4150) clean close complete
+2026/08/12 15:59:40 INF    2 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 15:59:40 INF    2 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 5.7208e-05
+2026/08/12 15:59:40 INF    3 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    3 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    3 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    3 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    3 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    3 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    3 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.655+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.655+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_128BPayload_NSQ_QUIC-8   	       1	       375.0 ns/op	 384.00 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:40.657+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.657+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.0209e-05
+2026/08/12 15:59:40 INF    4 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    4 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    4 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    4 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    4 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    4 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    4 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.754+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.754+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_256BPayload_NSQ_QUIC-8   	       1	       208.0 ns/op	1307.69 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 15:59:40 INF    3 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 15:59:40 INF    3 (localhost:4150) clean close complete
+time=2026-08-12T15:59:40.756+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.756+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.1792e-05
+2026/08/12 15:59:40 INF    5 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    5 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    5 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    5 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    5 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    5 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    5 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.824+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.824+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_1KBPayload_NSQ_QUIC-8    	       1	       333.0 ns/op	3123.12 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:40.825+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.825+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.5459e-05
+2026/08/12 15:59:40 INF    6 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    6 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    6 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    6 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    6 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    6 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    6 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.854+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.854+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_4KBPayload_NSQ_QUIC-8    	       1	       333.0 ns/op	12348.35 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 15:59:40 INF    4 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 15:59:40 INF    4 (localhost:4150) clean close complete
+time=2026-08-12T15:59:40.855+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.855+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 8.5458e-05
+2026/08/12 15:59:40 INF    7 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    7 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    7 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    7 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    7 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    7 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    7 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.873+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.873+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_8KBPayload_NSQ_QUIC-8    	       1	       500.0 ns/op	16416.00 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:40.875+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:40.875+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+2026/08/12 15:59:40 INF    5 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 15:59:40 INF    5 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 0.000233625
+2026/08/12 15:59:40 INF    8 (localhost:4150) connecting to nsqd
+2026/08/12 15:59:40 INF    8 (localhost:4150) stopping
+2026/08/12 15:59:40 INF    8 (localhost:4150) exiting router
+2026/08/12 15:59:40 INF    8 (localhost:4150) beginning close
+2026/08/12 15:59:40 INF    8 (localhost:4150) readLoop exiting
+2026/08/12 15:59:40 INF    8 (localhost:4150) breaking out of writeLoop
+2026/08/12 15:59:40 INF    8 (localhost:4150) writeLoop exiting
+time=2026-08-12T15:59:40.942+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:40.942+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_32KBPayload_NSQ_QUIC-8   	       1	      1333 ns/op	24594.15 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.022s
+
+===== compose down rc=0 =====
+ Container nsqadmin  Stopping
+ Container nsqd  Stopping
+ Container nsqadmin  Stopped
+ Container nsqadmin  Removing
+ Container nsqadmin  Removed
+ Container nsqd  Stopped
+ Container nsqd  Removing
+ Container nsqd  Removed
+ Container nsqlookupd  Stopping
+ Container nsqlookupd  Stopped
+ Container nsqlookupd  Removing
+ Container nsqlookupd  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

@@ -1,0 +1,42 @@
+{
+  "date": "2026-08-12",
+  "all_passed": true,
+  "variants": [
+    {
+      "variant": "default",
+      "command": "go test -count=1 ./...",
+      "rc": 0,
+      "failure_marker": false,
+      "seconds": 5.11,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-postfix-tests-default.txt",
+      "ok": true
+    },
+    {
+      "variant": "fujin",
+      "command": "go test -count=1 -tags=fujin ./...",
+      "rc": 0,
+      "failure_marker": false,
+      "seconds": 4.7,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-postfix-tests-fujin.txt",
+      "ok": true
+    },
+    {
+      "variant": "grpc",
+      "command": "go test -count=1 -tags=grpc ./...",
+      "rc": 0,
+      "failure_marker": false,
+      "seconds": 4.93,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-postfix-tests-grpc.txt",
+      "ok": true
+    },
+    {
+      "variant": "fujin-grpc",
+      "command": "go test -count=1 -tags=fujin,grpc ./...",
+      "rc": 0,
+      "failure_marker": false,
+      "seconds": 34.97,
+      "log": "test/performance/certification-2026-08-12-final/current-audit/goal-postfix-tests-fujin-grpc.txt",
+      "ok": true
+    }
+  ]
+}

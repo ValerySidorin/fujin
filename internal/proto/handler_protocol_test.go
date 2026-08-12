@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	pool2 "github.com/fujin-io/fujin/internal/common/pool"
-	"github.com/fujin-io/fujin/internal/connectors"
+	"github.com/fujin-io/fujin/internal/core"
+	"github.com/fujin-io/fujin/internal/proto/pool"
 	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/connector/config"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
@@ -116,6 +116,41 @@ func (w *mockConnectorWriter) getProduced() []mockProduced {
 	return r
 }
 
+type deferredConnectorWriter struct {
+	mu        sync.Mutex
+	callbacks []func(error)
+}
+
+func (w *deferredConnectorWriter) Produce(_ context.Context, _ []byte, callback func(error)) {
+	w.mu.Lock()
+	w.callbacks = append(w.callbacks, callback)
+	w.mu.Unlock()
+}
+
+func (w *deferredConnectorWriter) HProduce(_ context.Context, _ []byte, _ [][]byte, callback func(error)) {
+	w.Produce(context.Background(), nil, callback)
+}
+
+func (*deferredConnectorWriter) Flush(context.Context) error      { return nil }
+func (*deferredConnectorWriter) BeginTx(context.Context) error    { return nil }
+func (*deferredConnectorWriter) CommitTx(context.Context) error   { return nil }
+func (*deferredConnectorWriter) RollbackTx(context.Context) error { return nil }
+func (*deferredConnectorWriter) Close() error                     { return nil }
+
+func (w *deferredConnectorWriter) callbackCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return len(w.callbacks)
+}
+
+func (w *deferredConnectorWriter) complete(index int, err error) {
+	w.mu.Lock()
+	callback := w.callbacks[index]
+	w.callbacks[index] = nil
+	w.mu.Unlock()
+	callback(err)
+}
+
 // ---------------------------------------------------------------------------
 // Mock connector reader
 // ---------------------------------------------------------------------------
@@ -143,30 +178,66 @@ func (r *mockConnectorReader) Ack(_ context.Context, _ [][]byte, ah func(error),
 func (r *mockConnectorReader) Nack(_ context.Context, _ [][]byte, nh func(error), _ func([]byte, error)) {
 	nh(nil)
 }
-func (r *mockConnectorReader) MsgIDArgsLen() int                                   { return r.msgIDArgsLen }
-func (r *mockConnectorReader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte   { return buf }
-func (r *mockConnectorReader) AutoCommit() bool                                    { return r.autoCommit }
-func (r *mockConnectorReader) Close() error                                        { return nil }
+func (r *mockConnectorReader) MsgIDArgsLen() int                                 { return r.msgIDArgsLen }
+func (r *mockConnectorReader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte { return buf }
+func (r *mockConnectorReader) AutoCommit() bool                                  { return r.autoCommit }
+func (r *mockConnectorReader) Close() error                                      { return nil }
 
 // ---------------------------------------------------------------------------
 // Test harness
 // ---------------------------------------------------------------------------
-
 type testHarness struct {
-	h   *Handler
-	str *mockStream
-	out *Outbound
+	h       *Handler
+	str     *mockStream
+	out     *Outbound
+	manager *protocolTestManager
+}
+
+type protocolTestManager struct {
+	writers map[string]connector.WriteCloser
+	reader  connector.ReadCloser
+}
+
+func (m *protocolTestManager) GetReader(string, bool) (connector.ReadCloser, error) {
+	if m.reader == nil {
+		return &mockConnectorReader{}, nil
+	}
+	return m.reader, nil
+}
+
+func (m *protocolTestManager) GetWriter(name string) (connector.WriteCloser, error) {
+	if writer := m.writers[name]; writer != nil {
+		return writer, nil
+	}
+	writer := &mockConnectorWriter{}
+	m.writers[name] = writer
+	return writer, nil
+}
+
+func (*protocolTestManager) PutWriter(connector.WriteCloser, string) {}
+func (*protocolTestManager) Close()                                  {}
+
+func protocolTestConfigs(names ...string) config.ConnectorsConfig {
+	configs := make(config.ConnectorsConfig, len(names))
+	for _, name := range names {
+		configs[name] = config.ConnectorConfig{Type: "test"}
+	}
+	return configs
 }
 
 func newProtocolTestHarness() *testHarness {
 	str := &mockStream{}
 	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	out := NewOutbound(str, 5*time.Second, l)
+	manager := &protocolTestManager{writers: make(map[string]connector.WriteCloser)}
+	baseConfig := protocolTestConfigs("test-connector", "my-connector", "test-conn", "conn1", "my-conn", "conn")
 
 	h := &Handler{
-		ctx:          context.Background(),
+		ctx: context.Background(),
+		core: core.NewWithManagerFactory(context.Background(), baseConfig, nil, l, func(config.ConnectorConfig, string, *slog.Logger) core.Manager {
+			return manager
+		}),
 		ps:           &parseState{},
-		sessionState: STREAM_STATE_BIND,
 		pingInterval: 2 * time.Second,
 		pingTimeout:  5 * time.Second,
 		closed:       make(chan struct{}),
@@ -174,29 +245,41 @@ func newProtocolTestHarness() *testHarness {
 		l:            l,
 		out:          out,
 		str:          str,
-		subIDPool:    pool2.NewBytePool(),
-		subscribers:  make(map[byte]connector.ReadCloser),
-		unsubFuncs:   make(map[byte]func()),
-		fetchReaders: make(map[string]map[bool]byte),
-		fetchMsgHandlers: make(map[string]map[bool]func(message []byte, topic string, args ...any)),
-		fetchMsgWithHeadersHandlers: make(map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any)),
 	}
 
-	return &testHarness{h: h, str: str, out: out}
+	return &testHarness{h: h, str: str, out: out, manager: manager}
 }
 
 // setConnected sets handler state to connected (as if BIND completed)
 func (th *testHarness) setConnected(connectorName string) {
-	th.h.connected = true
-	th.h.sessionState = STREAM_STATE_CONNECTED
-	th.h.nonTxSessionWriters = make(map[string]connector.WriteCloser)
-	th.h.cman = connectors.NewManagerV2(config.ConnectorConfig{}, connectorName, th.h.l)
+	configs := protocolTestConfigs(connectorName)
+	th.manager = &protocolTestManager{writers: make(map[string]connector.WriteCloser)}
+	th.h.core = core.NewWithManagerFactory(context.Background(), configs, nil, th.h.l, func(config.ConnectorConfig, string, *slog.Logger) core.Manager {
+		return th.manager
+	})
+	if err := th.h.core.Bind(connectorName, nil, nil); err != nil {
+		panic(err)
+	}
 }
 
-// setConnectedWithWriter sets handler state to connected with a pre-populated writer
-func (th *testHarness) setConnectedWithWriter(topic string, w connector.WriteCloser) {
+// setConnectedWithWriter sets handler state to connected with a pre-populated route writer.
+func (th *testHarness) setConnectedWithWriter(route string, w connector.WriteCloser) {
 	th.setConnected("test")
-	th.h.nonTxSessionWriters[topic] = w
+	th.manager.writers[route] = w
+}
+
+func (th *testHarness) beginTransactionWithWriter(route string, w connector.WriteCloser) {
+	th.manager.writers[route] = w
+	if err := th.h.core.Begin(route); err != nil {
+		panic(err)
+	}
+}
+
+func (th *testHarness) activateTransactionWriter(route string, w connector.WriteCloser) {
+	th.beginTransactionWithWriter(route, w)
+	if err := th.h.core.TxProduce(nil, nil, nil); err != nil {
+		panic(err)
+	}
 }
 
 // startWriteLoop starts the outbound write loop and returns a done channel
@@ -254,37 +337,37 @@ func buildBindFrame(connectorName string, meta map[string]string, overrides map[
 	return buf
 }
 
-// buildProduceFrame constructs: PRODUCE opcode + correlationID(4b) + topicLen(u32) + topic + msgSize(u32) + msg
-func buildProduceFrame(cID [4]byte, topic string, msg []byte) []byte {
+// buildProduceFrame constructs: PRODUCE opcode + correlationID(4b) + routeLen(u32) + route + msgSize(u32) + msg.
+func buildProduceFrame(cID [4]byte, route string, msg []byte) []byte {
 	var buf []byte
 	buf = append(buf, byte(v1.OP_CODE_PRODUCE))
 	buf = append(buf, cID[:]...)
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
-	buf = append(buf, topic...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+	buf = append(buf, route...)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msg)))
 	buf = append(buf, msg...)
 	return buf
 }
 
-// buildHProduceFrame constructs: HPRODUCE opcode + correlationID(4b) + topicLen(u32) + topic + headerCount(u16) + [headerStrLen(u32) + headerStr]... + msgSize(u32) + msg
-func buildHProduceFrame(cID [4]byte, topic string, headers []string, msg []byte) []byte {
+// buildHProduceFrame constructs HPRODUCE with a route, headers, and message.
+func buildHProduceFrame(cID [4]byte, route string, headers []string, msg []byte) []byte {
 	var buf []byte
 	buf = append(buf, byte(v1.OP_CODE_HPRODUCE))
 	buf = append(buf, cID[:]...)
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
-	buf = append(buf, topic...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+	buf = append(buf, route...)
 	buf = binary.BigEndian.AppendUint16(buf, uint16(len(headers)))
-	for _, h := range headers {
-		buf = binary.BigEndian.AppendUint32(buf, uint32(len(h)))
-		buf = append(buf, h...)
+	for _, header := range headers {
+		buf = binary.BigEndian.AppendUint32(buf, uint32(len(header)))
+		buf = append(buf, header...)
 	}
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msg)))
 	buf = append(buf, msg...)
 	return buf
 }
 
-// buildSubscribeFrame constructs: SUBSCRIBE opcode + correlationID(4b) + autoCommit(1b) + topicLen(u32) + topic
-func buildSubscribeFrame(cID [4]byte, autoCommit bool, topic string) []byte {
+// buildSubscribeFrame constructs SUBSCRIBE with the configured route.
+func buildSubscribeFrame(cID [4]byte, autoCommit bool, route string) []byte {
 	var buf []byte
 	buf = append(buf, byte(v1.OP_CODE_SUBSCRIBE))
 	buf = append(buf, cID[:]...)
@@ -293,13 +376,13 @@ func buildSubscribeFrame(cID [4]byte, autoCommit bool, topic string) []byte {
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
-	buf = append(buf, topic...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+	buf = append(buf, route...)
 	return buf
 }
 
-// buildFetchFrame constructs: FETCH opcode + correlationID(4b) + autoCommit(1b) + topicLen(u32) + topic + n(u32)
-func buildFetchFrame(cID [4]byte, autoCommit bool, topic string, n uint32) []byte {
+// buildFetchFrame constructs FETCH with the configured route.
+func buildFetchFrame(cID [4]byte, autoCommit bool, route string, n uint32) []byte {
 	var buf []byte
 	buf = append(buf, byte(v1.OP_CODE_FETCH))
 	buf = append(buf, cID[:]...)
@@ -308,17 +391,42 @@ func buildFetchFrame(cID [4]byte, autoCommit bool, topic string, n uint32) []byt
 	} else {
 		buf = append(buf, 0)
 	}
-	buf = binary.BigEndian.AppendUint32(buf, uint32(len(topic)))
-	buf = append(buf, topic...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+	buf = append(buf, route...)
 	buf = binary.BigEndian.AppendUint32(buf, n)
 	return buf
 }
 
-// buildTxBeginFrame constructs: TX_BEGIN opcode + correlationID(4b)
-func buildTxBeginFrame(cID [4]byte) []byte {
+// buildTxBeginFrame constructs: TX_BEGIN opcode + correlationID(4b) + routeLen(u32) + route.
+func buildTxBeginFrame(cID [4]byte, route string) []byte {
 	var buf []byte
 	buf = append(buf, byte(v1.OP_CODE_TX_BEGIN))
 	buf = append(buf, cID[:]...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+	buf = append(buf, route...)
+	return buf
+}
+
+func buildTxProduceFrame(cID [4]byte, msg []byte) []byte {
+	var buf []byte
+	buf = append(buf, byte(v1.OP_CODE_TX_PRODUCE))
+	buf = append(buf, cID[:]...)
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msg)))
+	buf = append(buf, msg...)
+	return buf
+}
+
+func buildTxHProduceFrame(cID [4]byte, headers []string, msg []byte) []byte {
+	var buf []byte
+	buf = append(buf, byte(v1.OP_CODE_TX_HPRODUCE))
+	buf = append(buf, cID[:]...)
+	buf = binary.BigEndian.AppendUint16(buf, uint16(len(headers)))
+	for _, header := range headers {
+		buf = binary.BigEndian.AppendUint32(buf, uint32(len(header)))
+		buf = append(buf, header...)
+	}
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(msg)))
+	buf = append(buf, msg...)
 	return buf
 }
 
@@ -414,8 +522,7 @@ func TestHandle_BindState_AcceptsBind(t *testing.T) {
 	err := th.feed(frame)
 	assert.NoError(t, err)
 	assert.Equal(t, OP_START, th.h.ps.state)
-	assert.True(t, th.h.connected, "should be connected after BIND")
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 }
 
 func TestHandle_BindState_RejectsProduceOpcode(t *testing.T) {
@@ -474,19 +581,10 @@ func TestHandle_ConnectedState_RejectsInvalidOpcode(t *testing.T) {
 	assert.ErrorIs(t, err, ErrParseProto)
 }
 
-func TestHandle_ConnectedState_RejectsWithoutConnected(t *testing.T) {
-	// State is CONNECTED but connected flag is false (edge case)
-	th := newProtocolTestHarness()
-	th.h.sessionState = STREAM_STATE_CONNECTED
-	th.h.connected = false
-	err := th.feed([]byte{byte(v1.OP_CODE_PRODUCE)})
-	assert.ErrorIs(t, err, ErrParseProto)
-}
-
 func TestHandle_ConnectedState_AcceptsAllWriterCmds(t *testing.T) {
 	ops := []struct {
-		name    string
-		opcode  byte
+		name     string
+		opcode   byte
 		expState int
 	}{
 		{"PRODUCE", byte(v1.OP_CODE_PRODUCE), OP_PRODUCE},
@@ -547,26 +645,26 @@ func TestHandle_ConnectedState_HSubscribeSetsHeaderedFlag(t *testing.T) {
 	assert.Equal(t, OP_SUBSCRIBE, th.h.ps.state)
 }
 
-func TestHandle_ConnectedState_TxCommitOutsideTx_DispatchToFail(t *testing.T) {
+func TestHandle_ConnectedState_TxCommitOutsideTx_DispatchesToCore(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
 	err := th.feed([]byte{byte(v1.OP_CODE_TX_COMMIT)})
 	assert.NoError(t, err)
-	assert.Equal(t, OP_COMMIT_TX_FAIL, th.h.ps.state)
+	assert.Equal(t, OP_COMMIT_TX, th.h.ps.state)
 }
 
-func TestHandle_ConnectedState_TxRollbackOutsideTx_DispatchToFail(t *testing.T) {
+func TestHandle_ConnectedState_TxRollbackOutsideTx_DispatchesToCore(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
 	err := th.feed([]byte{byte(v1.OP_CODE_TX_ROLLBACK)})
 	assert.NoError(t, err)
-	assert.Equal(t, OP_ROLLBACK_TX_FAIL, th.h.ps.state)
+	assert.Equal(t, OP_ROLLBACK_TX, th.h.ps.state)
 }
 
 func TestHandle_InTxState_AcceptsDisconnect(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed(buildDisconnectFrame())
 	assert.ErrorIs(t, err, ErrClose)
 }
@@ -574,33 +672,53 @@ func TestHandle_InTxState_AcceptsDisconnect(t *testing.T) {
 func TestHandle_InTxState_AcceptsPong(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed(buildPongFrame())
 	assert.NoError(t, err)
 }
 
-func TestHandle_InTxState_ProduceDispatchesToTx(t *testing.T) {
+func TestHandle_InTxState_RejectsNormalProduce(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed([]byte{byte(v1.OP_CODE_PRODUCE)})
-	assert.NoError(t, err)
-	assert.Equal(t, OP_PRODUCE_TX, th.h.ps.state)
+	assert.ErrorIs(t, err, ErrParseProto)
 }
 
-func TestHandle_InTxState_TxBeginDispatchesToFail(t *testing.T) {
+func TestHandle_InTxState_TxProduceUsesTransactionDecoder(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
+	err := th.feed([]byte{byte(v1.OP_CODE_TX_PRODUCE)})
+	assert.NoError(t, err)
+	assert.True(t, th.h.ps.pa.transactional)
+	assert.Equal(t, OP_TX_PRODUCE, th.h.ps.state)
+}
+
+func TestHandle_InTxState_TxHProduceUsesTransactionDecoder(t *testing.T) {
+	th := newProtocolTestHarness()
+	th.setConnected("test")
+	require.NoError(t, th.h.core.Begin("tx"))
+	err := th.feed([]byte{byte(v1.OP_CODE_TX_HPRODUCE)})
+	assert.NoError(t, err)
+	assert.True(t, th.h.ps.pa.transactional)
+	assert.True(t, th.h.ps.pa.headered)
+	assert.Equal(t, OP_TX_PRODUCE_H, th.h.ps.state)
+}
+
+func TestHandle_InTxState_TxBeginDispatchesToCore(t *testing.T) {
+	th := newProtocolTestHarness()
+	th.setConnected("test")
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed([]byte{byte(v1.OP_CODE_TX_BEGIN)})
 	assert.NoError(t, err)
-	assert.Equal(t, OP_BEGIN_TX_FAIL, th.h.ps.state)
+	assert.Equal(t, OP_BEGIN_TX, th.h.ps.state)
 }
 
 func TestHandle_InTxState_TxCommitDispatchesToCommit(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed([]byte{byte(v1.OP_CODE_TX_COMMIT)})
 	assert.NoError(t, err)
 	assert.Equal(t, OP_COMMIT_TX, th.h.ps.state)
@@ -609,7 +727,7 @@ func TestHandle_InTxState_TxCommitDispatchesToCommit(t *testing.T) {
 func TestHandle_InTxState_TxRollbackDispatchesToRollback(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed([]byte{byte(v1.OP_CODE_TX_ROLLBACK)})
 	assert.NoError(t, err)
 	assert.Equal(t, OP_ROLLBACK_TX, th.h.ps.state)
@@ -618,16 +736,8 @@ func TestHandle_InTxState_TxRollbackDispatchesToRollback(t *testing.T) {
 func TestHandle_InTxState_RejectsInvalidOpcode(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed([]byte{0xFF})
-	assert.ErrorIs(t, err, ErrParseProto)
-}
-
-func TestHandle_InTxState_RejectsWithoutConnected(t *testing.T) {
-	th := newProtocolTestHarness()
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
-	th.h.connected = false
-	err := th.feed([]byte{byte(v1.OP_CODE_TX_COMMIT)})
 	assert.ErrorIs(t, err, ErrParseProto)
 }
 
@@ -645,8 +755,7 @@ func TestHandle_Bind_ParsesConnectorName(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, OP_START, th.h.ps.state)
-	assert.True(t, th.h.connected)
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 }
 
 func TestHandle_Bind_WithMeta(t *testing.T) {
@@ -662,7 +771,7 @@ func TestHandle_Bind_WithMeta(t *testing.T) {
 	err := th.feed(frame)
 	require.NoError(t, err)
 
-	assert.True(t, th.h.connected)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 	assert.Equal(t, OP_START, th.h.ps.state)
 }
 
@@ -707,7 +816,7 @@ func TestHandle_Bind_AlreadyConnected(t *testing.T) {
 	frame := buildBindFrame("test-conn", nil, nil)
 	err := th.feed(frame)
 	require.NoError(t, err)
-	assert.True(t, th.h.connected)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 
 	// Second BIND should fail (already connected, so we're in CONNECTED state)
 	// In CONNECTED state, BIND is not a valid opcode
@@ -723,7 +832,7 @@ func TestHandle_Bind_EmptyMeta(t *testing.T) {
 	frame := buildBindFrame("test-conn", map[string]string{}, map[string]string{})
 	err := th.feed(frame)
 	require.NoError(t, err)
-	assert.True(t, th.h.connected)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 }
 
 func TestHandle_Bind_Response(t *testing.T) {
@@ -766,6 +875,39 @@ func TestHandle_Produce_FullFrame(t *testing.T) {
 	assert.Equal(t, msg, produced[0].msg)
 }
 
+func TestHandle_Produce_DeferredCallbacksPreserveCorrelationIDsAcrossResponseReuse(t *testing.T) {
+	th := newProtocolTestHarness()
+	done := th.startWriteLoop()
+	w := &deferredConnectorWriter{}
+	th.setConnectedWithWriter("route", w)
+
+	for id := byte(1); id <= 2; id++ {
+		correlationID := [4]byte{0, 0, 0, id}
+		require.NoError(t, th.feed(buildProduceFrame(correlationID, "route", []byte{id})))
+	}
+	require.Eventually(t, func() bool { return w.callbackCount() == 2 }, time.Second, time.Millisecond)
+
+	w.complete(0, nil)
+	require.Eventually(t, func() bool { return len(th.str.written()) >= 6 }, time.Second, time.Millisecond)
+
+	thirdCorrelationID := [4]byte{0, 0, 0, 3}
+	require.NoError(t, th.feed(buildProduceFrame(thirdCorrelationID, "route", []byte{3})))
+	require.Eventually(t, func() bool { return w.callbackCount() == 3 }, time.Second, time.Millisecond)
+	w.complete(2, nil)
+	w.complete(1, nil)
+	require.Eventually(t, func() bool { return len(th.str.written()) >= 18 }, time.Second, time.Millisecond)
+	th.close(done)
+
+	response := th.str.written()
+	require.Len(t, response, 18)
+	for responseIndex, correlationID := range []byte{1, 3, 2} {
+		offset := responseIndex * 6
+		assert.Equal(t, byte(v1.RESP_CODE_PRODUCE), response[offset])
+		assert.Equal(t, []byte{0, 0, 0, correlationID}, response[offset+1:offset+5])
+		assert.Equal(t, byte(v1.ERR_CODE_NO), response[offset+5])
+	}
+}
+
 func TestHandle_Produce_LargePayload(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
@@ -773,7 +915,7 @@ func TestHandle_Produce_LargePayload(t *testing.T) {
 	th.setConnectedWithWriter("big-topic", w)
 
 	cID := [4]byte{0, 0, 0, 2}
-	msg := make([]byte, 64*1024) // 64KB
+	msg := make([]byte, 1024*1024) // 1 MiB, larger than the pooled buffer classes
 	for i := range msg {
 		msg[i] = byte(i % 256)
 	}
@@ -1019,7 +1161,7 @@ func TestHandle_Bind_ByteByByte(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.True(t, th.h.connected)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 	assert.Equal(t, OP_START, th.h.ps.state)
 }
 
@@ -1033,12 +1175,12 @@ func TestHandle_TxBegin_FromConnected(t *testing.T) {
 	th.setConnected("test")
 
 	cID := [4]byte{0, 0, 0, 1}
-	frame := buildTxBeginFrame(cID)
+	frame := buildTxBeginFrame(cID, "tx-route")
 	err := th.feed(frame)
 	require.NoError(t, err)
 
 	assert.Equal(t, OP_START, th.h.ps.state)
-	assert.Equal(t, STREAM_STATE_CONNECTED_IN_TX, th.h.sessionState)
+	assert.Equal(t, core.StateInTransaction, th.h.core.State())
 
 	resp := th.readResponse(50 * time.Millisecond)
 	th.close(done)
@@ -1053,10 +1195,10 @@ func TestHandle_TxBegin_WhenAlreadyInTx(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx-route"))
 
 	cID := [4]byte{0, 0, 0, 2}
-	frame := buildTxBeginFrame(cID)
+	frame := buildTxBeginFrame(cID, "tx-route")
 	err := th.feed(frame)
 	require.NoError(t, err)
 
@@ -1073,15 +1215,59 @@ func TestHandle_TxBegin_WhenAlreadyInTx(t *testing.T) {
 	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
 }
 
+func TestHandle_TxProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
+	th := newProtocolTestHarness()
+	done := th.startWriteLoop()
+	th.setConnected("test")
+	w := &mockConnectorWriter{}
+	th.beginTransactionWithWriter("tx-route", w)
+
+	cID := [4]byte{0, 0, 0, 3}
+	require.NoError(t, th.feed(buildTxProduceFrame(cID, []byte("message"))))
+	assert.Equal(t, OP_START, th.h.ps.state)
+	produced := w.getProduced()
+	require.Len(t, produced, 1)
+	assert.Equal(t, []byte("message"), produced[0].msg)
+	assert.Nil(t, produced[0].headers)
+
+	resp := th.readResponse(50 * time.Millisecond)
+	th.close(done)
+	require.GreaterOrEqual(t, len(resp), 6)
+	assert.Equal(t, byte(v1.RESP_CODE_TX_PRODUCE), resp[0])
+	assert.Equal(t, cID[:], resp[1:5])
+	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+}
+
+func TestHandle_TxHProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
+	th := newProtocolTestHarness()
+	done := th.startWriteLoop()
+	th.setConnected("test")
+	w := &mockConnectorWriter{}
+	th.beginTransactionWithWriter("tx-route", w)
+
+	cID := [4]byte{0, 0, 0, 4}
+	require.NoError(t, th.feed(buildTxHProduceFrame(cID, []string{"key", "value"}, []byte("message"))))
+	assert.Equal(t, OP_START, th.h.ps.state)
+	produced := w.getProduced()
+	require.Len(t, produced, 1)
+	assert.Equal(t, []byte("message"), produced[0].msg)
+	assert.Equal(t, [][]byte{[]byte("key"), []byte("value")}, produced[0].headers)
+
+	resp := th.readResponse(50 * time.Millisecond)
+	th.close(done)
+	require.GreaterOrEqual(t, len(resp), 6)
+	assert.Equal(t, byte(v1.RESP_CODE_TX_HPRODUCE), resp[0])
+	assert.Equal(t, cID[:], resp[1:5])
+	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+}
+
 func TestHandle_TxCommit_InTxState(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
-	// Set up a mock tx writer
+	// Set up a mock transaction writer through Session Core.
 	w := &mockConnectorWriter{}
-	th.h.currentTxWriter = w
-	th.h.currentTxWriterTopic = "tx-topic"
+	th.activateTransactionWriter("tx-topic", w)
 
 	cID := [4]byte{0, 0, 0, 3}
 	frame := buildTxCommitFrame(cID)
@@ -1089,7 +1275,7 @@ func TestHandle_TxCommit_InTxState(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, OP_START, th.h.ps.state)
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 
 	w.mu.Lock()
 	assert.True(t, w.txCommitted)
@@ -1130,10 +1316,8 @@ func TestHandle_TxRollback_InTxState(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
 	w := &mockConnectorWriter{}
-	th.h.currentTxWriter = w
-	th.h.currentTxWriterTopic = "tx-topic"
+	th.activateTransactionWriter("tx-topic", w)
 
 	cID := [4]byte{0, 0, 0, 5}
 	frame := buildTxRollbackFrame(cID)
@@ -1141,7 +1325,7 @@ func TestHandle_TxRollback_InTxState(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, OP_START, th.h.ps.state)
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 
 	w.mu.Lock()
 	assert.True(t, w.txRolledBack)
@@ -1175,6 +1359,54 @@ func TestHandle_TxRollback_OutsideTx(t *testing.T) {
 	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
 }
 
+func TestAppendAutoCommitFetchMessagePacksAcrossLargePoolBoundary(t *testing.T) {
+	payload := bytes.Repeat([]byte{0x7f}, 32*1024)
+	lease := &bufsLease{bufs: [][]byte{append(pool.Get(pool.SIZE_TINY), make([]byte, 11)...)}}
+	t.Cleanup(func() {
+		for _, buffer := range lease.bufs {
+			pool.Put(buffer)
+		}
+	})
+
+	appendAutoCommitFetchMessage(lease, payload)
+	appendAutoCommitFetchMessage(lease, payload)
+
+	require.Len(t, lease.bufs, 2)
+	expected := make([]byte, 11)
+	for range 2 {
+		expected = binary.BigEndian.AppendUint32(expected, uint32(len(payload)))
+		expected = append(expected, payload...)
+	}
+	assert.Equal(t, expected, bytes.Join(lease.bufs, nil))
+}
+
+func TestAppendAutoCommitHFetchMessagePacksAcrossLargePoolBoundary(t *testing.T) {
+	payload := bytes.Repeat([]byte{0x7f}, 32*1024)
+	headers := [][]byte{[]byte("key"), []byte("value")}
+	lease := &bufsLease{bufs: [][]byte{append(pool.Get(pool.SIZE_TINY), make([]byte, 11)...)}}
+	t.Cleanup(func() {
+		for _, buffer := range lease.bufs {
+			pool.Put(buffer)
+		}
+	})
+
+	appendAutoCommitHFetchMessage(lease, payload, headers)
+	appendAutoCommitHFetchMessage(lease, payload, headers)
+
+	require.Len(t, lease.bufs, 2)
+	expected := make([]byte, 11)
+	for range 2 {
+		expected = binary.BigEndian.AppendUint16(expected, uint16(len(headers)))
+		for _, header := range headers {
+			expected = binary.BigEndian.AppendUint32(expected, uint32(len(header)))
+			expected = append(expected, header...)
+		}
+		expected = binary.BigEndian.AppendUint32(expected, uint32(len(payload)))
+		expected = append(expected, payload...)
+	}
+	assert.Equal(t, expected, bytes.Join(lease.bufs, nil))
+}
+
 // ---------------------------------------------------------------------------
 // FETCH Parsing Tests (parsing only — up to the fetch() call)
 // ---------------------------------------------------------------------------
@@ -1200,20 +1432,20 @@ func TestHandle_Fetch_ParsesArgs(t *testing.T) {
 	err = th.feed([]byte{1})
 	require.NoError(t, err)
 	assert.True(t, th.h.ps.fa.autoCommit)
-	assert.Equal(t, OP_FETCH_TOPIC_ARG, th.h.ps.state)
+	assert.Equal(t, OP_FETCH_ROUTE_ARG, th.h.ps.state)
 
-	// Feed topic length (5 = "topic")
-	topicLen := make([]byte, 4)
-	binary.BigEndian.PutUint32(topicLen, 5)
-	err = th.feed(topicLen)
+	// Feed route length (5 = "route").
+	routeLen := make([]byte, 4)
+	binary.BigEndian.PutUint32(routeLen, 5)
+	err = th.feed(routeLen)
 	require.NoError(t, err)
-	assert.Equal(t, uint32(5), th.h.ps.fa.topicLen)
-	assert.Equal(t, OP_FETCH_TOPIC_PAYLOAD, th.h.ps.state)
+	assert.Equal(t, uint32(5), th.h.ps.fa.routeLen)
+	assert.Equal(t, OP_FETCH_ROUTE_PAYLOAD, th.h.ps.state)
 
-	// Feed topic
-	err = th.feed([]byte("topic"))
+	// Feed route.
+	err = th.feed([]byte("route"))
 	require.NoError(t, err)
-	assert.Equal(t, "topic", th.h.ps.fa.topic)
+	assert.Equal(t, "route", th.h.ps.fa.route)
 	assert.Equal(t, OP_FETCH_N_ARG, th.h.ps.state)
 }
 
@@ -1252,15 +1484,15 @@ func TestHandle_Subscribe_ParsesArgs(t *testing.T) {
 	err = th.feed([]byte{0})
 	require.NoError(t, err)
 	assert.False(t, th.h.ps.sa.autoCommit)
-	assert.Equal(t, OP_SUBSCRIBE_TOPIC_ARG, th.h.ps.state)
+	assert.Equal(t, OP_SUBSCRIBE_ROUTE_ARG, th.h.ps.state)
 
-	// Feed topic length (10 = "test-topic")
-	topicLen := make([]byte, 4)
-	binary.BigEndian.PutUint32(topicLen, 10)
-	err = th.feed(topicLen)
+	// Feed route length (10 = "test-route").
+	routeLen := make([]byte, 4)
+	binary.BigEndian.PutUint32(routeLen, 10)
+	err = th.feed(routeLen)
 	require.NoError(t, err)
-	assert.Equal(t, uint32(10), th.h.ps.sa.topicLen)
-	assert.Equal(t, OP_SUBSCRIBE_TOPIC_PAYLOAD, th.h.ps.state)
+	assert.Equal(t, uint32(10), th.h.ps.sa.routeLen)
+	assert.Equal(t, OP_SUBSCRIBE_ROUTE_PAYLOAD, th.h.ps.state)
 }
 
 func TestHandle_Subscribe_InvalidAutoCommit(t *testing.T) {
@@ -1289,7 +1521,7 @@ func TestHandle_Ack_ZeroMsgIDs(t *testing.T) {
 	var frame []byte
 	frame = append(frame, byte(v1.OP_CODE_ACK))
 	frame = append(frame, cID[:]...)
-	frame = append(frame, 42) // subID = 42
+	frame = append(frame, 42)                       // subID = 42
 	frame = binary.BigEndian.AppendUint32(frame, 0) // 0 msgIDs
 
 	err := th.feed(frame)
@@ -1315,22 +1547,22 @@ func TestHandle_Ack_ZeroMsgIDs(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestHandle_Pong_AllStates(t *testing.T) {
-	states := []struct {
+	tests := []struct {
 		name  string
-		state sessionState
+		setup func(*testHarness)
 	}{
-		{"BIND", STREAM_STATE_BIND},
-		{"CONNECTED", STREAM_STATE_CONNECTED},
-		{"IN_TX", STREAM_STATE_CONNECTED_IN_TX},
+		{name: "BIND", setup: func(*testHarness) {}},
+		{name: "CONNECTED", setup: func(th *testHarness) { th.setConnected("test") }},
+		{name: "IN_TX", setup: func(th *testHarness) {
+			th.setConnected("test")
+			require.NoError(t, th.h.core.Begin("tx"))
+		}},
 	}
 
-	for _, st := range states {
-		t.Run(st.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			th := newProtocolTestHarness()
-			th.h.sessionState = st.state
-			if st.state != STREAM_STATE_BIND {
-				th.h.connected = true
-			}
+			tt.setup(th)
 			err := th.feed(buildPongFrame())
 			assert.NoError(t, err)
 			assert.Equal(t, OP_START, th.h.ps.state)
@@ -1352,7 +1584,7 @@ func TestHandle_Disconnect_FromConnected(t *testing.T) {
 func TestHandle_Disconnect_FromInTx(t *testing.T) {
 	th := newProtocolTestHarness()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
+	require.NoError(t, th.h.core.Begin("tx"))
 	err := th.feed(buildDisconnectFrame())
 	assert.ErrorIs(t, err, ErrClose)
 }
@@ -1414,11 +1646,11 @@ func TestHandle_BindThenProduce_Sequential(t *testing.T) {
 	bindFrame := buildBindFrame("test-conn", nil, nil)
 	err := th.feed(bindFrame)
 	require.NoError(t, err)
-	require.True(t, th.h.connected)
+	require.Equal(t, core.StateConnected, th.h.core.State())
 
 	// Inject a writer into the now-connected handler
 	w := &mockConnectorWriter{}
-	th.h.nonTxSessionWriters["my-topic"] = w
+	th.manager.writers["my-topic"] = w
 
 	// Second: PRODUCE
 	cID := [4]byte{0, 0, 0, 1}
@@ -1445,7 +1677,7 @@ func TestHandle_BindThenProduce_InOneBuffer(t *testing.T) {
 	// However, we can test that parsing continues correctly.
 	err := th.feed(bindFrame)
 	require.NoError(t, err)
-	assert.True(t, th.h.connected)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 	assert.Equal(t, OP_START, th.h.ps.state)
 
 	th.close(done)
@@ -1461,14 +1693,14 @@ func TestHandle_TxBegin_ByteByByte(t *testing.T) {
 	th.setConnected("test")
 
 	cID := [4]byte{0, 0, 0, 1}
-	frame := buildTxBeginFrame(cID)
+	frame := buildTxBeginFrame(cID, "tx-route")
 
 	for _, b := range frame {
 		err := th.feed([]byte{b})
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, STREAM_STATE_CONNECTED_IN_TX, th.h.sessionState)
+	assert.Equal(t, core.StateInTransaction, th.h.core.State())
 	th.close(done)
 }
 
@@ -1476,10 +1708,8 @@ func TestHandle_TxCommit_ByteByByte(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
 	w := &mockConnectorWriter{}
-	th.h.currentTxWriter = w
-	th.h.currentTxWriterTopic = "tx-topic"
+	th.activateTransactionWriter("tx-topic", w)
 
 	cID := [4]byte{0, 0, 0, 1}
 	frame := buildTxCommitFrame(cID)
@@ -1489,7 +1719,7 @@ func TestHandle_TxCommit_ByteByByte(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 	w.mu.Lock()
 	assert.True(t, w.txCommitted)
 	w.mu.Unlock()
@@ -1500,10 +1730,8 @@ func TestHandle_TxRollback_ByteByByte(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	th.setConnected("test")
-	th.h.sessionState = STREAM_STATE_CONNECTED_IN_TX
 	w := &mockConnectorWriter{}
-	th.h.currentTxWriter = w
-	th.h.currentTxWriterTopic = "tx-topic"
+	th.activateTransactionWriter("tx-topic", w)
 
 	cID := [4]byte{0, 0, 0, 1}
 	frame := buildTxRollbackFrame(cID)
@@ -1513,7 +1741,7 @@ func TestHandle_TxRollback_ByteByByte(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	assert.Equal(t, STREAM_STATE_CONNECTED, th.h.sessionState)
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 	w.mu.Lock()
 	assert.True(t, w.txRolledBack)
 	w.mu.Unlock()
@@ -1538,11 +1766,11 @@ func TestHandle_Unsubscribe_ParsesCorrelationAndSubID(t *testing.T) {
 	resp := th.readResponse(50 * time.Millisecond)
 	th.close(done)
 
-	// Response: RESP_CODE_UNSUBSCRIBE(1) + cID(4) + ERR_CODE_NO(1) = 6 bytes
+	// Unknown subscription IDs now share the gRPC error semantics.
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_UNSUBSCRIBE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
 }
 
 // ---------------------------------------------------------------------------
@@ -1590,7 +1818,7 @@ func TestHandle_Produce_EmptyTopic(t *testing.T) {
 	frame = append(frame, cID[:]...)
 	frame = binary.BigEndian.AppendUint32(frame, 0) // topic len = 0
 	err := th.feed(frame)
-	assert.ErrorIs(t, err, ErrWriteTopicLenArgEmpty)
+	assert.ErrorIs(t, err, ErrWriteRouteLenArgEmpty)
 
 	th.close(done)
 }
@@ -1647,23 +1875,21 @@ func TestHandle_Bind_MultipleResponseBytes(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Verify BIND sets up connector manager
+// Verify BIND initializes the shared Session Core.
 // ---------------------------------------------------------------------------
 
-func TestHandle_Bind_SetsUpConnectorManager(t *testing.T) {
+func TestHandle_Bind_SetsUpSessionCore(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	defer th.close(done)
 
-	assert.Nil(t, th.h.cman, "cman should be nil before BIND")
-	assert.Nil(t, th.h.nonTxSessionWriters, "writers should be nil before BIND")
+	assert.Equal(t, core.StateUnbound, th.h.core.State())
 
 	frame := buildBindFrame("my-connector", nil, nil)
 	err := th.feed(frame)
 	require.NoError(t, err)
 
-	assert.NotNil(t, th.h.cman, "cman should be set after BIND")
-	assert.NotNil(t, th.h.nonTxSessionWriters, "writers map should be initialized after BIND")
+	assert.Equal(t, core.StateConnected, th.h.core.State())
 }
 
 // ---------------------------------------------------------------------------
@@ -1675,10 +1901,8 @@ func TestHandle_InitialState(t *testing.T) {
 	h := th.h
 
 	assert.Equal(t, OP_START, h.ps.state)
-	assert.Equal(t, STREAM_STATE_BIND, h.sessionState)
-	assert.False(t, h.connected)
-	assert.Nil(t, h.cman)
-	assert.Nil(t, h.nonTxSessionWriters)
+	assert.NotNil(t, h.core)
+	assert.Equal(t, core.StateUnbound, h.core.State())
 	assert.NotNil(t, h.ps)
 	assert.NotNil(t, h.out)
 }
@@ -1693,8 +1917,8 @@ func TestHandle_Produce_MultipleDifferentTopics(t *testing.T) {
 	w1 := &mockConnectorWriter{}
 	w2 := &mockConnectorWriter{}
 	th.setConnected("test")
-	th.h.nonTxSessionWriters["topic-a"] = w1
-	th.h.nonTxSessionWriters["topic-b"] = w2
+	th.manager.writers["topic-a"] = w1
+	th.manager.writers["topic-b"] = w2
 
 	cID1 := [4]byte{0, 0, 0, 1}
 	cID2 := [4]byte{0, 0, 0, 2}

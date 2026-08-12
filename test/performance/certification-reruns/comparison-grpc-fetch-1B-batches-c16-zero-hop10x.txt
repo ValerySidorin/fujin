@@ -1,0 +1,58 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                             │ test/performance/certification-reruns/baseline-grpc-batch-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-1B-batches-c16-zero-hop10x.txt │
+                                                             │                                  sec/op                                  │                            sec/op                              vs base                  │
+_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                   37.77µ ± 14%                                                    12.30µ ± 12%  -67.43% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                  64.31µ ± 13%                                                    40.54µ ± 14%  -36.96% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                                391.8µ ±  8%
+_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                  46.54µ ±  9%                                                    22.32µ ± 14%  -52.04% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                 83.64µ ±  9%                                                    75.95µ ± 13%        ~ (p=0.143 n=10)
+_Session_HFetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                               384.7µ ±  5%
+geomean                                                                                                                    106.1µ                                                          30.32µ        -45.32%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                             │ test/performance/certification-reruns/baseline-grpc-batch-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-1B-batches-c16-zero-hop10x.txt │
+                                                             │                                   B/s                                    │                             B/s                               vs base                   │
+_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                  830.1Ki ± 15%                                                 2543.9Ki ± 13%  +206.47% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                 3.796Mi ± 15%                                                  6.022Mi ± 15%   +58.67% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                               2.492Gi ±  8%
+_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                 668.9Ki ±  9%                                                 1396.5Ki ± 13%  +108.76% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                2.918Mi ± 10%                                                  3.214Mi ± 12%         ~ (p=0.138 n=10)
+_Session_HFetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                              2.540Gi ±  5%
+geomean                                                                                                                   18.41Mi                                                        2.846Mi         +82.86%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                             │ test/performance/certification-reruns/baseline-grpc-batch-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-1B-batches-c16-zero-hop10x.txt │
+                                                             │                                 p99-sec                                  │                            p99-sec                             vs base                  │
+_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                  707.9µ ± 152%                                                    266.2µ ± 17%  -62.40% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                 2.378m ±  35%                                                    1.297m ± 34%  -45.45% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                               11.91m ±  13%
+_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                 1.387m ±  40%                                                    1.095m ± 37%        ~ (p=0.143 n=10)
+_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                2.730m ±  12%                                                    2.651m ± 13%        ~ (p=0.971 n=10)
+_Session_HFetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                              11.96m ±  10%
+geomean                                                                                                                   3.111m                                                           1.001m        -37.03%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                             │ test/performance/certification-reruns/baseline-grpc-batch-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-1B-batches-c16-zero-hop10x.txt │
+                                                             │                                   B/op                                   │                              B/op                               vs base                 │
+_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                   9.042Ki ± 1%                                                     8.140Ki ± 0%  -9.97% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                  60.70Ki ± 0%                                                     56.16Ki ± 0%  -7.48% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                                1.304Mi ± 2%
+_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                  17.67Ki ± 1%                                                     16.70Ki ± 1%  -5.46% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                 132.3Ki ± 1%                                                     127.3Ki ± 0%  -3.73% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                               1.320Mi ± 3%
+geomean                                                                                                                    115.0Ki                                                          31.40Ki       -6.69%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                             │ test/performance/certification-reruns/baseline-grpc-batch-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-1B-batches-c16-zero-hop10x.txt │
+                                                             │                                allocs/op                                 │                           allocs/op                            vs base                  │
+_Session_Fetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                     155.0 ± 1%                                                      134.0 ± 0%  -13.55% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                    830.0 ± 0%                                                      806.0 ± 0%   -2.89% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                                  222.0 ± 2%
+_Session_HFetch_GRPC/payload=1B/batch=32/concurrency=16-8                                                                    342.5 ± 0%                                                      322.0 ± 0%   -5.99% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=1B/batch=256/concurrency=16-8                                                                  2.368k ± 0%                                                     2.345k ± 0%   -0.97% (p=0.000 n=10)
+_Session_HFetch_GRPC/payload=32KiB/batch=32/concurrency=16-8                                                                 409.5 ± 1%
+geomean                                                                                                                      460.1                                                           534.4        -5.97%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable

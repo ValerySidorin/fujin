@@ -27,6 +27,8 @@ const (
 	RESP_CODE_UNSUBSCRIBE RespCode = 14
 	RESP_CODE_DISCONNECT  RespCode = 15
 	RESP_CODE_BIND        RespCode = 16
+	RESP_CODE_TX_PRODUCE  RespCode = 17
+	RESP_CODE_TX_HPRODUCE RespCode = 18
 
 	// Client response opcodes
 	RESP_CODE_PONG RespCode = 99

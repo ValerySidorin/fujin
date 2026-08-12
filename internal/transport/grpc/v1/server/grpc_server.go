@@ -5,16 +5,9 @@ package server
 import (
 	"context"
 	"fmt"
-	"io"
-	"log/slog"
-	"net"
-	"sync"
-
-	"github.com/fujin-io/fujin/internal/connectors"
+	"github.com/fujin-io/fujin/internal/core"
 	"github.com/fujin-io/fujin/public/plugins/connector"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
-	bmw "github.com/fujin-io/fujin/public/plugins/middleware/bind"
-	bmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/bind/config"
 	pb "github.com/fujin-io/fujin/public/proto/grpc/v1"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	"google.golang.org/grpc"
@@ -22,6 +15,11 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
+	"io"
+	"log/slog"
+	"net"
+	"sync"
+	"time"
 )
 
 // GRPCServer implements the Fujin gRPC service
@@ -36,6 +34,8 @@ type GRPCServer struct {
 	lis        net.Listener // stored for ListenerFDs
 	grpcServer *grpc.Server
 	healthSrv  *health.Server
+	ready      chan struct{}
+	done       chan struct{}
 }
 
 // NewGRPCServer creates a new gRPC server instance
@@ -44,6 +44,8 @@ func NewGRPCServer(conf serverconfig.GRPCServerConfig, connectorsConfig connecto
 		conf:             conf,
 		connectorsConfig: connectorsConfig,
 		l:                l.With("server", "grpc"),
+		ready:            make(chan struct{}),
+		done:             make(chan struct{}),
 	}
 }
 
@@ -52,15 +54,9 @@ func (s *GRPCServer) SetBaseConfigProvider(p func() connectorconfig.ConnectorsCo
 	s.configProvider = p
 }
 
-func (s *GRPCServer) currentConnectorsConfig() connectorconfig.ConnectorsConfig {
-	if s.configProvider != nil {
-		return s.configProvider()
-	}
-	return s.connectorsConfig
-}
-
 // ListenAndServe starts the gRPC server
 func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
+	defer close(s.done)
 	lis, err := net.Listen("tcp", s.conf.Addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", s.conf.Addr, err)
@@ -74,6 +70,7 @@ func (s *GRPCServer) ListenAndServe(ctx context.Context) error {
 
 // ListenAndServeInherited starts the gRPC server on an inherited listener.
 func (s *GRPCServer) ListenAndServeInherited(ctx context.Context, lis net.Listener) error {
+	defer close(s.done)
 	s.initGRPCServer()
 	s.l.Info("grpc server started (inherited)", "addr", s.conf.Addr)
 
@@ -169,6 +166,7 @@ func (s *GRPCServer) serveListener(ctx context.Context, lis net.Listener) error 
 	}()
 
 	s.healthSrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	close(s.ready)
 
 	select {
 	case <-ctx.Done():
@@ -182,73 +180,82 @@ func (s *GRPCServer) serveListener(ctx context.Context, lis net.Listener) error 
 	}
 }
 
-// Stream implements the bidirectional streaming RPC
-func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
-	ctx := stream.Context()
-
-	session := &streamSession{
-		stream:           stream,
-		connectorsConfig: s.currentConnectorsConfig(),
-		cman:             nil, // Will be created during Init
-		l:                s.l,
-		ctx:              ctx,
-		writers:          make(map[string]connector.WriteCloser),
-		readers:          make(map[byte]*readerState),
-		fetchReaders:     make(map[string]byte),
-		nextSubID:        0,
-		connected:        false,
-	}
-
-	errCh := make(chan error, 2)
-
-	go func() {
-		errCh <- session.receiveLoop()
-	}()
-
+func (s *GRPCServer) ReadyForConnections(timeout time.Duration) bool {
 	select {
-	case <-ctx.Done():
-		session.cleanup()
-		return ctx.Err()
-	case err := <-errCh:
-		session.cleanup()
-		if err == io.EOF {
-			return nil
-		}
-		return err
+	case <-time.After(timeout):
+		return false
+	case <-s.ready:
+		return true
+	case <-s.done:
+		return false
 	}
 }
 
-// streamSession represents a single bidirectional stream session
+func (s *GRPCServer) Done() <-chan struct{} {
+	return s.done
+}
+
+// Stream implements the bidirectional streaming RPC.
+func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
+	ss := &streamSession{
+		stream: stream,
+		core:   core.New(stream.Context(), s.connectorsConfig, s.configProvider, s.l),
+		l:      s.l,
+		ctx:    stream.Context(),
+	}
+
+	err := ss.receiveLoop()
+	if closeErr := ss.core.Close(); closeErr != nil {
+		s.l.Error("close session", "err", closeErr)
+	}
+	if err == io.EOF {
+		return nil
+	}
+	return err
+}
+
+// streamSession is a thin protobuf and stream-lifecycle adapter around Session Core.
 type streamSession struct {
-	stream           pb.FujinService_StreamServer
-	connectorsConfig connectorconfig.ConnectorsConfig
-	cman             *connectors.ManagerV2 // Created during Init with overrides applied
-	l                *slog.Logger
-	ctx              context.Context
-
-	mu           sync.RWMutex
-	sendMu       sync.Mutex
-	writers      map[string]connector.WriteCloser
-	readers      map[byte]*readerState
-	fetchReaders map[string]byte // topic -> subscription_id mapping for fetch implicit subscriptions
-	nextSubID    byte
-	connected    bool
-
-	// Transaction state
-	inTx                 bool
-	currentTxWriter      connector.WriteCloser
-	currentTxWriterTopic string // Original topic used to get the writer (for PutWriter)
+	stream pb.FujinService_StreamServer
+	core   *core.Core
+	l      *slog.Logger
+	ctx    context.Context
+	sendMu sync.Mutex
 }
 
-type readerState struct {
-	reader      connector.ReadCloser
-	topic       string
-	autoCommit  bool
-	withHeaders bool
-	cancel      context.CancelFunc
+type grpcFetchLease struct {
+	messages  []*pb.FetchMessage
+	hmessages []*pb.HFetchMessage
 }
 
-// receiveLoop handles incoming requests from client
+var grpcFetchLeases = sync.Pool{
+	New: func() any {
+		return new(grpcFetchLease)
+	},
+}
+
+func getGRPCFetchLease(batchSize int, withHeaders bool) *grpcFetchLease {
+	lease := grpcFetchLeases.Get().(*grpcFetchLease)
+	lease.messages = lease.messages[:0]
+	lease.hmessages = lease.hmessages[:0]
+	if withHeaders {
+		if cap(lease.hmessages) < batchSize {
+			lease.hmessages = make([]*pb.HFetchMessage, 0, batchSize)
+		}
+	} else if cap(lease.messages) < batchSize {
+		lease.messages = make([]*pb.FetchMessage, 0, batchSize)
+	}
+	return lease
+}
+
+func putGRPCFetchLease(lease *grpcFetchLease) {
+	clear(lease.messages)
+	clear(lease.hmessages)
+	lease.messages = lease.messages[:0]
+	lease.hmessages = lease.hmessages[:0]
+	grpcFetchLeases.Put(lease)
+}
+
 func (s *streamSession) receiveLoop() error {
 	for {
 		req, err := s.stream.Recv()
@@ -258,15 +265,12 @@ func (s *streamSession) receiveLoop() error {
 			}
 			return fmt.Errorf("receive error: %w", err)
 		}
-
 		if err := s.handleRequest(req); err != nil {
-			s.l.Error("handle request", "err", err)
 			return fmt.Errorf("handle request: %w", err)
 		}
 	}
 }
 
-// handleRequest processes a single request
 func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 	switch r := req.Request.(type) {
 	case *pb.FujinRequest_Bind:
@@ -275,6 +279,10 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 		return s.handleProduce(r.Produce)
 	case *pb.FujinRequest_Hproduce:
 		return s.handleHProduce(r.Hproduce)
+	case *pb.FujinRequest_TxProduce:
+		return s.handleTxProduce(r.TxProduce)
+	case *pb.FujinRequest_TxHproduce:
+		return s.handleTxHProduce(r.TxHproduce)
 	case *pb.FujinRequest_BeginTx:
 		return s.handleBeginTx(r.BeginTx)
 	case *pb.FujinRequest_CommitTx:
@@ -300,1142 +308,341 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 	}
 }
 
-// handleBind processes BIND request - initializes the session and applies config overrides
 func (s *streamSession) handleBind(req *pb.BindRequest) error {
-	if s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Bind{
-				Bind: &pb.BindResponse{
-					Error: "already binded",
-				},
-			},
-		})
-	}
-
-	connectorConfig, ok := s.connectorsConfig[req.Connector]
-	if !ok {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Bind{
-				Bind: &pb.BindResponse{
-					Error: "connector not found",
-				},
-			},
-		})
-	}
-
-	// Process bind middlewares before applying config overrides
-	// This allows middlewares to modify config overrides if needed
-	configOverrides := make(map[string]string, len(req.ConfigOverrides))
-	for k, v := range req.ConfigOverrides {
-		configOverrides[k] = v
-	}
-
-	// Convert meta from protobuf map to regular map
-	meta := make(map[string]string, len(req.Meta))
-	for k, v := range req.Meta {
-		meta[k] = v
-	}
-
-	// Convert bind middleware configs
-	bindMiddlewareConfigs := make([]bmwconfig.Config, 0, len(connectorConfig.BindMiddlewares))
-	for _, cfg := range connectorConfig.BindMiddlewares {
-		bindMiddlewareConfigs = append(bindMiddlewareConfigs, cfg)
-	}
-
-	// Process bind middlewares
-	if len(bindMiddlewareConfigs) > 0 {
-		if err := bmw.Chain(s.ctx, meta, bindMiddlewareConfigs, s.l); err != nil {
-			s.l.Warn("bind middleware rejected", "connector", req.Connector, "err", err)
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Bind{
-					Bind: &pb.BindResponse{
-						Error: err.Error(),
-					},
-				},
-			})
-		}
-	}
-
-	// Apply config overrides if provided (may have been modified by middlewares)
-	modifiedConfig := connectorConfig
-	if len(configOverrides) > 0 {
-		// ApplyOverrides works with public/connectors.Config
-		// The function is in internal/connectors but uses public/connectors.Config
-		modifiedConfigForOverride, err := connectors.ApplyOverrides(connectorConfig, configOverrides)
-		if err != nil {
-			s.l.Error("apply config overrides", "err", err)
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Bind{
-					Bind: &pb.BindResponse{
-						Error: err.Error(),
-					},
-				},
-			})
-		}
-		modifiedConfig = modifiedConfigForOverride
-	}
-
-	// Create a new Manager with the modified configuration
-	s.cman = connectors.NewManagerV2(modifiedConfig, req.Connector, s.l)
-	s.connected = true
-
+	err := s.core.Bind(req.Connector, req.Meta, req.ConfigOverrides)
 	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Bind{
-			Bind: &pb.BindResponse{
-				Error: "",
-			},
-		},
+		Response: &pb.FujinResponse_Bind{Bind: &pb.BindResponse{Error: errorString(err)}},
 	})
 }
 
-// handleProduce processes PRODUCE request
 func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Produce{
-				Produce: &pb.ProduceResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
-	}
-
-	// Use transaction writer if in transaction
-	s.mu.Lock()
-	inTx := s.inTx
-	if inTx {
-		if err := s.ensureTxWriter(req.Topic); err != nil {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Produce{
-					Produce: &pb.ProduceResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         err.Error(),
-					},
-				},
-			})
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Produce{Produce: &pb.ProduceResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+			}},
+		}); sendErr != nil {
+			s.l.Error("send produce response", "err", sendErr)
 		}
 	}
-	s.mu.Unlock()
-
-	var w connector.WriteCloser
-	var err error
-	if inTx {
-		s.mu.RLock()
-		w = s.currentTxWriter
-		s.mu.RUnlock()
-	} else {
-		w, err = s.getWriter(req.Topic)
-		if err != nil {
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Produce{
-					Produce: &pb.ProduceResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         err.Error(),
-					},
-				},
-			})
-		}
+	if err := s.core.Produce(req.Route, req.Message, nil, respond); err != nil {
+		respond(err)
 	}
-
-	correlationID := req.CorrelationId
-
-	w.Produce(
-		s.ctx, req.Message,
-		func(writeErr error) {
-			var errMsg string
-			if writeErr != nil {
-				errMsg = writeErr.Error()
-			}
-
-			err := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Produce{
-					Produce: &pb.ProduceResponse{
-						CorrelationId: correlationID,
-						Error:         errMsg,
-					},
-				},
-			})
-			if err != nil {
-				s.l.Error("send produce response", "err", err)
-			}
-		})
-
 	return nil
 }
 
-// handleHProduce processes HPRODUCE request (produce with headers)
 func (s *streamSession) handleHProduce(req *pb.HProduceRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hproduce{
-				Hproduce: &pb.HProduceResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
-	}
-
-	// Use transaction writer if in transaction
-	s.mu.Lock()
-	inTx := s.inTx
-	if inTx {
-		if err := s.ensureTxWriter(req.Topic); err != nil {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hproduce{
-					Hproduce: &pb.HProduceResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         err.Error(),
-					},
-				},
-			})
+	headers := protoHeadersToConnector(req.Headers)
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Hproduce{Hproduce: &pb.HProduceResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+			}},
+		}); sendErr != nil {
+			s.l.Error("send hproduce response", "err", sendErr)
 		}
 	}
-	s.mu.Unlock()
-
-	var w connector.WriteCloser
-	var err error
-	if inTx {
-		s.mu.RLock()
-		w = s.currentTxWriter
-		s.mu.RUnlock()
-	} else {
-		w, err = s.getWriter(req.Topic)
-		if err != nil {
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hproduce{
-					Hproduce: &pb.HProduceResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         err.Error(),
-					},
-				},
-			})
-		}
+	if err := s.core.Produce(req.Route, req.Message, headers, respond); err != nil {
+		respond(err)
 	}
-
-	// Convert proto headers to [][]byte format (alternating key, value, key, value, ...)
-	var headersKV [][]byte
-	for _, h := range req.Headers {
-		headersKV = append(headersKV, h.Key, h.Value)
-	}
-
-	correlationID := req.CorrelationId
-
-	w.HProduce(
-		s.ctx, req.Message, headersKV,
-		func(writeErr error) {
-			var errMsg string
-			if writeErr != nil {
-				errMsg = writeErr.Error()
-			}
-
-			err := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hproduce{
-					Hproduce: &pb.HProduceResponse{
-						CorrelationId: correlationID,
-						Error:         errMsg,
-					},
-				},
-			})
-			if err != nil {
-				s.l.Error("send hproduce response", "err", err)
-			}
-		})
-
 	return nil
 }
 
-// ensureTxWriter lazily initializes the transaction writer on first produce within a TX.
-// Must be called with s.mu held.
-func (s *streamSession) ensureTxWriter(topic string) error {
-	if s.currentTxWriter != nil {
+func (s *streamSession) handleTxProduce(req *pb.TxProduceRequest) error {
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_TxProduce{TxProduce: &pb.TxProduceResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+			}},
+		}); sendErr != nil {
+			s.l.Error("send tx produce response", "err", sendErr)
+		}
+	}
+	if err := s.core.TxProduce(req.Message, nil, respond); err != nil {
+		respond(err)
+	}
+	return nil
+}
+
+func (s *streamSession) handleTxHProduce(req *pb.TxHProduceRequest) error {
+	headers := protoHeadersToConnector(req.Headers)
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_TxHproduce{TxHproduce: &pb.TxHProduceResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+			}},
+		}); sendErr != nil {
+			s.l.Error("send tx hproduce response", "err", sendErr)
+		}
+	}
+	if err := s.core.TxProduce(req.Message, headers, respond); err != nil {
+		respond(err)
+	}
+	return nil
+}
+
+func (s *streamSession) handleBeginTx(req *pb.BeginTxRequest) error {
+	err := s.core.Begin(req.Route)
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_BeginTx{BeginTx: &pb.BeginTxResponse{
+			CorrelationId: req.CorrelationId,
+			Error:         errorString(err),
+		}},
+	})
+}
+
+func (s *streamSession) handleCommitTx(req *pb.CommitTxRequest) error {
+	err := s.core.Commit()
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_CommitTx{CommitTx: &pb.CommitTxResponse{
+			CorrelationId: req.CorrelationId,
+			Error:         errorString(err),
+		}},
+	})
+}
+
+func (s *streamSession) handleRollbackTx(req *pb.RollbackTxRequest) error {
+	err := s.core.Rollback()
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_RollbackTx{RollbackTx: &pb.RollbackTxResponse{
+			CorrelationId: req.CorrelationId,
+			Error:         errorString(err),
+		}},
+	})
+}
+
+func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
+	return s.subscribe(req.CorrelationId, req.Route, req.AutoCommit, false)
+}
+
+func (s *streamSession) handleHSubscribe(req *pb.HSubscribeRequest) error {
+	return s.subscribe(req.CorrelationId, req.Route, req.AutoCommit, true)
+}
+
+func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit, withHeaders bool) error {
+	ready := func(subscriptionID byte) error {
+		if withHeaders {
+			return s.sendResponse(&pb.FujinResponse{
+				Response: &pb.FujinResponse_Hsubscribe{Hsubscribe: &pb.HSubscribeResponse{
+					CorrelationId:  correlationID,
+					SubscriptionId: uint32(subscriptionID),
+				}},
+			})
+		}
+		return s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Subscribe{Subscribe: &pb.SubscribeResponse{
+				CorrelationId:  correlationID,
+				SubscriptionId: uint32(subscriptionID),
+			}},
+		})
+	}
+
+	handlers := core.SubscriptionMessageHandlers{}
+	if withHeaders {
+		handlers.MessageWithHeaders = func(subscriptionID byte, reader connector.Reader) func([]byte, string, [][]byte, ...any) {
+			return func(payload []byte, topic string, headers [][]byte, args ...any) {
+				messageID := encodeMessageID(reader, autoCommit, topic, args...)
+				if err := s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Hmessage{Hmessage: &pb.HMessage{
+						SubscriptionId: uint32(subscriptionID),
+						MessageId:      messageID,
+						Payload:        payload,
+						Headers:        connectorHeadersToProto(headers),
+					}},
+				}); err != nil {
+					s.l.Error("send hmessage", "subscription_id", subscriptionID, "err", err)
+				}
+			}
+		}
+	} else {
+		handlers.Message = func(subscriptionID byte, reader connector.Reader) func([]byte, string, ...any) {
+			return func(payload []byte, topic string, args ...any) {
+				messageID := encodeMessageID(reader, autoCommit, topic, args...)
+				if err := s.sendResponse(&pb.FujinResponse{
+					Response: &pb.FujinResponse_Message{Message: &pb.Message{
+						SubscriptionId: uint32(subscriptionID),
+						MessageId:      messageID,
+						Payload:        payload,
+					}},
+				}); err != nil {
+					s.l.Error("send message", "subscription_id", subscriptionID, "err", err)
+				}
+			}
+		}
+	}
+
+	err := s.core.Subscribe(route, autoCommit, withHeaders, ready, handlers, func(err error) {
+		s.l.Error("subscribe retry", "route", route, "err", err)
+	})
+	if err == nil {
 		return nil
 	}
-	w, err := s.cman.GetWriter(topic)
-	if err != nil {
-		return err
-	}
-	if err := w.BeginTx(s.ctx); err != nil {
-		s.cman.PutWriter(w, topic)
-		return err
-	}
-	s.currentTxWriter = w
-	s.currentTxWriterTopic = topic
-	return nil
-}
-
-// handleBeginTx processes BEGIN TX request
-func (s *streamSession) handleBeginTx(req *pb.BeginTxRequest) error {
-	if !s.connected {
+	if withHeaders {
 		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_BeginTx{
-				BeginTx: &pb.BeginTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
+			Response: &pb.FujinResponse_Hsubscribe{Hsubscribe: &pb.HSubscribeResponse{
+				CorrelationId: correlationID,
+				Error:         err.Error(),
+			}},
 		})
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.inTx {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_BeginTx{
-				BeginTx: &pb.BeginTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "transaction already in progress",
-				},
-			},
-		})
-	}
-
-	// Flush all non-transactional writers
-	for topic, w := range s.writers {
-		w.Flush(s.ctx)
-		s.cman.PutWriter(w, topic)
-	}
-	s.writers = make(map[string]connector.WriteCloser)
-
-	s.inTx = true
-
 	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_BeginTx{
-			BeginTx: &pb.BeginTxResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         "",
-			},
-		},
+		Response: &pb.FujinResponse_Subscribe{Subscribe: &pb.SubscribeResponse{
+			CorrelationId: correlationID,
+			Error:         err.Error(),
+		}},
 	})
 }
 
-// handleCommitTx processes COMMIT TX request
-func (s *streamSession) handleCommitTx(req *pb.CommitTxRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_CommitTx{
-				CommitTx: &pb.CommitTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.inTx {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_CommitTx{
-				CommitTx: &pb.CommitTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "no transaction in progress",
-				},
-			},
-		})
-	}
-
-	var errMsg string
-	if s.currentTxWriter != nil {
-		if err := s.currentTxWriter.CommitTx(s.ctx); err != nil {
-			errMsg = err.Error()
-		}
-		s.cman.PutWriter(s.currentTxWriter, s.currentTxWriterTopic)
-		s.currentTxWriter = nil
-		s.currentTxWriterTopic = ""
-	}
-
-	s.inTx = false
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_CommitTx{
-			CommitTx: &pb.CommitTxResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         errMsg,
-			},
-		},
-	})
-}
-
-// handleRollbackTx processes ROLLBACK TX request
-func (s *streamSession) handleRollbackTx(req *pb.RollbackTxRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_RollbackTx{
-				RollbackTx: &pb.RollbackTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.inTx {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_RollbackTx{
-				RollbackTx: &pb.RollbackTxResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "no transaction in progress",
-				},
-			},
-		})
-	}
-
-	var errMsg string
-	if s.currentTxWriter != nil {
-		if err := s.currentTxWriter.RollbackTx(s.ctx); err != nil {
-			errMsg = err.Error()
-		}
-		s.cman.PutWriter(s.currentTxWriter, s.currentTxWriterTopic)
-		s.currentTxWriter = nil
-		s.currentTxWriterTopic = ""
-	}
-
-	s.inTx = false
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_RollbackTx{
-			RollbackTx: &pb.RollbackTxResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         errMsg,
-			},
-		},
-	})
-}
-
-// handleSubscribe processes SUBSCRIBE request
-func (s *streamSession) handleSubscribe(req *pb.SubscribeRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Subscribe{
-				Subscribe: &pb.SubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "not binded",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	if s.nextSubID == 255 {
-		s.mu.Unlock()
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Subscribe{
-				Subscribe: &pb.SubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "maximum subscriptions reached (255)",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-	s.nextSubID++
-	subID := s.nextSubID
-	s.mu.Unlock()
-
-	r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
-	if err != nil {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Subscribe{
-				Subscribe: &pb.SubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          err.Error(),
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	ctx, cancel := context.WithCancel(s.ctx)
-
-	state := &readerState{
-		reader:      r,
-		topic:       req.Topic,
-		autoCommit:  req.AutoCommit,
-		withHeaders: false,
-		cancel:      cancel,
-	}
-
-	s.mu.Lock()
-	s.readers[subID] = state
-	s.mu.Unlock()
-
-	if err := s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Subscribe{
-			Subscribe: &pb.SubscribeResponse{
-				CorrelationId:  req.CorrelationId,
-				Error:          "",
-				SubscriptionId: uint32(subID),
-			},
-		},
-	}); err != nil {
-		return err
-	}
-
-	go s.subscribeLoop(ctx, subID, state)
-
-	return nil
-}
-
-// handleHSubscribe processes HSUBSCRIBE request (subscribe with headers)
-func (s *streamSession) handleHSubscribe(req *pb.HSubscribeRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hsubscribe{
-				Hsubscribe: &pb.HSubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "not binded",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	if s.nextSubID == 255 {
-		s.mu.Unlock()
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hsubscribe{
-				Hsubscribe: &pb.HSubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "maximum subscriptions reached (255)",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-	s.nextSubID++
-	subID := s.nextSubID
-	s.mu.Unlock()
-
-	r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
-	if err != nil {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hsubscribe{
-				Hsubscribe: &pb.HSubscribeResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          err.Error(),
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	ctx, cancel := context.WithCancel(s.ctx)
-
-	state := &readerState{
-		reader:      r,
-		topic:       req.Topic,
-		autoCommit:  req.AutoCommit,
-		withHeaders: true,
-		cancel:      cancel,
-	}
-
-	s.mu.Lock()
-	s.readers[subID] = state
-	s.mu.Unlock()
-
-	if err := s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Hsubscribe{
-			Hsubscribe: &pb.HSubscribeResponse{
-				CorrelationId:  req.CorrelationId,
-				Error:          "",
-				SubscriptionId: uint32(subID),
-			},
-		},
-	}); err != nil {
-		return err
-	}
-
-	go s.subscribeLoop(ctx, subID, state)
-
-	return nil
-}
-
-// handleFetch processes FETCH request (pull-based message retrieval)
 func (s *streamSession) handleFetch(req *pb.FetchRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Fetch{
-				Fetch: &pb.FetchResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "not binded",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	subID, exists := s.fetchReaders[req.Topic]
-
-	if !exists {
-		if s.nextSubID == 255 {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Fetch{
-					Fetch: &pb.FetchResponse{
-						CorrelationId:  req.CorrelationId,
-						Error:          "maximum subscriptions reached (255)",
-						SubscriptionId: 0,
-					},
-				},
-			})
-		}
-		s.nextSubID++
-		subID = s.nextSubID
-
-		r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
-		if err != nil {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Fetch{
-					Fetch: &pb.FetchResponse{
-						CorrelationId:  req.CorrelationId,
-						Error:          err.Error(),
-						SubscriptionId: 0,
-					},
-				},
-			})
-		}
-
-		state := &readerState{
-			reader:      r,
-			topic:       req.Topic,
-			autoCommit:  req.AutoCommit,
-			withHeaders: false,
-		}
-		s.readers[subID] = state
-		s.fetchReaders[req.Topic] = subID
-	}
-	s.mu.Unlock()
-
-	s.mu.RLock()
-	state, exists := s.readers[subID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Fetch{
-				Fetch: &pb.FetchResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "reader not found",
-					SubscriptionId: uint32(subID),
-				},
-			},
-		})
-	}
-
-	var messages []*pb.FetchMessage
-	var msgIDBuf []byte
-	if !req.AutoCommit {
-		msgIDBuf = make([]byte, state.reader.MsgIDArgsLen())
-	}
-
-	fetchErr := make(chan error, 1)
-
-	msgHandler := func(message []byte, topic string, args ...any) {
-		var msgID []byte
-		if !req.AutoCommit && len(args) > 0 {
-			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-		}
-
-		messages = append(messages, &pb.FetchMessage{
-			MessageId: msgID,
-			Payload:   message,
-		})
-	}
-
-	fetchResponseHandler := func(n uint32, err error) {
-		fetchErr <- err
-	}
-
-	state.reader.Fetch(s.ctx, req.BatchSize, fetchResponseHandler, msgHandler)
-	err := <-fetchErr
-
-	var errMsg string
-	if err != nil {
-		errMsg = err.Error()
-	}
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Fetch{
-			Fetch: &pb.FetchResponse{
-				CorrelationId:  req.CorrelationId,
-				Error:          errMsg,
-				SubscriptionId: uint32(subID),
-				Messages:       messages,
-			},
-		},
-	})
+	return s.fetch(req.CorrelationId, req.Route, req.AutoCommit, false, req.BatchSize)
 }
 
-// handleHFetch processes HFETCH request (pull-based message retrieval with headers)
 func (s *streamSession) handleHFetch(req *pb.HFetchRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hfetch{
-				Hfetch: &pb.HFetchResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "not binded",
-					SubscriptionId: 0,
-				},
-			},
-		})
-	}
-
-	s.mu.Lock()
-	subID, exists := s.fetchReaders[req.Topic]
-
-	if !exists {
-		if s.nextSubID == 255 {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hfetch{
-					Hfetch: &pb.HFetchResponse{
-						CorrelationId:  req.CorrelationId,
-						Error:          "maximum subscriptions reached (255)",
-						SubscriptionId: 0,
-					},
-				},
-			})
-		}
-		s.nextSubID++
-		subID = s.nextSubID
-
-		r, err := s.cman.GetReader(req.Topic, req.AutoCommit)
-		if err != nil {
-			s.mu.Unlock()
-			return s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hfetch{
-					Hfetch: &pb.HFetchResponse{
-						CorrelationId:  req.CorrelationId,
-						Error:          err.Error(),
-						SubscriptionId: 0,
-					},
-				},
-			})
-		}
-
-		state := &readerState{
-			reader:      r,
-			topic:       req.Topic,
-			autoCommit:  req.AutoCommit,
-			withHeaders: true,
-		}
-		s.readers[subID] = state
-		s.fetchReaders[req.Topic] = subID
-	}
-	s.mu.Unlock()
-
-	// Get reader
-	s.mu.RLock()
-	state, exists := s.readers[subID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Hfetch{
-				Hfetch: &pb.HFetchResponse{
-					CorrelationId:  req.CorrelationId,
-					Error:          "reader not found",
-					SubscriptionId: uint32(subID),
-				},
-			},
-		})
-	}
-
-	var messages []*pb.HFetchMessage
-	var msgIDBuf []byte
-	if !req.AutoCommit {
-		msgIDBuf = make([]byte, state.reader.MsgIDArgsLen())
-	}
-
-	fetchErr := make(chan error, 1)
-
-	hmsgHandler := func(message []byte, topic string, hs [][]byte, args ...any) {
-		var msgID []byte
-		if !req.AutoCommit && len(args) > 0 {
-			msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-		}
-
-		// Convert headers from [][]byte to []*pb.Header
-		var protoHeaders []*pb.KV
-		for i := 0; i < len(hs); i += 2 {
-			key := hs[i]
-			var val []byte
-			if i+1 < len(hs) {
-				val = hs[i+1]
-			}
-			protoHeaders = append(protoHeaders, &pb.KV{
-				Key:   key,
-				Value: val,
-			})
-		}
-
-		messages = append(messages, &pb.HFetchMessage{
-			MessageId: msgID,
-			Payload:   message,
-			Headers:   protoHeaders,
-		})
-	}
-
-	fetchResponseHandler := func(n uint32, err error) {
-		fetchErr <- err
-	}
-
-	state.reader.FetchWithHeaders(s.ctx, req.BatchSize, fetchResponseHandler, hmsgHandler)
-	err := <-fetchErr
-
-	var errMsg string
-	if err != nil {
-		errMsg = err.Error()
-	}
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Hfetch{
-			Hfetch: &pb.HFetchResponse{
-				CorrelationId:  req.CorrelationId,
-				Error:          errMsg,
-				SubscriptionId: uint32(subID),
-				Messages:       messages,
-			},
-		},
-	})
+	return s.fetch(req.CorrelationId, req.Route, req.AutoCommit, true, req.BatchSize)
 }
 
-// handleUnsubscribe processes UNSUBSCRIBE request
-func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Unsubscribe{
-				Unsubscribe: &pb.UnsubscribeResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
-	}
+func (s *streamSession) fetch(correlationID uint32, route string, autoCommit, withHeaders bool, batchSize uint32) error {
+	lease := getGRPCFetchLease(int(batchSize), withHeaders)
 
-	subID := byte(req.SubscriptionId)
-
-	s.mu.Lock()
-	state, exists := s.readers[subID]
-	if !exists {
-		s.mu.Unlock()
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Unsubscribe{
-				Unsubscribe: &pb.UnsubscribeResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "subscription not found",
-				},
-			},
-		})
-	}
-
-	// Remove from fetchReaders if this is a fetch subscription
-	topic := state.topic
-	if fetchSubID, isFetch := s.fetchReaders[topic]; isFetch && fetchSubID == subID {
-		delete(s.fetchReaders, topic)
-	}
-
-	if state.cancel != nil {
-		state.cancel()
-	}
-	delete(s.readers, subID)
-	s.mu.Unlock()
-
-	state.reader.Close()
-
-	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Unsubscribe{
-			Unsubscribe: &pb.UnsubscribeResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         "",
-			},
-		},
-	})
-}
-
-// subscribeLoop continuously reads messages and sends them to client
-func (s *streamSession) subscribeLoop(ctx context.Context, subID byte, state *readerState) {
-	defer func() {
-		s.mu.Lock()
-		delete(s.readers, subID)
-		s.mu.Unlock()
-		state.reader.Close()
-	}()
-
-	var msgIDBuf []byte
-	if !state.autoCommit {
-		msgIDBuf = make([]byte, state.reader.MsgIDArgsLen())
-	}
-
-	if state.withHeaders {
-		hmsgHandler := func(message []byte, topic string, hs [][]byte, args ...any) {
-			var msgID []byte
-			if !state.autoCommit && len(args) > 0 {
-				msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-			}
-
-			var protoHeaders []*pb.KV
-			for i := 0; i < len(hs); i += 2 {
-				key := hs[i]
-				var val []byte
-				if i+1 < len(hs) {
-					val = hs[i+1]
-				}
-				protoHeaders = append(protoHeaders, &pb.KV{
-					Key:   key,
-					Value: val,
+	handlers := core.FetchMessageHandlers{}
+	switch {
+	case autoCommit && withHeaders:
+		handlers.AutoCommitWithHeaders = func(payload []byte, _ string, headers [][]byte, _ ...any) {
+			lease.hmessages = append(lease.hmessages, &pb.HFetchMessage{
+				Payload: payload,
+				Headers: connectorHeadersToProto(headers),
+			})
+		}
+	case autoCommit:
+		handlers.AutoCommit = func(payload []byte, _ string, _ ...any) {
+			lease.messages = append(lease.messages, &pb.FetchMessage{Payload: payload})
+		}
+	default:
+		handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, messageTopic string, headers [][]byte, args ...any) {
+			messageID := encodeMessageID(reader, false, messageTopic, args...)
+			if withHeaders {
+				lease.hmessages = append(lease.hmessages, &pb.HFetchMessage{
+					MessageId: messageID,
+					Payload:   payload,
+					Headers:   connectorHeadersToProto(headers),
 				})
-			}
-
-			if err := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Hmessage{
-					Hmessage: &pb.HMessage{
-						SubscriptionId: uint32(subID),
-						MessageId:      msgID,
-						Payload:        message,
-						Headers:        protoHeaders,
-					},
-				},
-			}); err != nil {
-				s.l.Error("failed to send hmessage", "sub_id", subID, "err", err)
-			}
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				err := state.reader.SubscribeWithHeaders(ctx, hmsgHandler)
-				if err != nil && ctx.Err() == nil {
-					s.l.Error("hsubscribe error", "sub_id", subID, "err", err)
-				}
-				if ctx.Err() != nil {
-					return
-				}
-			}
-		}
-	} else {
-		msgHandler := func(message []byte, topic string, args ...any) {
-			var msgID []byte
-			if !state.autoCommit && len(args) > 0 {
-				msgID = state.reader.EncodeMsgID(msgIDBuf, topic, args...)
-			}
-
-			if err := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Message{
-					Message: &pb.Message{
-						SubscriptionId: uint32(subID),
-						MessageId:      msgID,
-						Payload:        message,
-					},
-				},
-			}); err != nil {
-				s.l.Error("failed to send message", "sub_id", subID, "err", err)
-			}
-		}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				err := state.reader.Subscribe(ctx, msgHandler)
-				if err != nil && ctx.Err() == nil {
-					s.l.Error("subscribe error", "sub_id", subID, "err", err)
-				}
-				if ctx.Err() != nil {
-					return
-				}
+			} else {
+				lease.messages = append(lease.messages, &pb.FetchMessage{MessageId: messageID, Payload: payload})
 			}
 		}
 	}
+
+	subscriptionID, _, fetchErr := s.core.Fetch(route, autoCommit, withHeaders, batchSize, handlers)
+	if withHeaders {
+		response := &pb.HFetchResponse{
+			CorrelationId:  correlationID,
+			Error:          errorString(fetchErr),
+			SubscriptionId: uint32(subscriptionID),
+			Messages:       lease.hmessages,
+		}
+		sendErr := s.sendResponse(&pb.FujinResponse{Response: &pb.FujinResponse_Hfetch{Hfetch: response}})
+		putGRPCFetchLease(lease)
+		if sendErr != nil {
+			s.l.Error("send hfetch response", "err", sendErr)
+		}
+		return nil
+	}
+	response := &pb.FetchResponse{
+		CorrelationId:  correlationID,
+		Error:          errorString(fetchErr),
+		SubscriptionId: uint32(subscriptionID),
+		Messages:       lease.messages,
+	}
+	sendErr := s.sendResponse(&pb.FujinResponse{Response: &pb.FujinResponse_Fetch{Fetch: response}})
+	putGRPCFetchLease(lease)
+	if sendErr != nil {
+		s.l.Error("send fetch response", "err", sendErr)
+	}
+	return nil
 }
 
-// handleAck processes ACK request
+func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
+	err := s.core.Unsubscribe(byte(req.SubscriptionId))
+	return s.sendResponse(&pb.FujinResponse{
+		Response: &pb.FujinResponse_Unsubscribe{Unsubscribe: &pb.UnsubscribeResponse{
+			CorrelationId: req.CorrelationId,
+			Error:         errorString(err),
+		}},
+	})
+}
+
 func (s *streamSession) handleAck(req *pb.AckRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Ack{
-				Ack: &pb.AckResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
+	remaining := len(req.MessageIds)
+	results := make([]*pb.AckMessageResult, 0, remaining)
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Ack{Ack: &pb.AckResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+				Results:       results,
+			}},
+		}); sendErr != nil {
+			s.l.Error("send ack response", "err", sendErr)
+		}
 	}
-
-	subID := byte(req.SubscriptionId)
-
-	s.mu.RLock()
-	state, exists := s.readers[subID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Ack{
-				Ack: &pb.AckResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         fmt.Sprintf("subscription %d not found", subID),
-				},
-			},
-		})
-	}
-
-	msgIDs := req.MessageIds
-
-	results := make([]*pb.AckMessageResult, 0, len(msgIDs))
-	var resultsMu sync.Mutex
-
-	state.reader.Ack(
-		s.ctx,
-		msgIDs,
-		func(err error) {
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			}
-
-			if sendErr := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Ack{
-					Ack: &pb.AckResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         errMsg,
-						Results:       results,
-					},
-				},
-			}); sendErr != nil {
-				s.l.Error("failed to send ack response", "err", sendErr)
+	handlers := core.AckResultHandlers{
+		Result: func(err error) {
+			if err != nil || remaining == 0 {
+				respond(err)
 			}
 		},
-		func(msgID []byte, err error) {
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-				s.l.Error("ack message", "msgID", msgID, "err", err)
+		Message: func(messageID []byte, err error) {
+			results = append(results, &pb.AckMessageResult{MessageId: messageID, Error: errorString(err)})
+			remaining--
+			if remaining == 0 {
+				respond(nil)
 			}
-
-			resultsMu.Lock()
-			results = append(results, &pb.AckMessageResult{
-				MessageId: msgID,
-				Error:     errMsg,
-			})
-			resultsMu.Unlock()
 		},
-	)
-
+	}
+	if err := s.core.Ack(byte(req.SubscriptionId), req.MessageIds, handlers); err != nil {
+		respond(err)
+	}
 	return nil
 }
 
-// handleNack processes NACK request
 func (s *streamSession) handleNack(req *pb.NackRequest) error {
-	if !s.connected {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Nack{
-				Nack: &pb.NackResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         "not binded",
-				},
-			},
-		})
+	remaining := len(req.MessageIds)
+	results := make([]*pb.NackMessageResult, 0, remaining)
+	respond := func(err error) {
+		if sendErr := s.sendResponse(&pb.FujinResponse{
+			Response: &pb.FujinResponse_Nack{Nack: &pb.NackResponse{
+				CorrelationId: req.CorrelationId,
+				Error:         errorString(err),
+				Results:       results,
+			}},
+		}); sendErr != nil {
+			s.l.Error("send nack response", "err", sendErr)
+		}
 	}
-
-	subID := byte(req.SubscriptionId)
-
-	s.mu.RLock()
-	state, exists := s.readers[subID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Nack{
-				Nack: &pb.NackResponse{
-					CorrelationId: req.CorrelationId,
-					Error:         fmt.Sprintf("subscription %d not found", subID),
-				},
-			},
-		})
-	}
-
-	msgIDs := req.MessageIds
-
-	results := make([]*pb.NackMessageResult, 0, len(msgIDs))
-	var resultsMu sync.Mutex
-
-	state.reader.Nack(
-		s.ctx,
-		msgIDs,
-		func(err error) {
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-			}
-
-			if sendErr := s.sendResponse(&pb.FujinResponse{
-				Response: &pb.FujinResponse_Nack{
-					Nack: &pb.NackResponse{
-						CorrelationId: req.CorrelationId,
-						Error:         errMsg,
-						Results:       results,
-					},
-				},
-			}); sendErr != nil {
-				s.l.Error("failed to send nack response", "err", sendErr)
+	handlers := core.AckResultHandlers{
+		Result: func(err error) {
+			if err != nil || remaining == 0 {
+				respond(err)
 			}
 		},
-		func(msgID []byte, err error) {
-			var errMsg string
-			if err != nil {
-				errMsg = err.Error()
-				s.l.Error("nack message", "msgID", msgID, "err", err)
+		Message: func(messageID []byte, err error) {
+			results = append(results, &pb.NackMessageResult{MessageId: messageID, Error: errorString(err)})
+			remaining--
+			if remaining == 0 {
+				respond(nil)
 			}
-
-			resultsMu.Lock()
-			results = append(results, &pb.NackMessageResult{
-				MessageId: msgID,
-				Error:     errMsg,
-			})
-			resultsMu.Unlock()
 		},
-	)
-
+	}
+	if err := s.core.Nack(byte(req.SubscriptionId), req.MessageIds, handlers); err != nil {
+		respond(err)
+	}
 	return nil
 }
 
-// getWriter retrieves or creates a writer for the given topic
-func (s *streamSession) getWriter(topic string) (connector.WriteCloser, error) {
-	s.mu.RLock()
-	if w, exists := s.writers[topic]; exists {
-		s.mu.RUnlock()
-		return w, nil
-	}
-	s.mu.RUnlock()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	w, err := s.cman.GetWriter(topic)
-	if err != nil {
-		return nil, err
-	}
-
-	s.writers[topic] = w
-	return w, nil
-}
-
-// sendResponse sends a response to the client
 func (s *streamSession) sendResponse(resp *pb.FujinResponse) error {
 	s.sendMu.Lock()
 	defer s.sendMu.Unlock()
@@ -1445,35 +652,43 @@ func (s *streamSession) sendResponse(resp *pb.FujinResponse) error {
 	return nil
 }
 
-// cleanup releases all resources
-func (s *streamSession) cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func protoHeadersToConnector(headers []*pb.KV) [][]byte {
+	if len(headers) == 0 {
+		return [][]byte{}
+	}
+	result := make([][]byte, 0, len(headers)*2)
+	for _, header := range headers {
+		result = append(result, header.Key, header.Value)
+	}
+	return result
+}
 
-	// Close all writers
-	if s.cman != nil {
-		for topic, w := range s.writers {
-			w.Flush(s.ctx)
-			s.cman.PutWriter(w, topic)
+func connectorHeadersToProto(headers [][]byte) []*pb.KV {
+	if len(headers) == 0 {
+		return nil
+	}
+	result := make([]*pb.KV, 0, (len(headers)+1)/2)
+	for i := 0; i < len(headers); i += 2 {
+		var value []byte
+		if i+1 < len(headers) {
+			value = headers[i+1]
 		}
+		result = append(result, &pb.KV{Key: headers[i], Value: value})
 	}
-	s.writers = make(map[string]connector.WriteCloser)
+	return result
+}
 
-	// Cancel all readers
-	for _, state := range s.readers {
-		if state.cancel != nil {
-			state.cancel()
-		}
-		state.reader.Close()
+func encodeMessageID(reader connector.Reader, autoCommit bool, topic string, args ...any) []byte {
+	if autoCommit {
+		return nil
 	}
-	s.readers = make(map[byte]*readerState)
+	buf := make([]byte, 0, len(topic)+reader.MsgIDArgsLen())
+	return reader.EncodeMsgID(buf, topic, args...)
+}
 
-	// Clear fetch readers mapping
-	s.fetchReaders = make(map[string]byte)
-
-	// Close connector manager if it was created
-	if s.cman != nil {
-		s.cman.Close()
-		s.cman = nil
+func errorString(err error) string {
+	if err == nil {
+		return ""
 	}
+	return err.Error()
 }

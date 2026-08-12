@@ -1,0 +1,44 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     27013 ns/op	  37.91 MB/s	     87583 p99-ns	   27601 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26107 ns/op	  39.22 MB/s	     87083 p99-ns	   27605 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25644 ns/op	  39.93 MB/s	     87416 p99-ns	   27593 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25817 ns/op	  39.66 MB/s	     87333 p99-ns	   27600 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26105 ns/op	  39.23 MB/s	     88500 p99-ns	   27613 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25928 ns/op	  39.49 MB/s	     87875 p99-ns	   27601 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25943 ns/op	  39.47 MB/s	     88458 p99-ns	   27603 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25944 ns/op	  39.47 MB/s	     89667 p99-ns	   27603 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26132 ns/op	  39.19 MB/s	     87917 p99-ns	   27625 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26286 ns/op	  38.96 MB/s	     88416 p99-ns	   27616 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26221 ns/op	  39.05 MB/s	     92042 p99-ns	   27609 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26956 ns/op	  37.99 MB/s	     92125 p99-ns	   27616 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25802 ns/op	  39.69 MB/s	     89125 p99-ns	   27623 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25922 ns/op	  39.50 MB/s	     90667 p99-ns	   27603 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25850 ns/op	  39.61 MB/s	     87542 p99-ns	   27605 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26071 ns/op	  39.28 MB/s	     86625 p99-ns	   27619 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25711 ns/op	  39.83 MB/s	     87041 p99-ns	   27611 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26004 ns/op	  39.38 MB/s	     90375 p99-ns	   27609 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26053 ns/op	  39.31 MB/s	     91250 p99-ns	   27615 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25716 ns/op	  39.82 MB/s	     86917 p99-ns	   27605 B/op	       6 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26766 ns/op	  38.26 MB/s	     97792 p99-ns	   28977 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26860 ns/op	  38.12 MB/s	    100708 p99-ns	   28986 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26853 ns/op	  38.13 MB/s	     95541 p99-ns	   28984 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26758 ns/op	  38.27 MB/s	     98666 p99-ns	   28990 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26819 ns/op	  38.18 MB/s	     97750 p99-ns	   28964 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26573 ns/op	  38.54 MB/s	     96666 p99-ns	   28987 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26654 ns/op	  38.42 MB/s	     99208 p99-ns	   28989 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26342 ns/op	  38.87 MB/s	     94458 p99-ns	   28990 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     27456 ns/op	  37.30 MB/s	    104042 p99-ns	   28986 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25627 ns/op	  39.96 MB/s	     97166 p99-ns	   28988 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25811 ns/op	  39.67 MB/s	     93792 p99-ns	   28993 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25556 ns/op	  40.07 MB/s	    101000 p99-ns	   28985 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     25991 ns/op	  39.40 MB/s	     91959 p99-ns	   28992 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26721 ns/op	  38.32 MB/s	     94666 p99-ns	   28996 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26614 ns/op	  38.48 MB/s	     98166 p99-ns	   28982 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26108 ns/op	  39.22 MB/s	     87750 p99-ns	   28979 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26573 ns/op	  38.54 MB/s	     95334 p99-ns	   29002 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26431 ns/op	  38.74 MB/s	     93709 p99-ns	   28989 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26363 ns/op	  38.84 MB/s	     93625 p99-ns	   28971 B/op	      14 allocs/op
+Benchmark_Session_Fetch_Native/transport=tcp/payload=1KiB/batch=1/concurrency=1-8	10000	     26529 ns/op	  38.60 MB/s	     98083 p99-ns	   29002 B/op	      14 allocs/op

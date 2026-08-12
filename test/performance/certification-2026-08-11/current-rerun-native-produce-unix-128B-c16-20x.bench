@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7258 ns/op	  17.64 MB/s	    452750 p99-ns	   27486 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7289 ns/op	  17.56 MB/s	    461875 p99-ns	   27481 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7161 ns/op	  17.88 MB/s	    457958 p99-ns	   27479 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7098 ns/op	  18.03 MB/s	    460708 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7193 ns/op	  17.80 MB/s	    472500 p99-ns	   27475 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7248 ns/op	  17.66 MB/s	    478792 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7614 ns/op	  16.81 MB/s	    513042 p99-ns	   27478 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7104 ns/op	  18.02 MB/s	    475375 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      6901 ns/op	  18.55 MB/s	    441417 p99-ns	   27477 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7154 ns/op	  17.89 MB/s	    454000 p99-ns	   27477 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7146 ns/op	  17.91 MB/s	    449500 p99-ns	   27479 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      6976 ns/op	  18.35 MB/s	    460917 p99-ns	   27474 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      6931 ns/op	  18.47 MB/s	    447833 p99-ns	   27475 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7234 ns/op	  17.69 MB/s	    470834 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7050 ns/op	  18.16 MB/s	    473167 p99-ns	   27474 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7108 ns/op	  18.01 MB/s	    464958 p99-ns	   27473 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7252 ns/op	  17.65 MB/s	    463166 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7146 ns/op	  17.91 MB/s	    457500 p99-ns	   27475 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      6969 ns/op	  18.37 MB/s	    448334 p99-ns	   27476 B/op	       6 allocs/op
+Benchmark_Session_Produce_Native/transport=unix/payload=128B/batch=1/concurrency=16-8	10000	      7113 ns/op	  17.99 MB/s	    461042 p99-ns	   27474 B/op	       6 allocs/op

@@ -43,15 +43,15 @@ func newRESPStreamsConnector(config any, l *slog.Logger) (connector.Connector, e
 }
 
 // NewReader creates a reader from configuration.
-func (s *streamsConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := s.config.Clients[name]
+func (s *streamsConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := s.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("redis_rueidis_streams: client not found by name: %s", name)
+		return nil, fmt.Errorf("redis_rueidis_streams: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         s.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: s.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateReader(); err != nil {
@@ -62,15 +62,15 @@ func (s *streamsConnector) NewReader(config any, name string, autoCommit bool, l
 }
 
 // NewWriter creates a writer from configuration.
-func (s *streamsConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := s.config.Clients[name]
+func (s *streamsConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := s.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("redis_rueidis_streams: client not found by name: %s", name)
+		return nil, fmt.Errorf("redis_rueidis_streams: route not found: %s", route)
 	}
 
 	connConf := ConnectorConfig{
-		CommonSettings:         s.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: s.config.Common,
+		RouteSettings:  routeConf,
 	}
 
 	if err := connConf.ValidateWriter(); err != nil {

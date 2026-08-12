@@ -37,6 +37,8 @@ type TransportServer = transport.TransportServer
 type GRPCServer interface {
 	ListenAndServe(ctx context.Context) error
 	Stop()
+	ReadyForConnections(timeout time.Duration) bool
+	Done() <-chan struct{}
 }
 
 // NewServer creates a new server instance
@@ -199,6 +201,12 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 			return false
 		}
 	}
+	if s.grpcServer != nil {
+		remaining := time.Until(deadline)
+		if remaining <= 0 || !s.grpcServer.ReadyForConnections(remaining) {
+			return false
+		}
+	}
 	if s.healthServer != nil {
 		s.healthServer.SetReady(true)
 	}
@@ -207,7 +215,7 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 
 func (s *Server) Done() <-chan struct{} {
 	done := make(chan struct{})
-	if len(s.transportServers) == 0 {
+	if len(s.transportServers) == 0 && s.grpcServer == nil {
 		close(done)
 		return done
 	}
@@ -216,8 +224,10 @@ func (s *Server) Done() <-chan struct{} {
 		for _, ts := range s.transportServers {
 			<-ts.Done()
 		}
+		if s.grpcServer != nil {
+			<-s.grpcServer.Done()
+		}
 		close(done)
 	}()
-
 	return done
 }

@@ -13,7 +13,7 @@ connectors:
     type: azure_amqp1
     settings:
       common: {}
-      clients:
+      routes:
         pub:
           conn:
             addr: amqp://artemis:artemis@localhost:61616

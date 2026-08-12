@@ -11,9 +11,9 @@ connectors:
   my_kafka:
     type: kafka_franz
     overridable:
-      - clients.*.produce_topic
-      - clients.*.consume_topics
-      - clients.*.group
+      - routes.*.produce_topic
+      - routes.*.consume_topics
+      - routes.*.group
     settings:
       common:
         brokers: [localhost:9092, localhost:9093]
@@ -22,7 +22,7 @@ connectors:
           enabled: false
           server_cert_pem_path: ./certs/server.pem
           server_key_pem_path: ./certs/server-key.pem
-      clients:
+      routes:
         producer:
           produce_topic: my_topic
           allow_auto_topic_creation: true

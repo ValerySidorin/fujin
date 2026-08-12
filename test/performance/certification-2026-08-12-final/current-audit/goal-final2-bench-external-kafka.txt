@@ -1,0 +1,105 @@
+=== config ===
+
+=== compose up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container zoo1  Creating
+ Container zoo1  Created
+ Container kafka3  Creating
+ Container kafka2  Creating
+ Container kafka1  Creating
+ Container kafka2  Created
+ Container kafka3  Created
+ Container kafka1  Created
+ Container zoo1  Starting
+ Container zoo1  Started
+ Container kafka3  Starting
+ Container kafka2  Starting
+ Container kafka1  Starting
+ Container kafka3  Started
+ Container kafka1  Started
+ Container kafka2  Started
+ Container zoo1  Waiting
+ Container kafka1  Waiting
+ Container kafka2  Waiting
+ Container kafka3  Waiting
+ Container kafka3  Healthy
+ Container kafka1  Healthy
+ Container kafka2  Healthy
+ Container zoo1  Healthy
+
+=== benchmark ===
+seconds to write full buf to quic stream: 8.15e-05
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_Kafka_3Brokers_QUIC-8     	       1	     10708 ns/op	   1.59 MB/s	    7272 B/op	      66 allocs/op
+seconds to write full buf to quic stream: 4.7041e-05
+Benchmark_Produce_32BPayload_Kafka_3Brokers_QUIC-8    	       1	       167.0 ns/op	 287.43 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 6.6667e-05
+Benchmark_Produce_128BPayload_Kafka_3Brokers_QUIC-8   	       1	       250.0 ns/op	 576.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 4.8917e-05
+Benchmark_Produce_256BPayload_Kafka_3Brokers_QUIC-8   	       1	       166.0 ns/op	1638.55 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.2333e-05
+Benchmark_Produce_1KBPayload_Kafka_3Brokers_QUIC-8    	       1	       291.0 ns/op	3573.88 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 6.9625e-05
+Benchmark_Produce_4KBPayload_Kafka_3Brokers_QUIC-8    	       1	       583.0 ns/op	7053.17 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.1084e-05
+Benchmark_Produce_8KBPayload_Kafka_3Brokers_QUIC-8    	       1	       459.0 ns/op	17882.35 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000149416
+Benchmark_Produce_32KBPayload_Kafka_3Brokers_QUIC-8   	       1	      1250 ns/op	26227.20 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 5.3458e-05
+Benchmark_Produce_1BPayload_Kafka_3Brokers_TCP-8      	       1	       375.0 ns/op	  45.33 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 9.1209e-05
+Benchmark_Produce_32BPayload_Kafka_3Brokers_TCP-8     	       1	       416.0 ns/op	 115.38 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.2292e-05
+Benchmark_Produce_128BPayload_Kafka_3Brokers_TCP-8    	       1	        84.00 ns/op	1714.29 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 4.825e-05
+Benchmark_Produce_256BPayload_Kafka_3Brokers_TCP-8    	       1	       375.0 ns/op	 725.33 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 5.7541e-05
+Benchmark_Produce_1KBPayload_Kafka_3Brokers_TCP-8     	       1	       417.0 ns/op	2494.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 6.1917e-05
+Benchmark_Produce_4KBPayload_Kafka_3Brokers_TCP-8     	       1	       583.0 ns/op	7053.17 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 6.1209e-05
+Benchmark_Produce_8KBPayload_Kafka_3Brokers_TCP-8     	       1	       709.0 ns/op	11576.87 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to tcp conn: 6.7e-05
+Benchmark_Produce_32KBPayload_Kafka_3Brokers_TCP-8    	       1	      1750 ns/op	18733.71 MB/s	      40 B/op	       2 allocs/op
+seconds to write full buf to unix conn: 5.5084e-05
+Benchmark_Produce_1BPayload_Kafka_3Brokers_Unix-8     	       1	       291.0 ns/op	  58.42 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 6.6417e-05
+Benchmark_Produce_32BPayload_Kafka_3Brokers_Unix-8    	       1	       250.0 ns/op	 192.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.4375e-05
+Benchmark_Produce_128BPayload_Kafka_3Brokers_Unix-8   	       1	       167.0 ns/op	 862.28 MB/s	      56 B/op	       3 allocs/op
+seconds to write full buf to unix conn: 5.2875e-05
+Benchmark_Produce_256BPayload_Kafka_3Brokers_Unix-8   	       1	       208.0 ns/op	1307.69 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 5.0792e-05
+Benchmark_Produce_1KBPayload_Kafka_3Brokers_Unix-8    	       1	       292.0 ns/op	3561.64 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 0.0001455
+Benchmark_Produce_4KBPayload_Kafka_3Brokers_Unix-8    	       1	       459.0 ns/op	8958.61 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 0.000131542
+Benchmark_Produce_8KBPayload_Kafka_3Brokers_Unix-8    	       1	       750.0 ns/op	10944.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to unix conn: 0.000237792
+Benchmark_Produce_32KBPayload_Kafka_3Brokers_Unix-8   	       1	      3292 ns/op	9958.69 MB/s	    2680 B/op	      10 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	15.286s
+
+=== compose down ===
+ Container kafka1  Stopping
+ Container kafka3  Stopping
+ Container kafka2  Stopping
+ Container kafka3  Stopped
+ Container kafka3  Removing
+ Container kafka3  Removed
+ Container kafka1  Stopped
+ Container kafka1  Removing
+ Container kafka1  Removed
+ Container kafka2  Stopped
+ Container kafka2  Removing
+ Container kafka2  Removed
+ Container zoo1  Stopping
+ Container zoo1  Stopped
+ Container zoo1  Removing
+ Container zoo1  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

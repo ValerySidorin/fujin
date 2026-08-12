@@ -23,14 +23,14 @@ type GroupConf struct {
 	Consumer string `yaml:"consumer"`
 }
 
-// CommonSettings contains settings shared across all Redis Rueidis Streams clients.
+// CommonSettings contains settings shared across all Redis Rueidis Streams routes.
 type CommonSettings struct {
 	config.RedisConfig       `yaml:",inline"`
 	config.WriterBatchConfig `yaml:",inline"`
 }
 
-// ClientSpecificSettings contains settings specific to a client.
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	// Reader settings
 	Streams map[string]StreamConf `yaml:"streams,omitempty"`
 	Block   time.Duration         `yaml:"block,omitempty"`
@@ -46,14 +46,14 @@ type ClientSpecificSettings struct {
 
 // Config is the top-level configuration for RESP Streams connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client.
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
 // Validate validates the Redis Rueidis Streams configuration.
@@ -61,8 +61,8 @@ func (c *Config) Validate() error {
 	if err := c.Common.RedisConfig.Validate(); err != nil {
 		return fmt.Errorf("redis_rueidis_streams: %w", err)
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("redis_rueidis_streams: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("redis_rueidis_streams: at least one route must be configured")
 	}
 	return nil
 }

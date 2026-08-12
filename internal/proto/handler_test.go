@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +17,6 @@ func newTestHandler() *Handler {
 	h := &Handler{
 		ctx:          ctx,
 		ps:           &parseState{},
-		sessionState: STREAM_STATE_BIND,
 		pingInterval: 2 * time.Second,
 		pingTimeout:  5 * time.Second,
 		closed:       make(chan struct{}),
@@ -28,65 +26,65 @@ func newTestHandler() *Handler {
 	return h
 }
 
-func TestHandler_ParseWriteTopicLenArg_Valid(t *testing.T) {
+func TestHandler_ParseWriteRouteLenArg_Valid(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = make([]byte, 4)
 	binary.BigEndian.PutUint32(h.ps.argBuf, 10)
 
-	err := h.parseWriteTopicLenArg()
+	err := h.parseWriteRouteLenArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(10), h.ps.pa.topicLen)
+	assert.Equal(t, uint32(10), h.ps.pa.routeLen)
 }
 
-func TestHandler_ParseWriteTopicLenArg_Zero(t *testing.T) {
+func TestHandler_ParseWriteRouteLenArg_Zero(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = make([]byte, 4)
 	binary.BigEndian.PutUint32(h.ps.argBuf, 0)
 
-	err := h.parseWriteTopicLenArg()
+	err := h.parseWriteRouteLenArg()
 
-	assert.ErrorIs(t, err, ErrWriteTopicLenArgEmpty)
+	assert.ErrorIs(t, err, ErrWriteRouteLenArgEmpty)
 }
 
-func TestHandler_ParseWriteTopicLenArg_MaxValue(t *testing.T) {
+func TestHandler_ParseWriteRouteLenArg_MaxValue(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = make([]byte, 4)
 	binary.BigEndian.PutUint32(h.ps.argBuf, 4294967295) // max uint32
 
-	err := h.parseWriteTopicLenArg()
+	err := h.parseWriteRouteLenArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(4294967295), h.ps.pa.topicLen)
+	assert.Equal(t, uint32(4294967295), h.ps.pa.routeLen)
 }
 
-func TestHandler_ParseWriteTopicArg_Valid(t *testing.T) {
+func TestHandler_ParseWriteRouteArg_Valid(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = []byte("test-topic")
 
-	err := h.parseWriteTopicArg()
+	err := h.parseWriteRouteArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, "test-topic", h.ps.pa.topic)
+	assert.Equal(t, "test-topic", h.ps.pa.route)
 }
 
-func TestHandler_ParseWriteTopicArg_Empty(t *testing.T) {
+func TestHandler_ParseWriteRouteArg_Empty(t *testing.T) {
 	h := newTestHandler()
-	h.ps.argBuf = []byte("")
+	h.ps.argBuf = []byte{}
 
-	err := h.parseWriteTopicArg()
+	err := h.parseWriteRouteArg()
 
-	assert.ErrorIs(t, err, ErrWriteTopicArgEmpty)
+	assert.ErrorIs(t, err, ErrWriteRouteArgEmpty)
 }
 
-func TestHandler_ParseWriteTopicArg_WithSpecialCharacters(t *testing.T) {
+func TestHandler_ParseWriteRouteArg_WithSpecialCharacters(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = []byte("test.topic-123_abc")
 
-	err := h.parseWriteTopicArg()
+	err := h.parseWriteRouteArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, "test.topic-123_abc", h.ps.pa.topic)
+	assert.Equal(t, "test.topic-123_abc", h.ps.pa.route)
 }
 
 func TestHandler_ParseWriteMsgSizeArg_Valid(t *testing.T) {
@@ -121,25 +119,25 @@ func TestHandler_ParseWriteMsgSizeArg_LargeValue(t *testing.T) {
 	assert.Equal(t, uint32(10485760), h.ps.pma.size)
 }
 
-func TestHandler_ParseSubscribeTopicLenArg_Valid(t *testing.T) {
+func TestHandler_ParseSubscribeRouteLenArg_Valid(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = make([]byte, 4)
 	binary.BigEndian.PutUint32(h.ps.argBuf, 20)
 
-	err := h.parseSubscribeTopicLenArg()
+	err := h.parseSubscribeRouteLenArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(20), h.ps.sa.topicLen)
+	assert.Equal(t, uint32(20), h.ps.sa.routeLen)
 }
 
-func TestHandler_ParseSubscribeTopicLenArg_Zero(t *testing.T) {
+func TestHandler_ParseSubscribeRouteLenArg_Zero(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = make([]byte, 4)
 	binary.BigEndian.PutUint32(h.ps.argBuf, 0)
 
-	err := h.parseSubscribeTopicLenArg()
+	err := h.parseSubscribeRouteLenArg()
 
-	assert.ErrorIs(t, err, ErrReaderNameSizeArgNotProvided)
+	assert.ErrorIs(t, err, ErrRouteSizeArgNotProvided)
 }
 
 func TestHandler_Close(t *testing.T) {
@@ -166,34 +164,6 @@ func TestHandler_Close(t *testing.T) {
 	}
 }
 
-func TestHandler_FlushWriters_NoWriters(t *testing.T) {
-	h := newTestHandler()
-	h.nonTxSessionWriters = make(map[string]connector.WriteCloser)
-
-	err := h.flushWriters()
-
-	assert.NoError(t, err)
-}
-
-func TestHandler_SessionStates(t *testing.T) {
-	tests := []struct {
-		name  string
-		state sessionState
-	}{
-		{"bind state", STREAM_STATE_BIND},
-		{"connected state", STREAM_STATE_CONNECTED},
-		{"connected in tx state", STREAM_STATE_CONNECTED_IN_TX},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := newTestHandler()
-			h.sessionState = tt.state
-			assert.Equal(t, tt.state, h.sessionState)
-		})
-	}
-}
-
 func TestHandler_ParseState(t *testing.T) {
 	h := newTestHandler()
 
@@ -214,11 +184,11 @@ func TestHandler_CorrelationIDArg(t *testing.T) {
 
 func TestHandler_ProduceArgs(t *testing.T) {
 	h := newTestHandler()
-	h.ps.pa.topicLen = 10
-	h.ps.pa.topic = "test-topic"
+	h.ps.pa.routeLen = 10
+	h.ps.pa.route = "test-topic"
 
-	assert.Equal(t, uint32(10), h.ps.pa.topicLen)
-	assert.Equal(t, "test-topic", h.ps.pa.topic)
+	assert.Equal(t, uint32(10), h.ps.pa.routeLen)
+	assert.Equal(t, "test-topic", h.ps.pa.route)
 }
 
 func TestHandler_ProduceMsgArgs(t *testing.T) {
@@ -230,13 +200,13 @@ func TestHandler_ProduceMsgArgs(t *testing.T) {
 
 func TestHandler_SubscribeArgs(t *testing.T) {
 	h := newTestHandler()
-	h.ps.sa.topicLen = 15
-	h.ps.sa.topic = "subscribe-topic"
+	h.ps.sa.routeLen = 15
+	h.ps.sa.route = "subscribe-topic"
 	h.ps.sa.autoCommit = true
 	h.ps.sa.headered = false
 
-	assert.Equal(t, uint32(15), h.ps.sa.topicLen)
-	assert.Equal(t, "subscribe-topic", h.ps.sa.topic)
+	assert.Equal(t, uint32(15), h.ps.sa.routeLen)
+	assert.Equal(t, "subscribe-topic", h.ps.sa.route)
 	assert.True(t, h.ps.sa.autoCommit)
 	assert.False(t, h.ps.sa.headered)
 }
@@ -258,13 +228,13 @@ func TestHandler_InitArgs(t *testing.T) {
 func TestHandler_FetchArgs(t *testing.T) {
 	h := newTestHandler()
 	h.ps.fa.autoCommit = true
-	h.ps.fa.topicLen = 12
-	h.ps.fa.topic = "fetch-topic"
+	h.ps.fa.routeLen = 12
+	h.ps.fa.route = "fetch-topic"
 	h.ps.fa.headered = true
 
 	assert.True(t, h.ps.fa.autoCommit)
-	assert.Equal(t, uint32(12), h.ps.fa.topicLen)
-	assert.Equal(t, "fetch-topic", h.ps.fa.topic)
+	assert.Equal(t, uint32(12), h.ps.fa.routeLen)
+	assert.Equal(t, "fetch-topic", h.ps.fa.route)
 	assert.True(t, h.ps.fa.headered)
 }
 
@@ -295,28 +265,6 @@ func TestHandler_HeaderArgs(t *testing.T) {
 	assert.Len(t, h.ps.ha.headersKV, 2)
 }
 
-func TestHandler_Subscribers(t *testing.T) {
-	h := newTestHandler()
-	h.subscribers = make(map[byte]connector.ReadCloser)
-	h.unsubFuncs = make(map[byte]func())
-
-	assert.NotNil(t, h.subscribers)
-	assert.Empty(t, h.subscribers)
-	assert.NotNil(t, h.unsubFuncs)
-	assert.Empty(t, h.unsubFuncs)
-}
-
-func TestHandler_FetchMsgHandlers(t *testing.T) {
-	h := newTestHandler()
-	h.fetchMsgHandlers = make(map[string]map[bool]func(message []byte, topic string, args ...any))
-	h.fetchMsgWithHeadersHandlers = make(map[string]map[bool]func(message []byte, topic string, hs [][]byte, args ...any))
-
-	assert.NotNil(t, h.fetchMsgHandlers)
-	assert.Empty(t, h.fetchMsgHandlers)
-	assert.NotNil(t, h.fetchMsgWithHeadersHandlers)
-	assert.Empty(t, h.fetchMsgWithHeadersHandlers)
-}
-
 func TestHandler_MultipleParseCalls(t *testing.T) {
 	h := newTestHandler()
 
@@ -324,9 +272,9 @@ func TestHandler_MultipleParseCalls(t *testing.T) {
 	for i := uint32(1); i <= 5; i++ {
 		h.ps.argBuf = make([]byte, 4)
 		binary.BigEndian.PutUint32(h.ps.argBuf, i*10)
-		err := h.parseWriteTopicLenArg()
+		err := h.parseWriteRouteLenArg()
 		require.NoError(t, err)
-		assert.Equal(t, i*10, h.ps.pa.topicLen)
+		assert.Equal(t, i*10, h.ps.pa.routeLen)
 	}
 }
 
@@ -334,10 +282,10 @@ func TestHandler_ParseTopicWithUnicode(t *testing.T) {
 	h := newTestHandler()
 	h.ps.argBuf = []byte("test-topic-中文-🚀")
 
-	err := h.parseWriteTopicArg()
+	err := h.parseWriteRouteArg()
 
 	assert.NoError(t, err)
-	assert.Equal(t, "test-topic-中文-🚀", h.ps.pa.topic)
+	assert.Equal(t, "test-topic-中文-🚀", h.ps.pa.route)
 }
 
 func TestHandler_ErrorConstants(t *testing.T) {
@@ -345,18 +293,11 @@ func TestHandler_ErrorConstants(t *testing.T) {
 	assert.Error(t, ErrParseProto)
 	assert.Error(t, ErrFetchArgNotProvided)
 	assert.Error(t, ErrInvalidReaderType)
-	assert.Error(t, ErrReaderNameSizeArgNotProvided)
-	assert.Error(t, ErrWriteTopicArgEmpty)
+	assert.Error(t, ErrRouteSizeArgNotProvided)
+	assert.Error(t, ErrWriteRouteArgEmpty)
 	assert.Error(t, ErrWriteMsgSizeArgEmpty)
-	assert.Error(t, ErrWriteTopicLenArgEmpty)
+	assert.Error(t, ErrWriteRouteLenArgEmpty)
 	assert.Error(t, ErrConnectReaderIsAutoCommitArgInvalid)
-	assert.Error(t, ErrInvalidTxState)
-}
-
-func TestHandler_StateConstants(t *testing.T) {
-	assert.Equal(t, sessionState(0), STREAM_STATE_BIND)
-	assert.Equal(t, sessionState(1), STREAM_STATE_CONNECTED)
-	assert.Equal(t, sessionState(2), STREAM_STATE_CONNECTED_IN_TX)
 }
 
 func TestHandler_OpCodeConstants(t *testing.T) {

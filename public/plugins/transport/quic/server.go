@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fujin-io/fujin/internal/proto/pool"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
@@ -187,7 +186,7 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 				continue
 			}
 
-			ctx, cancel := context.WithCancel(ctx)
+			connCtx, cancel := context.WithCancel(ctx)
 			connWg.Add(1)
 			go func() {
 				retryCount := 0
@@ -198,74 +197,35 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 					connWg.Done()
 				}()
 
-				pingBuf := pool.Get(1)
-				defer pool.Put(pingBuf)
-				pingBuf = pingBuf[:1]
-
 				for {
 					select {
-					case <-ctx.Done():
+					case <-connCtx.Done():
 						return
 					case <-t.C:
-						str, err := conn.OpenStreamSync(ctx)
-						if err != nil {
-							retryCount++
-							s.l.Error("open ping stream error", "err", err, "retry", retryCount)
-							if retryCount >= s.conf.Fujin.PingMaxRetries {
-								if err := conn.CloseWithError(v1.PingErr, "open stream failed after retries: "+err.Error()); err != nil {
-									s.l.Error("close with error", "err", err)
-								}
-								return
-							}
-							continue
-						}
-						retryCount = 0
-
-						pingBuf[0] = byte(v1.OP_CODE_PING)
-						if _, err := str.Write(pingBuf); err != nil {
-							retryCount++
-							s.l.Error("write ping error", "err", err, "retry", retryCount)
-							_ = str.Close()
-							if retryCount >= s.conf.Fujin.PingMaxRetries {
-								if err := conn.CloseWithError(v1.PingErr, "write failed after retries: "+err.Error()); err != nil {
-									s.l.Error("close with error", "err", err)
-								}
-								return
-							}
+						err := pingQUICConnection(connCtx, conn, s.conf.Fujin.PingTimeout)
+						if err == nil {
+							retryCount = 0
 							continue
 						}
 
-						if err := str.Close(); err != nil {
-							s.l.Error("close ping stream error", "err", err)
-						}
-
-						err = str.SetDeadline(time.Now().Add(s.conf.Fujin.PingTimeout))
-						if err != nil {
-							s.l.Error("set read deadline error", "err", err)
-						}
-
-						_, err = io.ReadAll(str)
-						if err != nil {
-							retryCount++
-							s.l.Error("read ping response error", "err", err, "retry", retryCount)
-							if retryCount >= s.conf.Fujin.PingMaxRetries {
-								if err := conn.CloseWithError(v1.PingErr, "read failed after retries: "+err.Error()); err != nil {
-									s.l.Error("close with error", "err", err)
-								}
-								return
-							}
+						retryCount++
+						s.l.Error("ping error", "err", err, "retry", retryCount)
+						if retryCount < s.conf.Fujin.PingMaxRetries {
 							continue
 						}
-						retryCount = 0
+						if closeErr := conn.CloseWithError(v1.PingErr, "ping failed after retries: "+err.Error()); closeErr != nil {
+							s.l.Error("close with error", "err", closeErr)
+						}
+						return
 					}
 				}
 			}()
 
 			go func() {
 				for {
-					str, err := conn.AcceptStream(ctx)
+					str, err := conn.AcceptStream(connCtx)
 					if err != nil {
-						if err != ctx.Err() {
+						if err != connCtx.Err() {
 							if err := conn.CloseWithError(v1.ConnErr, "accept stream: "+err.Error()); err != nil {
 								s.l.Error("close with error", "err", err)
 							}
@@ -275,7 +235,7 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 
 					connWg.Add(1)
 					go func() {
-						handler.HandleStream(ctx, str, session.StreamOptions{
+						handler.HandleStream(connCtx, str, session.StreamOptions{
 							BaseConfig:            s.baseConfig,
 							BaseConfigProvider:    s.configProvider,
 							PingInterval:          s.conf.Fujin.PingInterval,
@@ -294,6 +254,44 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 			}()
 		}
 	}
+}
+
+func pingQUICConnection(ctx context.Context, conn *quicgo.Conn, timeout time.Duration) error {
+	pingCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	str, err := conn.OpenStreamSync(pingCtx)
+	if err != nil {
+		return fmt.Errorf("open stream: %w", err)
+	}
+	deadline, _ := pingCtx.Deadline()
+	if err := str.SetDeadline(deadline); err != nil {
+		return fmt.Errorf("set deadline: %w", err)
+	}
+
+	if _, err := str.Write(v1.PING_REQ); err != nil {
+		str.CancelWrite(v1.PingErr)
+		str.CancelRead(v1.PingErr)
+		return fmt.Errorf("write request: %w", err)
+	}
+	if err := str.Close(); err != nil {
+		str.CancelRead(v1.PingErr)
+		return fmt.Errorf("close request: %w", err)
+	}
+
+	var response [2]byte
+	n, err := io.ReadFull(str, response[:])
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		str.CancelRead(v1.PingErr)
+		if err == nil {
+			return fmt.Errorf("invalid response length: at least %d", n)
+		}
+		return fmt.Errorf("read response: %w", err)
+	}
+	if n != 1 || response[0] != byte(v1.RESP_CODE_PONG) {
+		return fmt.Errorf("invalid response: %v", response[:n])
+	}
+	return nil
 }
 
 func (s *FujinServer) ReadyForConnections(timeout time.Duration) bool {

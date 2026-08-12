@@ -26,7 +26,7 @@ var allowedSettings = map[string]bool{
 
 // convertConfigValue converts and validates a configuration value for MQTT
 func convertConfigValue(settingPath string, value string) (any, error) {
-	// Normalize the path - remove "clients.<name>." prefix if present
+	// Normalize the path by removing the "routes.<name>." prefix when present.
 	normalizedPath := normalizePath(settingPath)
 
 	// Check if this setting is allowed
@@ -96,10 +96,9 @@ func convertConfigValue(settingPath string, value string) (any, error) {
 	}
 }
 
-// normalizePath removes the "clients.<name>." prefix from a setting path
+// normalizePath removes the "routes.<name>." prefix from a setting path.
 func normalizePath(fullPath string) string {
-	// Handle paths like "clients.myClient.qos" -> "qos"
-	if strings.HasPrefix(fullPath, "clients.") {
+	if strings.HasPrefix(fullPath, "routes.") {
 		parts := strings.SplitN(fullPath, ".", 3)
 		if len(parts) >= 3 {
 			return parts[2]

@@ -13,7 +13,7 @@ connectors:
     type: rabbitmq_amqp09
     settings:
       common: {}
-      clients:
+      routes:
         pub:
           conn:
             url: amqp://guest:guest@localhost

@@ -20,8 +20,8 @@ type PoolConfig struct {
 	ReleaseTimeout time.Duration `yaml:"release_timeout"`
 }
 
-// ClientSpecificSettings contains settings specific to a client
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	ClientID         string        `yaml:"client_id"`
 	Topic            string        `yaml:"topic"`
 	QoS              byte          `yaml:"qos"`
@@ -33,23 +33,23 @@ type ClientSpecificSettings struct {
 	Pool             PoolConfig    `yaml:"pool,omitempty"`     // Only used for writers
 }
 
-// Config is the top-level configuration structure for MQTT connector
+// Config is the top-level configuration structure for MQTT connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-// NewConnectorConfig creates a new ConnectorConfig from common and client-specific settings
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+// NewConnectorConfig creates a ConnectorConfig from common and route-specific settings.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
@@ -58,18 +58,18 @@ func (c *Config) Validate() error {
 	if c.Common.BrokerURL == "" {
 		return fmt.Errorf("mqtt: broker_url is required")
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("mqtt: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("mqtt: at least one route must be configured")
 	}
-	for name, client := range c.Clients {
-		if client.ClientID == "" {
-			return fmt.Errorf("mqtt: client %q: client_id is required", name)
+	for name, route := range c.Routes {
+		if route.ClientID == "" {
+			return fmt.Errorf("mqtt: route %q: client_id is required", name)
 		}
-		if client.Topic == "" {
-			return fmt.Errorf("mqtt: client %q: topic is required", name)
+		if route.Topic == "" {
+			return fmt.Errorf("mqtt: route %q: topic is required", name)
 		}
-		if client.QoS > 2 {
-			return fmt.Errorf("mqtt: client %q: qos must be 0, 1, or 2", name)
+		if route.QoS > 2 {
+			return fmt.Errorf("mqtt: route %q: qos must be 0, 1, or 2", name)
 		}
 	}
 	return nil

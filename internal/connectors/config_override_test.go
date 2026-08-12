@@ -98,20 +98,20 @@ func TestValidateOverridePath(t *testing.T) {
 	}{
 		{
 			name:      "exact match",
-			path:      "clients.client1.topic",
-			whitelist: []string{"clients.client1.topic"},
+			path:      "routes.route1.topic",
+			whitelist: []string{"routes.route1.topic"},
 			wantErr:   false,
 		},
 		{
 			name:      "wildcard match",
-			path:      "clients.client1.topic",
-			whitelist: []string{"clients.*.topic"},
+			path:      "routes.route1.topic",
+			whitelist: []string{"routes.*.topic"},
 			wantErr:   false,
 		},
 		{
-			name:      "wildcard match different client",
-			path:      "clients.client2.topic",
-			whitelist: []string{"clients.*.topic"},
+			name:      "wildcard match different route",
+			path:      "routes.route2.topic",
+			whitelist: []string{"routes.*.topic"},
 			wantErr:   false,
 		},
 		{
@@ -123,24 +123,24 @@ func TestValidateOverridePath(t *testing.T) {
 		{
 			name:      "not in whitelist",
 			path:      "common.servers",
-			whitelist: []string{"clients.*.topic"},
+			whitelist: []string{"routes.*.topic"},
 			wantErr:   true,
 		},
 		{
 			name:      "empty whitelist",
-			path:      "clients.client1.topic",
+			path:      "routes.route1.topic",
 			whitelist: []string{},
 			wantErr:   true,
 		},
 		{
 			name:      "nil whitelist",
-			path:      "clients.client1.topic",
+			path:      "routes.route1.topic",
 			whitelist: nil,
 			wantErr:   true,
 		},
 		{
 			name:      "allow all with *",
-			path:      "clients.client1.topic",
+			path:      "routes.route1.topic",
 			whitelist: []string{"*"},
 			wantErr:   false,
 		},
@@ -158,26 +158,26 @@ func TestValidateOverridePath(t *testing.T) {
 		},
 		{
 			name:      "path length mismatch - shorter",
-			path:      "clients.client1",
-			whitelist: []string{"clients.*.topic"},
+			path:      "routes.route1",
+			whitelist: []string{"routes.*.topic"},
 			wantErr:   true,
 		},
 		{
 			name:      "path length mismatch - longer",
-			path:      "clients.client1.topic.extra",
-			whitelist: []string{"clients.*.topic"},
+			path:      "routes.route1.topic.extra",
+			whitelist: []string{"routes.*.topic"},
 			wantErr:   true,
 		},
 		{
 			name:      "multiple patterns - first matches",
-			path:      "clients.client1.topic",
-			whitelist: []string{"clients.*.topic", "common.*"},
+			path:      "routes.route1.topic",
+			whitelist: []string{"routes.*.topic", "common.*"},
 			wantErr:   false,
 		},
 		{
 			name:      "multiple patterns - second matches",
 			path:      "common.servers",
-			whitelist: []string{"clients.*.topic", "common.*"},
+			whitelist: []string{"routes.*.topic", "common.*"},
 			wantErr:   false,
 		},
 	}
@@ -221,7 +221,7 @@ func TestMatchOverridePath(t *testing.T) {
 func TestApplyOverrides_NotAllowed(t *testing.T) {
 	originalConfig := config.ConnectorConfig{
 		Type:        "test",
-		Overridable: []string{"clients.*.topic"}, // Only allow topic
+		Overridable: []string{"routes.*.topic"}, // Only allow route topic.
 		Settings: map[string]any{
 			"common": map[string]any{
 				"servers": []string{"host1:1234"},
@@ -229,7 +229,7 @@ func TestApplyOverrides_NotAllowed(t *testing.T) {
 		},
 	}
 
-	// Try to override servers (not allowed)
+	// Try to override servers (not allowed).
 	overrides := map[string]string{
 		"common.servers": "host2:1234",
 	}

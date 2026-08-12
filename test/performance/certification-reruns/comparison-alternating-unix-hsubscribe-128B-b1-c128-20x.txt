@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                         sec/op                                                         │                                               sec/op                                                 vs base          │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                              228.8n ± 5%                                                                                           243.8n ± 6%  ~ (p=0.113 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                          B/s                                                           │                                                 B/s                                                  vs base          │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                             533.5Mi ± 5%                                                                                          500.7Mi ± 6%  ~ (p=0.114 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                        p99-sec                                                         │                                            p99-sec                                             vs base                │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                             860.2µ ± 17%                                                                                    660.0µ ± 26%  -23.28% (p=0.009 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                          B/op                                                          │                                              B/op                                               vs base               │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                               383.5 ± 5%                                                                                       399.0 ± 5%  +4.04% (p=0.009 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                       allocs/op                                                        │                                             allocs/op                                              vs base            │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                               8.000 ± 0%                                                                                          8.000 ± 0%  ~ (p=1.000 n=20) ¹
+¹ all samples are equal

@@ -1,0 +1,66 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     14620 ns/op	   2.19 MB/s	    280250 p99-ns	    4952 B/op	     102 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     14429 ns/op	   2.22 MB/s	    302625 p99-ns	    4902 B/op	     102 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     12952 ns/op	   2.47 MB/s	    318917 p99-ns	    4536 B/op	     101 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     16055 ns/op	   1.99 MB/s	    320292 p99-ns	    5087 B/op	     101 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     13892 ns/op	   2.30 MB/s	    280625 p99-ns	    5132 B/op	     103 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     14620 ns/op	   2.19 MB/s	    289166 p99-ns	    4598 B/op	     102 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     14603 ns/op	   2.19 MB/s	    302042 p99-ns	    4751 B/op	     101 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     16339 ns/op	   1.96 MB/s	    442958 p99-ns	    4872 B/op	     101 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     12887 ns/op	   2.48 MB/s	    263958 p99-ns	    4590 B/op	     100 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8         	     100	     15781 ns/op	   2.03 MB/s	    348375 p99-ns	    4618 B/op	     101 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     23292 ns/op	  10.99 MB/s	    819667 p99-ns	   23498 B/op	     557 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     23500 ns/op	  10.89 MB/s	    762667 p99-ns	   23618 B/op	     555 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     22490 ns/op	  11.38 MB/s	    828709 p99-ns	   23659 B/op	     557 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     25556 ns/op	  10.02 MB/s	    909583 p99-ns	   23613 B/op	     555 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     22245 ns/op	  11.51 MB/s	    729250 p99-ns	   23878 B/op	     557 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     22681 ns/op	  11.29 MB/s	    792084 p99-ns	   23900 B/op	     556 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     22389 ns/op	  11.43 MB/s	    817792 p99-ns	   23608 B/op	     556 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     23084 ns/op	  11.09 MB/s	    787458 p99-ns	   23951 B/op	     556 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     22095 ns/op	  11.59 MB/s	    765917 p99-ns	   23728 B/op	     556 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8        	     100	     23336 ns/op	  10.97 MB/s	    687666 p99-ns	   23288 B/op	     555 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8016310 ns/op	 130.81 MB/s	 129576334 p99-ns	 1648605 B/op	   13953 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   7934126 ns/op	 132.16 MB/s	 129558875 p99-ns	 1648218 B/op	   13966 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   7977442 ns/op	 131.44 MB/s	 128755833 p99-ns	 1646655 B/op	   13949 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   7983381 ns/op	 131.34 MB/s	 130170584 p99-ns	 1646712 B/op	   13926 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   7966591 ns/op	 131.62 MB/s	 129325250 p99-ns	 1648522 B/op	   13962 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8001008 ns/op	 131.06 MB/s	 129375875 p99-ns	 1647132 B/op	   13945 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8150552 ns/op	 128.65 MB/s	 134011875 p99-ns	 1644479 B/op	   13914 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8180062 ns/op	 128.19 MB/s	 132261417 p99-ns	 1645817 B/op	   13899 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8163914 ns/op	 128.44 MB/s	 132510458 p99-ns	 1642421 B/op	   13883 allocs/op
+Benchmark_Session_Fetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8      	     100	   8102852 ns/op	 129.41 MB/s	 132224500 p99-ns	 1647234 B/op	   13915 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     24288 ns/op	   1.32 MB/s	    554375 p99-ns	    9546 B/op	     316 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     22790 ns/op	   1.40 MB/s	    511625 p99-ns	    9094 B/op	     317 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     21548 ns/op	   1.49 MB/s	    475625 p99-ns	    9320 B/op	     317 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     23332 ns/op	   1.37 MB/s	    463750 p99-ns	    9481 B/op	     315 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     29354 ns/op	   1.09 MB/s	    694625 p99-ns	    9162 B/op	     315 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     28333 ns/op	   1.13 MB/s	    793750 p99-ns	    9555 B/op	     318 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     26048 ns/op	   1.23 MB/s	    585125 p99-ns	    9228 B/op	     317 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     22627 ns/op	   1.41 MB/s	    509916 p99-ns	    9206 B/op	     315 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     24887 ns/op	   1.29 MB/s	    510875 p99-ns	    8817 B/op	     315 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=32/concurrency=16-8        	     100	     24361 ns/op	   1.31 MB/s	    527042 p99-ns	    9237 B/op	     314 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    130484 ns/op	   1.96 MB/s	   2873917 p99-ns	   64709 B/op	    2334 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    146062 ns/op	   1.75 MB/s	   2962583 p99-ns	   64696 B/op	    2330 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    136081 ns/op	   1.88 MB/s	   3645958 p99-ns	   65175 B/op	    2332 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    135594 ns/op	   1.89 MB/s	   3184333 p99-ns	   65152 B/op	    2337 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    134277 ns/op	   1.91 MB/s	   3211292 p99-ns	   64926 B/op	    2331 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    135940 ns/op	   1.88 MB/s	   2782208 p99-ns	   64984 B/op	    2339 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    131992 ns/op	   1.94 MB/s	   2982667 p99-ns	   64492 B/op	    2335 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    132580 ns/op	   1.93 MB/s	   3141791 p99-ns	   64906 B/op	    2335 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    131747 ns/op	   1.94 MB/s	   2799625 p99-ns	   64581 B/op	    2337 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=256/concurrency=16-8       	     100	    132162 ns/op	   1.94 MB/s	   3042000 p99-ns	   65446 B/op	    2336 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7941973 ns/op	 132.03 MB/s	 128578416 p99-ns	 1654163 B/op	   14167 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   8015029 ns/op	 130.83 MB/s	 129905625 p99-ns	 1650845 B/op	   14147 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7917493 ns/op	 132.44 MB/s	 128378541 p99-ns	 1651831 B/op	   14189 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7953064 ns/op	 131.85 MB/s	 128118708 p99-ns	 1653646 B/op	   14182 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7985223 ns/op	 131.31 MB/s	 128728709 p99-ns	 1655155 B/op	   14149 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7891248 ns/op	 132.88 MB/s	 127681916 p99-ns	 1653611 B/op	   14203 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   8082244 ns/op	 129.74 MB/s	 132702709 p99-ns	 1652386 B/op	   14143 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   7948856 ns/op	 131.92 MB/s	 129160709 p99-ns	 1650952 B/op	   14174 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   8099791 ns/op	 129.46 MB/s	 137470708 p99-ns	 1647029 B/op	   14124 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=32KiB/batch=32/concurrency=16-8     	     100	   8123732 ns/op	 129.08 MB/s	 132482000 p99-ns	 1650673 B/op	   14135 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	26.690s

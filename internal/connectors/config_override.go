@@ -32,13 +32,13 @@ func DeepCopyConfig(original config.ConnectorConfig) (config.ConnectorConfig, er
 // Overrides format: "{setting_path}" -> "value"
 //
 // Examples:
-//   - "clients.writer1.topic" -> "my-topic"
-//   - "clients.reader1.group" -> "my-group"
+//   - "routes.writer1.topic" -> "my-topic"
+//   - "routes.reader1.group" -> "my-group"
 //   - "common.servers" -> "host1:9092,host2:9092"
 //
 // Paths are validated against the Overridable whitelist in the config.
 // Wildcard (*) is supported in whitelist patterns:
-//   - "clients.*.topic" matches "clients.writer1.topic", "clients.reader1.topic", etc.
+//   - "routes.*.topic" matches "routes.writer1.topic", "routes.reader1.topic", etc.
 //   - "common.*" matches any field under common
 //   - "*" (alone) allows ALL overrides (use with caution)
 func ApplyOverrides(baseConfig config.ConnectorConfig, overrides map[string]string) (config.ConnectorConfig, error) {

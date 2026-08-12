@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-tcp-hfetch-32KiB-b32-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-tcp-hfetch-32KiB-b32-20x.bench │
+                                                                             │                                               sec/op                                               │                                   sec/op                                    vs base               │
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                                          142.5µ ± 1%                                                                  139.0µ ± 2%  -2.50% (p=0.004 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-tcp-hfetch-32KiB-b32-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-tcp-hfetch-32KiB-b32-20x.bench │
+                                                                             │                                                B/s                                                 │                                    B/s                                      vs base               │
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                                         6.852Gi ± 1%                                                                 7.028Gi ± 1%  +2.56% (p=0.004 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-tcp-hfetch-32KiB-b32-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-tcp-hfetch-32KiB-b32-20x.bench │
+                                                                             │                                              p99-sec                                               │                                     p99-sec                                      vs base          │
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                                          6.937m ± 4%                                                                       6.823m ± 4%  ~ (p=0.738 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-tcp-hfetch-32KiB-b32-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-tcp-hfetch-32KiB-b32-20x.bench │
+                                                                             │                                                B/op                                                │                                    B/op                                     vs base               │
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                                         1.050Mi ± 0%                                                                 1.043Mi ± 0%  -0.65% (p=0.001 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-tcp-hfetch-32KiB-b32-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-tcp-hfetch-32KiB-b32-20x.bench │
+                                                                             │                                             allocs/op                                              │                                 allocs/op                                   vs base               │
+_Session_HFetch_Native/transport=tcp/payload=32KiB/batch=32/concurrency=16-8                                                                                           276.0 ± 0%                                                                   274.0 ± 0%  -0.72% (p=0.000 n=20)

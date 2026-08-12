@@ -1,0 +1,57 @@
+===== compose up rc=0 =====
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container emqx  Creating
+ Container emqx  Created
+ Container emqx  Starting
+ Container emqx  Started
+ Container emqx  Waiting
+ Container emqx  Healthy
+
+===== go test rc=0 =====
+=== RUN   TestE2E_MQTT
+time=2026-08-12T15:15:50.519+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:15:50.519+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:897 msg="Server started"
+=== RUN   TestE2E_MQTT/Produce
+time=2026-08-12T15:15:51.024+03:00 level=ERROR source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/writer.go:47 msg="mqtt writer connection error" server=fujin_tcp err="failed to connect to tcp://localhost:1883: read tcp [::1]:51208->[::1]:1883: read: connection reset by peer"
+time=2026-08-12T15:16:01.032+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/writer.go:44 msg="mqtt writer connection up" server=fujin_tcp session_present=false
+=== RUN   TestE2E_MQTT/HProduce
+time=2026-08-12T15:16:01.043+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/writer.go:44 msg="mqtt writer connection up" server=fujin_tcp session_present=false
+=== RUN   TestE2E_MQTT/Produce_Subscribe
+time=2026-08-12T15:16:01.052+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/reader.go:77 msg="mqtt connection up" server=fujin_tcp reader_type=mqtt_paho session_present=false
+time=2026-08-12T15:16:01.558+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/writer.go:44 msg="mqtt writer connection up" server=fujin_tcp session_present=false
+=== RUN   TestE2E_MQTT/Produce_HSubscribe
+time=2026-08-12T15:16:01.565+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/reader.go:77 msg="mqtt connection up" server=fujin_tcp reader_type=mqtt_paho session_present=false
+time=2026-08-12T15:16:02.072+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/connector/mqtt/paho/writer.go:44 msg="mqtt writer connection up" server=fujin_tcp session_present=false
+=== RUN   TestE2E_MQTT/Fetch_Flow
+    e2e_test.go:276: fetch not supported
+=== RUN   TestE2E_MQTT/Produce_Fetch_Ack
+    e2e_test.go:377: fetch+ack not supported
+=== RUN   TestE2E_MQTT/Produce_Fetch_Nack
+    e2e_test.go:436: fetch+nack not supported
+=== RUN   TestE2E_MQTT/Tx_Produce_Commit
+    e2e_test.go:494: tx not supported
+=== RUN   TestE2E_MQTT/Tx_Produce_Rollback
+    e2e_test.go:526: tx not supported
+time=2026-08-12T15:16:03.083+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:16:03.083+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+--- PASS: TestE2E_MQTT (12.56s)
+    --- PASS: TestE2E_MQTT/Produce (10.01s)
+    --- PASS: TestE2E_MQTT/HProduce (0.01s)
+    --- PASS: TestE2E_MQTT/Produce_Subscribe (0.52s)
+    --- PASS: TestE2E_MQTT/Produce_HSubscribe (0.52s)
+    --- SKIP: TestE2E_MQTT/Fetch_Flow (0.00s)
+    --- SKIP: TestE2E_MQTT/Produce_Fetch_Ack (0.00s)
+    --- SKIP: TestE2E_MQTT/Produce_Fetch_Nack (0.00s)
+    --- SKIP: TestE2E_MQTT/Tx_Produce_Commit (0.00s)
+    --- SKIP: TestE2E_MQTT/Tx_Produce_Rollback (0.00s)
+PASS
+ok  	github.com/fujin-io/fujin/test	13.069s
+
+===== compose down rc=0 =====
+ Container emqx  Stopping
+ Container emqx  Stopped
+ Container emqx  Removing
+ Container emqx  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

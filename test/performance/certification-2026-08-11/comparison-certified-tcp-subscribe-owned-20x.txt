@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/baseline-certified-tcp-subscribe-owned-20x.bench │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/current-certified-tcp-subscribe-owned-20x.bench │
+                                                                             │                                                     sec/op                                                      │                                            sec/op                                             vs base          │
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                                                                                       147.8n ± 8%                                                                                    148.9n ± 7%  ~ (p=0.461 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/baseline-certified-tcp-subscribe-owned-20x.bench │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/current-certified-tcp-subscribe-owned-20x.bench │
+                                                                             │                                                       B/s                                                       │                                             B/s                                               vs base          │
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                                                                                      825.9Mi ± 9%                                                                                   819.8Mi ± 7%  ~ (p=0.461 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/baseline-certified-tcp-subscribe-owned-20x.bench │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/current-certified-tcp-subscribe-owned-20x.bench │
+                                                                             │                                                     p99-sec                                                     │                                           p99-sec                                             vs base          │
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                                                                                      521.0n ± 12%                                                                                   541.5n ± 15%  ~ (p=0.793 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/baseline-certified-tcp-subscribe-owned-20x.bench │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/current-certified-tcp-subscribe-owned-20x.bench │
+                                                                             │                                                      B/op                                                       │                                          B/op                                           vs base                │
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                                                                                        341.0 ± 2%                                                                               376.5 ± 3%  +10.41% (p=0.000 n=20)
+
+                                                                             │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/baseline-certified-tcp-subscribe-owned-20x.bench │ /Users/mak/src/fujin/test/performance/certification-2026-08-11/current-certified-tcp-subscribe-owned-20x.bench │
+                                                                             │                                                    allocs/op                                                    │                                         allocs/op                                           vs base            │
+_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8                                                                                                        2.000 ± 0%                                                                                   2.000 ± 0%  ~ (p=1.000 n=20) ¹
+¹ all samples are equal

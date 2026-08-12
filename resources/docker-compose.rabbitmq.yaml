@@ -7,4 +7,10 @@ services:
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_VHOST: /
+    healthcheck:
+      test: ["CMD", "/opt/rabbitmq/sbin/rabbitmq-diagnostics", "-q", "ping", "--timeout", "5"]
+      interval: 2s
+      timeout: 6s
+      retries: 30
+      start_period: 2s
     restart: always

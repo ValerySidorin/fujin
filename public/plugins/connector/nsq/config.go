@@ -21,31 +21,31 @@ type CommonSettings struct {
 	LookupdAddresses []string `yaml:"lookupd_addresses,omitempty"`
 }
 
-// ClientSpecificSettings contains settings specific to a client
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	Topic       string     `yaml:"topic"`
-	Channel     string     `yaml:"channel,omitempty"`     // Only for readers
+	Channel     string     `yaml:"channel,omitempty"`       // Only for readers
 	MaxInFlight int        `yaml:"max_in_flight,omitempty"` // Only for readers
-	Pool        PoolConfig `yaml:"pool,omitempty"`        // Only for writers
+	Pool        PoolConfig `yaml:"pool,omitempty"`          // Only for writers
 }
 
-// Config is the top-level configuration structure for NSQ connector
+// Config is the top-level configuration structure for NSQ connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-// NewConnectorConfig creates a new ConnectorConfig from common and client-specific settings
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+// NewConnectorConfig creates a ConnectorConfig from common and route-specific settings.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
@@ -55,12 +55,12 @@ func (c *Config) Validate() error {
 	if c.Common.Address == "" && len(c.Common.Addresses) == 0 && len(c.Common.LookupdAddresses) == 0 {
 		return fmt.Errorf("nsq: at least one of address, addresses, or lookupd_addresses is required")
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("nsq: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("nsq: at least one route must be configured")
 	}
-	for name, client := range c.Clients {
-		if client.Topic == "" {
-			return fmt.Errorf("nsq: client %q: topic is required", name)
+	for name, route := range c.Routes {
+		if route.Topic == "" {
+			return fmt.Errorf("nsq: route %q: topic is required", name)
 		}
 	}
 	return nil
@@ -102,7 +102,7 @@ func (c *ConnectorConfig) ValidateWriter() error {
 	return nil
 }
 
-// ValidateReader validates reader-specific settings  
+// ValidateReader validates reader-specific settings
 func (c *ConnectorConfig) ValidateReader() error {
 	c.applyDefaults()
 	if len(c.Addresses) == 0 && len(c.LookupdAddresses) == 0 {
@@ -113,4 +113,3 @@ func (c *ConnectorConfig) ValidateReader() error {
 	}
 	return nil
 }
-

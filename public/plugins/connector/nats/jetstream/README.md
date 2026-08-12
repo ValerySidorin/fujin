@@ -23,7 +23,7 @@ connectors:
       common:
         url: "nats://localhost:4222"
         stream: "ORDERS"
-      clients:
+      routes:
         order_writer:
           subject: "orders.created"
         order_reader:

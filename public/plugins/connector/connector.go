@@ -23,21 +23,31 @@ import (
 type Reader interface {
 	Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error
 	SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error
+	// Fetch invokes fetchResponseHandler exactly once before any msgHandler call.
+	// The reported count equals the number of subsequent message callbacks. Both
+	// callbacks are synchronous: none may run after Fetch returns. An error response
+	// must not be followed by message callbacks.
 	Fetch(
 		ctx context.Context, n uint32,
 		fetchResponseHandler func(n uint32, err error),
 		msgHandler func(message []byte, topic string, args ...any),
 	)
+	// FetchWithHeaders has the same callback ordering and lifetime contract as Fetch.
 	FetchWithHeaders(
 		ctx context.Context, n uint32,
 		fetchResponseHandler func(n uint32, err error),
 		msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
 	)
+	// Ack invokes ackHandler exactly once and, if it reports nil, invokes
+	// ackMsgHandler exactly once per message ID. The callback groups may arrive
+	// in either order and may run after Ack returns, but are serialized per
+	// invocation. An error result must not be followed by message callbacks.
 	Ack(
 		ctx context.Context, msgIDs [][]byte,
 		ackHandler func(error),
 		ackMsgHandler func([]byte, error),
 	)
+	// Nack has the same callback ordering, serialization, and lifetime contract as Ack.
 	Nack(
 		ctx context.Context, msgIDs [][]byte,
 		nackHandler func(error),
@@ -60,16 +70,16 @@ type Writer interface {
 
 // Connector creates readers and writers for a specific message broker protocol.
 type Connector interface {
-	// NewReader creates a reader from configuration.
+	// NewReader creates a reader from the connector configuration for a route.
 	// config is the connector-specific configuration (can be nil).
-	// name is the connector instance name.
+	// route selects the configured Fujin route.
 	// autoCommit indicates whether the reader should auto-commit messages.
-	NewReader(config any, name string, autoCommit bool, l *slog.Logger) (ReadCloser, error)
+	NewReader(config any, route string, autoCommit bool, l *slog.Logger) (ReadCloser, error)
 
-	// NewWriter creates a writer from configuration.
+	// NewWriter creates a writer from the connector configuration for a route.
 	// config is the connector-specific configuration (can be nil).
-	// name is the connector instance name.
-	NewWriter(config any, name string, l *slog.Logger) (WriteCloser, error)
+	// route selects the configured Fujin route.
+	NewWriter(config any, route string, l *slog.Logger) (WriteCloser, error)
 
 	// GetConfigValueConverter returns a converter for configuration values, or nil if not supported.
 	// This is used for runtime configuration overrides.
@@ -157,8 +167,8 @@ func List() []string {
 	return names
 }
 
-// NewWriter creates a new writer using the registered factory for the protocol.
-func NewWriter(conf config.ConnectorConfig, name string, l *slog.Logger) (WriteCloser, error) {
+// NewWriter creates a writer for the configured route using the registered factory.
+func NewWriter(conf config.ConnectorConfig, route string, l *slog.Logger) (WriteCloser, error) {
 	factory, ok := Get(conf.Type)
 	if !ok {
 		return nil, fmt.Errorf("unsupported protocol: %q (is it compiled in?)", conf.Type)
@@ -169,12 +179,12 @@ func NewWriter(conf config.ConnectorConfig, name string, l *slog.Logger) (WriteC
 		return nil, fmt.Errorf("create connector: %w", err)
 	}
 
-	return conn.NewWriter(conf.Settings, name, l)
+	return conn.NewWriter(conf.Settings, route, l)
 }
 
-// NewReader creates a new reader using the registered factory for the protocol.
+// NewReader creates a reader for the configured route using the registered factory.
 func NewReader(
-	conf config.ConnectorConfig, name string, autoCommit bool, l *slog.Logger,
+	conf config.ConnectorConfig, route string, autoCommit bool, l *slog.Logger,
 ) (ReadCloser, error) {
 	factory, ok := Get(conf.Type)
 	if !ok {
@@ -186,5 +196,5 @@ func NewReader(
 		return nil, fmt.Errorf("create connector: %w", err)
 	}
 
-	return conn.NewReader(conf.Settings, name, autoCommit, l)
+	return conn.NewReader(conf.Settings, route, autoCommit, l)
 }

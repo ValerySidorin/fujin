@@ -1,0 +1,110 @@
+=== config ===
+
+=== up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container rabbitmq  Creating
+ Container rabbitmq  Created
+ Container rabbitmq  Starting
+ Container rabbitmq  Started
+ Container rabbitmq  Waiting
+ Container rabbitmq  Healthy
+
+wait_seconds=5.76
+health=healthy
+
+=== benchmark ===
+seconds to write full buf to quic stream: 4.9584e-05
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	       1	       250.0 ns/op	  68.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.8709e-05
+       1	       250.0 ns/op	  68.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 8.6083e-05
+       1	      2417 ns/op	   7.03 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.8084e-05
+       1	       125.0 ns/op	 136.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 6.5791e-05
+       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.4e-05
+       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.3125e-05
+       1	       167.0 ns/op	 101.80 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.2375e-05
+       1	       250.0 ns/op	  68.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.7292e-05
+       1	       125.0 ns/op	 136.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.9292e-05
+       1	       291.0 ns/op	  58.42 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.5292e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.0917e-05
+       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.775e-05
+       1	       292.0 ns/op	  58.22 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.1459e-05
+       1	       333.0 ns/op	  51.05 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.4292e-05
+       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.825e-05
+       1	       208.0 ns/op	  81.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 4.8291e-05
+       1	       166.0 ns/op	 102.41 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 3.9917e-05
+       1	       250.0 ns/op	  68.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 5.0375e-05
+       1	       209.0 ns/op	  81.34 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_1BPayload_RabbitMQ_QUIC-8     	seconds to write full buf to quic stream: 9.7833e-05
+       1	       417.0 ns/op	  40.77 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000257833
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	       1	      1083 ns/op	30271.47 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000246
+       1	      1125 ns/op	29141.33 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000204583
+       1	      1166 ns/op	28116.64 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000514958
+       1	      1584 ns/op	20696.97 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000231375
+       1	      2083 ns/op	15738.84 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.00021575
+       1	      2208 ns/op	14847.83 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000284916
+       1	      1250 ns/op	26227.20 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000174916
+       1	      1375 ns/op	23842.91 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000147416
+       1	      1083 ns/op	30271.47 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000202042
+       1	      1000 ns/op	32784.00 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000179125
+       1	      1125 ns/op	29141.33 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000181125
+       1	      1417 ns/op	23136.20 MB/s	      64 B/op	       1 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000203542
+       1	      1291 ns/op	25394.27 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000253459
+       1	      1458 ns/op	22485.60 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000138458
+       1	      1292 ns/op	25374.61 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000268167
+       1	      1125 ns/op	29141.33 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000185709
+       1	      1208 ns/op	27139.07 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.00017525
+       1	      1292 ns/op	25374.61 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000250792
+       1	      2166 ns/op	15135.73 MB/s	       0 B/op	       0 allocs/op
+Benchmark_Produce_32KBPayload_RabbitMQ_QUIC-8   	seconds to write full buf to quic stream: 0.000142375
+       1	      1917 ns/op	17101.72 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	3.170s
+
+=== down ===
+ Container rabbitmq  Stopping
+ Container rabbitmq  Stopped
+ Container rabbitmq  Removing
+ Container rabbitmq  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

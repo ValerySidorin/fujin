@@ -43,36 +43,36 @@ func newAzureAMQP1Connector(config any, l *slog.Logger) (connector.Connector, er
 }
 
 // NewReader creates a reader from configuration
-func (a *azureAmqp1Connector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := a.config.Clients[name]
+func (a *azureAmqp1Connector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
+	routeConf, ok := a.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("azure_amqp1: client not found by name: %s", name)
+		return nil, fmt.Errorf("azure_amqp1: route not found: %s", route)
 	}
 
-	if clientConf.Receiver == nil {
-		return nil, fmt.Errorf("azure_amqp1: client %q is not configured as a reader (receiver not defined)", name)
+	if routeConf.Receiver == nil {
+		return nil, fmt.Errorf("azure_amqp1: route %q is not configured as a reader (receiver not defined)", route)
 	}
 
 	return NewReader(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: a.config.Common,
+		RouteSettings:  routeConf,
 	}, autoCommit, l)
 }
 
 // NewWriter creates a writer from configuration
-func (a *azureAmqp1Connector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := a.config.Clients[name]
+func (a *azureAmqp1Connector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
+	routeConf, ok := a.config.Routes[route]
 	if !ok {
-		return nil, fmt.Errorf("azure_amqp1: client not found by name: %s", name)
+		return nil, fmt.Errorf("azure_amqp1: route not found: %s", route)
 	}
 
-	if clientConf.Sender == nil {
-		return nil, fmt.Errorf("azure_amqp1: client %q is not configured as a writer (sender not defined)", name)
+	if routeConf.Sender == nil {
+		return nil, fmt.Errorf("azure_amqp1: route %q is not configured as a writer (sender not defined)", route)
 	}
 
 	return NewWriter(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
+		CommonSettings: a.config.Common,
+		RouteSettings:  routeConf,
 	}, l)
 }
 

@@ -28,7 +28,7 @@ message BindResponse {
 // Produce request
 message ProduceRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bytes message = 3;
 }
 
@@ -41,7 +41,7 @@ message ProduceResponse {
 // HProduceRequest - produce with headers
 message HProduceRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   repeated KV headers = 3;
   bytes message = 4;
 }
@@ -51,14 +51,37 @@ message HProduceResponse {
   uint32 correlation_id = 1;
   string error = 2;
 }
-
-// BeginTxRequest - begin transaction
+// BeginTxRequest - eagerly begin a transaction for one route
 message BeginTxRequest {
   uint32 correlation_id = 1;
+  string route = 2;
 }
 
 // BeginTxResponse
 message BeginTxResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// TxProduceRequest - produce on the active transaction route
+message TxProduceRequest {
+  uint32 correlation_id = 1;
+  bytes message = 2;
+}
+
+message TxProduceResponse {
+  uint32 correlation_id = 1;
+  string error = 2;
+}
+
+// TxHProduceRequest - produce with headers on the active transaction route
+message TxHProduceRequest {
+  uint32 correlation_id = 1;
+  repeated KV headers = 2;
+  bytes message = 3;
+}
+
+message TxHProduceResponse {
   uint32 correlation_id = 1;
   string error = 2;
 }
@@ -88,7 +111,7 @@ message RollbackTxResponse {
 // Subscribe request
 message SubscribeRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
 }
 
@@ -102,7 +125,7 @@ message SubscribeResponse {
 // HSubscribe request - subscribe with headers support
 message HSubscribeRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
 }
 
@@ -143,7 +166,7 @@ message HMessage {
 // FetchRequest - request a batch of messages (pull-based)
 message FetchRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
   uint32 batch_size = 4;  // Number of messages to fetch
 }
@@ -165,7 +188,7 @@ message FetchMessage {
 // HFetchRequest - request a batch of messages with headers (pull-based)
 message HFetchRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
   uint32 batch_size = 4;  // Number of messages to fetch
 }
@@ -247,6 +270,8 @@ message FujinRequest {
     BeginTxRequest begin_tx = 11;
     CommitTxRequest commit_tx = 12;
     RollbackTxRequest rollback_tx = 13;
+    TxProduceRequest tx_produce = 14;
+    TxHProduceRequest tx_hproduce = 15;
   }
 }
 
@@ -268,5 +293,7 @@ message FujinResponse {
     BeginTxResponse begin_tx = 13;
     CommitTxResponse commit_tx = 14;
     RollbackTxResponse rollback_tx = 15;
+    TxProduceResponse tx_produce = 16;
+    TxHProduceResponse tx_hproduce = 17;
   }
 }

@@ -1,0 +1,38 @@
+Fujin Session Core final verification
+Date: 2026-08-12
+
+Self-contained repository suite
+- go test -count=1 ./...: PASS
+- go test -count=1 -tags=fujin ./...: PASS
+- go test -count=1 -tags=grpc ./...: PASS
+- go test -count=1 -tags=fujin,grpc ./...: PASS
+- Post-fix results: test/performance/certification-2026-08-12-final/current-audit/goal-postfix-test-matrix.json
+- Broker-backed TestE2E_* suites skip before server startup unless FUJIN_E2E=1 is explicitly set.
+
+Broker-backed E2E suites
+Each suite used FUJIN_E2E=1, its declared resources/docker-compose.*.yaml dependency, protocol-aware `docker compose up --wait`, strict go test and cleanup exit statuses, -count=1, a 180s Go timeout, and docker compose down.
+
+- TestE2E_KafkaFranz: PASS
+- TestE2E_NatsCore: PASS
+- TestE2E_NatsJetstream: PASS
+- TestE2E_RabbitMQ: PASS
+- TestE2E_AzureAMQP1: PASS
+- TestE2E_RedisPubSub: PASS
+- TestE2E_RedisStreams: PASS
+- TestE2E_MQTT: PASS
+- TestE2E_NSQ: PASS
+- Post-fix results and transcript paths: test/performance/certification-2026-08-12-final/current-audit/goal-postfix-e2e-matrix.json
+- Strict Makefile lifecycle smoke: make e2e-nats_core: PASS; broker started, test executed, compose resources removed.
+
+Benchmark and artifact audit
+- 151/151 top-level benchmark entry points executed successfully; 876 Session matrix cells completed on the final snapshot.
+- Legacy native Produce benchmarks drain protocol responses until DISCONNECT and compare the observed count with the final Go 1.26 `B.Loop` iteration count; they no longer read `b.N` while `B.Loop` has it set to zero.
+- RabbitMQ and Artemis Compose dependencies use native protocol healthchecks, so `up --wait` cannot race broker startup.
+- 12/12 authoritative benchstat reports regenerate exactly after path and table-layout normalization from retained raw .bench inputs; benchmark names, values, deltas, and p-values match.
+- Final 20-sample suspect and QUIC ACK/NACK files contain exactly 20 samples per cell.
+- Sustained 1 MiB native Produce/HSubscribe completed 10,000 operations in all six TCP/QUIC/Unix cells.
+- Post-fix consolidated audit: test/performance/certification-2026-08-12-final/current-audit/goal-postfix-final-artifact-audit.json
+
+Cleanup checks
+- docker ps -q returned no running containers after teardown.
+- No go test, test.test, or Fujin process remained active after verification.

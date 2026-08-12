@@ -15,7 +15,7 @@ connectors:
         init_address: [localhost:6379]
         batch_size: 100
         linger: 10ms
-      clients:
+      routes:
         writer:
           stream: my_stream
           marshaller: json

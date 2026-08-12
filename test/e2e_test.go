@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	e2eTimeout    = 30 * time.Second
+	e2eTimeout      = 30 * time.Second
 	e2eFetchTimeout = 60 * time.Second
 )
 
@@ -122,6 +123,9 @@ func runE2ESuite(
 	pubClient, subClient string,
 	caps e2eCapabilities,
 ) {
+	if os.Getenv("FUJIN_E2E") != "1" {
+		t.Skip("broker-backed E2E disabled; set FUJIN_E2E=1")
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
@@ -267,16 +271,14 @@ func runE2ESuite(
 	// Small pause to let previous consumers (subscribe) release before fetch tests.
 	time.Sleep(1 * time.Second)
 
-	// Fetch and HFetch use one connection (autoCommit=true)
+	// Fetch and HFetch use separate sessions. A cached Kafka FETCH reader stays
+	// in its consumer group until the session closes; keeping it alive while
+	// creating the HFETCH reader can leave the single topic partition assigned
+	// to the idle reader and make HFETCH wait indefinitely.
 	t.Run("Fetch_Flow", func(t *testing.T) {
 		if !caps.produce || !caps.fetch {
 			t.Skip("fetch not supported")
 		}
-
-		c := newE2EConn(t, PERF_TCP_ADDR)
-		defer c.close()
-		c.setDeadline(e2eTimeout)
-		c.bindAndRead("connector")
 
 		var cIDCounter uint32 = 100
 
@@ -287,6 +289,11 @@ func runE2ESuite(
 
 		// --- Subtest: Fetch ---
 		t.Run("Produce_Fetch", func(t *testing.T) {
+			c := newE2EConn(t, PERF_TCP_ADDR)
+			defer c.close()
+			c.setDeadline(e2eTimeout)
+			c.bindAndRead("connector")
+
 			payload := fmt.Sprintf("e2e-fetch-%d", time.Now().UnixNano())
 
 			cPub := newE2EConn(t, PERF_TCP_ADDR)
@@ -321,6 +328,11 @@ func runE2ESuite(
 			if !caps.hfetch {
 				t.Skip("hfetch not supported")
 			}
+			c := newE2EConn(t, PERF_TCP_ADDR)
+			defer c.close()
+			c.setDeadline(e2eTimeout)
+			c.bindAndRead("connector")
+
 			payload := fmt.Sprintf("e2e-hfetch-%d", time.Now().UnixNano())
 
 			cPub := newE2EConn(t, PERF_TCP_ADDR)
@@ -491,7 +503,7 @@ func runE2ESuite(
 		c.setDeadline(e2eTimeout)
 		c.bindAndRead("connector")
 
-		c.write(buildTxBeginCmd(70))
+		c.write(buildTxBeginCmd(70, pubClient))
 		cID, err := c.pr.readTxResp(v1.RESP_CODE_TX_BEGIN)
 		if err != nil {
 			t.Fatalf("tx_begin error: %v", err)
@@ -500,10 +512,10 @@ func runE2ESuite(
 			t.Fatalf("expected cID=70, got %d", cID)
 		}
 
-		c.write(buildProduceCmd(71, pubClient, "tx-commit-payload"))
-		_, err = c.pr.readProduceResp()
+		c.write(buildTxProduceCmd(71, "tx-commit-payload"))
+		_, err = c.pr.readTxResp(v1.RESP_CODE_TX_PRODUCE)
 		if err != nil {
-			t.Fatalf("produce in tx error: %v", err)
+			t.Fatalf("tx_produce error: %v", err)
 		}
 
 		c.write(buildTxCommitCmd(72))
@@ -523,16 +535,16 @@ func runE2ESuite(
 		c.setDeadline(e2eTimeout)
 		c.bindAndRead("connector")
 
-		c.write(buildTxBeginCmd(80))
+		c.write(buildTxBeginCmd(80, pubClient))
 		_, err := c.pr.readTxResp(v1.RESP_CODE_TX_BEGIN)
 		if err != nil {
 			t.Fatalf("tx_begin error: %v", err)
 		}
 
-		c.write(buildProduceCmd(81, pubClient, "tx-rollback-payload"))
-		_, err = c.pr.readProduceResp()
+		c.write(buildTxProduceCmd(81, "tx-rollback-payload"))
+		_, err = c.pr.readTxResp(v1.RESP_CODE_TX_PRODUCE)
 		if err != nil {
-			t.Fatalf("produce in tx error: %v", err)
+			t.Fatalf("tx_produce error: %v", err)
 		}
 
 		c.write(buildTxRollbackCmd(82))

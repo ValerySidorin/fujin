@@ -1,0 +1,129 @@
+=== compose up ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container nsqlookupd  Creating
+ Container nsqlookupd  Created
+ Container nsqadmin  Creating
+ Container nsqd  Creating
+ Container nsqadmin  Created
+ Container nsqd  Created
+ Container nsqlookupd  Starting
+ Container nsqlookupd  Started
+ Container nsqadmin  Starting
+ Container nsqd  Starting
+ Container nsqadmin  Started
+ Container nsqd  Started
+ Container nsqlookupd  Waiting
+ Container nsqd  Waiting
+ Container nsqadmin  Waiting
+ Container nsqd  Healthy
+ Container nsqlookupd  Healthy
+ Container nsqadmin  Healthy
+
+=== go benchmark ===
+seconds to write full buf to quic stream: 8.7834e-05
+2026/08/12 16:59:55 INF    1 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    1 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    1 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    1 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    1 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    1 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    1 (localhost:4150) writeLoop exiting
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_NSQ_QUIC-8     	       1	     10833 ns/op	   1.57 MB/s	    2776 B/op	      38 allocs/op
+seconds to write full buf to quic stream: 5.2e-05
+2026/08/12 16:59:55 INF    2 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    1 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    1 (localhost:4150) clean close complete
+2026/08/12 16:59:55 INF    2 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    2 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    2 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    2 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    2 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    2 (localhost:4150) writeLoop exiting
+Benchmark_Produce_32BPayload_NSQ_QUIC-8    	       1	       375.0 ns/op	 128.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.5208e-05
+2026/08/12 16:59:55 INF    3 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    3 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    3 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    3 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    3 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    3 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    3 (localhost:4150) writeLoop exiting
+Benchmark_Produce_128BPayload_NSQ_QUIC-8   	       1	       208.0 ns/op	 692.31 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 16:59:55 INF    2 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    2 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 4.9166e-05
+2026/08/12 16:59:55 INF    4 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    4 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    4 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    4 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    4 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    4 (localhost:4150) writeLoop exiting
+2026/08/12 16:59:55 INF    4 (localhost:4150) exiting router
+Benchmark_Produce_256BPayload_NSQ_QUIC-8   	       1	       292.0 ns/op	 931.51 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 16:59:55 INF    3 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    3 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 4.7625e-05
+2026/08/12 16:59:55 INF    5 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    5 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    5 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    5 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    5 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    5 (localhost:4150) writeLoop exiting
+2026/08/12 16:59:55 INF    5 (localhost:4150) exiting router
+Benchmark_Produce_1KBPayload_NSQ_QUIC-8    	       1	       167.0 ns/op	6227.54 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.65e-05
+2026/08/12 16:59:55 INF    6 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    6 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    6 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    6 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    6 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    6 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    6 (localhost:4150) writeLoop exiting
+Benchmark_Produce_4KBPayload_NSQ_QUIC-8    	       1	       250.0 ns/op	16448.00 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 16:59:55 INF    4 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    4 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 7.3583e-05
+2026/08/12 16:59:55 INF    7 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    7 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    7 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    7 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    7 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    7 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    7 (localhost:4150) writeLoop exiting
+Benchmark_Produce_8KBPayload_NSQ_QUIC-8    	       1	       625.0 ns/op	13132.80 MB/s	       0 B/op	       0 allocs/op
+2026/08/12 16:59:55 INF    5 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    5 (localhost:4150) clean close complete
+2026/08/12 16:59:55 INF    6 (localhost:4150) finished draining, cleanup exiting
+2026/08/12 16:59:55 INF    6 (localhost:4150) clean close complete
+seconds to write full buf to quic stream: 0.000173208
+2026/08/12 16:59:55 INF    8 (localhost:4150) connecting to nsqd
+2026/08/12 16:59:55 INF    8 (localhost:4150) stopping
+2026/08/12 16:59:55 INF    8 (localhost:4150) exiting router
+2026/08/12 16:59:55 INF    8 (localhost:4150) beginning close
+2026/08/12 16:59:55 INF    8 (localhost:4150) readLoop exiting
+2026/08/12 16:59:55 INF    8 (localhost:4150) breaking out of writeLoop
+2026/08/12 16:59:55 INF    8 (localhost:4150) writeLoop exiting
+Benchmark_Produce_32KBPayload_NSQ_QUIC-8   	       1	      1875 ns/op	17484.80 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.080s
+
+=== compose down ===
+ Container nsqd  Stopping
+ Container nsqadmin  Stopping
+ Container nsqadmin  Stopped
+ Container nsqadmin  Removing
+ Container nsqadmin  Removed
+ Container nsqd  Stopped
+ Container nsqd  Removing
+ Container nsqd  Removed
+ Container nsqlookupd  Stopping
+ Container nsqlookupd  Stopped
+ Container nsqlookupd  Removing
+ Container nsqlookupd  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

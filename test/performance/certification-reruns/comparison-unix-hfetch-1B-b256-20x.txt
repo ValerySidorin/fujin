@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-unix-hfetch-1B-b256-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-unix-hfetch-1B-b256-20x.bench │
+                                                                            │                                              sec/op                                               │                                     sec/op                                      vs base          │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                        28.79µ ± 16%                                                                      32.16µ ± 9%  ~ (p=0.102 n=20)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-unix-hfetch-1B-b256-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-unix-hfetch-1B-b256-20x.bench │
+                                                                            │                                                B/s                                                │                                      B/s                                        vs base          │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                       8.483Mi ± 14%                                                                    7.591Mi ± 10%  ~ (p=0.101 n=20)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-unix-hfetch-1B-b256-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-unix-hfetch-1B-b256-20x.bench │
+                                                                            │                                              p99-sec                                              │                                    p99-sec                                      vs base          │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                        1.410m ± 59%                                                                     1.704m ± 23%  ~ (p=0.192 n=20)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-unix-hfetch-1B-b256-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-unix-hfetch-1B-b256-20x.bench │
+                                                                            │                                               B/op                                                │                                   B/op                                     vs base               │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                        49.20Ki ± 0%                                                                49.46Ki ± 0%  +0.52% (p=0.000 n=20)
+
+                                                                            │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-unix-hfetch-1B-b256-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-unix-hfetch-1B-b256-20x.bench │
+                                                                            │                                             allocs/op                                             │                                 allocs/op                                  vs base               │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=256/concurrency=16-8                                                                                         2.066k ± 0%                                                                 2.064k ± 0%  -0.10% (p=0.000 n=20)
