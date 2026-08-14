@@ -60,3 +60,18 @@ jobs:
             org.opencontainers.image.source=https://github.com/fujin-io/fujin
             org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
             org.opencontainers.image.version=${{ inputs.version }}
+
+      - name: Verify published manifest
+        env:
+          IMAGE: ghcr.io/fujin-io/fujin:${{ inputs.version }}
+        run: docker buildx imagetools inspect "$IMAGE"
+
+      - name: Smoke test published image
+        env:
+          IMAGE: ghcr.io/fujin-io/fujin:${{ inputs.version }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker pull --platform linux/amd64 "$IMAGE"
+          output=$(docker run --rm --platform linux/amd64 "$IMAGE" 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -F "version: $VERSION"
