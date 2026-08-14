@@ -189,7 +189,7 @@ func (r *Reader) cleanupExpiredMessages() {
 	}
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	r.handlerMu.Lock()
 	r.msgHandler = h
 	r.isHSubscribe = false
@@ -206,12 +206,15 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	if err != nil {
 		return fmt.Errorf("mqtt_paho: subscribe: %w", err)
 	}
+	if err := ready(); err != nil {
+		return err
+	}
 
 	<-ctx.Done()
 	return nil
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	r.handlerMu.Lock()
 	r.hMsgHandler = h
 	r.isHSubscribe = true
@@ -228,24 +231,19 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 	if err != nil {
 		return fmt.Errorf("mqtt_paho: subscribe: %w", err)
 	}
+	if err := ready(); err != nil {
+		return err
+	}
 
 	<-ctx.Done()
 	return nil
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -255,8 +253,18 @@ func (r *Reader) Ack(
 	ackMsgHandler func([]byte, error),
 ) {
 	ackHandler(nil)
+	if r.autoAck {
+		for _, id := range msgIDs {
+			ackMsgHandler(id, connector.ErrOperationUnsupported)
+		}
+		return
+	}
 
 	for _, id := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			ackMsgHandler(id, fmt.Errorf("mqtt: ack: %w", err))
+			continue
+		}
 		packetID := binary.BigEndian.Uint16(id)
 
 		r.msgsMu.Lock()
@@ -285,19 +293,18 @@ func (r *Reader) Nack(
 	nackHandler func(error),
 	nackMsgHandler func([]byte, error),
 ) {
-	// MQTT doesn't have native NACK support
-	// We just remove from pending and let the broker redeliver
+	// MQTT has no explicit negative acknowledgement operation.
 	nackHandler(nil)
 	for _, id := range msgIDs {
-		packetID := binary.BigEndian.Uint16(id)
-		r.msgsMu.Lock()
-		delete(r.msgs, packetID)
-		r.msgsMu.Unlock()
-		nackMsgHandler(id, nil)
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			nackMsgHandler(id, fmt.Errorf("mqtt: nack: %w", err))
+			continue
+		}
+		nackMsgHandler(id, connector.ErrOperationUnsupported)
 	}
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
 	return binary.BigEndian.AppendUint16(buf, args[0].(uint16))
 }
 

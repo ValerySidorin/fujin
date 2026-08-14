@@ -1,0 +1,41 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     48581 ns/op	   2.63 MB/s	    104375 p99-ns	    1904 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     53593 ns/op	   2.39 MB/s	    115834 p99-ns	    1904 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     50993 ns/op	   2.51 MB/s	    115875 p99-ns	    1905 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     49511 ns/op	   2.59 MB/s	    102584 p99-ns	    1901 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     51950 ns/op	   2.46 MB/s	    104333 p99-ns	    1902 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     47318 ns/op	   2.71 MB/s	     90125 p99-ns	    1901 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     46940 ns/op	   2.73 MB/s	    105792 p99-ns	    1901 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     50752 ns/op	   2.52 MB/s	     96417 p99-ns	    1902 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     50187 ns/op	   2.55 MB/s	    101167 p99-ns	    1901 B/op	      48 allocs/op
+Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=1-8         	    1000	     52514 ns/op	   2.44 MB/s	    109625 p99-ns	    1904 B/op	      48 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     51869 ns/op	   2.47 MB/s	    105875 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     52254 ns/op	   2.45 MB/s	    118167 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     49217 ns/op	   2.60 MB/s	    105209 p99-ns	    2035 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     51104 ns/op	   2.50 MB/s	    102125 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     53793 ns/op	   2.38 MB/s	    119166 p99-ns	    2032 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     49910 ns/op	   2.56 MB/s	    111250 p99-ns	    2034 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     50085 ns/op	   2.56 MB/s	    119875 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     51295 ns/op	   2.50 MB/s	    101958 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     52107 ns/op	   2.46 MB/s	    111833 p99-ns	    2033 B/op	      52 allocs/op
+Benchmark_Session_Fetch_GRPC/payload=128B/batch=1/concurrency=1-8           	    1000	     53276 ns/op	   2.40 MB/s	    119583 p99-ns	    2034 B/op	      52 allocs/op
+--- FAIL: Benchmark_Session_Ack_GRPC/payload=128B/batch=1/concurrency=1
+    session_matrix_bench_test.go:196: worker 0 operation 1/1: ack response: ack:{correlation_id:2 error:"invalid connector message ID: message ID already settled or in progress"}
+--- FAIL: Benchmark_Session_Ack_GRPC
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    122659 ns/op	   1.04 MB/s	    289084 p99-ns	    4056 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    121922 ns/op	   1.05 MB/s	    248542 p99-ns	    4056 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    122592 ns/op	   1.04 MB/s	    222042 p99-ns	    4056 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    120210 ns/op	   1.06 MB/s	    254042 p99-ns	    4056 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    123646 ns/op	   1.04 MB/s	    246583 p99-ns	    4057 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    122980 ns/op	   1.04 MB/s	    228625 p99-ns	    4055 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    123390 ns/op	   1.04 MB/s	    316042 p99-ns	    4052 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    117527 ns/op	   1.09 MB/s	    300417 p99-ns	    4054 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    116137 ns/op	   1.10 MB/s	    204209 p99-ns	    4051 B/op	     132 allocs/op
+Benchmark_Session_Transaction_GRPC/payload=128B/batch=1/concurrency=1-8     	    1000	    121293 ns/op	   1.06 MB/s	    222291 p99-ns	    4055 B/op	     132 allocs/op
+FAIL
+exit status 1
+FAIL	github.com/fujin-io/fujin/test	10.581s
+FAIL

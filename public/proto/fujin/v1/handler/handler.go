@@ -11,7 +11,7 @@ func HandleStream(ctx context.Context, str session.Stream, opts session.StreamOp
 	out := proto.NewOutbound(str, opts.WriteDeadline, opts.Logger)
 	h := proto.NewHandler(ctx,
 		opts.PingInterval, opts.PingTimeout, opts.PingStream,
-		opts.BaseConfig, opts.BaseConfigProvider, out, str, opts.Logger,
+		opts.BaseGeneration, opts.GenerationProvider, out, str, opts.Logger,
 	)
 	in := proto.NewInbound(str, opts.ForceTerminateTimeout, h, opts.Logger,
 		opts.AbortRead, opts.CloseRead,

@@ -6,31 +6,25 @@ import (
 	"github.com/fujin-io/fujin/public/plugins/connector"
 )
 
-// fakerConnector implements connector.Connector interface
-type fakerConnector struct {
-	l *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Compile: func(any) (connector.Compiled, error) {
+		profiles := map[string]connector.RouteProfile{
+			"default": {
+				Produce:          true,
+				Headers:          true,
+				Transactions:     true,
+				Subscribe:        true,
+				ProduceGuarantee: connector.AcceptanceLocal,
+			},
+		}
+		factories := map[string]connector.RouteFactory{
+			"default": {
+				Reader: func(autoSettle bool, l *slog.Logger) (connector.ReadCloser, error) {
+					return NewReader(autoSettle, l)
+				},
+				Writer: func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(l) },
+			},
+		}
+		return connector.CompileStatic(profiles, factories)
+	}}
 }
-
-// NewFakerConnector creates a new Faker connector instance
-func NewFakerConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	// Faker connector doesn't need any configuration
-	return &fakerConnector{
-		l: l,
-	}, nil
-}
-
-// NewReader creates a reader from configuration
-func (f *fakerConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	return NewReader(autoCommit, l)
-}
-
-// NewWriter creates a writer from configuration
-func (f *fakerConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	return NewWriter(l)
-}
-
-// GetConfigValueConverter returns nil as faker doesn't support config overrides
-func (f *fakerConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return nil
-}
-

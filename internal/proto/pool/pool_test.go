@@ -82,8 +82,8 @@ func TestGet_SizeBoundaries(t *testing.T) {
 		{"boundary medium", SIZE_MEDIUM, SIZE_MEDIUM},
 		{"boundary medium plus one", SIZE_MEDIUM + 1, SIZE_LARGE},
 		{"boundary large", SIZE_LARGE, SIZE_LARGE},
-		{"larger than large", SIZE_LARGE + 1, SIZE_LARGE},
-		{"very large", 1000000, SIZE_LARGE},
+		{"larger than large", SIZE_LARGE + 1, SIZE_LARGE + 1},
+		{"very large", 1000000, 1000000},
 	}
 
 	for _, tt := range tests {

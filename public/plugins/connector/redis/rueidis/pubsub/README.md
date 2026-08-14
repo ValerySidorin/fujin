@@ -18,7 +18,7 @@ connectors:
         disable_cache: false
         batch_size: 100
         linger: 10ms
-      clients:
+      routes:
         pub:
           channel: my_channel
         sub:

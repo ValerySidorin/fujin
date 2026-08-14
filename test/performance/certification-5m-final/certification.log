@@ -1,0 +1,25 @@
+    0.0s START baseline grpc-c128 benchtime=128x count=3
+   99.3s DONE baseline grpc-c128
+   99.3s START current grpc-c128 benchtime=128x count=3
+  199.4s DONE current grpc-c128
+  199.4s DONE comparison grpc-c128
+  199.4s START current tcp-payload-c1 benchtime=100x count=5
+  202.3s DONE current tcp-payload-c1
+  202.3s START baseline tcp-payload-c1 benchtime=100x count=5
+  204.9s DONE baseline tcp-payload-c1
+  204.9s DONE comparison tcp-payload-c1
+  204.9s START baseline grpc-payload-c1 benchtime=100x count=5
+  220.4s DONE baseline grpc-payload-c1
+  220.4s START current grpc-payload-c1 benchtime=100x count=5
+  235.9s DONE current grpc-payload-c1
+  235.9s DONE comparison grpc-payload-c1
+  235.9s START current quic-batches-c16 benchtime=100x count=5
+  255.5s DONE current quic-batches-c16
+  255.5s START baseline quic-batches-c16 benchtime=100x count=5
+  275.1s DONE baseline quic-batches-c16
+  275.1s DONE comparison quic-batches-c16
+  275.1s START baseline grpc-batches-c16 benchtime=100x count=5
+  290.0s SKIP grpc-batches-c16: Command '['go', 'test', '-tags=fujin,grpc', '-run', '^$', '-bench=^Benchmark_Session_(Fetch|HFetch)_GRPC$/^payload=(1B|32KiB)$/^batch=(1|32|256)$/^concurrency=16$', '-benchtime=100x', '-count=5', './test']' timed out after 14.917450917004317 seconds
+  290.0s SKIP quic-1MiB-c16: global certification deadline reached
+  290.0s SKIP grpc-1MiB-c16: global certification deadline reached
+  290.0s CERTIFICATION COMPLETE profiles=grpc-c128,tcp-payload-c1,grpc-payload-c1,quic-batches-c16

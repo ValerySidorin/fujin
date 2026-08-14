@@ -1,0 +1,58 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                            │ test/performance/certification-reruns/baseline-grpc-payload-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-fixed.bench │
+                                                            │                                   sec/op                                   │                   sec/op                     vs base                 │
+_Session_Produce_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                   55.20µ ± 6%
+_Session_Produce_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                  85.15µ ± 4%
+_Session_Produce_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                   376.9µ ± 1%
+_Session_Fetch_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                     56.29µ ± 2%
+_Session_Fetch_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                    85.32µ ± 2%                                   82.79µ ± 3%  -2.96% (p=0.043 n=10)
+_Session_Fetch_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                     368.7µ ± 1%                                   367.7µ ± 9%       ~ (p=0.971 n=10)
+geomean                                                                                                                      121.0µ                                        174.5µ       -1.63%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                            │ test/performance/certification-reruns/baseline-grpc-payload-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-fixed.bench │
+                                                            │                                    B/s                                     │                     B/s                      vs base                 │
+_Session_Produce_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                  17.70Mi ± 6%
+_Session_Produce_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                 367.0Mi ± 3%
+_Session_Produce_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                  2.591Gi ± 1%
+_Session_Fetch_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                    17.35Mi ± 2%
+_Session_Fetch_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                   366.3Mi ± 2%                                  377.5Mi ± 3%  +3.06% (p=0.043 n=10)
+_Session_Fetch_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                    2.648Gi ± 1%                                  2.656Gi ± 8%       ~ (p=0.971 n=10)
+geomean                                                                                                                     258.3Mi                                      1013.2Mi       +1.66%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                            │ test/performance/certification-reruns/baseline-grpc-payload-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-fixed.bench │
+                                                            │                                  p99-sec                                   │                  p99-sec                    vs base                  │
+_Session_Produce_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                  132.3µ ± 10%
+_Session_Produce_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                 232.5µ ±  7%
+_Session_Produce_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                  847.0µ ±  6%
+_Session_Fetch_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                    138.9µ ±  6%
+_Session_Fetch_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                   235.4µ ±  8%                                 208.9µ ± 11%  -11.25% (p=0.001 n=10)
+_Session_Fetch_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                    786.5µ ±  7%                                 707.5µ ± 33%        ~ (p=0.143 n=10)
+geomean                                                                                                                     295.8µ                                       384.5µ        -10.65%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                            │ test/performance/certification-reruns/baseline-grpc-payload-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-fixed.bench │
+                                                            │                                    B/op                                    │                    B/op                      vs base                 │
+_Session_Produce_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                 2.079Ki ±  0%
+_Session_Produce_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                65.03Ki ± 13%
+_Session_Produce_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                 1.484Mi ±  1%
+_Session_Fetch_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                   2.573Ki ±  0%
+_Session_Fetch_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                  57.80Ki ± 19%                                 65.88Ki ± 19%       ~ (p=0.075 n=10)
+_Session_Fetch_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                   1.510Mi ±  2%                                 1.478Mi ±  2%  -2.16% (p=0.035 n=10)
+geomean                                                                                                                    60.13Ki                                       315.8Ki        +5.61%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable
+
+                                                            │ test/performance/certification-reruns/baseline-grpc-payload-suspects.bench │ test/performance/certification-reruns/current-grpc-fetch-fixed.bench │
+                                                            │                                 allocs/op                                  │                  allocs/op                   vs base                 │
+_Session_Produce_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                    39.00 ± 0%
+_Session_Produce_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                   51.00 ± 0%
+_Session_Produce_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                    99.50 ± 3%
+_Session_Fetch_GRPC/payload=1KiB/batch=1/concurrency=1-8                                                                      47.00 ± 0%
+_Session_Fetch_GRPC/payload=32KiB/batch=1/concurrency=1-8                                                                     59.00 ± 0%                                    55.00 ± 0%  -6.78% (p=0.000 n=10)
+_Session_Fetch_GRPC/payload=1MiB/batch=1/concurrency=1-8                                                                      107.0 ± 1%                                    102.0 ± 1%  -4.67% (p=0.000 n=10)
+geomean                                                                                                                       62.34                                         74.90       -5.73%                ¹
+¹ benchmark set differs from baseline; geomeans may not be comparable

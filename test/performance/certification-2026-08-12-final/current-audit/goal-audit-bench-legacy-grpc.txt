@@ -1,0 +1,60 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_Nop_GRPC/1B-8        	       1	     23375 ns/op	   0.04 MB/s	    6520 B/op	      73 allocs/op
+Benchmark_Produce_Nop_GRPC/128B-8      	       1	      4084 ns/op	  31.34 MB/s	     376 B/op	       6 allocs/op
+Benchmark_Produce_Nop_GRPC/1KiB-8      	       1	      7416 ns/op	 138.08 MB/s	    6696 B/op	       9 allocs/op
+Benchmark_Produce_Nop_GRPC/32KiB-8     	       1	     44750 ns/op	 732.25 MB/s	 1051176 B/op	       9 allocs/op
+Benchmark_Produce_Nop_GRPC/1MiB-8      	       1	    261375 ns/op	4011.77 MB/s	 1059488 B/op	      15 allocs/op
+Benchmark_Fetch_Nop_GRPC-8             	       1	     68541 ns/op	    7592 B/op	      83 allocs/op
+Benchmark_Subscribe_Gen_GRPC/1B-8      	       1	     21292 ns/op	   0.05 MB/s	    6232 B/op	     148 allocs/op
+Benchmark_Subscribe_Gen_GRPC/128B-8    	       1	     24042 ns/op	   5.32 MB/s	   12856 B/op	     262 allocs/op
+Benchmark_Subscribe_Gen_GRPC/1KiB-8    	       1	      7166 ns/op	 142.90 MB/s	    1224 B/op	       6 allocs/op
+Benchmark_Subscribe_Gen_GRPC/32KiB-8   	       1	   1006083 ns/op	  32.57 MB/s	 4333568 B/op	     107 allocs/op
+Benchmark_Subscribe_Gen_GRPC/1MiB-8    	       1	   1668750 ns/op	 628.36 MB/s	 5758576 B/op	     517 allocs/op
+Benchmark_HProduce_Session_GRPC/1B-8   	       1	     48292 ns/op	   0.02 MB/s	   13928 B/op	     151 allocs/op
+Benchmark_HProduce_Session_GRPC/128B-8 	       1	     11375 ns/op	  11.25 MB/s	     520 B/op	      11 allocs/op
+Benchmark_HProduce_Session_GRPC/1KiB-8 	       1	      8625 ns/op	 118.72 MB/s	    6696 B/op	       9 allocs/op
+Benchmark_HProduce_Session_GRPC/32KiB-8         	       1	    127708 ns/op	 256.59 MB/s	 1051464 B/op	      12 allocs/op
+Benchmark_HProduce_Session_GRPC/1MiB-8          	       1	     70750 ns/op	14820.86 MB/s	 1059704 B/op	      14 allocs/op
+Benchmark_Fetch_Session_GRPC/1B/batch=1-8       	       1	      5667 ns/op	   0.18 MB/s	     272 B/op	       7 allocs/op
+Benchmark_Fetch_Session_GRPC/1B/batch=32-8      	       1	      7083 ns/op	   4.52 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/1B/batch=256-8     	       1	      7959 ns/op	  32.16 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/128B/batch=1-8     	       1	      6333 ns/op	  20.21 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/128B/batch=32-8    	       1	     10333 ns/op	 396.40 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/128B/batch=256-8   	       1	     14416 ns/op	2273.03 MB/s	     320 B/op	      10 allocs/op
+Benchmark_Fetch_Session_GRPC/1KiB/batch=1-8     	       1	      8000 ns/op	 128.00 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/1KiB/batch=32-8    	       1	      6500 ns/op	5041.23 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/1KiB/batch=256-8   	       1	      7292 ns/op	35949.53 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/32KiB/batch=1-8    	       1	      6500 ns/op	5041.23 MB/s	     248 B/op	       6 allocs/op
+Benchmark_Fetch_Session_GRPC/32KiB/batch=32-8   	       1	      6917 ns/op	151594.04 MB/s	     424 B/op	       8 allocs/op
+Benchmark_Fetch_Session_GRPC/1MiB/batch=1-8     	       1	      7125 ns/op	147168.56 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1B/batch=1-8      	       1	     36625 ns/op	   0.03 MB/s	    7496 B/op	      78 allocs/op
+Benchmark_HFetch_Session_GRPC/1B/batch=32-8     	       1	      7334 ns/op	   4.36 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1B/batch=256-8    	       1	      7792 ns/op	  32.85 MB/s	     424 B/op	       8 allocs/op
+Benchmark_HFetch_Session_GRPC/128B/batch=1-8    	       1	      8041 ns/op	  15.92 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/128B/batch=32-8   	       1	      6417 ns/op	 638.30 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/128B/batch=256-8  	       1	      7750 ns/op	4228.13 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1KiB/batch=1-8    	       1	      7500 ns/op	 136.53 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1KiB/batch=32-8   	       1	      7375 ns/op	4443.12 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1KiB/batch=256-8  	       1	      6708 ns/op	39079.31 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/32KiB/batch=1-8   	       1	      7375 ns/op	4443.12 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/32KiB/batch=32-8  	       1	      8250 ns/op	127100.12 MB/s	     248 B/op	       6 allocs/op
+Benchmark_HFetch_Session_GRPC/1MiB/batch=1-8    	       1	      6959 ns/op	150679.12 MB/s	     472 B/op	       8 allocs/op
+Benchmark_HSubscribe_Session_GRPC/1B-8          	       1	     20792 ns/op	   0.05 MB/s	    8424 B/op	     148 allocs/op
+Benchmark_HSubscribe_Session_GRPC/128B-8        	       1	     18666 ns/op	   6.86 MB/s	   13240 B/op	     164 allocs/op
+Benchmark_HSubscribe_Session_GRPC/1KiB-8        	       1	     27625 ns/op	  37.07 MB/s	   37896 B/op	      91 allocs/op
+Benchmark_HSubscribe_Session_GRPC/32KiB-8       	       1	    632041 ns/op	  51.84 MB/s	 3250984 B/op	     124 allocs/op
+Benchmark_HSubscribe_Session_GRPC/1MiB-8        	       1	   1418583 ns/op	 739.17 MB/s	 4451608 B/op	     442 allocs/op
+Benchmark_Ack_Session_GRPC/batch=1-8            	       1	     32542 ns/op	    6704 B/op	      70 allocs/op
+Benchmark_Ack_Session_GRPC/batch=32-8           	       1	      6833 ns/op	     552 B/op	       6 allocs/op
+Benchmark_Ack_Session_GRPC/batch=256-8          	       1	     13209 ns/op	     272 B/op	       5 allocs/op
+Benchmark_Nack_Session_GRPC/batch=1-8           	       1	     44791 ns/op	    6864 B/op	      76 allocs/op
+Benchmark_Nack_Session_GRPC/batch=32-8          	       1	     15500 ns/op	     552 B/op	       6 allocs/op
+Benchmark_Nack_Session_GRPC/batch=256-8         	       1	     14875 ns/op	     208 B/op	       4 allocs/op
+Benchmark_Transaction_Session_GRPC-8            	       1	     78000 ns/op	   15768 B/op	     175 allocs/op
+Benchmark_Bind_GRPC-8                           	       1	  44368250 ns/op	  190560 B/op	     740 allocs/op
+Benchmark_Cleanup_GRPC-8                        	       1	  46844083 ns/op	  193952 B/op	     747 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	3.336s

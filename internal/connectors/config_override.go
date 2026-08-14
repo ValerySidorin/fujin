@@ -11,34 +11,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DeepCopyConfig creates a deep copy of the connectors configuration
+// DeepCopyConfig creates a deep copy of the connectors configuration.
 func DeepCopyConfig(original config.ConnectorConfig) (config.ConnectorConfig, error) {
-	// Use YAML marshaling/unmarshaling for deep copy
-	// This works because all config types have YAML tags
-	data, err := yaml.Marshal(original)
-	if err != nil {
-		return config.ConnectorConfig{}, fmt.Errorf("marshal config for deep copy: %w", err)
-	}
-
-	var copy config.ConnectorConfig
-	if err := yaml.Unmarshal(data, &copy); err != nil {
-		return config.ConnectorConfig{}, fmt.Errorf("unmarshal config for deep copy: %w", err)
-	}
-
-	return copy, nil
+	return config.CloneConnectorConfig(original)
 }
 
 // ApplyOverrides applies configuration overrides to a base configuration.
 // Overrides format: "{setting_path}" -> "value"
 //
 // Examples:
-//   - "clients.writer1.topic" -> "my-topic"
-//   - "clients.reader1.group" -> "my-group"
+//   - "routes.writer1.topic" -> "my-topic"
+//   - "routes.reader1.group" -> "my-group"
 //   - "common.servers" -> "host1:9092,host2:9092"
 //
 // Paths are validated against the Overridable whitelist in the config.
 // Wildcard (*) is supported in whitelist patterns:
-//   - "clients.*.topic" matches "clients.writer1.topic", "clients.reader1.topic", etc.
+//   - "routes.*.topic" matches "routes.writer1.topic", "routes.reader1.topic", etc.
 //   - "common.*" matches any field under common
 //   - "*" (alone) allows ALL overrides (use with caution)
 func ApplyOverrides(baseConfig config.ConnectorConfig, overrides map[string]string) (config.ConnectorConfig, error) {

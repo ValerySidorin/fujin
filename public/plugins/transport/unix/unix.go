@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	"gopkg.in/yaml.v3"
@@ -66,10 +66,10 @@ func decodeSettings(raw any, out any) error {
 	return yaml.Unmarshal(data, out)
 }
 
-func factory(cfg any, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) (transport.TransportServer, error) {
+func factory(cfg any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
 	if _, ok := cfg.(unixDisabledConfig); ok {
 		return nil, nil
 	}
 	conf := cfg.(serverconfig.UnixServerConfig)
-	return NewServer(conf, baseConfig, l), nil
+	return NewServer(conf, catalog, l), nil
 }

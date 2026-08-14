@@ -6,7 +6,7 @@ import (
 	"time"
 
 	pconfig "github.com/fujin-io/fujin/public/config"
-	"github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	"gopkg.in/yaml.v3"
@@ -77,10 +77,10 @@ func parseFujin(s fujinSettings) serverconfig.FujinProtocolConfig {
 	return f
 }
 
-func factory(cfg any, baseConfig config.ConnectorsConfig, l *slog.Logger) (transport.TransportServer, error) {
+func factory(cfg any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
 	c := cfg.(serverconfig.TCPServerConfig)
 	if !c.Enabled {
 		return nil, nil
 	}
-	return NewServer(c, baseConfig, l), nil
+	return NewServer(c, catalog, l), nil
 }

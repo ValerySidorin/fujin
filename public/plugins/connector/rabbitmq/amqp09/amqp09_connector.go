@@ -8,75 +8,46 @@ import (
 	"github.com/fujin-io/fujin/public/util"
 )
 
-// rabbitmqAMQP09Connector implements connector.Connector interface
-type rabbitmqAMQP09Connector struct {
-	config Config
-	l      *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Converter: convertConfigValue, Compile: compileConnector}
 }
-
-// NewRabbitMQAMQP09Connector creates a new AMQP091 connector instance
-func NewRabbitMQAMQP09Connector(config any, l *slog.Logger) (connector.Connector, error) {
-	// Allow nil config for getting converter only
-	if config == nil {
-		return &rabbitmqAMQP09Connector{
-			config: Config{},
-			l:      l,
-		}, nil
+func compileConnector(raw any) (connector.Compiled, error) {
+	var config Config
+	if parsed, ok := raw.(Config); ok {
+		config = parsed
+	} else if err := util.ConvertConfig(raw, &config); err != nil {
+		return nil, fmt.Errorf("rabbitmq_amqp09 connector: convert config: %w", err)
 	}
-
-	var typedConfig Config
-	if parsedConfig, ok := config.(Config); ok {
-		typedConfig = parsedConfig
-	} else {
-		if err := util.ConvertConfig(config, &typedConfig); err != nil {
-			return nil, fmt.Errorf("rabbitmq_amqp09 connector: failed to convert config: %w", err)
-		}
-	}
-	if err := typedConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("rabbitmq_amqp09 connector: invalid config: %w", err)
 	}
-
-	return &rabbitmqAMQP09Connector{
-		config: typedConfig,
-		l:      l,
-	}, nil
-}
-
-// NewReader creates a reader from configuration
-func (a *rabbitmqAMQP09Connector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := a.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client not found by name: %s", name)
+	profiles := make(map[string]connector.RouteProfile, len(config.Routes))
+	factories := make(map[string]connector.RouteFactory, len(config.Routes))
+	for route, settings := range config.Routes {
+		conf := NewConnectorConfig(config.Common, settings)
+		profile := connector.RouteProfile{}
+		factory := connector.RouteFactory{}
+		if settings.Consume != nil {
+			profile.Subscribe = true
+			profile.ManualSettlement = true
+			ack := connector.AckSingle
+			if settings.Ack != nil && settings.Ack.Multiple {
+				ack = connector.AckCumulative
+			}
+			nack := connector.NackDrop
+			if settings.Nack != nil && settings.Nack.Requeue {
+				nack = connector.NackRequeue
+			}
+			profile.Settlement = connector.SettlementProfile{Ack: ack, Nack: nack}
+			factory.Reader = func(auto bool, l *slog.Logger) (connector.ReadCloser, error) { return NewReader(conf, auto, l) }
+		}
+		if settings.Publish != nil {
+			profile.Produce = true
+			profile.Transactions = true
+			profile.ProduceGuarantee = connector.AcceptanceLocal
+			factory.Writer = func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(conf, l) }
+		}
+		profiles[route], factories[route] = profile, factory
 	}
-
-	if clientConf.Consume == nil {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client %q is not configured as a reader (consume not defined)", name)
-	}
-
-	return NewReader(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, autoCommit, l)
-}
-
-// NewWriter creates a writer from configuration
-func (a *rabbitmqAMQP09Connector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := a.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client not found by name: %s", name)
-	}
-
-	if clientConf.Publish == nil {
-		return nil, fmt.Errorf("rabbitmq_amqp09: client %q is not configured as a writer (publish not defined)", name)
-	}
-
-	return NewWriter(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, l)
-}
-
-// GetConfigValueConverter returns the config value converter for AMQP091
-func (a *rabbitmqAMQP09Connector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return convertConfigValue
+	return connector.CompileStatic(profiles, factories)
 }

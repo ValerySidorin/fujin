@@ -78,7 +78,7 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	cc, err := r.cons.Consume(func(msg jetstream.Msg) {
 		meta, err := msg.Metadata()
 		if err != nil {
@@ -101,13 +101,17 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	if err != nil {
 		return fmt.Errorf("nats_jetstream: consume: %w", err)
 	}
+	if err := ready(); err != nil {
+		cc.Stop()
+		return err
+	}
 
 	defer cc.Stop()
 	<-ctx.Done()
 	return nil
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	cc, err := r.cons.Consume(func(msg jetstream.Msg) {
 		meta, err := msg.Metadata()
 		if err != nil {
@@ -131,23 +135,21 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 	if err != nil {
 		return fmt.Errorf("nats_jetstream: consume: %w", err)
 	}
+	if err := ready(); err != nil {
+		cc.Stop()
+		return err
+	}
 
 	defer cc.Stop()
 	<-ctx.Done()
 	return nil
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
-	if r.fetching.Load() {
-		fetchHandler(0, nil)
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
+	if !r.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
 		return
 	}
-
-	r.fetching.Store(true)
 	defer r.fetching.Store(false)
 
 	batch, err := r.cons.Fetch(int(n), jetstream.FetchMaxWait(r.conf.fetchMaxWaitDuration()))
@@ -191,17 +193,11 @@ func (r *Reader) Fetch(
 	}
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
-	if r.fetching.Load() {
-		fetchHandler(0, nil)
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
+	if !r.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
 		return
 	}
-
-	r.fetching.Store(true)
 	defer r.fetching.Store(false)
 
 	batch, err := r.cons.Fetch(int(n), jetstream.FetchMaxWait(r.conf.fetchMaxWaitDuration()))
@@ -259,8 +255,8 @@ func (r *Reader) Ack(
 	ackHandler(nil)
 
 	for _, id := range msgIDs {
-		if len(id) < 8 {
-			ackMsgHandler(id, fmt.Errorf("nats_jetstream: invalid msg id"))
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			ackMsgHandler(id, fmt.Errorf("nats_jetstream: ack: %w", err))
 			continue
 		}
 
@@ -290,8 +286,8 @@ func (r *Reader) Nack(
 	nackHandler(nil)
 
 	for _, id := range msgIDs {
-		if len(id) < 8 {
-			nackMsgHandler(id, fmt.Errorf("nats_jetstream: invalid msg id"))
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			nackMsgHandler(id, fmt.Errorf("nats_jetstream: nack: %w", err))
 			continue
 		}
 
@@ -311,15 +307,11 @@ func (r *Reader) Nack(
 	}
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
-	seq := args[0].(uint64)
-	buf = binary.BigEndian.AppendUint64(buf, seq)
-	return append(buf, topic...)
+func (r *Reader) EncodeMsgID(buf []byte, _ string, args ...any) []byte {
+	return binary.BigEndian.AppendUint64(buf, args[0].(uint64))
 }
 
-func (r *Reader) MsgIDArgsLen() int {
-	return 8
-}
+func (r *Reader) MsgIDArgsLen() int { return 8 }
 
 func (r *Reader) AutoCommit() bool {
 	return r.autoCommit
@@ -330,45 +322,16 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-// natsHeadersToSlice converts NATS headers to the Fujin [][]byte format (alternating key/value).
+// natsHeadersToSlice preserves every duplicate header value.
 func natsHeadersToSlice(headers nats.Header) [][]byte {
-	if len(headers) == 0 {
-		return nil
-	}
-
-	var hs [][]byte
-	for k, vals := range headers {
-		hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(k)), len(k)))
-		var joined [][]byte
-		for _, v := range vals {
-			joined = append(joined, unsafe.Slice((*byte)(unsafe.StringData(v)), len(v)))
+	var result [][]byte
+	for key, values := range headers {
+		for _, value := range values {
+			result = append(result,
+				unsafe.Slice((*byte)(unsafe.StringData(key)), len(key)),
+				unsafe.Slice((*byte)(unsafe.StringData(value)), len(value)),
+			)
 		}
-		hs = append(hs, joinBytes(joined, ','))
 	}
-	return hs
-}
-
-// joinBytes joins byte slices with a separator.
-func joinBytes(elems [][]byte, sep byte) []byte {
-	switch len(elems) {
-	case 0:
-		return nil
-	case 1:
-		out := make([]byte, len(elems[0]))
-		copy(out, elems[0])
-		return out
-	}
-
-	totalLen := len(elems) - 1
-	for _, e := range elems {
-		totalLen += len(e)
-	}
-
-	out := make([]byte, totalLen)
-	pos := copy(out, elems[0])
-	for _, e := range elems[1:] {
-		pos += copy(out[pos:], []byte{sep})
-		pos += copy(out[pos:], e)
-	}
-	return out
+	return result
 }

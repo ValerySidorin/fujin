@@ -1,0 +1,319 @@
+time=2026-08-12T12:06:01.705+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:01.705+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:01.739+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:01.739+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:01.740+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:01.740+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:03.525+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:03.525+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17156 ns/op	   7.46 MB/s	   3540500 p99-ns	   84450 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.482s
+
+time=2026-08-12T12:06:11.060+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:11.060+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:11.087+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:11.087+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:11.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:11.088+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:12.900+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:12.900+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17268 ns/op	   7.41 MB/s	   3543833 p99-ns	   84445 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.278s
+
+time=2026-08-12T12:06:14.028+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:14.028+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:14.073+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:14.073+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:14.073+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:14.073+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:15.896+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:15.896+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17318 ns/op	   7.39 MB/s	   3551833 p99-ns	   84449 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.327s
+
+time=2026-08-12T12:06:23.273+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:23.273+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:23.302+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:23.302+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:23.303+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:23.303+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:25.107+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:25.107+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17244 ns/op	   7.42 MB/s	   3541792 p99-ns	   84457 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.350s
+
+time=2026-08-12T12:06:26.290+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:26.290+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:26.412+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+time=2026-08-12T12:06:26.412+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:26.413+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:26.413+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:28.240+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:28.240+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17441 ns/op	   7.34 MB/s	   3563875 p99-ns	   84442 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.438s
+
+time=2026-08-12T12:06:35.617+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:35.617+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:35.667+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:35.667+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:35.668+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:35.668+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:37.509+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:37.509+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17593 ns/op	   7.28 MB/s	   3689333 p99-ns	   84445 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.447s
+
+time=2026-08-12T12:06:38.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:38.635+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:38.660+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:38.660+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:38.661+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:38.661+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:40.480+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:40.480+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17365 ns/op	   7.37 MB/s	   3563209 p99-ns	   84452 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.298s
+
+time=2026-08-12T12:06:48.039+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:48.039+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:48.075+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:48.075+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:48.076+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:48.076+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:49.977+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:49.977+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17283 ns/op	   7.41 MB/s	   3497166 p99-ns	   84448 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.479s
+
+time=2026-08-12T12:06:51.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:51.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:51.201+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:51.201+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:06:51.202+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:06:51.202+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:06:53.053+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:06:53.053+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17502 ns/op	   7.31 MB/s	   3614083 p99-ns	   84450 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.405s
+
+time=2026-08-12T12:07:00.255+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:00.255+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:00.293+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:00.293+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:00.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:00.294+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:02.115+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:02.115+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17310 ns/op	   7.39 MB/s	   3531709 p99-ns	   84447 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.365s
+
+time=2026-08-12T12:07:03.267+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:03.267+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:03.352+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:03.352+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:03.352+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:03.352+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:05.212+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:05.212+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17287 ns/op	   7.40 MB/s	   3528500 p99-ns	   84453 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.410s
+
+time=2026-08-12T12:07:12.606+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:12.606+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:12.683+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:12.683+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:12.684+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:12.684+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:14.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:14.496+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17224 ns/op	   7.43 MB/s	   3534625 p99-ns	   84453 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.363s
+
+time=2026-08-12T12:07:15.762+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:15.762+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:15.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:15.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:15.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:15.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:17.651+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:17.651+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17319 ns/op	   7.39 MB/s	   3568541 p99-ns	   84451 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.485s
+
+time=2026-08-12T12:07:25.000+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:25.000+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:25.044+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:25.044+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:25.045+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:25.045+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:26.857+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:26.857+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17484 ns/op	   7.32 MB/s	   3574500 p99-ns	   84450 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.315s
+
+time=2026-08-12T12:07:28.043+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:28.043+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:28.110+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:28.110+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:28.111+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:28.111+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:29.931+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:29.931+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17433 ns/op	   7.34 MB/s	   3590792 p99-ns	   84453 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.397s
+
+time=2026-08-12T12:07:37.367+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:37.367+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:37.422+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+time=2026-08-12T12:07:37.422+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:37.423+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:37.423+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:39.274+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:39.274+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17447 ns/op	   7.34 MB/s	   3636000 p99-ns	   84448 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.467s
+
+time=2026-08-12T12:07:40.494+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:40.494+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:40.538+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:40.538+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:40.538+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:40.538+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:42.341+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:42.341+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17208 ns/op	   7.44 MB/s	   3528917 p99-ns	   84445 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.397s
+
+time=2026-08-12T12:07:49.749+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:49.749+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:49.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:49.807+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:49.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:49.808+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:51.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:51.628+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17256 ns/op	   7.42 MB/s	   3537541 p99-ns	   84443 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.394s
+
+time=2026-08-12T12:07:52.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:52.731+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:52.793+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:52.793+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:07:52.793+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:07:52.793+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:07:54.591+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:07:54.591+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17331 ns/op	   7.39 MB/s	   3557917 p99-ns	   84452 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.293s
+
+time=2026-08-12T12:08:01.877+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:08:01.877+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:08:01.909+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:08:01.909+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Transaction_Native/transport=quic/payload=128B/batch=1/concurrency=128-8         	time=2026-08-12T12:08:01.910+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T12:08:01.910+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-12T12:08:03.835+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T12:08:03.835+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+  100000	     17261 ns/op	   7.42 MB/s	   3536250 p99-ns	   84450 B/op	      58 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	2.393s

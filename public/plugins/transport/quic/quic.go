@@ -6,7 +6,7 @@ import (
 	"time"
 
 	pconfig "github.com/fujin-io/fujin/public/config"
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	quicgo "github.com/quic-go/quic-go"
@@ -84,10 +84,10 @@ func decodeSettings(raw any, out any) error {
 	return yaml.Unmarshal(data, out)
 }
 
-func factory(cfg any, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) (transport.TransportServer, error) {
+func factory(cfg any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
 	conf := cfg.(serverconfig.QUICServerConfig)
 	if !conf.Enabled {
 		return nil, nil
 	}
-	return NewServer(conf, baseConfig, l), nil
+	return NewServer(conf, catalog, l), nil
 }

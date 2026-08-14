@@ -1,0 +1,135 @@
+{
+  "reports": [
+    {
+      "report": "test/performance/certification-2026-08-12-final/comparison-native-128B-allops-alltransports-allconcurrency-1000x-10-interleaved-final-head.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 410,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-12-final/comparison-grpc-128B-allops-allconcurrency-1000x-10-interleaved.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 140,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-12-final/comparison-native-produce-payload-spectrum-c1-100x-10-interleaved-post-local-response.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 65,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-final-post-backpressure-native-batches-c16-10x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 95,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-batch-spectrum-1B-c16-10x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 35,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-operation-scale-subscribe-tcp-128B-c16-100000x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 5,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-operation-scale-subscribe-tcp-128B-c16-1000000x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 5,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-operation-scale-subscribe-tcp-1MiB-c16-1000x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 5,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11/comparison-operation-scale-subscribe-tcp-1MiB-c16-10000x.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 5,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-11-post-route/comparison-transaction-128B-all-transports-all-concurrency-10000x-10-interleaved-post-pooled-response.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 50,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-12-final/comparison-native-final-suspects-20-balanced-final-source.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 20,
+      "normalized_equal": true
+    },
+    {
+      "report": "test/performance/certification-2026-08-12-final/comparison-native-ack-nack-quic-128B-c128-100000x-20-balanced-lock-free-final.txt",
+      "rc": 0,
+      "inputs_exist": true,
+      "rows": 15,
+      "normalized_equal": true
+    }
+  ],
+  "reports_ok": true,
+  "raw_failures": [],
+  "samples": {
+    "test/performance/certification-2026-08-12-final/baseline-native-final-suspects-20-balanced-final-source.bench": {
+      "cells": 3,
+      "counts": [
+        20
+      ],
+      "ok": true
+    },
+    "test/performance/certification-2026-08-12-final/current-native-final-suspects-20-balanced-final-source.bench": {
+      "cells": 3,
+      "counts": [
+        20
+      ],
+      "ok": true
+    },
+    "test/performance/certification-2026-08-12-final/baseline-native-ack-nack-quic-128B-c128-100000x-20-balanced-lock-free-final.bench": {
+      "cells": 2,
+      "counts": [
+        20
+      ],
+      "ok": true
+    },
+    "test/performance/certification-2026-08-12-final/current-native-ack-nack-quic-128B-c128-100000x-20-balanced-lock-free-final.bench": {
+      "cells": 2,
+      "counts": [
+        20
+      ],
+      "ok": true
+    }
+  },
+  "samples_ok": true,
+  "sustained_cells": 6,
+  "sustained_10000x": true,
+  "missing_references": [],
+  "unchecked_criteria": [],
+  "benchmark_coverage": {
+    "source_benchmarks": 151,
+    "executed_unique": 151,
+    "missing": [],
+    "unexpected": [],
+    "failure_logs": [],
+    "session_cells": 876,
+    "logs": 13
+  },
+  "e2e_all_passed": true
+}

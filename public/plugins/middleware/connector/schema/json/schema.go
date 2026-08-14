@@ -93,17 +93,17 @@ func (e *ValidationError) Unwrap() error {
 
 func (m *schemaMiddleware) WrapWriter(w connector.WriteCloser, connectorName string) connector.WriteCloser {
 	return &schemaWriterWrapper{
-		w:      w,
-		mw:     m,
-		l:      m.l.With("connector", connectorName),
+		w:  w,
+		mw: m,
+		l:  m.l.With("connector", connectorName),
 	}
 }
 
 func (m *schemaMiddleware) WrapReader(r connector.ReadCloser, connectorName string) connector.ReadCloser {
 	return &schemaReaderWrapper{
-		r:      r,
-		mw:     m,
-		l:      m.l.With("connector", connectorName),
+		r:  r,
+		mw: m,
+		l:  m.l.With("connector", connectorName),
 	}
 }
 

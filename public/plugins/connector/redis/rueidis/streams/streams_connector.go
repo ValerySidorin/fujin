@@ -8,79 +8,40 @@ import (
 	"github.com/fujin-io/fujin/public/util"
 )
 
-// streamsConnector implements connector.Connector interface for Redis Rueidis Streams.
-type streamsConnector struct {
-	config Config
-	l      *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Converter: convertConfigValue, Compile: compileConnector}
 }
-
-// newRESPStreamsConnector creates a new Redis Rueidis Streams connector instance.
-func newRESPStreamsConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	// Allow nil config for getting converter only
-	if config == nil {
-		return &streamsConnector{
-			config: Config{},
-			l:      l,
-		}, nil
+func compileConnector(raw any) (connector.Compiled, error) {
+	var config Config
+	if parsed, ok := raw.(Config); ok {
+		config = parsed
+	} else if err := util.ConvertConfig(raw, &config); err != nil {
+		return nil, fmt.Errorf("redis_rueidis_streams connector: convert config: %w", err)
 	}
-
-	var typedConfig Config
-	if parsedConfig, ok := config.(Config); ok {
-		typedConfig = parsedConfig
-	} else {
-		if err := util.ConvertConfig(config, &typedConfig); err != nil {
-			return nil, fmt.Errorf("redis_rueidis_streams connector: failed to convert config: %w", err)
-		}
-	}
-	if err := typedConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("redis_rueidis_streams connector: invalid config: %w", err)
 	}
-
-	return &streamsConnector{
-		config: typedConfig,
-		l:      l,
-	}, nil
-}
-
-// NewReader creates a reader from configuration.
-func (s *streamsConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := s.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("redis_rueidis_streams: client not found by name: %s", name)
+	profiles := make(map[string]connector.RouteProfile, len(config.Routes))
+	factories := make(map[string]connector.RouteFactory, len(config.Routes))
+	for route, settings := range config.Routes {
+		conf := NewConnectorConfig(config.Common, settings)
+		profile := connector.RouteProfile{}
+		factory := connector.RouteFactory{}
+		if err := conf.ValidateReader(); err == nil {
+			profile.Subscribe = true
+			profile.Fetch = true
+			if settings.Group.Name != "" {
+				profile.ManualSettlement = true
+				profile.Settlement = connector.SettlementProfile{Ack: connector.AckSingle}
+			}
+			factory.Reader = func(auto bool, l *slog.Logger) (connector.ReadCloser, error) { return NewReader(conf, auto, l) }
+		}
+		if err := conf.ValidateWriter(); err == nil {
+			profile.Produce = true
+			profile.ProduceGuarantee = connector.AcceptancePeer
+			factory.Writer = func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(conf, l) }
+		}
+		profiles[route], factories[route] = profile, factory
 	}
-
-	connConf := ConnectorConfig{
-		CommonSettings:         s.config.Common,
-		ClientSpecificSettings: clientConf,
-	}
-
-	if err := connConf.ValidateReader(); err != nil {
-		return nil, err
-	}
-
-	return NewReader(connConf, autoCommit, l)
-}
-
-// NewWriter creates a writer from configuration.
-func (s *streamsConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := s.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("redis_rueidis_streams: client not found by name: %s", name)
-	}
-
-	connConf := ConnectorConfig{
-		CommonSettings:         s.config.Common,
-		ClientSpecificSettings: clientConf,
-	}
-
-	if err := connConf.ValidateWriter(); err != nil {
-		return nil, err
-	}
-
-	return NewWriter(connConf, l)
-}
-
-// GetConfigValueConverter returns the config value converter for Redis Rueidis Streams.
-func (s *streamsConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return convertConfigValue
+	return connector.CompileStatic(profiles, factories)
 }

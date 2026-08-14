@@ -8,67 +8,49 @@ import (
 	"github.com/fujin-io/fujin/public/util"
 )
 
-// mqttPahoConnector implements connector.Connector interface
-type mqttPahoConnector struct {
-	config Config
-	l      *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Converter: convertConfigValue, Compile: compileConnector}
 }
-
-// newMQTTPahoConnector creates a new MQTT connector instance
-func newMQTTPahoConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	// Allow nil config for getting converter only
-	if config == nil {
-		return &mqttPahoConnector{
-			config: Config{},
-			l:      l,
-		}, nil
+func compileConnector(raw any) (connector.Compiled, error) {
+	var config Config
+	if parsed, ok := raw.(Config); ok {
+		config = parsed
+	} else if err := util.ConvertConfig(raw, &config); err != nil {
+		return nil, fmt.Errorf("mqtt connector: convert config: %w", err)
 	}
-
-	var typedConfig Config
-	if parsedConfig, ok := config.(Config); ok {
-		typedConfig = parsedConfig
-	} else {
-		if err := util.ConvertConfig(config, &typedConfig); err != nil {
-			return nil, fmt.Errorf("mqtt connector: failed to convert config: %w", err)
-		}
-	}
-	if err := typedConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("mqtt connector: invalid config: %w", err)
 	}
-
-	return &mqttPahoConnector{
-		config: typedConfig,
-		l:      l,
-	}, nil
-}
-
-// NewReader creates a reader from configuration
-func (m *mqttPahoConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := m.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("mqtt: client not found by name: %s", name)
+	profiles := make(map[string]connector.RouteProfile, len(config.Routes))
+	factories := make(map[string]connector.RouteFactory, len(config.Routes))
+	for route, settings := range config.Routes {
+		conf := NewConnectorConfig(config.Common, settings)
+		if err := conf.ValidateReader(); err != nil {
+			return nil, fmt.Errorf("route %q: %w", route, err)
+		}
+		if err := conf.ValidateWriter(); err != nil {
+			return nil, fmt.Errorf("route %q: %w", route, err)
+		}
+		guarantee := connector.AcceptanceLocal
+		if settings.QoS > 0 {
+			guarantee = connector.AcceptancePeer
+		}
+		profiles[route] = connector.RouteProfile{
+			Produce:          true,
+			Subscribe:        true,
+			ManualSettlement: settings.QoS > 0,
+			ProduceGuarantee: guarantee,
+			Settlement: connector.SettlementProfile{Ack: func() connector.AckGranularity {
+				if settings.QoS > 0 {
+					return connector.AckSingle
+				}
+				return connector.AckUnsupported
+			}()},
+		}
+		factories[route] = connector.RouteFactory{
+			Reader: func(auto bool, l *slog.Logger) (connector.ReadCloser, error) { return NewReader(conf, auto, l) },
+			Writer: func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(conf, l) },
+		}
 	}
-
-	return NewReader(ConnectorConfig{
-		CommonSettings:         m.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, autoCommit, l)
-}
-
-// NewWriter creates a writer from configuration
-func (m *mqttPahoConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := m.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("mqtt: client not found by name: %s", name)
-	}
-
-	return NewWriter(ConnectorConfig{
-		CommonSettings:         m.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, l)
-}
-
-// GetConfigValueConverter returns the config value converter for MQTT
-func (m *mqttPahoConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return convertConfigValue
+	return connector.CompileStatic(profiles, factories)
 }

@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                                │ /Users/mak/src/fujin/test/performance/certification-reruns/a-scoped-unix-subscribe-128B-b1-c128-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-scoped-unix-subscribe-128B-b1-c128-10x.bench │
+                                                                                │                                                  sec/op                                                   │                                         sec/op                                           vs base          │
+_Session_Subscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                195.5n ± 19%                                                                              208.1n ± 14%  ~ (p=0.971 n=10)
+
+                                                                                │ /Users/mak/src/fujin/test/performance/certification-reruns/a-scoped-unix-subscribe-128B-b1-c128-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-scoped-unix-subscribe-128B-b1-c128-10x.bench │
+                                                                                │                                                    B/s                                                    │                                           B/s                                            vs base          │
+_Session_Subscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                               624.4Mi ± 16%                                                                             588.2Mi ± 16%  ~ (p=0.971 n=10)
+
+                                                                                │ /Users/mak/src/fujin/test/performance/certification-reruns/a-scoped-unix-subscribe-128B-b1-c128-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-scoped-unix-subscribe-128B-b1-c128-10x.bench │
+                                                                                │                                                  p99-sec                                                  │                                         p99-sec                                          vs base          │
+_Session_Subscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                792.5µ ± 39%                                                                              835.0µ ± 48%  ~ (p=0.796 n=10)
+
+                                                                                │ /Users/mak/src/fujin/test/performance/certification-reruns/a-scoped-unix-subscribe-128B-b1-c128-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-scoped-unix-subscribe-128B-b1-c128-10x.bench │
+                                                                                │                                                   B/op                                                    │                                          B/op                                            vs base          │
+_Session_Subscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                 281.5 ± 11%                                                                               283.5 ± 10%  ~ (p=0.811 n=10)
+
+                                                                                │ /Users/mak/src/fujin/test/performance/certification-reruns/a-scoped-unix-subscribe-128B-b1-c128-10x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-scoped-unix-subscribe-128B-b1-c128-10x.bench │
+                                                                                │                                                 allocs/op                                                 │                                       allocs/op                                        vs base            │
+_Session_Subscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                  2.000 ± 0%                                                                              2.000 ± 0%  ~ (p=1.000 n=10) ¹
+¹ all samples are equal

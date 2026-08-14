@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       150.8 ns/op	 848.71 MB/s	       667.0 p99-ns	     341 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       163.3 ns/op	 783.73 MB/s	       542.0 p99-ns	     353 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       160.3 ns/op	 798.44 MB/s	       583.0 p99-ns	     354 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       149.3 ns/op	 857.14 MB/s	       500.0 p99-ns	     337 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       139.1 ns/op	 919.95 MB/s	       292.0 p99-ns	     325 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       134.2 ns/op	 953.71 MB/s	       583.0 p99-ns	     341 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       133.9 ns/op	 956.00 MB/s	       500.0 p99-ns	     333 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       135.9 ns/op	 941.61 MB/s	       458.0 p99-ns	     334 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       133.2 ns/op	 960.90 MB/s	       500.0 p99-ns	     332 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       146.3 ns/op	 874.94 MB/s	       500.0 p99-ns	     344 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       133.5 ns/op	 958.56 MB/s	       417.0 p99-ns	     345 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       150.1 ns/op	 852.86 MB/s	       666.0 p99-ns	     330 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       183.5 ns/op	 697.41 MB/s	       666.0 p99-ns	     317 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       144.3 ns/op	 887.22 MB/s	       625.0 p99-ns	     347 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       161.6 ns/op	 792.08 MB/s	       750.0 p99-ns	     329 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       149.7 ns/op	 855.31 MB/s	       500.0 p99-ns	     343 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       160.6 ns/op	 797.20 MB/s	       458.0 p99-ns	     348 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       141.4 ns/op	 905.15 MB/s	       416.0 p99-ns	     342 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       153.5 ns/op	 834.08 MB/s	       583.0 p99-ns	     347 B/op	       2 allocs/op
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8	10000	       134.4 ns/op	 952.29 MB/s	       583.0 p99-ns	     337 B/op	       2 allocs/op

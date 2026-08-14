@@ -8,75 +8,40 @@ import (
 	"github.com/fujin-io/fujin/public/util"
 )
 
-// azureAmqp1Connector implements connector.Connector interface
-type azureAmqp1Connector struct {
-	config Config
-	l      *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Converter: convertConfigValue, Compile: compileConnector}
 }
-
-// newAzureAMQP1Connector creates a new Azure AMQP1.0 connector instance
-func newAzureAMQP1Connector(config any, l *slog.Logger) (connector.Connector, error) {
-	// Allow nil config for getting converter only
-	if config == nil {
-		return &azureAmqp1Connector{
-			config: Config{},
-			l:      l,
-		}, nil
+func compileConnector(raw any) (connector.Compiled, error) {
+	var config Config
+	if parsed, ok := raw.(Config); ok {
+		config = parsed
+	} else if err := util.ConvertConfig(raw, &config); err != nil {
+		return nil, fmt.Errorf("azure_amqp1 connector: convert config: %w", err)
 	}
-
-	var typedConfig Config
-	if parsedConfig, ok := config.(Config); ok {
-		typedConfig = parsedConfig
-	} else {
-		if err := util.ConvertConfig(config, &typedConfig); err != nil {
-			return nil, fmt.Errorf("azure_amqp1 connector: failed to convert config: %w", err)
-		}
-	}
-	if err := typedConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("azure_amqp1 connector: invalid config: %w", err)
 	}
-
-	return &azureAmqp1Connector{
-		config: typedConfig,
-		l:      l,
-	}, nil
-}
-
-// NewReader creates a reader from configuration
-func (a *azureAmqp1Connector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	clientConf, ok := a.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("azure_amqp1: client not found by name: %s", name)
+	profiles := make(map[string]connector.RouteProfile, len(config.Routes))
+	factories := make(map[string]connector.RouteFactory, len(config.Routes))
+	for route, settings := range config.Routes {
+		conf := NewConnectorConfig(config.Common, settings)
+		profile := connector.RouteProfile{}
+		factory := connector.RouteFactory{}
+		if settings.Receiver != nil {
+			profile.Subscribe = true
+			profile.ManualSettlement = true
+			profile.Settlement = connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackRelease}
+			factory.Reader = func(auto bool, l *slog.Logger) (connector.ReadCloser, error) { return NewReader(conf, auto, l) }
+		}
+		if settings.Sender != nil {
+			profile.Produce = true
+			profile.ProduceGuarantee = connector.AcceptancePeer
+			if settings.Send != nil && settings.Send.Settled {
+				profile.ProduceGuarantee = connector.AcceptanceLocal
+			}
+			factory.Writer = func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(conf, l) }
+		}
+		profiles[route], factories[route] = profile, factory
 	}
-
-	if clientConf.Receiver == nil {
-		return nil, fmt.Errorf("azure_amqp1: client %q is not configured as a reader (receiver not defined)", name)
-	}
-
-	return NewReader(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, autoCommit, l)
-}
-
-// NewWriter creates a writer from configuration
-func (a *azureAmqp1Connector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	clientConf, ok := a.config.Clients[name]
-	if !ok {
-		return nil, fmt.Errorf("azure_amqp1: client not found by name: %s", name)
-	}
-
-	if clientConf.Sender == nil {
-		return nil, fmt.Errorf("azure_amqp1: client %q is not configured as a writer (sender not defined)", name)
-	}
-
-	return NewWriter(ConnectorConfig{
-		CommonSettings:         a.config.Common,
-		ClientSpecificSettings: clientConf,
-	}, l)
-}
-
-// GetConfigValueConverter returns the config value converter for AMQP10
-func (a *azureAmqp1Connector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return convertConfigValue
+	return connector.CompileStatic(profiles, factories)
 }

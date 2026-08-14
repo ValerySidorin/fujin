@@ -1,0 +1,90 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     25063 ns/op	   0.04 MB/s	     65500 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47209 ns/op	   0.02 MB/s	     64333 p99-ns	    1742 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11804 ns/op	   0.08 MB/s	     21792 p99-ns	     543 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.479s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     25291 ns/op	   0.04 MB/s	     69208 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47114 ns/op	   0.02 MB/s	     70916 p99-ns	    1741 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11826 ns/op	   0.08 MB/s	     23625 p99-ns	     543 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.572s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24842 ns/op	   0.04 MB/s	     54542 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     49319 ns/op	   0.02 MB/s	     76083 p99-ns	    1741 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11761 ns/op	   0.09 MB/s	     23000 p99-ns	     543 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.507s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24449 ns/op	   0.04 MB/s	     57375 p99-ns	     541 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47398 ns/op	   0.02 MB/s	     69667 p99-ns	    1741 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11918 ns/op	   0.08 MB/s	     21167 p99-ns	     543 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.448s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24471 ns/op	   0.04 MB/s	     63625 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47282 ns/op	   0.02 MB/s	     67791 p99-ns	    1740 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     12017 ns/op	   0.08 MB/s	     21375 p99-ns	     542 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.359s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24665 ns/op	   0.04 MB/s	     62167 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47399 ns/op	   0.02 MB/s	     66042 p99-ns	    1741 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11791 ns/op	   0.08 MB/s	     21000 p99-ns	     544 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.384s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24625 ns/op	   0.04 MB/s	     66084 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     49310 ns/op	   0.02 MB/s	     70250 p99-ns	    1741 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11846 ns/op	   0.08 MB/s	     21167 p99-ns	     542 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.477s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     27073 ns/op	   0.04 MB/s	     63375 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47322 ns/op	   0.02 MB/s	     65417 p99-ns	    1740 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11976 ns/op	   0.08 MB/s	     21250 p99-ns	     544 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.584s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     24910 ns/op	   0.04 MB/s	     64125 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     47570 ns/op	   0.02 MB/s	     65750 p99-ns	    1742 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     12033 ns/op	   0.08 MB/s	     20959 p99-ns	     544 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.415s
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HFetch_Native/transport=tcp/payload=1B/batch=1/concurrency=1-8         	   10000	     25021 ns/op	   0.04 MB/s	     61917 p99-ns	     540 B/op	      19 allocs/op
+Benchmark_Session_HFetch_Native/transport=quic/payload=1B/batch=1/concurrency=1-8        	   10000	     49369 ns/op	   0.02 MB/s	     80042 p99-ns	    1744 B/op	      49 allocs/op
+Benchmark_Session_HFetch_Native/transport=unix/payload=1B/batch=1/concurrency=1-8        	   10000	     11642 ns/op	   0.09 MB/s	     23125 p99-ns	     543 B/op	      19 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.644s

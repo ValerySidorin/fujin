@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                           │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-continuous-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-continuous-1B-b32.bench │
+                                                                           │                                                       sec/op                                                        │                                              sec/op                                               vs base          │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                                                           6.052µ ± 2%                                                                                        6.107µ ± 3%  ~ (p=0.616 n=10)
+
+                                                                           │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-continuous-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-continuous-1B-b32.bench │
+                                                                           │                                                         B/s                                                         │                                               B/s                                                 vs base          │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                                                          5.045Mi ± 2%                                                                                       4.997Mi ± 3%  ~ (p=0.566 n=10)
+
+                                                                           │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-continuous-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-continuous-1B-b32.bench │
+                                                                           │                                                       p99-sec                                                       │                                          p99-sec                                            vs base                │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                                                           459.4µ ± 3%                                                                                  568.3µ ± 6%  +23.69% (p=0.000 n=10)
+
+                                                                           │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-continuous-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-continuous-1B-b32.bench │
+                                                                           │                                                        B/op                                                         │                                            B/op                                              vs base               │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                                                          6.822Ki ± 0%                                                                                  6.424Ki ± 0%  -5.83% (p=0.000 n=10)
+
+                                                                           │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-unix-hfetch-continuous-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-unix-hfetch-continuous-1B-b32.bench │
+                                                                           │                                                      allocs/op                                                      │                                          allocs/op                                           vs base               │
+_Session_HFetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                                                            269.0 ± 0%                                                                                    267.0 ± 0%  -0.74% (p=0.000 n=10)

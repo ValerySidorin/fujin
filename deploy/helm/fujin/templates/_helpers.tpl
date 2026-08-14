@@ -25,7 +25,7 @@ Create a default fully qualified app name.
 Common labels
 */}}
 {{- define "fujin.labels" -}}
-helm.sh/chart: {{ include "fujin.name" . }}
+helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{ include "fujin.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}

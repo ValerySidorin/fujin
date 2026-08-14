@@ -1,0 +1,73 @@
+===== compose up rc=0 =====
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container valkey  Creating
+ Container valkey  Created
+ Container valkey  Starting
+ Container valkey  Started
+ Container valkey  Waiting
+ Container valkey  Healthy
+
+===== go benchmark rc=0 =====
+time=2026-08-12T15:59:26.292+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:59:26.292+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+seconds to write full buf to quic stream: 6.65e-05
+time=2026-08-12T15:59:26.358+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.358+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_RedisPubSub_QUIC-8     	       1	     16875 ns/op	   1.01 MB/s	     432 B/op	      10 allocs/op
+time=2026-08-12T15:59:26.359+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.359+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.0083e-05
+time=2026-08-12T15:59:26.405+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.406+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_32BPayload_RedisPubSub_QUIC-8    	       1	       334.0 ns/op	 143.71 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.406+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.406+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 6.6084e-05
+time=2026-08-12T15:59:26.449+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.449+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_128BPayload_RedisPubSub_QUIC-8   	       1	        84.00 ns/op	1714.29 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.450+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.450+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.45e-05
+time=2026-08-12T15:59:26.558+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.558+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_256BPayload_RedisPubSub_QUIC-8   	       1	       334.0 ns/op	 814.37 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.559+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.559+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 4.3958e-05
+time=2026-08-12T15:59:26.626+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.626+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_1KBPayload_RedisPubSub_QUIC-8    	       1	       250.0 ns/op	4160.00 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.627+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.627+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 5.8292e-05
+time=2026-08-12T15:59:26.655+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.655+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_4KBPayload_RedisPubSub_QUIC-8    	       1	       375.0 ns/op	10965.33 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.656+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.656+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 0.000291667
+time=2026-08-12T15:59:26.824+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.824+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_8KBPayload_RedisPubSub_QUIC-8    	       1	       500.0 ns/op	16416.00 MB/s	       0 B/op	       0 allocs/op
+time=2026-08-12T15:59:26.825+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:59:26.825+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+seconds to write full buf to quic stream: 0.000334459
+time=2026-08-12T15:59:26.908+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:59:26.908+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Produce_32KBPayload_RedisPubSub_QUIC-8   	       1	      1250 ns/op	26227.20 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	1.102s
+
+===== compose down rc=0 =====
+ Container valkey  Stopping
+ Container valkey  Stopped
+ Container valkey  Removing
+ Container valkey  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

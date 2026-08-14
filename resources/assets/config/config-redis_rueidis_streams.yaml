@@ -14,7 +14,7 @@ connectors:
     settings:
       common:
         init_address: ["localhost:6379"]
-      clients:
+      routes:
         pub:
           stream: stream
           batch_size: 1000

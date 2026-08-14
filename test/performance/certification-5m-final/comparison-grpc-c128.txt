@@ -1,0 +1,43 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                │ /Users/mak/src/fujin/test/performance/certification-5m-final/baseline-grpc-c128.bench │ /Users/mak/src/fujin/test/performance/certification-5m-final/current-grpc-c128.bench │
+                                                                │                                        sec/op                                         │                            sec/op                             vs base                │
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8                                                                               30.35µ ± ∞ ¹                                                   27.41µ ± ∞ ¹       ~ (p=0.200 n=3) ²
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=128-8                                                                            4.380µ ± ∞ ¹                                                   4.394µ ± ∞ ¹       ~ (p=0.700 n=3) ²
+geomean                                                                                                                                    11.53µ                                                         10.97µ        -4.81%
+¹ need >= 6 samples for confidence interval at level 0.95
+² need >= 4 samples to detect a difference at alpha level 0.05
+
+                                                                │ /Users/mak/src/fujin/test/performance/certification-5m-final/baseline-grpc-c128.bench │ /Users/mak/src/fujin/test/performance/certification-5m-final/current-grpc-c128.bench │
+                                                                │                                          B/s                                          │                             B/s                               vs base                │
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8                                                                              4.025Mi ± ∞ ¹                                                  4.454Mi ± ∞ ¹       ~ (p=0.300 n=3) ²
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=128-8                                                                           27.87Mi ± ∞ ¹                                                  27.78Mi ± ∞ ¹       ~ (p=0.700 n=3) ²
+geomean                                                                                                                                   10.59Mi                                                        11.12Mi        +5.03%
+¹ need >= 6 samples for confidence interval at level 0.95
+² need >= 4 samples to detect a difference at alpha level 0.05
+
+                                                                │ /Users/mak/src/fujin/test/performance/certification-5m-final/baseline-grpc-c128.bench │ /Users/mak/src/fujin/test/performance/certification-5m-final/current-grpc-c128.bench │
+                                                                │                                        p99-sec                                        │                           p99-sec                             vs base                │
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8                                                                               3.094m ± ∞ ¹                                                   3.050m ± ∞ ¹       ~ (p=0.700 n=3) ²
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=128-8                                                                            50.96µ ± ∞ ¹                                                   49.42µ ± ∞ ¹       ~ (p=1.000 n=3) ²
+geomean                                                                                                                                    397.1µ                                                         388.2µ        -2.23%
+¹ need >= 6 samples for confidence interval at level 0.95
+² need >= 4 samples to detect a difference at alpha level 0.05
+
+                                                                │ /Users/mak/src/fujin/test/performance/certification-5m-final/baseline-grpc-c128.bench │ /Users/mak/src/fujin/test/performance/certification-5m-final/current-grpc-c128.bench │
+                                                                │                                         B/op                                          │                             B/op                              vs base                │
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8                                                                              1.717Ki ± ∞ ¹                                                  1.702Ki ± ∞ ¹       ~ (p=0.400 n=3) ²
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=128-8                                                                             553.0 ± ∞ ¹                                                    512.0 ± ∞ ¹       ~ (p=0.700 n=3) ²
+geomean                                                                                                                                     986.0                                                          944.7        -4.19%
+¹ need >= 6 samples for confidence interval at level 0.95
+² need >= 4 samples to detect a difference at alpha level 0.05
+
+                                                                │ /Users/mak/src/fujin/test/performance/certification-5m-final/baseline-grpc-c128.bench │ /Users/mak/src/fujin/test/performance/certification-5m-final/current-grpc-c128.bench │
+                                                                │                                       allocs/op                                       │                          allocs/op                            vs base                │
+_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8                                                                                41.00 ± ∞ ¹                                                    41.00 ± ∞ ¹       ~ (p=1.000 n=3) ²
+_Session_HSubscribe_GRPC/payload=128B/batch=1/concurrency=128-8                                                                             11.00 ± ∞ ¹                                                    10.00 ± ∞ ¹       ~ (p=1.000 n=3) ²
+geomean                                                                                                                                     21.24                                                          20.25        -4.65%
+¹ need >= 6 samples for confidence interval at level 0.95
+² need >= 4 samples to detect a difference at alpha level 0.05

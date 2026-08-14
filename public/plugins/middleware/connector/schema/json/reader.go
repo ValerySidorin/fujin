@@ -13,8 +13,8 @@ type schemaReaderWrapper struct {
 	l  *slog.Logger
 }
 
-func (r *schemaReaderWrapper) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	return r.r.Subscribe(ctx, func(message []byte, topic string, args ...any) {
+func (r *schemaReaderWrapper) Subscribe(ctx context.Context, ready func() error, h func(message []byte, topic string, args ...any)) error {
+	return r.r.Subscribe(ctx, ready, func(message []byte, topic string, args ...any) {
 		if err := r.mw.validate(message); err != nil {
 			r.l.Warn("subscribe: invalid message skipped", "topic", topic, "error", formatValidationError(err))
 			return
@@ -23,8 +23,8 @@ func (r *schemaReaderWrapper) Subscribe(ctx context.Context, h func(message []by
 	})
 }
 
-func (r *schemaReaderWrapper) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	return r.r.SubscribeWithHeaders(ctx, func(message []byte, topic string, hs [][]byte, args ...any) {
+func (r *schemaReaderWrapper) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	return r.r.SubscribeWithHeaders(ctx, ready, func(message []byte, topic string, hs [][]byte, args ...any) {
 		if err := r.mw.validate(message); err != nil {
 			r.l.Warn("subscribe: invalid message skipped", "topic", topic, "error", formatValidationError(err))
 			return

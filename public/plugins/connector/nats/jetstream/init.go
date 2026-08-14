@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("nats_jetstream", newJetStreamConnector); err != nil {
+	if err := connector.Register("nats_jetstream", descriptor()); err != nil {
 		panic(fmt.Sprintf("register nats_jetstream connector: %v", err))
 	}
 }

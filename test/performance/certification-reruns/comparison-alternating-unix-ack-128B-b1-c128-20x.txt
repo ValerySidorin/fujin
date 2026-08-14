@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                          │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-ack-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-ack-128B-b1-c128-20x.bench │
+                                                                          │                                                     sec/op                                                      │                                            sec/op                                             vs base          │
+_Session_Ack_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                       3.599µ ± 2%                                                                                    3.520µ ± 2%  ~ (p=0.072 n=20)
+
+                                                                          │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-ack-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-ack-128B-b1-c128-20x.bench │
+                                                                          │                                                       B/s                                                       │                                             B/s                                               vs base          │
+_Session_Ack_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                      33.92Mi ± 2%                                                                                   34.69Mi ± 2%  ~ (p=0.071 n=20)
+
+                                                                          │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-ack-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-ack-128B-b1-c128-20x.bench │
+                                                                          │                                                     p99-sec                                                     │                                           p99-sec                                             vs base          │
+_Session_Ack_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                     1239.6µ ± 29%                                                                                   868.9µ ± 38%  ~ (p=0.076 n=20)
+
+                                                                          │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-ack-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-ack-128B-b1-c128-20x.bench │
+                                                                          │                                                      B/op                                                       │                                          B/op                                           vs base                │
+_Session_Ack_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                        175.0 ± 1%                                                                               142.0 ± 1%  -18.86% (p=0.000 n=20)
+
+                                                                          │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-alternating-unix-ack-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-alternating-unix-ack-128B-b1-c128-20x.bench │
+                                                                          │                                                    allocs/op                                                    │                                       allocs/op                                         vs base                │
+_Session_Ack_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                       10.000 ± 0%                                                                               8.000 ± 0%  -20.00% (p=0.000 n=20)

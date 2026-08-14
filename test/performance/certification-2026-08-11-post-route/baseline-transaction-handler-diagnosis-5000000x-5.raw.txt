@@ -1,0 +1,11 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/internal/proto
+cpu: Apple M2
+BenchmarkDiagnosisTransactionHandler-8   	 5000000	       394.9 ns/op	     122 B/op	       3 allocs/op
+BenchmarkDiagnosisTransactionHandler-8   	 5000000	       391.4 ns/op	     122 B/op	       3 allocs/op
+BenchmarkDiagnosisTransactionHandler-8   	 5000000	       391.4 ns/op	     122 B/op	       3 allocs/op
+BenchmarkDiagnosisTransactionHandler-8   	 5000000	       391.2 ns/op	     122 B/op	       3 allocs/op
+BenchmarkDiagnosisTransactionHandler-8   	 5000000	       391.1 ns/op	     122 B/op	       3 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/internal/proto	10.314s

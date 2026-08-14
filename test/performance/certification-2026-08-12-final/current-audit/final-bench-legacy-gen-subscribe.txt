@@ -1,0 +1,81 @@
+time=2026-08-12T15:58:15.329+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.329+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:58:15.331+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:58:15.331+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Subscribe_1BPayload_Gen_TCP-8      	       1	    129542 ns/op	   0.05 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.332+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.332+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:132 msg="fujin unix server started" server=fujin_unix path=/tmp/fujin-bench.sock
+time=2026-08-12T15:58:15.332+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:124 msg="closing unix listener after all connections done" server=fujin_unix
+time=2026-08-12T15:58:15.332+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:128 msg="fujin unix server stopped" server=fujin_unix
+Benchmark_Subscribe_1BPayload_Gen_Unix-8     	       1	     22667 ns/op	   0.31 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.333+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:58:15.333+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.361+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:58:15.361+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Subscribe_1BPayload_Gen_QUIC-8     	       1	     56959 ns/op	   0.12 MB/s	  525424 B/op	      18 allocs/op
+time=2026-08-12T15:58:15.362+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:58:15.362+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.362+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:58:15.362+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Subscribe_32BPayload_Gen_TCP-8     	       1	     16917 ns/op	   2.25 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.363+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:132 msg="fujin unix server started" server=fujin_unix path=/tmp/fujin-bench.sock
+time=2026-08-12T15:58:15.363+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.363+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:124 msg="closing unix listener after all connections done" server=fujin_unix
+time=2026-08-12T15:58:15.363+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:128 msg="fujin unix server stopped" server=fujin_unix
+Benchmark_Subscribe_32BPayload_Gen_Unix-8    	       1	     20666 ns/op	   1.84 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.364+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:58:15.364+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.415+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:58:15.415+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Subscribe_32BPayload_Gen_QUIC-8    	       1	     13626 ns/op	   2.79 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.416+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:58:15.416+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Subscribe_1KBPayload_Gen_TCP-8     	       1	     24000 ns/op	  42.92 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:132 msg="fujin unix server started" server=fujin_unix path=/tmp/fujin-bench.sock
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:124 msg="closing unix listener after all connections done" server=fujin_unix
+time=2026-08-12T15:58:15.417+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:128 msg="fujin unix server stopped" server=fujin_unix
+Benchmark_Subscribe_1KBPayload_Gen_Unix-8    	       1	     12125 ns/op	  84.95 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.418+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:58:15.418+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.557+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:58:15.557+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Subscribe_1KBPayload_Gen_QUIC-8    	       1	     14250 ns/op	  72.28 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.557+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:58:15.557+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.559+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:58:15.559+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Subscribe_32KBPayload_Gen_TCP-8    	       1	     56791 ns/op	 577.10 MB/s	  524752 B/op	       6 allocs/op
+time=2026-08-12T15:58:15.559+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:132 msg="fujin unix server started" server=fujin_unix path=/tmp/fujin-bench.sock
+time=2026-08-12T15:58:15.559+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.560+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:124 msg="closing unix listener after all connections done" server=fujin_unix
+time=2026-08-12T15:58:15.560+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:128 msg="fujin unix server stopped" server=fujin_unix
+Benchmark_Subscribe_32KBPayload_Gen_Unix-8   	       1	     84916 ns/op	 385.96 MB/s	  524928 B/op	       8 allocs/op
+time=2026-08-12T15:58:15.560+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:58:15.560+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.597+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:58:15.597+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Subscribe_32KBPayload_Gen_QUIC-8   	       1	    280500 ns/op	 116.84 MB/s	  549072 B/op	     360 allocs/op
+time=2026-08-12T15:58:15.598+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T15:58:15.598+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.608+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T15:58:15.608+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+Benchmark_Subscribe_1MBPayload_Gen_TCP-8     	       1	    712708 ns/op	1471.26 MB/s	 1609984 B/op	      11 allocs/op
+time=2026-08-12T15:58:15.608+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:132 msg="fujin unix server started" server=fujin_unix path=/tmp/fujin-bench.sock
+time=2026-08-12T15:58:15.608+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.619+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:124 msg="closing unix listener after all connections done" server=fujin_unix
+time=2026-08-12T15:58:15.619+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/unix/server.go:128 msg="fujin unix server stopped" server=fujin_unix
+Benchmark_Subscribe_1MBPayload_Gen_Unix-8    	       1	    917833 ns/op	1142.45 MB/s	 1608848 B/op	      11 allocs/op
+time=2026-08-12T15:58:15.619+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:160 msg="fujin server started" server=fujin_quic addr=[::]:4848
+time=2026-08-12T15:58:15.619+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T15:58:15.699+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:145 msg="closing quic listener after all connections done" server=fujin_quic
+time=2026-08-12T15:58:15.699+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/quic/server.go:156 msg="fujin server stopped" server=fujin_quic
+Benchmark_Subscribe_1MBPayload_Gen_QUIC-8    	       1	   9666249 ns/op	 108.48 MB/s	 1047944 B/op	   11841 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.887s

@@ -14,7 +14,7 @@ connectors:
     settings:
       common:
         init_address: ["valkey:6379"]
-      clients:
+      routes:
         pub:
           channel: example-channel
           batch_size: 1000

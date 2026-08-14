@@ -45,11 +45,7 @@ func (w *Writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, cal
 	if len(headers) > 0 {
 		natsMsg.Header = make(nats.Header)
 		for i := 0; i < len(headers); i += 2 {
-			if i+1 < len(headers) {
-				key := string(headers[i])
-				value := string(headers[i+1])
-				natsMsg.Header.Set(key, value)
-			}
+			natsMsg.Header.Add(string(headers[i]), string(headers[i+1]))
 		}
 	}
 

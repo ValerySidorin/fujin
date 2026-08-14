@@ -50,12 +50,12 @@ type mockReader struct {
 	headerHandler func([]byte, string, [][]byte, ...any)
 }
 
-func (r *mockReader) Subscribe(_ context.Context, h func([]byte, string, ...any)) error {
+func (r *mockReader) Subscribe(_ context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	r.handler = h
 	return nil
 }
 
-func (r *mockReader) SubscribeWithHeaders(_ context.Context, h func([]byte, string, [][]byte, ...any)) error {
+func (r *mockReader) SubscribeWithHeaders(_ context.Context, ready func() error, h func([]byte, string, [][]byte, ...any)) error {
 	r.headerHandler = h
 	return nil
 }
@@ -125,7 +125,7 @@ func TestRoundtrip_Produce_Subscribe(t *testing.T) {
 	wrappedR := mw.WrapReader(mockR, "test")
 
 	var received []byte
-	wrappedR.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrappedR.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = msg
 	})
 	mockR.handler(compressed, "topic1")
@@ -151,7 +151,7 @@ func TestRoundtrip_HProduce_SubscribeWithHeaders(t *testing.T) {
 
 	var received []byte
 	var receivedHeaders [][]byte
-	wrappedR.SubscribeWithHeaders(context.Background(), func(msg []byte, topic string, hs [][]byte, args ...any) {
+	wrappedR.SubscribeWithHeaders(context.Background(), func() error { return nil }, func(msg []byte, topic string, hs [][]byte, args ...any) {
 		received = msg
 		receivedHeaders = hs
 	})
@@ -207,7 +207,7 @@ func TestReader_Subscribe_InvalidData(t *testing.T) {
 	wrappedR := mw.WrapReader(mockR, "test")
 
 	var received bool
-	wrappedR.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrappedR.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mockR.handler([]byte("not zstd compressed data"), "topic1")

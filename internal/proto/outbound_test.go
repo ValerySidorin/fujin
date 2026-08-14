@@ -5,11 +5,15 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
+
+	"github.com/fujin-io/fujin/internal/proto/pool"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,6 +56,20 @@ func (m *mockStream) written() []byte {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.buf.Bytes()
+}
+
+type boundedWriteStream struct {
+	mockStream
+	maxWrite int
+	enobufs  atomic.Int32
+}
+
+func (m *boundedWriteStream) Write(p []byte) (int, error) {
+	if len(p) > m.maxWrite {
+		m.enobufs.Add(1)
+		return 0, syscall.ENOBUFS
+	}
+	return m.mockStream.Write(p)
 }
 
 func newTestOutbound(str *mockStream) *Outbound {
@@ -335,6 +353,94 @@ func TestQueueOutbound_PendingBytesTracking(t *testing.T) {
 	assert.Equal(t, int64(11), o.pb)
 	o.Unlock()
 }
+func TestQueueOutbound_BlocksAtPendingLimit(t *testing.T) {
+	str := &mockStream{}
+	o := newTestOutbound(str)
+	o.Lock()
+	o.pb = maximumPendingBytes
+	o.Unlock()
+
+	enqueued := make(chan struct{})
+	go func() {
+		o.EnqueueProto([]byte("x"))
+		close(enqueued)
+	}()
+
+	select {
+	case <-enqueued:
+		t.Fatal("enqueue completed while pending bytes were at the limit")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	o.Lock()
+	o.pb = 0
+	o.c.Broadcast()
+	o.Unlock()
+	select {
+	case <-enqueued:
+	case <-time.After(time.Second):
+		t.Fatal("enqueue did not resume after pending bytes were released")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		o.WriteLoop()
+		close(done)
+	}()
+	o.Close()
+	<-done
+	assert.Equal(t, []byte("x"), str.written())
+}
+func TestQueueOutboundOwnedMulti_BlocksWholeFrameAtPendingLimit(t *testing.T) {
+	str := &mockStream{}
+	o := newTestOutbound(str)
+	o.Lock()
+	o.pb = maximumPendingBytes
+	o.Unlock()
+
+	first := pool.Get(1)[:1]
+	first[0] = 'a'
+	second := pool.Get(1)[:1]
+	second[0] = 'b'
+	enqueued := make(chan struct{})
+	go func() {
+		o.Lock()
+		o.QueueOutboundOwnedMultiNoLock(first, second)
+		o.SignalFlush()
+		o.Unlock()
+		close(enqueued)
+	}()
+
+	select {
+	case <-enqueued:
+		t.Fatal("owned frame completed while pending bytes were at the limit")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	o.Lock()
+	o.pb = 0
+	o.c.Broadcast()
+	o.Unlock()
+	select {
+	case <-enqueued:
+	case <-time.After(time.Second):
+		t.Fatal("owned frame did not resume after pending bytes were released")
+	}
+
+	o.Lock()
+	assert.Equal(t, int64(2), o.pb)
+	require.Len(t, o.v, 2)
+	o.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		o.WriteLoop()
+		close(done)
+	}()
+	o.Close()
+	<-done
+	assert.Equal(t, []byte("ab"), str.written())
+}
 
 func TestQueueOutbound_CoalesceIntoLastBuffer(t *testing.T) {
 	str := &mockStream{}
@@ -362,6 +468,37 @@ func TestQueueOutbound_CoalesceIntoLastBuffer(t *testing.T) {
 	o.Unlock()
 
 	assert.Equal(t, []byte("aaaaaaaaaabb"), total)
+}
+func TestSelectWriteBatchBoundsBytesAndVectors(t *testing.T) {
+	chunks := net.Buffers{make([]byte, 48*1024), make([]byte, 48*1024)}
+	var storage [MaxVectorSize][]byte
+	batch := selectWriteBatch(storage[:0], chunks, fallbackWriteBatchLen)
+	require.Len(t, batch, 2)
+	assert.Len(t, batch[0], 48*1024)
+	assert.Len(t, batch[1], 16*1024)
+	assert.Len(t, chunks[1], 48*1024)
+
+	many := make(net.Buffers, MaxVectorSize+1)
+	for i := range many {
+		many[i] = []byte{byte(i)}
+	}
+	batch = selectWriteBatch(storage[:0], many, 0)
+	assert.Len(t, batch, MaxVectorSize)
+}
+
+func TestWriteBuffers_RetriesENOBUFSWithBoundedBatch(t *testing.T) {
+	str := &boundedWriteStream{maxWrite: fallbackWriteBatchLen}
+	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
+	o := NewOutbound(str, 5*time.Second, l)
+	payload := bytes.Repeat([]byte("x"), 2*fallbackWriteBatchLen)
+	o.wv = append(o.wv, payload)
+
+	n := o.writeBuffers()
+
+	assert.Equal(t, int64(len(payload)), n)
+	assert.Equal(t, int32(1), str.enobufs.Load())
+	assert.Equal(t, payload, str.written())
+	assert.Empty(t, o.wv)
 }
 
 func TestWriteBuffers_NilStream(t *testing.T) {
@@ -458,6 +595,31 @@ func TestConcurrent_EnqueueAndWriteLoop(t *testing.T) {
 	total := int(totalBytes.Load())
 	assert.Equal(t, total, written,
 		"all bytes should be written to stream")
+}
+
+func TestWriteLoop_FlushesSequentialEnqueues(t *testing.T) {
+	str := &mockStream{}
+	o := newTestOutbound(str)
+	done := make(chan struct{})
+	go func() {
+		o.WriteLoop()
+		close(done)
+	}()
+
+	const messages = 1000
+	for i := range messages {
+		o.EnqueueProto([]byte{'x'})
+		require.Eventually(t, func() bool {
+			o.Lock()
+			pending := o.pb
+			o.Unlock()
+			return pending == 0 && len(str.written()) == i+1
+		}, 100*time.Millisecond, time.Microsecond)
+	}
+
+	o.Close()
+	<-done
+	assert.Len(t, str.written(), messages)
 }
 
 func TestConcurrent_EnqueueMultiAndWriteLoop(t *testing.T) {

@@ -1,0 +1,14 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1932 ns/op	  66.26 MB/s	    239125 p99-ns	     711 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1982 ns/op	  64.59 MB/s	    253875 p99-ns	     712 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      2018 ns/op	  63.41 MB/s	    254792 p99-ns	     716 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1962 ns/op	  65.23 MB/s	    253375 p99-ns	     718 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1982 ns/op	  64.59 MB/s	    250667 p99-ns	     711 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1906 ns/op	  67.17 MB/s	    245500 p99-ns	     711 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1951 ns/op	  65.59 MB/s	    262208 p99-ns	     714 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1949 ns/op	  65.66 MB/s	    251209 p99-ns	     721 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      1923 ns/op	  66.55 MB/s	    251208 p99-ns	     716 B/op	      12 allocs/op
+Benchmark_Session_HSubscribe_Native/transport=quic/payload=128B/batch=1/concurrency=16-8	10000	      2000 ns/op	  63.99 MB/s	    245292 p99-ns	     715 B/op	      12 allocs/op

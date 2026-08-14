@@ -375,9 +375,10 @@ type otelReaderWrapper struct {
 	connectorName string
 }
 
-func (d *otelReaderWrapper) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (d *otelReaderWrapper) Subscribe(ctx context.Context, ready func() error, h func(message []byte, topic string, args ...any)) error {
 	return d.r.Subscribe(
 		ctx,
+		ready,
 		func(message []byte, topic string, args ...any) {
 			_, span := tracer().Start(ctx, "reader.subscribe.handle",
 				trace.WithAttributes(
@@ -391,9 +392,10 @@ func (d *otelReaderWrapper) Subscribe(ctx context.Context, h func(message []byte
 	)
 }
 
-func (d *otelReaderWrapper) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (d *otelReaderWrapper) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	return d.r.SubscribeWithHeaders(
 		ctx,
+		ready,
 		func(message []byte, topic string, hs [][]byte, args ...any) {
 			carrier := newByteHeadersCarrier(&hs)
 			ctx2 := propagator().Extract(ctx, carrier)

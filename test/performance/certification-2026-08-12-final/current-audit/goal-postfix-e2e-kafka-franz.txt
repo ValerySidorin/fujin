@@ -1,0 +1,87 @@
+=== config ===
+
+=== compose up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container zoo1  Creating
+ Container zoo1  Created
+ Container kafka3  Creating
+ Container kafka2  Creating
+ Container kafka1  Creating
+ Container kafka3  Created
+ Container kafka2  Created
+ Container kafka1  Created
+ Container zoo1  Starting
+ Container zoo1  Started
+ Container kafka3  Starting
+ Container kafka2  Starting
+ Container kafka1  Starting
+ Container kafka1  Started
+ Container kafka2  Started
+ Container kafka3  Started
+ Container kafka1  Waiting
+ Container kafka2  Waiting
+ Container kafka3  Waiting
+ Container zoo1  Waiting
+ Container kafka3  Healthy
+ Container kafka2  Healthy
+ Container zoo1  Healthy
+ Container kafka1  Healthy
+
+=== go test ===
+=== RUN   TestE2E_KafkaFranz
+time=2026-08-12T17:46:15.228+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:913 msg="Server started"
+time=2026-08-12T17:46:15.228+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+=== RUN   TestE2E_KafkaFranz/Produce
+=== RUN   TestE2E_KafkaFranz/HProduce
+=== RUN   TestE2E_KafkaFranz/Produce_Subscribe
+=== RUN   TestE2E_KafkaFranz/Produce_HSubscribe
+=== RUN   TestE2E_KafkaFranz/Fetch_Flow
+=== RUN   TestE2E_KafkaFranz/Fetch_Flow/Produce_Fetch
+=== RUN   TestE2E_KafkaFranz/Fetch_Flow/Produce_HFetch
+=== RUN   TestE2E_KafkaFranz/Produce_Fetch_Ack
+=== RUN   TestE2E_KafkaFranz/Produce_Fetch_Nack
+=== RUN   TestE2E_KafkaFranz/Tx_Produce_Commit
+    e2e_test.go:498: tx not supported
+=== RUN   TestE2E_KafkaFranz/Tx_Produce_Rollback
+    e2e_test.go:530: tx not supported
+time=2026-08-12T17:46:41.355+03:00 level=ERROR source=/Users/mak/src/fujin/internal/proto/outbound.go:167 msg="write buffers" server=fujin_tcp err="writev tcp [::1]:4850->[::1]:61940: writev: broken pipe"
+time=2026-08-12T17:46:41.355+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T17:46:41.355+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+--- PASS: TestE2E_KafkaFranz (26.13s)
+    --- PASS: TestE2E_KafkaFranz/Produce (3.83s)
+    --- PASS: TestE2E_KafkaFranz/HProduce (0.02s)
+    --- PASS: TestE2E_KafkaFranz/Produce_Subscribe (3.91s)
+    --- PASS: TestE2E_KafkaFranz/Produce_HSubscribe (0.53s)
+    --- PASS: TestE2E_KafkaFranz/Fetch_Flow (8.15s)
+        --- PASS: TestE2E_KafkaFranz/Fetch_Flow/Produce_Fetch (4.08s)
+        --- PASS: TestE2E_KafkaFranz/Fetch_Flow/Produce_HFetch (4.07s)
+    --- PASS: TestE2E_KafkaFranz/Produce_Fetch_Ack (4.12s)
+    --- PASS: TestE2E_KafkaFranz/Produce_Fetch_Nack (4.06s)
+    --- SKIP: TestE2E_KafkaFranz/Tx_Produce_Commit (0.00s)
+    --- SKIP: TestE2E_KafkaFranz/Tx_Produce_Rollback (0.00s)
+PASS
+ok  	github.com/fujin-io/fujin/test	26.668s
+
+=== compose down ===
+ Container kafka1  Stopping
+ Container kafka2  Stopping
+ Container kafka3  Stopping
+ Container kafka2  Stopped
+ Container kafka2  Removing
+ Container kafka2  Removed
+ Container kafka1  Stopped
+ Container kafka1  Removing
+ Container kafka1  Removed
+ Container kafka3  Stopped
+ Container kafka3  Removing
+ Container kafka3  Removed
+ Container zoo1  Stopping
+ Container zoo1  Stopped
+ Container zoo1  Removing
+ Container zoo1  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed
+
+=== remaining containers ===
+

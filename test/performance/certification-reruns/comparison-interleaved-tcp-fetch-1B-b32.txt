@@ -1,0 +1,23 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                         │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-tcp-fetch-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-tcp-fetch-1B-b32.bench │
+                                                                         │                                                 sec/op                                                 │                                     sec/op                                      vs base               │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                                              6.822µ ± 9%                                                                      6.644µ ± 2%  -2.62% (p=0.006 n=10)
+
+                                                                         │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-tcp-fetch-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-tcp-fetch-1B-b32.bench │
+                                                                         │                                                  B/s                                                   │                                      B/s                                        vs base               │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                                             4.473Mi ± 8%                                                                     4.592Mi ± 2%  +2.67% (p=0.006 n=10)
+
+                                                                         │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-tcp-fetch-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-tcp-fetch-1B-b32.bench │
+                                                                         │                                                p99-sec                                                 │                                       p99-sec                                        vs base          │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                                              389.8µ ± 8%                                                                           397.1µ ± 7%  ~ (p=0.436 n=10)
+
+                                                                         │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-tcp-fetch-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-tcp-fetch-1B-b32.bench │
+                                                                         │                                                  B/op                                                  │                                      B/op                                       vs base               │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                                             3.237Ki ± 0%                                                                     3.062Ki ± 0%  -5.39% (p=0.000 n=10)
+
+                                                                         │ /Users/mak/src/fujin/test/performance/certification-reruns/baseline-interleaved-tcp-fetch-1B-b32.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/current-interleaved-tcp-fetch-1B-b32.bench │
+                                                                         │                                               allocs/op                                                │                                   allocs/op                                     vs base               │
+_Session_Fetch_Native/transport=tcp/payload=1B/batch=32/concurrency=16-8                                                                                               75.00 ± 0%                                                                       73.00 ± 0%  -2.67% (p=0.000 n=10)

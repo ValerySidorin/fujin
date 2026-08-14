@@ -1,0 +1,24 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/a-direct-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-direct-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                   sec/op                                                   │                                          sec/op                                           vs base          │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                 237.9n ± 12%                                                                                257.7n ± 4%  ~ (p=0.052 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/a-direct-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-direct-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                    B/s                                                     │                                           B/s                                             vs base          │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                513.2Mi ± 10%                                                                               473.8Mi ± 4%  ~ (p=0.052 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/a-direct-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-direct-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                  p99-sec                                                   │                                         p99-sec                                           vs base          │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                 784.5µ ± 12%                                                                               643.9µ ± 18%  ~ (p=0.086 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/a-direct-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-direct-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                    B/op                                                    │                                        B/op                                          vs base               │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                   387.5 ± 3%                                                                            407.0 ± 2%  +5.03% (p=0.001 n=20)
+
+                                                                                 │ /Users/mak/src/fujin/test/performance/certification-reruns/a-direct-unix-hsubscribe-128B-b1-c128-20x.bench │ /Users/mak/src/fujin/test/performance/certification-reruns/b-direct-unix-hsubscribe-128B-b1-c128-20x.bench │
+                                                                                 │                                                 allocs/op                                                  │                                       allocs/op                                         vs base            │
+_Session_HSubscribe_Native/transport=unix/payload=128B/batch=1/concurrency=128-8                                                                                                   8.000 ± 0%                                                                               8.000 ± 0%  ~ (p=1.000 n=20) ¹
+¹ all samples are equal

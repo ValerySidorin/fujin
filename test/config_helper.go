@@ -9,17 +9,18 @@ import (
 func ptr(b bool) *bool { return &b }
 
 // DefaultQUICTransportConfig returns a transport.Config for QUIC with test TLS.
-// Uses examples/assets/certs (run tests from repo root).
+// Go test binaries run with the package directory as their working directory.
 func DefaultQUICTransportConfig() transport.Config {
 	return transport.Config{
 		Type:    "quic",
 		Enabled: ptr(true),
 		Settings: map[string]any{
-			"addr": ":4848",
+			"addr":                 ":4848",
+			"max_incoming_streams": 1024,
 			"tls": map[string]any{
-				"enabled":               true,
-				"server_cert_pem_path":  "examples/assets/certs/fujin.io.pem",
-				"server_key_pem_path":   "examples/assets/certs/fujin.io-key.pem",
+				"enabled":              true,
+				"server_cert_pem_path": "../examples/assets/certs/fujin.io.pem",
+				"server_key_pem_path":  "../examples/assets/certs/fujin.io-key.pem",
 			},
 		},
 	}
@@ -63,6 +64,26 @@ func MakeConfigWithQUICAndGRPC(connectors connector_config.ConnectorsConfig) ser
 		GRPC:       DefaultGRPCServerTestConfig,
 		Connectors: connectors,
 	}
+}
+
+// MakeConfigWithGRPC creates a server Config with only the gRPC adapter.
+func MakeConfigWithGRPC(connectors connector_config.ConnectorsConfig) serverconfig.Config {
+	grpcConfig := DefaultGRPCServerTestConfig
+	grpcConfig.TLS = nil
+	return serverconfig.Config{
+		GRPC:       grpcConfig,
+		Connectors: connectors,
+	}
+}
+
+// MakeConfigWithGRPCAndOptionalTCP preserves the combined benchmark topology
+// when native transports are compiled in while supporting grpc-only builds.
+func MakeConfigWithGRPCAndOptionalTCP(connectors connector_config.ConnectorsConfig) serverconfig.Config {
+	config := MakeConfigWithGRPC(connectors)
+	if _, _, ok := transport.Get("tcp"); ok {
+		config.Transports = append(config.Transports, DefaultTCPTransportConfig())
+	}
+	return config
 }
 
 // MakeConfigWithTCP creates a server Config with TCP transport.

@@ -1,0 +1,51 @@
+=== compose up ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container valkey  Creating
+ Container valkey  Created
+ Container valkey  Starting
+ Container valkey  Started
+ Container valkey  Waiting
+ Container valkey  Healthy
+
+=== go test ===
+=== RUN   TestE2E_RedisPubSub
+time=2026-08-12T16:47:43.888+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:905 msg="Server started"
+time=2026-08-12T16:47:43.888+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+=== RUN   TestE2E_RedisPubSub/Produce
+=== RUN   TestE2E_RedisPubSub/HProduce
+=== RUN   TestE2E_RedisPubSub/Produce_Subscribe
+=== RUN   TestE2E_RedisPubSub/Produce_HSubscribe
+    e2e_test.go:231: hsubscribe not supported
+=== RUN   TestE2E_RedisPubSub/Fetch_Flow
+    e2e_test.go:280: fetch not supported
+=== RUN   TestE2E_RedisPubSub/Produce_Fetch_Ack
+    e2e_test.go:381: fetch+ack not supported
+=== RUN   TestE2E_RedisPubSub/Produce_Fetch_Nack
+    e2e_test.go:440: fetch+nack not supported
+=== RUN   TestE2E_RedisPubSub/Tx_Produce_Commit
+    e2e_test.go:498: tx not supported
+=== RUN   TestE2E_RedisPubSub/Tx_Produce_Rollback
+    e2e_test.go:530: tx not supported
+time=2026-08-12T16:47:45.931+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T16:47:45.931+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+--- PASS: TestE2E_RedisPubSub (2.04s)
+    --- PASS: TestE2E_RedisPubSub/Produce (0.02s)
+    --- PASS: TestE2E_RedisPubSub/HProduce (0.01s)
+    --- PASS: TestE2E_RedisPubSub/Produce_Subscribe (0.51s)
+    --- SKIP: TestE2E_RedisPubSub/Produce_HSubscribe (0.00s)
+    --- SKIP: TestE2E_RedisPubSub/Fetch_Flow (0.00s)
+    --- SKIP: TestE2E_RedisPubSub/Produce_Fetch_Ack (0.00s)
+    --- SKIP: TestE2E_RedisPubSub/Produce_Fetch_Nack (0.00s)
+    --- SKIP: TestE2E_RedisPubSub/Tx_Produce_Commit (0.00s)
+    --- SKIP: TestE2E_RedisPubSub/Tx_Produce_Rollback (0.00s)
+PASS
+ok  	github.com/fujin-io/fujin/test	2.547s
+
+=== compose down ===
+ Container valkey  Stopping
+ Container valkey  Stopped
+ Container valkey  Removing
+ Container valkey  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

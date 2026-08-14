@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+var ErrBytePoolExhausted = errors.New("no available byte values")
+
 type BytePool struct {
 	mu   sync.Mutex
 	bits [4]uint64
@@ -32,7 +34,7 @@ func (bp *BytePool) Get() (byte, error) {
 			}
 		}
 	}
-	return 0, errors.New("no available byte values")
+	return 0, ErrBytePoolExhausted
 }
 
 // Put returns value to pool

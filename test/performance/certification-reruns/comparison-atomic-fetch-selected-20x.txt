@@ -1,0 +1,33 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+                                                                           │ test/performance/certification-reruns/baseline-atomic-fetch-selected-20x.bench │ test/performance/certification-reruns/current-atomic-fetch-selected-20x.bench │
+                                                                           │                                     sec/op                                     │                         sec/op                          vs base               │
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                       5.054µ ± 3%                                              5.335µ ± 6%       ~ (p=0.092 n=20)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                      27.90µ ± 1%                                              29.97µ ± 2%  +7.41% (p=0.000 n=20)
+geomean                                                                                                                                         11.87µ                                                   12.64µ       +6.49%
+
+                                                                           │ test/performance/certification-reruns/baseline-atomic-fetch-selected-20x.bench │ test/performance/certification-reruns/current-atomic-fetch-selected-20x.bench │
+                                                                           │                                      B/s                                       │                          B/s                            vs base               │
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                      6.042Mi ± 3%                                             5.717Mi ± 7%       ~ (p=0.092 n=20)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                     8.755Mi ± 1%                                             8.144Mi ± 2%  -6.97% (p=0.000 n=20)
+geomean                                                                                                                                        7.273Mi                                                  6.824Mi       -6.17%
+
+                                                                           │ test/performance/certification-reruns/baseline-atomic-fetch-selected-20x.bench │ test/performance/certification-reruns/current-atomic-fetch-selected-20x.bench │
+                                                                           │                                    p99-sec                                     │                        p99-sec                         vs base                │
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                       262.4µ ± 9%                                            293.2µ ± 15%        ~ (p=0.174 n=20)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                      1.199m ± 4%                                            1.353m ±  5%  +12.78% (p=0.000 n=20)
+geomean                                                                                                                                         561.1µ                                                 629.8µ        +12.25%
+
+                                                                           │ test/performance/certification-reruns/baseline-atomic-fetch-selected-20x.bench │ test/performance/certification-reruns/current-atomic-fetch-selected-20x.bench │
+                                                                           │                                      B/op                                      │                          B/op                           vs base               │
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                      3.231Ki ± 0%                                             3.077Ki ± 0%  -4.77% (p=0.000 n=20)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                     48.87Ki ± 0%                                             49.24Ki ± 0%  +0.75% (p=0.000 n=20)
+geomean                                                                                                                                        12.57Ki                                                  12.31Ki       -2.05%
+
+                                                                           │ test/performance/certification-reruns/baseline-atomic-fetch-selected-20x.bench │ test/performance/certification-reruns/current-atomic-fetch-selected-20x.bench │
+                                                                           │                                   allocs/op                                    │                       allocs/op                         vs base               │
+_Session_Fetch_Native/transport=unix/payload=1B/batch=32/concurrency=16-8                                                                        75.00 ± 0%                                               73.00 ± 0%  -2.67% (p=0.000 n=20)
+_Session_HFetch_Native/transport=tcp/payload=1B/batch=256/concurrency=16-8                                                                      2.065k ± 0%                                              2.064k ± 0%  -0.05% (p=0.000 n=20)
+geomean                                                                                                                                          393.5                                                    388.2       -1.37%

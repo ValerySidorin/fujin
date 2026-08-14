@@ -37,11 +37,11 @@ func (w *mockWriter) HProduce(_ context.Context, msg []byte, headers [][]byte, c
 	}
 }
 
-func (w *mockWriter) Flush(_ context.Context) error          { return nil }
-func (w *mockWriter) BeginTx(_ context.Context) error        { return nil }
-func (w *mockWriter) CommitTx(_ context.Context) error       { return nil }
-func (w *mockWriter) RollbackTx(_ context.Context) error     { return nil }
-func (w *mockWriter) Close() error                           { return nil }
+func (w *mockWriter) Flush(_ context.Context) error      { return nil }
+func (w *mockWriter) BeginTx(_ context.Context) error    { return nil }
+func (w *mockWriter) CommitTx(_ context.Context) error   { return nil }
+func (w *mockWriter) RollbackTx(_ context.Context) error { return nil }
+func (w *mockWriter) Close() error                       { return nil }
 
 // --- mock reader ---
 
@@ -51,13 +51,13 @@ type mockReader struct {
 	headerHandler   func([]byte, string, [][]byte, ...any)
 }
 
-func (r *mockReader) Subscribe(_ context.Context, h func([]byte, string, ...any)) error {
+func (r *mockReader) Subscribe(_ context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	r.subscribeCalled = true
 	r.handler = h
 	return nil
 }
 
-func (r *mockReader) SubscribeWithHeaders(_ context.Context, h func([]byte, string, [][]byte, ...any)) error {
+func (r *mockReader) SubscribeWithHeaders(_ context.Context, ready func() error, h func([]byte, string, [][]byte, ...any)) error {
 	r.headerHandler = h
 	return nil
 }
@@ -80,10 +80,10 @@ func (r *mockReader) Nack(_ context.Context, _ [][]byte, nh func(error), _ func(
 	nh(nil)
 }
 
-func (r *mockReader) MsgIDArgsLen() int                                  { return 0 }
-func (r *mockReader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte  { return buf }
-func (r *mockReader) AutoCommit() bool                                   { return true }
-func (r *mockReader) Close() error                                       { return nil }
+func (r *mockReader) MsgIDArgsLen() int                                 { return 0 }
+func (r *mockReader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte { return buf }
+func (r *mockReader) AutoCommit() bool                                  { return true }
+func (r *mockReader) Close() error                                      { return nil }
 
 // --- helpers ---
 
@@ -208,7 +208,7 @@ func TestReader_Subscribe_ValidMessage(t *testing.T) {
 	mock := &mockReader{}
 	wrapped := mw.WrapReader(mock, "test")
 
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {})
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {})
 
 	if !mock.subscribeCalled {
 		t.Fatal("expected Subscribe to be called")
@@ -217,7 +217,7 @@ func TestReader_Subscribe_ValidMessage(t *testing.T) {
 	// Simulate broker delivering a valid message
 	var received bool
 	// Re-subscribe to capture the wrapped handler
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mock.handler([]byte(`{"name":"alice","age":30}`), "topic1")
@@ -233,7 +233,7 @@ func TestReader_Subscribe_InvalidMessage(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 
@@ -251,7 +251,7 @@ func TestReader_SubscribeWithHeaders_InvalidMessage(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.SubscribeWithHeaders(context.Background(), func(msg []byte, topic string, hs [][]byte, args ...any) {
+	wrapped.SubscribeWithHeaders(context.Background(), func() error { return nil }, func(msg []byte, topic string, hs [][]byte, args ...any) {
 		received = true
 	})
 

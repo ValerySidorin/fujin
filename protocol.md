@@ -1,447 +1,510 @@
 # Fujin protocol
 
-This document provides a brief description of the native Fujin protocol, used for communication between the Fujin server and client. It is a byte-based protocol that supports various patterns. The protocol layer is transport-agnostic — the same binary protocol runs over QUIC or TCP.
+This document specifies Fujin native protocol v1. It is an incremental, length-prefixed binary protocol used over TCP, QUIC, and Unix domain sockets. The gRPC API has a separate protobuf wire format but delegates the same session semantics to Session Core.
 
-The Fujin server implements a [zero allocation byte parser](https://youtu.be/ylRKac5kSOk?t=10m46s), inspired by the NATS server, ensuring high speed and efficiency.
+The server parser consumes an arbitrary byte stream without command delimiters and uses pooled buffers on protocol hot paths.
 
 ## Protocol conventions
 
-**Command as an Array of Bytes with Optional Content**: Each interaction between the client and server consists of a control (protocol) byte array, optionally followed by message content.  
-**No Command Delimiters**: The Fujin server receives commands as a plain stream of bytes. Commands are parsed based on their structure.  
-**Byte Order**: The Fujin server uses big-endian byte order.  
+- **Byte order:** all integers use big-endian byte order.
+- **Framing:** an opcode determines the remaining fields. There is no delimiter between commands.
+- **Correlation IDs:** request/response operations use a client-selected `uint32` unless their section says otherwise.
+- **Booleans:** exactly one byte: `0` is false and `1` is true. Other values are malformed.
+- **Counts:** a collection count is the number of following elements, not its byte size.
+- **Lengths:** a length prefixes the raw bytes immediately following it.
 
 ## Type system
 
-Before describing the commands, let's explore the data types used in the Fujin protocol.
+| Type | Wire encoding | Example |
+| --- | --- | --- |
+| `byte` | 1 byte | `[1]` |
+| `uint16` | 2 bytes | `[0, 1]` |
+| `uint32` | 4 bytes | `[0, 0, 0, 1]` |
+| `bool` | 1 byte, `0` or `1` | `[0]` |
+| `[uint16]T` | `uint16` element count followed by the encoded elements | `[0, 1, ...]` |
+| `[uint32]T` | `uint32` element count followed by the encoded elements | `[0, 0, 0, 1, ...]` |
+| `bytes` | `uint32` byte length followed by raw bytes | `[0, 0, 0, 2, 104, 105]` |
+| `string` | the same encoding as `bytes`; semantic UTF-8 requirements are stated per field | `[0, 0, 0, 2, 104, 105]` |
 
-| Type               | Length (bytes)               | Example                                    | Representation     |
-|--------------------|------------------------------|--------------------------------------------| ------------------ |
-| byte               | 1                            | `[1]`                                      | `1`                |
-| uint16             | 2                            | `[0, 1]`                                   | `1`                |
-| uint32             | 4                            | `[0, 0, 0, 1]`                             | `1`                |
-| bool               | 1                            | `[0]`                                      | `false`            |
-| [uint16]type       | dynamic (uint16 len+payload) | `[0, 1, 1]`                                | `[1]`              |
-| [uint32]type       | dynamic (uint32 len+payload) | `[0, 0, 0, 1, 1]`                          | `[1]`              |
-| string             | dynamic (uint32 len+payload) | `[0, 0, 0, 5, 104, 101, 108, 108, 111]`    | `"hello"`          |
-| type{string, bool} | dynamic                      | `[0, 0, 0, 5, 104, 101, 108, 108, 111, 0]` | `{"hello", false}` |
+### Error encoding
 
-* **Nullability**: If type is nullable, 1 byte is always prepended before (0 if null, 1 if not). For this doc, nullable types will be illustrated as followed: `string?`. In some cases value nullability is client defined, and we don't need to prepend 1 byte. Such values will be illustrated as followed: `string??`.
+Every operation response starts its result with a `status: byte`. Status values match the canonical gRPC status codes:
 
-## Type aliases
+- `0 OK`
+- `1 CANCELED`
+- `2 UNKNOWN`
+- `3 INVALID_ARGUMENT`
+- `4 DEADLINE_EXCEEDED`
+- `5 NOT_FOUND`
+- `6 ALREADY_EXISTS`
+- `7 PERMISSION_DENIED`
+- `8 RESOURCE_EXHAUSTED`
+- `9 FAILED_PRECONDITION`
+- `10 ABORTED`
+- `11 OUT_OF_RANGE`
+- `12 UNIMPLEMENTED`
+- `13 INTERNAL`
+- `14 UNAVAILABLE`
+- `15 DATA_LOSS`
+- `16 UNAUTHENTICATED`
 
-For convenience, some type aliases are introduced.
-| Type       | Alias for                                            |
-| ---------- | ---------------------------------------------------- |
-| string     | [uint32]byte                                         |
-| message    | type{[uint32]byte??, string}                         |
-| hmessage   | type{[uint32]byte??, string, [uint16]byte??, string} |
-| ackres     | type{[uint32]byte, bool}                             |
+`0` is success and is followed immediately by the operation's success fields. A nonzero status is followed by:
+
+`[<outcome: byte>, <reason: string>, <message: string>, <detail count: uint16>, <details>]`
+
+Each detail is `<key: string>, <value: string>`. Detail keys are encoded in lexical order. Outcome values are `0 unspecified`, `1 not_applied`, `2 applied`, and `3 unknown`.
+
+`reason` is a stable Fujin identifier suitable for programmatic handling. `message` is the human-readable explanation. Status gives the general failure class; outcome states whether a state-changing operation took effect. Retry policy is not encoded because it also depends on operation idempotency and outcome.
+
+Fields documented after `<status>` are present only when status is `0` unless explicitly stated otherwise. Per-message ACK/NACK results use the same status and error envelope independently for each message ID.
+### Message encodings
+
+Delivery mode determines whether a client-settleable message ID is present:
+
+- auto-settle message: `<payload: bytes>`
+- manual-settlement message: `<message id: bytes>, <payload: bytes>`
+- headered message: `<headers>, [<message id: bytes>], <payload: bytes>`
+
+`headers` is a `uint16` count of raw byte strings followed by that many `bytes` fields. The count is the total number of alternating key and value strings and therefore must be even.
+
+## Messaging terms
+
+- `route` is the stable Fujin configuration name selected by a client command.
+- `destination` is a connector-specific broker address configured under that route.
+- `filter` is a connector-specific selector that may cover multiple destinations.
+- `source` is the broker-specific origin supplied internally by an adapter. Native v1 does not expose it as a separate response field; in manual-settlement mode an adapter may include it inside the opaque message ID.
+- Headers form an unordered multimap. Keys are non-empty UTF-8 bytes, values are arbitrary bytes, duplicate keys remain distinct, pair order has no meaning, and an empty collection means no headers.
+
+## Route capabilities and guarantees
+
+Each compiled connector route has an immutable capability profile pinned by `BIND`. Session Core validates the profile before opening a reader or writer. Unsupported operations return an explicit error rather than degrading silently.
+
+The profile can advertise `produce`, lossless `headers`, `transactions`, `subscribe`, `fetch`, and manual settlement. A producer route also declares the strongest condition observed before a successful response:
+
+- `local_accept` — accepted by local connector or socket buffering;
+- `peer_accept` — positively acknowledged by a remote broker or peer;
+- `durable_accept` — positively acknowledged as durably stored under the configured policy.
+
+Manual settlement separately declares ACK granularity (`single` or `cumulative`) and NACK effect (`requeue`, `release`, `drop`, or unsupported).
+
+Both native v1 and gRPC return the pinned profile on a successful `BIND`, so clients can reject unsupported workflows before issuing an operation. The profile is descriptive: broker availability and remote authentication are still established lazily by the first operation that opens a broker resource.
 
 ## Transports
 
-The Fujin protocol is transport-agnostic. The same byte stream runs over any supported transport:
+The command and response frames below are identical on every native transport:
 
-- **QUIC** — Multiplexed streams over UDP with built-in TLS. Each command session runs on a separate QUIC stream. PING uses a dedicated control stream.
-- **TCP** — Plain TCP (with optional TLS). One connection carries a single command session. PING is in-band on the same connection.
-- **Unix** — Unix domain sockets. Same-machine only; uses filesystem path. PING is in-band.
+- **QUIC:** one bidirectional QUIC stream carries one Fujin session. A connection-level health probe uses a dedicated server-opened stream. If `ping_stream` is enabled, the server additionally emits in-band PING frames on each messaging stream.
+- **TCP:** one connection carries one Fujin session. Fujin-level PING emission is not currently enabled; the transport enables TCP keepalive.
+- **Unix:** one Unix domain socket connection carries one Fujin session. Fujin-level PING emission is not currently enabled.
 
 ## Versioning
 
-Over QUIC, Fujin uses protocol versioning at the TLS layer via ALPN.
+QUIC negotiates native protocol v1 through ALPN value `fujin/1`. The server rejects a missing or unsupported ALPN value. TCP and Unix connections implicitly use v1 and perform no protocol negotiation.
 
-- Current protocol version: "fujin/1" (v1)
-- The server only accepts connections with supported ALPN versions and rejects others.
+The opcodes, field encodings, and semantics in this document are the current `fujin/1` contract. Until Fujin declares the native protocol stable, coordinated server and SDK releases may evolve this contract while retaining the `fujin/1` identifier; clients and servers must therefore use compatible release lines. After that stability declaration, an incompatible wire or semantic change requires a new negotiated protocol version.
 
-Compatibility rules:
-- All opcodes and formats below apply to v1 (ALPN "fujin/1").
-- Future versions will use a new ALPN value (e.g., "fujin/2"). Clients may provide multiple values to negotiate the highest mutually supported version.
-- Header semantics may evolve in future versions without changing the opcodes.
+## PING / PONG
 
-Over TCP, the protocol version is implicitly v1 (no ALPN negotiation).
-
-## PING
 ### Direction
-Server -> Client
-### Description
-`PING` and `PONG` implement a simple keep-alive mechanism between the client and server. Once a client establishes a connection, the server sends `PING` messages at a configurable interval. If the client fails to respond with a `PONG` message within the configured response interval, the server will terminate its connection. If a connection remains idle for too long, it will be closed.
-Additionally, the server can be configured to ping opened streams. This helps to determine broken protocol writes, and close such streams.
 
-**Transport-specific behavior:**
-- **QUIC**: `PING` messages are sent over dedicated control streams, separated from messaging ones (QUIC supports multiplexing).
-- **TCP**: `PING` is sent in-band on the same connection as other commands. TCP keepalive is also enabled at the transport level.
+Server -> Client -> Server
+
+### Description
+
+When a transport emits PING, the client must reply with PONG on the same stream. Both frames are the single byte `99`.
+
+QUIC always performs its connection-level probe on a dedicated stream. Failure to receive a valid one-byte PONG within the configured timeout counts as a failed attempt; after the configured retry limit the connection is closed. Optional QUIC `ping_stream` probing uses the same frame in-band on each messaging stream and closes an unresponsive stream.
+
 ### Syntax
-##### Request
-`[99]`
-##### Response
-`[99]`
-### Examples
+
+Request: `[99]`
+
+Response: `[99]`
+
+### Example
+
 - `[99]` -> `[99]`
 
 ## BIND
 
 ### Direction
+
 Client -> Server
+
 ### Description
-Before producing messages, the client must open a stream (QUIC stream or TCP connection) and send a `BIND` command to the server. This command binds the session to a connector and optionally applies configuration overrides to connector settings. The `BIND` command must be sent before any other commands (except `PING`/`PONG`).
 
-The `BIND` command includes:
-- `connector_name`: The name of the connector to bind to (e.g., `kafka_connector`)
-- `meta`: Optional metadata key-value pairs that can be used by bind middleware plugins (e.g., for authentication)
-- `config_overrides`: Optional configuration overrides that allow dynamic modification of connector settings at runtime
+`BIND` selects one connector configuration and pins an immutable, locally validated configuration generation to the session. It runs bind middleware and may apply whitelisted configuration overrides. Success proves that the plugin is compiled in and that its settings, routes, capabilities, and guarantees are locally valid. It performs no broker I/O and does not prove broker availability or remote authentication.
 
-### Syntax
-##### Request
- `[1, <connector_name>, <meta>, <config_overrides>]`  
- where:
- | name              | description                                          | type           |
-| ------------------ | ---------------------------------------------------- | -------------- |
-| `connector_name`   | The name of the connector to bind to.                | string         |
-| `meta`             | Optional metadata key-value pairs.                   | [uint16]string |
-| `config_overrides` | Array of key-value pairs for configuration override. | [uint16]string |
+Clients must successfully bind before issuing session operations. PONG may be sent before BIND when the transport has emitted a PING.
 
-Where `meta` and `config_overrides` are arrays of key-value pairs, each pair represented as:
-- `[uint32]string` (key length + key)
-- `[uint32]string` (value length + value)
+### Request
 
-##### Response
-`[16, <error>]` 
+`[1, <connector name: string>, <meta pair count: uint16>, <meta pairs>, <override pair count: uint16>, <override pairs>]`
 
-### Examples
-- `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 0]` -> `[16, 0]` (BIND with connector name "kafka_connector", no meta, no overrides)
-- `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 1, 0, 0, 0, 7, 97, 112, 105, 95, 107, 101, 121, 0, 0, 0, 16, 109, 121, 45, 115, 101, 99, 114, 101, 116, 45, 107, 101, 121, 45, 49, 50, 51, 0, 0]` -> `[16, 0]` (BIND with connector name "kafka_connector", one meta pair: `api_key` = `my-secret-key-123`, no overrides)
-- `[1, 0, 0, 0, 14, 107, 97, 102, 107, 97, 95, 99, 111, 110, 110, 101, 99, 116, 111, 114, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 25, 119, 114, 105, 116, 101, 114, 46, 112, 117, 98, 46, 116, 114, 97, 110, 115, 97, 99, 116, 105, 111, 110, 97, 108, 95, 105, 100, 0, 0, 0, 15, 109, 121, 45, 116, 120, 45, 105, 100, 45, 49, 50, 51, 52, 53]` -> `[16, 0]` (BIND with connector name "kafka_connector", no meta, one override: `writer.pub.transactional_id` = `my-tx-id-12345`)
+Each pair is encoded as `<key: string>, <value: string>`. The pair count counts key/value pairs, not individual strings.
+
+- `connector name` is the configured connector instance name, not its plugin type.
+- `meta` is consumed by bind middleware.
+- override keys are configuration paths such as `routes.orders.transactional_id` and must be permitted by the connector's `overridable` list.
+
+### Response
+
+- success: `[16, 0, <route count: uint32>, <route profiles>]`
+- failure: `[16, <status>, <error envelope after status>]`
+
+Each successful route profile is:
+
+`[<route: string>, <capability flags: byte>, <produce guarantee: byte>, <ACK granularity: byte>, <NACK effect: byte>]`
+
+Capability flag bits are `0x01 produce`, `0x02 headers`, `0x04 transactions`, `0x08 subscribe`, `0x10 fetch`, and `0x20 manual settlement`. Guarantee values are `0 unspecified`, `1 local_accept`, `2 peer_accept`, and `3 durable_accept`. ACK values are `0 unsupported`, `1 single`, and `2 cumulative`. NACK values are `0 unsupported`, `1 requeue`, `2 release`, and `3 drop`.
+
+Routes are encoded in lexical order for deterministic framing. BIND has no correlation ID. A failure response has no route profiles.
+
+### Example
+
+- A successful connector with one `pub` route supporting produce and headers with `local_accept` returns `[16, 0, 0, 0, 0, 1, 0, 0, 0, 3, 112, 117, 98, 3, 1, 0, 0]`.
 
 ## PRODUCE
 
 ### Direction
+
 Client -> Server
+
 ### Description
-Sends a message to the specified topic. This must be sent on the same stream where the `BIND` command was previously issued.
-### Syntax
-##### Request
-`[2, <correlation id>, <topic>, <message>]`  
-where:
-| name             | description                                                               | type                      |
-| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
-| `topic`          | The target topic for the message.                                         | string                    |
-| `message`        | The message content.                                                      | [uint32]byte              |
-##### Response
-`[3, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type   |
-| ---------------- | ------------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
-### Examples
-- `[2, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[3, 0, 1, 1, 1, 0]`
+
+Sends one non-transactional message through a configured Fujin route. The route must advertise `produce`; success means the route's declared acceptance guarantee was reached. The payload length must be greater than zero. `PRODUCE` is rejected while a transaction is active.
+
+### Request
+
+`[2, <correlation id: uint32>, <route: string>, <payload: bytes>]`
+
+### Response
+
+- success: `[3, <correlation id>, 0]`
+- failure: `[3, <correlation id>, <status>, <error envelope after status>]`
 
 ## HPRODUCE
 
 ### Direction
-Client -> Server
-### Description
-Sends a message with headers to the specified topic. This must be sent on the same stream where the `BIND` command was previously issued.
-### Syntax
-##### Request
-`[3, <correlation id>, <topic>, <headers>, <message>]`  
-where:
-| name             | description                                                               | type                      |
-| ---------------- | ------------------------------------------------------------------------- | ------------------------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32                    |
-| `topic`          | The target topic for the message.                                         | string                    |
-| `headers`        | Optional headers for the message.                                         | [uint16]string            |
-| `message`        | The message content.                                                      | [uint32]byte              |
-##### Response
-`[4, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type   |
-| ---------------- | ------------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
-### Examples
-- `[3, 0, 1, 1, 1, 0, 0, 0, 3, 112, 117, 98, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]` -> `[4, 0, 1, 1, 1, 0]`
 
+Client -> Server
+
+### Description
+
+Header-aware form of `PRODUCE`. The route must advertise both `produce` and lossless `headers`. Headers use the canonical alternating key/value representation. The payload length must be greater than zero, and the operation is rejected while a transaction is active.
+
+### Request
+
+`[3, <correlation id: uint32>, <route: string>, <headers>, <payload: bytes>]`
+
+### Response
+
+- success: `[4, <correlation id>, 0]`
+- failure: `[4, <correlation id>, <status>, <error envelope after status>]`
 
 ## BEGIN TX
+
 ### Direction
+
 Client -> Server
 
 ### Description
-Begins transaction. Must be sent on the same stream where the `BIND` command was sent previously. For Kafka transactions, `transactional_id` should be configured via `BIND` command's config overrides (e.g., `clients.client1.transactional_id`).
 
-### Syntax
-##### Request
-`[4, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-##### Response
-`[3, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type   |
-| ---------------- | ------------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32 |
-| `error`     | An error.               | string?   | always   |
+Flushes ordinary session writers, verifies that the route advertises transactions, acquires its writer, and successfully invokes the connector's transaction begin operation before returning success. A successful BEGIN therefore represents a concrete broker transaction, including an empty transaction with no subsequent produce. The transaction is restricted to the selected route.
 
-### Examples
-- `[4, 0, 0, 0, 1]` -> `[3, 0, 0, 0, 1, 0]`
+### Request
+
+`[4, <correlation id: uint32>, <route: string>]`
+
+### Response
+
+- success: `[5, <correlation id>, 0]`
+- failure: `[5, <correlation id>, <status>, <error envelope after status>]`
 
 ## COMMIT TX
+
 ### Direction
+
 Client -> Server
 
 ### Description
-Commits transaction. Must be sent on the same stream where the `BIND` command was sent previously.
 
-### Syntax
-##### Request
-`[5, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-##### Response
-`[4, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type    |
-| ---------------- | ------------------------------------------------------------------------- | ------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
-| `error`          | An error.                                                                 | string? |
+Flushes operations accepted by the transaction writer and then commits the active transaction. The local transaction always ends. A flush failure triggers best-effort rollback; a commit failure is reported as an unknown remote outcome. Any writer involved in a terminal error is closed and not returned to the session pool.
 
-### Examples
-- `[5, 0, 0, 0, 1]` -> `[4, 0, 0, 0, 1, 0]`
+### Request
+
+`[5, <correlation id: uint32>]`
+
+### Response
+
+- success: `[6, <correlation id>, 0]`
+- failure: `[6, <correlation id>, <status>, <error envelope after status>]`
 
 ## ROLLBACK TX
+
 ### Direction
+
 Client -> Server
 
 ### Description
-Rolls back transaction. Must be sent on the same stream where the `BIND` command was sent previously.
 
-### Syntax
-##### Request
-`[6, <correlation id>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-##### Response
-`[5, <correlation id>, <error>]`  
-where:
-| name             | description                                                               | type    |
-| ---------------- | ------------------------------------------------------------------------- | ------- |
-| `correlation id` | Correlation ID used to match the client request with the server response. | uint32  |
-| `error`          | An error.                                                                 | string? |
+Rolls back the active transaction. The local transaction always ends. A writer whose rollback fails is closed and not reused.
 
-### Examples
-- `[6, 0, 0, 0, 1]` -> `[5, 0, 0, 0, 1, 0]`
+### Request
 
-## SUBSCRIBE
+`[6, <correlation id: uint32>]`
+
+### Response
+
+- success: `[7, <correlation id>, 0]`
+- failure: `[7, <correlation id>, <status>, <error envelope after status>]`
+
+## TX_PRODUCE
 
 ### Direction
+
 Client -> Server
+
 ### Description
-Client initiates a subscription to a topic. Messages will be sent by the server on the same stream opened by the client. Message distribution is handled by the underlying broker.
 
-### Syntax
-##### Request
-`[11, <correlation id>, <auto commit>, <topic>]`  
-where:
-| name             | description                                                          | type   |
-| ---------------- | -------------------------------------------------------------------- | ------ |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32 |
-| `auto commit`    | Subscribe with auto commit.                                          | bool   |
-| `topic`          | Topic to read from.                                                  | string |
-##### Response
-`[1, <correlation id>, <error>, <subscription id>]`  
-where:
-| name              | description                                                          |  type   |
-| ----------------- | -------------------------------------------------------------------- | ------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32  |
-| `error`           | An error.                                                            | string? |
-| `subscription id` | Subscription ID.                                                     | byte    |
+Sends a non-empty payload through the route selected by BEGIN. The request carries no route and cannot switch transaction destinations.
 
-### Examples
-- `[11, 0, 0, 0, 1, 1, 0, 0, 0, 3, 112, 117, 98]` -> `[1, 0, 0, 0, 1, 0, 5]`
+### Request
+
+`[15, <correlation id: uint32>, <payload: bytes>]`
+
+### Response
+
+- success: `[17, <correlation id>, 0]`
+- failure: `[17, <correlation id>, <status>, <error envelope after status>]`
+
+## TX_HPRODUCE
+
+### Direction
+
+Client -> Server
+
+### Description
+
+Header-aware form of TX_PRODUCE. The transaction route must advertise lossless header support.
+
+### Request
+
+`[16, <correlation id: uint32>, <headers>, <payload: bytes>]`
+
+### Response
+
+- success: `[18, <correlation id>, 0]`
+- failure: `[18, <correlation id>, <status>, <error envelope after status>]`
+
+Normal PRODUCE and HPRODUCE are not transaction message commands. During an active transaction, clients must use TX_PRODUCE or TX_HPRODUCE.
+
+## SUBSCRIBE / HSUBSCRIBE
+
+### Direction
+
+Client -> Server
+
+### Description
+
+Creates a push reader for a configured route. SUBSCRIBE requires the `subscribe` capability; HSUBSCRIBE additionally requires lossless `headers`. Manual mode also requires manual-settlement capability.
+
+The successful response is emitted only after the adapter reaches its strongest observable readiness boundary and before the first delivered message. Session Core invokes the receive lifecycle once. If it fails before readiness, the request fails. If it terminates after readiness, the native v1 stream is closed because v1 has no asynchronous subscription-terminal-error frame.
+
+The wire field remains named `auto commit` for compatibility:
+
+- `0` — manual settlement; delivered messages contain client-settleable IDs.
+- `1` — auto-settle; delivered messages contain no IDs and later ACK/NACK is invalid. Delivery is at-most-once relative to the Fujin client after the adapter hands the message to Session Core.
+
+### Requests
+
+- SUBSCRIBE: `[11, <correlation id: uint32>, <auto commit: bool>, <route: string>]`
+- HSUBSCRIBE: `[12, <correlation id: uint32>, <auto commit: bool>, <route: string>]`
+
+### Responses
+
+- SUBSCRIBE success: `[1, <correlation id>, 0, <subscription id: byte>]`
+- HSUBSCRIBE success: `[2, <correlation id>, 0, <subscription id: byte>]`
+- SUBSCRIBE failure: `[1, <correlation id>, <status>, <error envelope after status>]`
+- HSUBSCRIBE failure: `[2, <correlation id>, <status>, <error envelope after status>]`
+
 ## MSG
 
 ### Direction
+
 Server -> Client
+
 ### Description
-A message propagated by the server on the client's stream after issuing `SUBSCRIBE` command.
-### Syntax
-`[8, <subscription id>, <message>]`
-where:
-| name                  | description      | type           |
-| --------------------- | ---------------- | -------------- |
-| `subscription id`     | Subscription ID. | byte           |
-| `message`             | Message.         | message        |
-### Examples
-- `-` -> `[8, 5, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
+
+Delivers one non-headered subscription message. The subscription mode established by SUBSCRIBE determines the frame layout.
+
+### Frames
+
+- auto-settle: `[8, <subscription id: byte>, <payload: bytes>]`
+- manual settlement: `[8, <subscription id: byte>, <message id: bytes>, <payload: bytes>]`
+
+The message ID is opaque to clients and must be returned unchanged to ACK or NACK.
 
 ## HMSG
 
 ### Direction
-Server -> Client
-### Description
-A message with headers propagated by the server on the client's stream after issuing `SUBSCRIBE` command.
-### Syntax
-`[9, <subscription id>, <hmessage>]`  
-where:
-| name                  | description       | type           |
-| --------------------- | ----------------- | -------------- |
-| `subscription id`     | Subscription ID.  | byte           |
-| `message`             | Headered message. | hmessage       |
-### Examples
-- `-` -> `[9, 5, 0, 0, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
 
+Server -> Client
+
+### Description
+
+Header-aware subscription delivery.
+
+### Frames
+
+- auto-settle: `[9, <subscription id: byte>, <headers>, <payload: bytes>]`
+- manual settlement: `[9, <subscription id: byte>, <headers>, <message id: bytes>, <payload: bytes>]`
+
+## UNSUBSCRIBE
+
+### Direction
+
+Client -> Server
+
+### Description
+
+Cancels and closes the reader identified by the subscription ID. Closing the reader invalidates every outstanding message ID from it. Repeating UNSUBSCRIBE for the same ID returns an error.
+
+### Request
+
+`[13, <correlation id: uint32>, <subscription id: byte>]`
+
+### Response
+
+- success: `[14, <correlation id>, 0]`
+- failure: `[14, <correlation id>, <status>, <error envelope after status>]`
 
 ## ACK
 
 ### Direction
-Client -> Server
-### Description
-If auto commit is disabled on the specified topic, the reader must `ACK` each message or message offset. `ACK` rules are dictated by the underlying broker.
-### Syntax
-##### Request
-`[9, <correlation id>, <subscription id>, <msg ids>]`  
-where:
-| name             | description                                                          | type                 |
-| ---------------- | ---------------------------------------------------------------------| -------------------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32               |
-| `subscription id`| Subscription ID to identify the subscription.                        | byte                 |
-| `msg ids`        | Message ID batch.                                                    | [uint32][uint32]byte |
-##### Response
-`[12, <correlation id>, <error>, <ack results>]`  
-where:
-| name             | description                                                          | type           |
-| ---------------- | -------------------------------------------------------------------- | -------------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32         |
-| `error`          | An error.                                                            | string?        |
-| `ack results`    | An array of ack results. (Msg ID + success)                          | [uint32]ackres |
 
-### Examples
-- `[9, 0, 0, 0, 1, 1, 0, 0, 0, 1]` -> `[12, 0, 0, 0, 1, 0]`
+Client -> Server
+
+### Description
+
+Applies the route's declared acknowledgement granularity to a manual-settlement reader. ACK is invalid for an auto-settle reader. Message IDs are versioned Core envelopes scoped to one reader incarnation; malformed, stale, cross-reader, duplicated within the request, or already consumed IDs are rejected.
+
+### Request
+
+`[9, <correlation id: uint32>, <subscription id: byte>, <message id count: uint32>, <message ids>]`
+
+Each message ID is a `bytes` field. A zero count is valid and produces an empty successful result set.
+
+### Response
+
+- top-level failure: `[12, <correlation id>, <status>, <error envelope after status>]`
+- top-level success: `[12, <correlation id>, 0, <result count: uint32>, <results>]`
+
+Each result is:
+
+- success: `[<message id: bytes>, 0]`
+- failure: `[<message id: bytes>, <status>, <error envelope after status>]`
+
+Results are emitted once per requested ID after top-level success. A successful result consumes that message ID.
 
 ## NACK
 
 ### Direction
+
 Client -> Server
+
 ### Description
-Works similarly to `ACK`.
-### Syntax
-##### Request
-`[10, <correlation id>, <subscription id>, <message ids>]`  
-where:
-| name              | description                                                          | type                 | presence |
-| ----------------- | ---------------------------------------------------------------------| -------------------- | -------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32               | always   |
-| `subscription id` | Subscription ID to identify the subscription.                        | byte                 | always   |
-| `msg ids`         | Message ID batch.                                                    | [uint32][uint32]byte | always   |
-##### Response
-`[13, <correlation id>, <error>, <nack results>]`  
-where:
-| name             | description                                                          | type           |
-| ---------------- | -------------------------------------------------------------------- | -------------- |
-| `correlation id` | Correlation ID is used to match client request with server response. | uint32         |
-| `error`          | An error.                                                            | string?        |
-| `nack results`   | An array of nack results. (Msg ID + success)                         | [uint32]ackres |
 
+Applies the route's declared NACK effect (`requeue`, `release`, or `drop`) to a manual-settlement reader. Unsupported or no-op behavior is a top-level error. NACK uses the same message-ID validation, request layout, and result layout as ACK, with response opcode `13`.
 
-### Examples
-- `[10, 0, 0, 0, 1, 1, 0, 0, 0, 1]` -> `[13, 0, 0, 0, 1, 0]`
+### Request
+
+`[10, <correlation id: uint32>, <subscription id: byte>, <message id count: uint32>, <message ids>]`
+
+### Response
+
+- top-level failure: `[13, <correlation id>, <status>, <error envelope after status>]`
+- top-level success: `[13, <correlation id>, 0, <result count: uint32>, <results>]`
 
 ## FETCH
 
 ### Direction
+
 Client -> Server
-## Description
-Client can send a `FETCH` command to the server to retrieve messages from the current stream. The server will respond with a `FETCH` reply containing a batch of messages. The behavior of batch retrieval depends on the underlying broker: some brokers will block until all messages are received (or at least one), while others may return immediately, even if the batch contains zero messages. Not all connectors implement `FETCH`. For those, who are not - subscriber pattern is a preferred way of reading messages.
 
-On the first `FETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `FETCH` requests for the same topic reuse the same subscription.
+### Description
 
-## Syntax
-##### Request
-`[7, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
-where:
-| name                     | description                                                          | type   |
-| ------------------------ | -------------------------------------------------------------------- | ------ |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32 |
-| `auto commit`            | Fetch with auto commit.                                              | bool   |
-| `topic`                  | Topic to read from.                                                  | string |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32 |
+Retrieves up to a strict positive maximum number of messages. Zero is an invalid batch size. A successful response may contain from zero through the requested maximum; zero is valid only after the connector's fetch or configured wait completes without messages.
 
-##### Response
-`[10, <correlation id>, <error>, <subscription_id>, <msgs>]`  
-where:
-| name              | description                                                          | type             |
-| ----------------- | -------------------------------------------------------------------- | ---------------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32           |
-| `error`           | An error.                                                            | string?          |
-| `subscription_id` | Subscription ID for ACK/NACK operations (reused across fetches).    | byte             |
-| `msgs`            | Message batch.                                                       | [uint32]message  |
+The first FETCH for a `(route, auto commit, header mode)` tuple creates an implicit reader and assigns a subscription ID. Equivalent later requests reuse it. Only one FETCH may be active on that reader; contention returns an explicit error. FETCH and HFETCH use separate implicit readers.
+
+### Request
+
+`[7, <correlation id: uint32>, <auto commit: bool>, <route: string>, <maximum messages: uint32>]`
+
+### Response
+
+- failure: `[10, <correlation id>, <status>, <error envelope after status>]`
+- success: `[10, <correlation id>, 0, <subscription id: byte>, <message count: uint32>, <messages>]`
+
+Each message uses the MSG body layout without its opcode and subscription ID:
+
+- auto-settle: `<payload: bytes>`
+- manual settlement: `<message id: bytes>, <payload: bytes>`
+
+The returned subscription ID is stable for the implicit reader and is used by ACK, NACK, and UNSUBSCRIBE.
 
 ## HFETCH
 
 ### Direction
+
 Client -> Server
-## Description
-`FETCH` with headers support.
 
-On the first `HFETCH` request for a given topic, the server creates an implicit subscription (reader) and assigns a `subscription_id`. This `subscription_id` is returned in the response and should be used for subsequent `ACK`/`NACK` operations. Subsequent `HFETCH` requests for the same topic reuse the same subscription.
+### Description
 
-## Syntax
-##### Request
-`[8, <correlation id>, <auto commit>, <topic>, <msg response batch len>]`  
-where:
-| name                     | description                                                          | type    |
-| ------------------------ | -------------------------------------------------------------------- | ------- |
-| `correlation id`         | Correlation ID is used to match client request with server response. | uint32  |
-| `auto commit`            | Fetch with auto commit.                                              | bool    |
-| `topic`                  | Topic to read from.                                                  | string  |
-| `msg response batch len` | The number of messages the server should send in response.           | uint32  |
+Header-aware FETCH. The route must advertise both `fetch` and lossless `headers`.
 
-##### Response
-`[11, <correlation id>, <error>, <subscription_id>, <msgs>]`  
-where:
-| name              | description                                                          | type                                   |
-| ----------------- | -------------------------------------------------------------------- | -------------------------------------- |
-| `correlation id`  | Correlation ID is used to match client request with server response. | uint32                                 |
-| `error`           | An error.                                                            | string?                                |
-| `subscription_id` | Subscription ID for ACK/NACK operations (reused across fetches).    | byte                                   |
-| `msgs`            | Message with headers batch.                                          | [uint32]type{[uint16]string, message}  |
+### Request
 
+`[8, <correlation id: uint32>, <auto commit: bool>, <route: string>, <maximum messages: uint32>]`
 
-### Examples
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 5, 104, 101, 108, 108, 111]`
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 0]`
-- `[8, 0, 0, 0, 1, 0, 0, 0, 1]` -> `[11, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 42, 107, 97, 102, 107, 97, 58, 32, 112, 111, 108, 108, 32, 102, 101, 116, 99, 104, 101, 115, 58, 32, 91, 123, 32, 45, 49, 32, 99, 108, 105, 101, 110, 116, 32, 99, 108, 111, 115, 101, 100, 125, 93]` 
+### Response
+
+- failure: `[11, <correlation id>, <status>, <error envelope after status>]`
+- success: `[11, <correlation id>, 0, <subscription id: byte>, <message count: uint32>, <messages>]`
+
+Each message uses the HMSG body layout without its opcode and subscription ID:
+
+- auto-settle: `<headers>, <payload: bytes>`
+- manual settlement: `<headers>, <message id: bytes>, <payload: bytes>`
+
 ## DISCONNECT
 
 ### Direction
+
 Client -> Server
+
 ### Description
-The client should send `DISCONNECT` request to the server and receive response before closing the stream/connection. Over QUIC, `DISCONNECT` should be sent on each open stream; over TCP, on the connection. The server will close the stream after sending the `DISCONNECT` response.
-### Syntax
-##### Request
-`[14]`
-##### Response
-`[15]`
-### Examples
-- `[14]` -> `[15]`
+
+After a successful BIND, the client should send DISCONNECT and wait for its response before closing the session stream. The server stops accepting commands, waits for active FETCH operations, performs bounded Session Core cleanup, then emits the response and closes the stream. On QUIC, each Fujin session stream disconnects independently.
+
+### Frames
+
+- request: `[14]`
+- response: `[15]`
+
+DISCONNECT has no correlation ID or error field. Cleanup failures are logged because the v1 response cannot carry them.
 
 ## STOP
 
 ### Direction
+
 Server -> Client
+
 ### Description
-The server can sometimes send `STOP` command to the client, when trying to shutdown gracefully. If the client does not disconnect within the configured response interval, the server will terminate its connection.
-### Syntax
-##### Request
+
+During graceful server shutdown, the server sends STOP and gives the client the configured force-termination interval to disconnect. STOP has no client response frame; the client should initiate DISCONNECT. When the interval expires, the server closes the read side of the stream.
+
+### Frame
+
 `[98]`
-##### Response
-`-`
-### Examples
-- `[98]` -> `-`

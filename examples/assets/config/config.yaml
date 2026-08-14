@@ -58,13 +58,13 @@ grpc:
 connectors:
   connector:
     type: kafka_franz
-    # Whitelist of paths that clients can override via BIND command
-    # Supports wildcards: clients.*.field matches clients.client1.field, clients.client2.field, etc.
+    # Whitelist of route-setting paths that BIND may override in its pinned generation.
+    # Supports wildcards: routes.*.field matches routes.pub.field, routes.sub.field, etc.
     overridable:
-      - clients.*.produce_topic
-      - clients.*.consume_topics
-      - clients.*.group
-      - clients.*.transactional_id
+      - routes.*.produce_topic
+      - routes.*.consume_topics
+      - routes.*.group
+      - routes.*.transactional_id
     # Bind middlewares are applied to the bind request
     # They are particularly useful for authentication and authorization for example
     # Available middlewares:
@@ -96,7 +96,10 @@ connectors:
           enabled: false
           server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
           server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
-      clients:
+      routes:
+        # Route names are Fujin client-facing identifiers. Broker destinations remain
+        # connector-specific fields such as produce_topic and consume_topics below.
+        # Delivered messages report their actual broker source, not this route name.
         pub:
           # writer settings
           allow_auto_topic_creation: true

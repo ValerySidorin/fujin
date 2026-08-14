@@ -29,12 +29,12 @@ const (
 )
 
 type dedupMiddleware struct {
-	strategy    keyStrategy
-	headerName  string
-	jqCode      *gojq.Code
+	strategy     keyStrategy
+	headerName   string
+	jqCode       *gojq.Code
 	produceStore *dedupStore
 	consumeStore *dedupStore
-	l           *slog.Logger
+	l            *slog.Logger
 }
 
 func newDedupMiddleware(config any, l *slog.Logger) (cmw.Middleware, error) {

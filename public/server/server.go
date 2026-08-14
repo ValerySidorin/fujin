@@ -2,13 +2,15 @@ package server
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/fujin-io/fujin/internal/health"
 	grpc_server "github.com/fujin-io/fujin/internal/transport/grpc/v1/server"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	"github.com/fujin-io/fujin/public/server/config"
@@ -16,9 +18,8 @@ import (
 )
 
 type Server struct {
-	conf config.Config
-
-	connectorConfig atomic.Pointer[connectorconfig.ConnectorsConfig]
+	conf    config.Config
+	catalog *connector.Catalog
 
 	transportServers []transport.TransportServer
 	grpcServer       GRPCServer
@@ -37,60 +38,47 @@ type TransportServer = transport.TransportServer
 type GRPCServer interface {
 	ListenAndServe(ctx context.Context) error
 	Stop()
+	ReadyForConnections(timeout time.Duration) bool
+	Done() <-chan struct{}
 }
 
-// NewServer creates a new server instance
+// NewServer creates a new server instance and validates the complete connector generation.
 func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 	conf.SetDefaults()
-
-	s := &Server{
-		conf: conf,
-		l:    l,
+	catalog, err := connector.CompileCatalog(conf.Connectors, l)
+	if err != nil {
+		return nil, fmt.Errorf("compile connectors: %w", err)
 	}
 
-	// Store initial connectors config
-	cc := conf.Connectors
-	s.connectorConfig.Store(&cc)
-
-	configProvider := func() connectorconfig.ConnectorsConfig {
-		return *s.connectorConfig.Load()
-	}
-
-	for _, e := range conf.Transports {
-		srv, err := transport.NewServer(e, conf.Connectors, l)
+	s := &Server{conf: conf, catalog: catalog, l: l}
+	for _, entry := range conf.Transports {
+		srv, err := transport.NewServer(entry, catalog, l)
 		if err != nil {
+			_ = catalog.Close(context.Background())
 			return nil, err
 		}
 		if srv != nil {
-			// Enable hot reload if transport supports it
-			if hr, ok := srv.(transport.HotReloadable); ok {
-				hr.SetBaseConfigProvider(configProvider)
-			}
 			s.transportServers = append(s.transportServers, srv)
 		}
 	}
 
 	if conf.GRPC.Enabled {
-		wrapper := grpc_server.NewGRPCServerWrapper(s.conf.GRPC, s.conf.Connectors, s.l)
-		// Enable hot reload on gRPC wrapper
-		if hr, ok := interface{}(wrapper).(transport.HotReloadable); ok {
-			hr.SetBaseConfigProvider(configProvider)
-		}
-		s.grpcServer = wrapper
+		s.grpcServer = grpc_server.NewGRPCServerWrapper(s.conf.GRPC, catalog, s.l)
 	}
-
 	if conf.Health.Enabled {
 		s.healthServer = health.NewServer(conf.Health, s.l)
 	}
-
 	return s, nil
 }
 
-// ReloadConnectors atomically swaps the connectors config.
-// New connections will use the updated config; existing connections are unaffected.
-func (s *Server) ReloadConnectors(cc connectorconfig.ConnectorsConfig) {
-	s.connectorConfig.Store(&cc)
+// ReloadConnectors compiles a complete replacement before publishing it.
+// Existing BINDs remain pinned to their prior generation.
+func (s *Server) ReloadConnectors(cc connectorconfig.ConnectorsConfig) error {
+	if err := s.catalog.Reload(cc); err != nil {
+		return err
+	}
 	s.l.Info("connectors config reloaded", "count", len(cc))
+	return nil
 }
 
 // SetInheritedFDs sets file descriptors inherited from a previous process
@@ -129,51 +117,37 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 	for _, ts := range s.transportServers {
 		ts := ts
-
-		// Check if we have an inherited FD for this transport
 		if inh, ok := ts.(transport.ListenerInheritor); ok && s.inheritedFDs != nil {
 			if fd := s.findInheritedFD(ts); fd != nil {
-				eg.Go(func() error {
-					return inh.ListenAndServeInherited(eCtx, fd)
-				})
+				eg.Go(func() error { return inh.ListenAndServeInherited(eCtx, fd) })
 				continue
 			}
 		}
-
-		eg.Go(func() error {
-			return ts.ListenAndServe(eCtx)
-		})
+		eg.Go(func() error { return ts.ListenAndServe(eCtx) })
 	}
 
 	if s.grpcServer != nil {
-		// Check for inherited gRPC FD
 		if inh, ok := s.grpcServer.(interface {
-			ListenAndServeInherited(ctx context.Context, fd *os.File) error
+			ListenAndServeInherited(context.Context, *os.File) error
 		}); ok && s.inheritedFDs != nil {
 			key := "tcp:" + s.conf.GRPC.Addr + ":grpc"
 			if fd, ok := s.inheritedFDs[key]; ok {
-				eg.Go(func() error {
-					return inh.ListenAndServeInherited(eCtx, fd)
-				})
+				eg.Go(func() error { return inh.ListenAndServeInherited(eCtx, fd) })
 			} else {
-				eg.Go(func() error {
-					return s.grpcServer.ListenAndServe(eCtx)
-				})
+				eg.Go(func() error { return s.grpcServer.ListenAndServe(eCtx) })
 			}
 		} else {
-			eg.Go(func() error {
-				return s.grpcServer.ListenAndServe(eCtx)
-			})
+			eg.Go(func() error { return s.grpcServer.ListenAndServe(eCtx) })
 		}
 	}
-
 	if s.healthServer != nil {
-		eg.Go(func() error {
-			return s.healthServer.ListenAndServe(eCtx)
-		})
+		eg.Go(func() error { return s.healthServer.ListenAndServe(eCtx) })
 	}
 
-	return eg.Wait()
+	serveErr := eg.Wait()
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return errors.Join(serveErr, s.catalog.Close(cleanupCtx))
 }
 
 func (s *Server) findInheritedFD(ts transport.TransportServer) *os.File {
@@ -199,6 +173,12 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 			return false
 		}
 	}
+	if s.grpcServer != nil {
+		remaining := time.Until(deadline)
+		if remaining <= 0 || !s.grpcServer.ReadyForConnections(remaining) {
+			return false
+		}
+	}
 	if s.healthServer != nil {
 		s.healthServer.SetReady(true)
 	}
@@ -207,7 +187,7 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 
 func (s *Server) Done() <-chan struct{} {
 	done := make(chan struct{})
-	if len(s.transportServers) == 0 {
+	if len(s.transportServers) == 0 && s.grpcServer == nil {
 		close(done)
 		return done
 	}
@@ -216,8 +196,10 @@ func (s *Server) Done() <-chan struct{} {
 		for _, ts := range s.transportServers {
 			<-ts.Done()
 		}
+		if s.grpcServer != nil {
+			<-s.grpcServer.Done()
+		}
 		close(done)
 	}()
-
 	return done
 }

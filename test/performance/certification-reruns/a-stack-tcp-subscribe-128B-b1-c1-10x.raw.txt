@@ -1,0 +1,150 @@
+time=2026-08-11T18:07:25.008+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:25.008+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:25.010+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:25.010+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:25.010+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:25.010+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:25.012+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:25.012+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       118.2 ns/op	1082.64 MB/s	      1125 p99-ns	     178 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.476s
+time=2026-08-11T18:07:28.590+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:28.590+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:28.592+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:28.592+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:28.593+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:28.593+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:28.595+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:28.595+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       130.8 ns/op	 978.78 MB/s	       750.0 p99-ns	     193 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.453s
+time=2026-08-11T18:07:31.029+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:31.029+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:31.031+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:31.031+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:31.032+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:31.032+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:31.034+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:31.034+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       120.7 ns/op	1060.66 MB/s	       500.0 p99-ns	     188 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.527s
+time=2026-08-11T18:07:32.279+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:32.279+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:32.281+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:32.281+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:32.281+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:32.281+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:32.283+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:32.283+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       120.9 ns/op	1058.62 MB/s	       500.0 p99-ns	     192 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.575s
+time=2026-08-11T18:07:34.555+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:34.555+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:34.557+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:34.557+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:34.558+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:34.558+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:34.560+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:34.560+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       121.0 ns/op	1057.60 MB/s	       958.0 p99-ns	     180 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.444s
+time=2026-08-11T18:07:38.133+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:38.133+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:38.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:38.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:38.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:38.135+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:38.137+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:38.137+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       131.6 ns/op	 972.80 MB/s	       875.0 p99-ns	     198 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.505s
+time=2026-08-11T18:07:40.462+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:40.462+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:40.464+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:40.464+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:40.464+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:40.464+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:40.466+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:40.466+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       129.7 ns/op	 986.80 MB/s	      1084 p99-ns	     196 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.507s
+time=2026-08-11T18:07:41.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:41.682+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:41.684+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:41.684+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:41.685+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:41.685+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:41.687+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:41.687+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       149.5 ns/op	 856.43 MB/s	       834.0 p99-ns	     214 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.541s
+time=2026-08-11T18:07:44.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:44.046+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:44.048+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:44.048+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:44.048+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:44.048+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:44.050+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:44.050+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       121.0 ns/op	1057.52 MB/s	       541.0 p99-ns	     185 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.500s
+time=2026-08-11T18:07:47.612+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:47.612+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:47.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:47.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Session_Subscribe_Native/transport=tcp/payload=128B/batch=1/concurrency=1-8         	time=2026-08-11T18:07:47.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-11T18:07:47.614+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/test/test.go:897 msg="Server started"
+time=2026-08-11T18:07:47.616+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-11T18:07:47.616+03:00 level=INFO source=/private/tmp/fujin-baseline-7a75cbe/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+   10000	       114.3 ns/op	1120.23 MB/s	       459.0 p99-ns	     179 B/op	       2 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.549s

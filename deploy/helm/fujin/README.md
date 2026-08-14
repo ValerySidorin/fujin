@@ -21,3 +21,5 @@ helm install fujin ./deploy/helm/fujin --set mode=sidecar
 ## Values
 
 See [values.yaml](values.yaml) for all configuration options.
+
+The chart defaults to the immutable Fujin image tag matching `appVersion`. Override `image.repository` or `image.tag` when publishing through a different registry.

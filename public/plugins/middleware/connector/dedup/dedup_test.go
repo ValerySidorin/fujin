@@ -51,13 +51,13 @@ type mockReader struct {
 	headerHandler   func([]byte, string, [][]byte, ...any)
 }
 
-func (r *mockReader) Subscribe(_ context.Context, h func([]byte, string, ...any)) error {
+func (r *mockReader) Subscribe(_ context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	r.subscribeCalled = true
 	r.handler = h
 	return nil
 }
 
-func (r *mockReader) SubscribeWithHeaders(_ context.Context, h func([]byte, string, [][]byte, ...any)) error {
+func (r *mockReader) SubscribeWithHeaders(_ context.Context, ready func() error, h func([]byte, string, [][]byte, ...any)) error {
 	r.headerHandler = h
 	return nil
 }
@@ -198,7 +198,7 @@ func TestReader_Subscribe_FirstMessage(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mock.handler([]byte(`{"id":1}`), "topic1")
@@ -214,7 +214,7 @@ func TestReader_Subscribe_Duplicate(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var count int
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		count++
 	})
 
@@ -234,7 +234,7 @@ func TestReader_SubscribeWithHeaders_Duplicate(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var count int
-	wrapped.SubscribeWithHeaders(context.Background(), func(msg []byte, topic string, hs [][]byte, args ...any) {
+	wrapped.SubscribeWithHeaders(context.Background(), func() error { return nil }, func(msg []byte, topic string, hs [][]byte, args ...any) {
 		count++
 	})
 
@@ -378,7 +378,7 @@ func TestStoreIsolation(t *testing.T) {
 
 	// Same message on consume side should still be delivered (separate store).
 	var received bool
-	wrappedR.Subscribe(context.Background(), func(m []byte, topic string, args ...any) {
+	wrappedR.Subscribe(context.Background(), func() error { return nil }, func(m []byte, topic string, args ...any) {
 		received = true
 	})
 	mockR.handler(msg, "topic1")

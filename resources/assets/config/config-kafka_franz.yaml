@@ -14,7 +14,7 @@ connectors:
     settings:
       common:
         brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
-      clients:
+      routes:
         client1:
           allow_auto_topic_creation: true
           produce_topic: my_pub_topic

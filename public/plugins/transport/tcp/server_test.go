@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 
@@ -29,7 +30,7 @@ func TestListenAndServeInherited(t *testing.T) {
 	origLn.Close() // close original; FD keeps socket alive
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewServer(serverconfig.TCPServerConfig{Addr: addr}, connectorconfig.ConnectorsConfig{}, logger)
+	srv := NewServer(serverconfig.TCPServerConfig{Addr: addr}, testCatalog(t), logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -60,7 +61,7 @@ func TestListenAndServeInherited(t *testing.T) {
 func TestFDKey(t *testing.T) {
 	srv := NewServer(
 		serverconfig.TCPServerConfig{Addr: ":4850"},
-		connectorconfig.ConnectorsConfig{},
+		testCatalog(t),
 		slog.New(slog.NewTextHandler(os.Stderr, nil)),
 	)
 	if got := srv.FDKey(); got != "tcp::4850" {
@@ -70,7 +71,7 @@ func TestFDKey(t *testing.T) {
 
 func TestListenerFDs(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewServer(serverconfig.TCPServerConfig{Addr: "127.0.0.1:0"}, connectorconfig.ConnectorsConfig{}, logger)
+	srv := NewServer(serverconfig.TCPServerConfig{Addr: "127.0.0.1:0"}, testCatalog(t), logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -107,32 +108,26 @@ func TestListenerFDs(t *testing.T) {
 	<-errCh
 }
 
-func TestHotReloadConfigProvider(t *testing.T) {
-	initial := connectorconfig.ConnectorsConfig{
-		"conn1": {Type: "noop"},
+func TestCatalogReloadPublishesGenerationToServer(t *testing.T) {
+	srv := NewServer(
+		serverconfig.TCPServerConfig{Addr: "127.0.0.1:0"},
+		testCatalog(t),
+		slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+	)
+	previous := srv.catalog.Current()
+	if err := srv.catalog.Reload(connectorconfig.ConnectorsConfig{}); err != nil {
+		t.Fatal(err)
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	srv := NewServer(serverconfig.TCPServerConfig{Addr: "127.0.0.1:0"}, initial, logger)
+	if srv.catalog.Current() == previous {
+		t.Fatal("catalog reload did not publish a new generation")
+	}
+}
 
-	// Set a config provider that returns updated config
-	updated := connectorconfig.ConnectorsConfig{
-		"conn1": {Type: "kafka"},
-		"conn2": {Type: "nats"},
+func testCatalog(t *testing.T) *connector.Catalog {
+	t.Helper()
+	catalog, err := connector.CompileCatalog(connectorconfig.ConnectorsConfig{}, slog.Default())
+	if err != nil {
+		t.Fatal(err)
 	}
-	srv.SetBaseConfigProvider(func() connectorconfig.ConnectorsConfig {
-		return updated
-	})
-
-	// Verify the provider is stored
-	if srv.configProvider == nil {
-		t.Fatal("configProvider should be set")
-	}
-
-	got := srv.configProvider()
-	if len(got) != 2 {
-		t.Fatalf("expected 2 connectors from provider, got %d", len(got))
-	}
-	if got["conn2"].Type != "nats" {
-		t.Fatalf("expected nats, got %s", got["conn2"].Type)
-	}
+	return catalog
 }

@@ -13,7 +13,7 @@ connectors:
     type: nsq
     settings:
       common: {}
-      clients:
+      routes:
         pub:
           address: "localhost:4150"
           topic: my_topic

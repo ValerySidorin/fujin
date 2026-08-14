@@ -1,0 +1,43 @@
+=== config ===
+
+=== compose up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container nats  Creating
+ Container nats  Created
+ Container nats  Starting
+ Container nats  Started
+ Container nats  Waiting
+ Container nats  Healthy
+
+=== benchmark ===
+seconds to write full buf to quic stream: 7.45e-05
+goos: darwin
+goarch: arm64
+pkg: github.com/fujin-io/fujin/test
+cpu: Apple M2
+Benchmark_Produce_1BPayload_Nats_QUIC-8     	       1	     10959 ns/op	   1.55 MB/s	     336 B/op	      10 allocs/op
+seconds to write full buf to quic stream: 5.5208e-05
+Benchmark_Produce_32BPayload_Nats_QUIC-8    	       1	       333.0 ns/op	 144.14 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 4.8083e-05
+Benchmark_Produce_128BPayload_Nats_QUIC-8   	       1	       291.0 ns/op	 494.85 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 4.8416e-05
+Benchmark_Produce_256BPayload_Nats_QUIC-8   	       1	       333.0 ns/op	 816.82 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 5.625e-05
+Benchmark_Produce_1KBPayload_Nats_QUIC-8    	       1	       333.0 ns/op	3123.12 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 6.55e-05
+Benchmark_Produce_4KBPayload_Nats_QUIC-8    	       1	       541.0 ns/op	7600.74 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 8.7167e-05
+Benchmark_Produce_8KBPayload_Nats_QUIC-8    	       1	       500.0 ns/op	16416.00 MB/s	       0 B/op	       0 allocs/op
+seconds to write full buf to quic stream: 0.000143792
+Benchmark_Produce_32KBPayload_Nats_QUIC-8   	       1	      1125 ns/op	29141.33 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fujin-io/fujin/test	0.950s
+
+=== compose down ===
+ Container nats  Stopping
+ Container nats  Stopped
+ Container nats  Removing
+ Container nats  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed

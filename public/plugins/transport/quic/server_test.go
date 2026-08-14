@@ -2,14 +2,23 @@ package quic_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"io"
 	"log/slog"
+	"math/big"
+	"net"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	quicserver "github.com/fujin-io/fujin/public/plugins/transport/quic"
+	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	"github.com/fujin-io/fujin/public/server/config"
 	quicgo "github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +36,7 @@ func TestNewFujinServer(t *testing.T) {
 			ForceTerminateTimeout: 15 * time.Second,
 		},
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -41,7 +50,7 @@ func TestNewFujinServer_WithNilLogger(t *testing.T) {
 	}
 
 	assert.NotPanics(t, func() {
-		quicserver.NewServer(conf, connectorconfig.ConnectorsConfig{}, slog.Default())
+		quicserver.NewServer(conf, testCatalog(t), slog.Default())
 	})
 }
 
@@ -55,7 +64,7 @@ func TestNewFujinServer_WithTLS(t *testing.T) {
 			MinVersion: tls.VersionTLS12,
 		},
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -73,7 +82,7 @@ func TestNewFujinServer_WithQUICConfig(t *testing.T) {
 			MaxIdleTimeout: 30 * time.Second,
 		},
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -85,7 +94,7 @@ func TestFujinServer_ReadyForConnections_Timeout(t *testing.T) {
 	conf := config.QUICServerConfig{
 		Addr: ":4848",
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -98,7 +107,7 @@ func TestFujinServer_ReadyForConnections_Success(t *testing.T) {
 	conf := config.QUICServerConfig{
 		Addr: ":4848",
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -115,7 +124,7 @@ func TestFujinServer_Done(t *testing.T) {
 	conf := config.QUICServerConfig{
 		Addr: ":4848",
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -134,7 +143,7 @@ func TestFujinServer_ListenAndServe_InvalidAddress(t *testing.T) {
 	conf := config.QUICServerConfig{
 		Addr: "invalid address format",
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -159,7 +168,7 @@ func TestFujinServer_ListenAndServe_CancelContext(t *testing.T) {
 		TLS:  &tls.Config{},
 		QUIC: &quicgo.Config{},
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelError,
 	}))
@@ -194,7 +203,7 @@ func TestFujinServer_ListenAndServe_CancelContext(t *testing.T) {
 
 func TestFujinServer_MultipleInstances(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 
 	servers := make([]*quicserver.FujinServer, 3)
 	for i := 0; i < 3; i++ {
@@ -273,7 +282,7 @@ func TestFujinServer_ConfigurationVariations(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -288,7 +297,7 @@ func TestFujinServer_ReadyForConnections_MultipleWaiters(t *testing.T) {
 	conf := config.QUICServerConfig{
 		Addr: ":4848",
 	}
-	baseConfig := connectorconfig.ConnectorsConfig{}
+	baseConfig := testCatalog(t)
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	srv := quicserver.NewServer(conf, baseConfig, logger)
@@ -304,5 +313,119 @@ func TestFujinServer_ReadyForConnections_MultipleWaiters(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		ready := <-results
 		assert.False(t, ready, "All should timeout since server not started")
+	}
+}
+
+func TestFujinServer_QUICPingKeepsResponsiveConnectionAlive(t *testing.T) {
+	ctx, conn := startQUICPingTestServer(t, 2)
+	var pings atomic.Int32
+	go respondToQUICPings(ctx, conn, byte(v1.RESP_CODE_PONG), &pings)
+
+	require.Eventually(t, func() bool { return pings.Load() >= 3 }, time.Second, 10*time.Millisecond)
+	select {
+	case <-conn.Context().Done():
+		t.Fatalf("responsive connection closed: %v", context.Cause(conn.Context()))
+	default:
+	}
+}
+
+func TestFujinServer_QUICPingClosesConnectionAfterConsecutiveTimeouts(t *testing.T) {
+	_, conn := startQUICPingTestServer(t, 2)
+	assertQUICPingConnectionClosed(t, conn)
+}
+
+func TestFujinServer_QUICPingRejectsInvalidPong(t *testing.T) {
+	ctx, conn := startQUICPingTestServer(t, 2)
+	go respondToQUICPings(ctx, conn, byte(v1.RESP_CODE_PONG)-1, nil)
+	assertQUICPingConnectionClosed(t, conn)
+}
+
+func startQUICPingTestServer(t *testing.T, maxRetries int) (context.Context, *quicgo.Conn) {
+	t.Helper()
+	udpConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
+	require.NoError(t, err)
+	addr := udpConn.LocalAddr().String()
+	fd, err := udpConn.File()
+	require.NoError(t, err)
+	require.NoError(t, udpConn.Close())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	srv := quicserver.NewServer(config.QUICServerConfig{
+		Addr: addr,
+		TLS:  quicPingServerTLS(t),
+		QUIC: &quicgo.Config{MaxIdleTimeout: 5 * time.Second},
+		Fujin: config.FujinProtocolConfig{
+			PingInterval:          20 * time.Millisecond,
+			PingTimeout:           30 * time.Millisecond,
+			PingMaxRetries:        maxRetries,
+			WriteDeadline:         time.Second,
+			ForceTerminateTimeout: time.Second,
+		},
+	}, testCatalog(t), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- srv.ListenAndServeInherited(ctx, fd) }()
+	require.True(t, srv.ReadyForConnections(time.Second))
+
+	conn, err := quicgo.DialAddr(ctx, addr, &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         quicserver.NextProtos,
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = conn.CloseWithError(v1.NoErr, "")
+		cancel()
+		require.NoError(t, <-serverDone)
+	})
+	return ctx, conn
+}
+
+func testCatalog(t *testing.T) *connector.Catalog {
+	t.Helper()
+	catalog, err := connector.CompileCatalog(connectorconfig.ConnectorsConfig{}, slog.Default())
+	require.NoError(t, err)
+	return catalog
+}
+
+func quicPingServerTLS(t *testing.T) *tls.Config {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	certificate, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	require.NoError(t, err)
+	return &tls.Config{Certificates: []tls.Certificate{{Certificate: [][]byte{certificate}, PrivateKey: key}}}
+}
+
+func respondToQUICPings(ctx context.Context, conn *quicgo.Conn, response byte, count *atomic.Int32) {
+	for {
+		stream, err := conn.AcceptStream(ctx)
+		if err != nil {
+			return
+		}
+		var request [1]byte
+		if _, err := io.ReadFull(stream, request[:]); err != nil || request[0] != byte(v1.OP_CODE_PING) {
+			return
+		}
+		if _, err := stream.Write([]byte{response}); err != nil {
+			return
+		}
+		if err := stream.Close(); err != nil {
+			return
+		}
+		if count != nil {
+			count.Add(1)
+		}
+	}
+}
+
+func assertQUICPingConnectionClosed(t *testing.T, conn *quicgo.Conn) {
+	t.Helper()
+	select {
+	case <-conn.Context().Done():
+		var applicationError *quicgo.ApplicationError
+		require.ErrorAs(t, context.Cause(conn.Context()), &applicationError)
+		assert.Equal(t, quicgo.ApplicationErrorCode(v1.PingErr), applicationError.ErrorCode)
+	case <-time.After(time.Second):
+		t.Fatal("connection remained open after consecutive invalid ping responses")
 	}
 }

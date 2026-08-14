@@ -24,9 +24,9 @@ func convertConfigValue(settingPath string, value string) (any, error) {
 	return nil, fmt.Errorf("setting '%s' is not supported for runtime override", settingPath)
 }
 
-// normalizePath removes the "clients.<name>." prefix from a setting path.
+// normalizePath removes the "routes.<name>." prefix from a setting path.
 func normalizePath(fullPath string) string {
-	if strings.HasPrefix(fullPath, "clients.") {
+	if strings.HasPrefix(fullPath, "routes.") {
 		parts := strings.SplitN(fullPath, ".", 3)
 		if len(parts) >= 3 {
 			return parts[2]

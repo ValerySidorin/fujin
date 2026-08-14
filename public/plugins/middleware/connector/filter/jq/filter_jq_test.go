@@ -47,12 +47,12 @@ type mockReader struct {
 	headerHandler func([]byte, string, [][]byte, ...any)
 }
 
-func (r *mockReader) Subscribe(_ context.Context, h func([]byte, string, ...any)) error {
+func (r *mockReader) Subscribe(_ context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	r.handler = h
 	return nil
 }
 
-func (r *mockReader) SubscribeWithHeaders(_ context.Context, h func([]byte, string, [][]byte, ...any)) error {
+func (r *mockReader) SubscribeWithHeaders(_ context.Context, ready func() error, h func([]byte, string, [][]byte, ...any)) error {
 	r.headerHandler = h
 	return nil
 }
@@ -189,7 +189,7 @@ func TestReader_Subscribe_Pass(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mock.handler([]byte(`{"country":"US","name":"alice"}`), "topic1")
@@ -205,7 +205,7 @@ func TestReader_Subscribe_Filtered(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mock.handler([]byte(`{"country":"DE","name":"bob"}`), "topic1")
@@ -221,7 +221,7 @@ func TestReader_Subscribe_InvalidJSON(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.Subscribe(context.Background(), func(msg []byte, topic string, args ...any) {
+	wrapped.Subscribe(context.Background(), func() error { return nil }, func(msg []byte, topic string, args ...any) {
 		received = true
 	})
 	mock.handler([]byte(`not json`), "topic1")
@@ -237,7 +237,7 @@ func TestReader_SubscribeWithHeaders_Filtered(t *testing.T) {
 	wrapped := mw.WrapReader(mock, "test")
 
 	var received bool
-	wrapped.SubscribeWithHeaders(context.Background(), func(msg []byte, topic string, hs [][]byte, args ...any) {
+	wrapped.SubscribeWithHeaders(context.Background(), func() error { return nil }, func(msg []byte, topic string, hs [][]byte, args ...any) {
 		received = true
 	})
 	mock.headerHandler([]byte(`{"active":null}`), "topic1", nil)

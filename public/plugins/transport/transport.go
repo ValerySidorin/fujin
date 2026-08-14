@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 )
 
 // TransportServer is the interface for fujin-protocol transports.
@@ -35,8 +35,8 @@ type Config struct {
 // ParseConfigFunc converts a transport Entry into typed server config.
 type ParseConfigFunc func(e Config) (any, error)
 
-// Factory creates a TransportServer from parsed config.
-type Factory func(config any, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) (TransportServer, error)
+// Factory creates a TransportServer from parsed config and the shared connector catalog.
+type Factory func(config any, catalog *connector.Catalog, l *slog.Logger) (TransportServer, error)
 
 type plugin struct {
 	parse   ParseConfigFunc
@@ -78,12 +78,6 @@ func List() []string {
 	return names
 }
 
-// HotReloadable is implemented by transports that support dynamic config reload.
-// When set, the provider function is called at BIND time to get the latest config.
-type HotReloadable interface {
-	SetBaseConfigProvider(func() connectorconfig.ConnectorsConfig)
-}
-
 // ListenerFD holds a duplicated file descriptor for a listener along with metadata
 // describing the listener type and address, used during graceful binary upgrades.
 type ListenerFD struct {
@@ -113,7 +107,7 @@ type FDKeyProvider interface {
 }
 
 // NewServer creates a TransportServer for the given entry.
-func NewServer(e Config, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) (TransportServer, error) {
+func NewServer(e Config, catalog *connector.Catalog, l *slog.Logger) (TransportServer, error) {
 	parse, factory, ok := Get(e.Type)
 	if !ok {
 		return nil, fmt.Errorf("transport %q not registered (available: %v)", e.Type, List())
@@ -122,5 +116,5 @@ func NewServer(e Config, baseConfig connectorconfig.ConnectorsConfig, l *slog.Lo
 	if err != nil {
 		return nil, fmt.Errorf("parse %s config: %w", e.Type, err)
 	}
-	return factory(cfg, baseConfig, l)
+	return factory(cfg, catalog, l)
 }

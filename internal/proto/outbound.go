@@ -1,10 +1,13 @@
 package proto
 
 import (
+	"errors"
 	"log/slog"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/fujin-io/fujin/internal/proto/pool"
@@ -12,8 +15,10 @@ import (
 )
 
 const (
-	maxBufSize    = 65536
-	MaxVectorSize = 1024
+	MaxVectorSize         = 1024
+	fallbackWriteBatchLen = 64 * 1024
+	maximumPendingBytes   = fallbackWriteBatchLen
+	minimumWriteBatchLen  = 4 * 1024
 )
 
 type Outbound struct {
@@ -42,28 +47,22 @@ func NewOutbound(
 }
 
 func (o *Outbound) WriteLoop() {
-	waitOK := false
-	var closed bool
-
 	for {
 		o.Lock()
-		if closed = o.IsClosed(); !closed {
-			if waitOK && (o.pb == 0 || o.pb < maxBufSize) {
-				o.c.Wait()
-				closed = o.IsClosed()
-			}
+		for o.pb == 0 && !o.IsClosed() {
+			o.c.Wait()
 		}
 
-		if closed {
-			// Detach remaining pending buffers
+		if o.IsClosed() {
+			// Detach remaining pending buffers.
 			o.wv = append(o.wv, o.v...)
 			o.v = nil
 			o.Unlock()
 
-			// Final write without lock
+			// Final write without lock.
 			o.writeBuffers()
 
-			// Return any remaining buffers to pool
+			// Return any remaining buffers to pool.
 			o.Lock()
 			for i := range o.v {
 				pool.Put(o.v[i])
@@ -77,42 +76,45 @@ func (o *Outbound) WriteLoop() {
 			return
 		}
 
-		// Detach pending buffers under lock
+		// Detach pending buffers under lock.
 		o.wv = append(o.wv, o.v...)
 		o.v = nil
 		o.Unlock()
 
-		// I/O without lock — wv is only accessed from WriteLoop
+		// I/O without lock — wv is only accessed from WriteLoop.
 		n := o.writeBuffers()
 
-		// Update pending bytes under lock
+		// Update pending bytes under lock and wake blocked producers.
 		o.Lock()
 		o.pb -= n
-		waitOK = o.pb == 0
+		if n > 0 {
+			o.c.Broadcast()
+		}
 		o.Unlock()
 	}
 }
 
 func (o *Outbound) EnqueueProto(proto []byte) {
-	if o.IsClosed() {
-		return
-	}
-
 	o.queueOutbound(proto)
-	o.SignalFlush()
 }
 
 func (o *Outbound) EnqueueProtoMulti(protos ...[]byte) {
+	o.Lock()
+	defer o.Unlock()
 	if o.IsClosed() {
 		return
 	}
-
-	o.Lock()
+	total := 0
+	for _, proto := range protos {
+		total += len(proto)
+	}
+	if !o.waitForQueueSpaceNoLock(total) {
+		return
+	}
 	for _, proto := range protos {
 		o.QueueOutboundNoLock(proto)
 	}
-	o.Unlock()
-	o.SignalFlush()
+	o.c.Signal()
 }
 
 // writeBuffers writes wv to the stream without holding the lock.
@@ -122,37 +124,52 @@ func (o *Outbound) writeBuffers() int64 {
 		return 0
 	}
 
-	var _orig [MaxVectorSize][]byte
-	orig := append(_orig[:0], o.wv...)
+	var originalStorage [MaxVectorSize][]byte
+	original := append(originalStorage[:0], o.wv...)
 	startOfWv := o.wv[0:]
+	var batchStorage [MaxVectorSize][]byte
 
 	start := time.Now()
-
+	maxBatchLen := 0
 	var n int64
-	var wn int64
-	var err error
 
 	for len(o.wv) > 0 {
-		wv := o.wv
-		if len(wv) > MaxVectorSize {
-			wv = wv[:MaxVectorSize]
+		batch := o.wv
+		if maxBatchLen == 0 {
+			if len(batch) > MaxVectorSize {
+				batch = batch[:MaxVectorSize]
+			}
+		} else {
+			batch = selectWriteBatch(batchStorage[:0], batch, maxBatchLen)
 		}
-		consumed := len(wv)
+		if len(batch) == 0 {
+			break
+		}
 
 		_ = o.str.SetWriteDeadline(start.Add(o.wdl))
-		wn, err = wv.WriteTo(o.str)
+		wn, err := batch.WriteTo(o.str)
 		_ = o.str.SetWriteDeadline(time.Time{})
 
 		n += wn
-		o.wv = o.wv[consumed-len(wv):]
-		if err != nil {
-			o.l.Error("write buffers", "err", err)
-			break
+		consumeWriteBuffers(&o.wv, wn)
+		if err == nil {
+			continue
 		}
+		if errors.Is(err, syscall.ENOBUFS) && maxBatchLen != minimumWriteBatchLen {
+			if maxBatchLen == 0 {
+				maxBatchLen = fallbackWriteBatchLen
+			} else {
+				maxBatchLen = max(maxBatchLen/2, minimumWriteBatchLen)
+			}
+			runtime.Gosched()
+			continue
+		}
+		o.l.Error("write buffers", "err", err)
+		break
 	}
 
-	for i := 0; i < len(orig)-len(o.wv); i++ {
-		pool.Put(orig[i])
+	for i := 0; i < len(original)-len(o.wv); i++ {
+		pool.Put(original[i])
 	}
 
 	o.wv = append(startOfWv[:0], o.wv...)
@@ -160,36 +177,58 @@ func (o *Outbound) writeBuffers() int64 {
 	return n
 }
 
+func selectWriteBatch(dst, src net.Buffers, maxBytes int) net.Buffers {
+	total := 0
+	for _, chunk := range src {
+		if len(chunk) == 0 {
+			continue
+		}
+		if len(dst) == MaxVectorSize {
+			break
+		}
+		if maxBytes > 0 {
+			remaining := maxBytes - total
+			if remaining <= 0 {
+				break
+			}
+			if len(chunk) > remaining {
+				chunk = chunk[:remaining]
+			}
+		}
+		dst = append(dst, chunk)
+		total += len(chunk)
+		if maxBytes > 0 && total == maxBytes {
+			break
+		}
+	}
+	return dst
+}
+
+func consumeWriteBuffers(buffers *net.Buffers, written int64) {
+	for written > 0 && len(*buffers) > 0 {
+		chunkLen := int64(len((*buffers)[0]))
+		if written < chunkLen {
+			(*buffers)[0] = (*buffers)[0][written:]
+			return
+		}
+		written -= chunkLen
+		(*buffers)[0] = nil
+		*buffers = (*buffers)[1:]
+	}
+}
+
 func (o *Outbound) SignalFlush() {
 	o.c.Signal()
 }
 
 func (o *Outbound) queueOutbound(data []byte) {
-	if o.IsClosed() {
-		return
-	}
-
 	o.Lock()
 	defer o.Unlock()
-	o.pb += int64(len(data))
-	toBuffer := data
-	if len(o.v) > 0 {
-		last := &o.v[len(o.v)-1]
-		if free := cap(*last) - len(*last); free > 0 {
-			if l := len(toBuffer); l < free {
-				free = l
-			}
-			*last = append(*last, toBuffer[:free]...)
-			toBuffer = toBuffer[free:]
-		}
+	if o.IsClosed() || !o.waitForQueueSpaceNoLock(len(data)) {
+		return
 	}
-
-	for len(toBuffer) > 0 {
-		new := pool.Get(len(toBuffer))
-		n := copy(new[:cap(new)], toBuffer)
-		o.v = append(o.v, new[:n])
-		toBuffer = toBuffer[n:]
-	}
+	o.QueueOutboundNoLock(data)
+	o.c.Signal()
 }
 
 func (o *Outbound) QueueOutboundNoLock(data []byte) {
@@ -214,8 +253,35 @@ func (o *Outbound) QueueOutboundNoLock(data []byte) {
 	}
 }
 
+func (o *Outbound) waitForQueueSpaceNoLock(size int) bool {
+	for !o.IsClosed() && o.pb > 0 && o.pb+int64(size) > maximumPendingBytes {
+		o.c.Wait()
+	}
+	return !o.IsClosed()
+}
+
+// QueueOutboundOwnedMultiNoLock transfers ownership of pool-backed buffers to
+// the outbound queue as one frame. The caller must hold o's lock and must not
+// retain or return any buffer after this call.
+func (o *Outbound) QueueOutboundOwnedMultiNoLock(data ...[]byte) {
+	total := 0
+	for _, buffer := range data {
+		total += len(buffer)
+	}
+	if !o.waitForQueueSpaceNoLock(total) {
+		for _, buffer := range data {
+			pool.Put(buffer)
+		}
+		return
+	}
+	for _, buffer := range data {
+		o.pb += int64(len(buffer))
+		o.v = append(o.v, buffer)
+	}
+}
+
 func (o *Outbound) QueueOutboundByteNoLock(data byte) {
-	o.pb += 1
+	o.pb++
 	new := pool.Get(1)[:1]
 	new[0] = data
 	o.v = append(o.v, new)
@@ -226,10 +292,14 @@ func (o *Outbound) IsClosed() bool {
 }
 
 func (o *Outbound) Close() {
+	o.Lock()
 	o.closed.Store(true)
 	o.c.Broadcast()
+	o.Unlock()
 }
 
 func (o *Outbound) BroadcastCond() {
+	o.Lock()
 	o.c.Broadcast()
+	o.Unlock()
 }

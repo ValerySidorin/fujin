@@ -1,0 +1,55 @@
+=== config ===
+
+=== compose up --wait ===
+ Network resources_default  Creating
+ Network resources_default  Created
+ Container artemis  Creating
+ Container artemis  Created
+ Container artemis  Starting
+ Container artemis  Started
+ Container artemis  Waiting
+ Container artemis  Healthy
+
+=== go test ===
+=== RUN   TestE2E_AzureAMQP1
+time=2026-08-12T17:47:50.649+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:132 msg="fujin tcp server started" server=fujin_tcp addr=[::]:4850
+time=2026-08-12T17:47:50.649+03:00 level=INFO source=/Users/mak/src/fujin/test/test.go:913 msg="Server started"
+=== RUN   TestE2E_AzureAMQP1/Produce
+=== RUN   TestE2E_AzureAMQP1/HProduce
+=== RUN   TestE2E_AzureAMQP1/Produce_Subscribe
+=== RUN   TestE2E_AzureAMQP1/Produce_HSubscribe
+=== RUN   TestE2E_AzureAMQP1/Fetch_Flow
+    e2e_test.go:280: fetch not supported
+=== RUN   TestE2E_AzureAMQP1/Produce_Fetch_Ack
+    e2e_test.go:381: fetch+ack not supported
+=== RUN   TestE2E_AzureAMQP1/Produce_Fetch_Nack
+    e2e_test.go:440: fetch+nack not supported
+=== RUN   TestE2E_AzureAMQP1/Tx_Produce_Commit
+    e2e_test.go:498: tx not supported
+=== RUN   TestE2E_AzureAMQP1/Tx_Produce_Rollback
+    e2e_test.go:530: tx not supported
+time=2026-08-12T17:47:53.301+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:124 msg="closing tcp listener after all connections done" server=fujin_tcp
+time=2026-08-12T17:47:53.301+03:00 level=INFO source=/Users/mak/src/fujin/public/plugins/transport/tcp/server.go:128 msg="fujin tcp server stopped" server=fujin_tcp
+--- PASS: TestE2E_AzureAMQP1 (2.65s)
+    --- PASS: TestE2E_AzureAMQP1/Produce (0.09s)
+    --- PASS: TestE2E_AzureAMQP1/HProduce (0.01s)
+    --- PASS: TestE2E_AzureAMQP1/Produce_Subscribe (0.53s)
+    --- PASS: TestE2E_AzureAMQP1/Produce_HSubscribe (0.53s)
+    --- SKIP: TestE2E_AzureAMQP1/Fetch_Flow (0.00s)
+    --- SKIP: TestE2E_AzureAMQP1/Produce_Fetch_Ack (0.00s)
+    --- SKIP: TestE2E_AzureAMQP1/Produce_Fetch_Nack (0.00s)
+    --- SKIP: TestE2E_AzureAMQP1/Tx_Produce_Commit (0.00s)
+    --- SKIP: TestE2E_AzureAMQP1/Tx_Produce_Rollback (0.00s)
+PASS
+ok  	github.com/fujin-io/fujin/test	3.140s
+
+=== compose down ===
+ Container artemis  Stopping
+ Container artemis  Stopped
+ Container artemis  Removing
+ Container artemis  Removed
+ Network resources_default  Removing
+ Network resources_default  Removed
+
+=== remaining containers ===
+

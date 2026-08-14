@@ -9,22 +9,13 @@ func TestEncodeMsgID(t *testing.T) {
 	r := &Reader{}
 
 	var seq uint64 = 42
-	topic := "test.subject"
+	buf := r.EncodeMsgID(nil, "test.subject", seq)
 
-	buf := r.EncodeMsgID(nil, topic, seq)
-
-	if len(buf) != 8+len(topic) {
-		t.Fatalf("expected length %d, got %d", 8+len(topic), len(buf))
+	if len(buf) != 8 {
+		t.Fatalf("expected length 8, got %d", len(buf))
 	}
-
-	gotSeq := binary.BigEndian.Uint64(buf[:8])
-	if gotSeq != seq {
-		t.Fatalf("expected seq %d, got %d", seq, gotSeq)
-	}
-
-	gotTopic := string(buf[8:])
-	if gotTopic != topic {
-		t.Fatalf("expected topic %q, got %q", topic, gotTopic)
+	if got := binary.BigEndian.Uint64(buf); got != seq {
+		t.Fatalf("expected seq %d, got %d", seq, got)
 	}
 }
 
@@ -32,18 +23,10 @@ func TestEncodeMsgID_LargeSequence(t *testing.T) {
 	r := &Reader{}
 
 	var seq uint64 = 1<<63 - 1
-	topic := "orders.created"
+	buf := r.EncodeMsgID(nil, "orders.created", seq)
 
-	buf := r.EncodeMsgID(nil, topic, seq)
-
-	gotSeq := binary.BigEndian.Uint64(buf[:8])
-	if gotSeq != seq {
-		t.Fatalf("expected seq %d, got %d", seq, gotSeq)
-	}
-
-	gotTopic := string(buf[8:])
-	if gotTopic != topic {
-		t.Fatalf("expected topic %q, got %q", topic, gotTopic)
+	if got := binary.BigEndian.Uint64(buf); got != seq {
+		t.Fatalf("expected seq %d, got %d", seq, got)
 	}
 }
 
@@ -83,7 +66,7 @@ func TestConfigValidate(t *testing.T) {
 			name: "valid config",
 			config: Config{
 				Common: CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {Subject: "orders.>"},
 				},
 			},
@@ -92,7 +75,7 @@ func TestConfigValidate(t *testing.T) {
 			name: "missing url",
 			config: Config{
 				Common: CommonSettings{Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {Subject: "orders.>"},
 				},
 			},
@@ -102,17 +85,17 @@ func TestConfigValidate(t *testing.T) {
 			name: "missing stream",
 			config: Config{
 				Common: CommonSettings{URL: "nats://localhost:4222"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {Subject: "orders.>"},
 				},
 			},
 			wantErr: true,
 		},
 		{
-			name: "no clients",
+			name: "no routes",
 			config: Config{
-				Common:  CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{},
+				Common: CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
+				Routes: map[string]RouteSettings{},
 			},
 			wantErr: true,
 		},
@@ -120,7 +103,7 @@ func TestConfigValidate(t *testing.T) {
 			name: "missing subject",
 			config: Config{
 				Common: CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {},
 				},
 			},
@@ -130,7 +113,7 @@ func TestConfigValidate(t *testing.T) {
 			name: "invalid ack_wait",
 			config: Config{
 				Common: CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {Subject: "orders.>", AckWait: "not-a-duration"},
 				},
 			},
@@ -140,7 +123,7 @@ func TestConfigValidate(t *testing.T) {
 			name: "valid ack_wait",
 			config: Config{
 				Common: CommonSettings{URL: "nats://localhost:4222", Stream: "ORDERS"},
-				Clients: map[string]ClientSpecificSettings{
+				Routes: map[string]RouteSettings{
 					"c1": {Subject: "orders.>", AckWait: "10s"},
 				},
 			},
@@ -167,7 +150,7 @@ func TestAckWaitDuration(t *testing.T) {
 
 	t.Run("custom", func(t *testing.T) {
 		conf := ConnectorConfig{
-			ClientSpecificSettings: ClientSpecificSettings{AckWait: "5s"},
+			RouteSettings: RouteSettings{AckWait: "5s"},
 		}
 		if d := conf.ackWaitDuration(); d != 5*1e9 {
 			t.Fatalf("expected 5s, got %v", d)

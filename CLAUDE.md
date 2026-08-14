@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Fujin is a high-performance, unified message broker connector written in Go. It provides a single binary protocol (zero-allocation parsing) and gRPC interface to bridge applications with any message broker (Kafka, NATS, RabbitMQ, Azure Service Bus, Redis, MQTT, NSQ, ZeroMQ).
+Fujin is a high-performance, unified message broker connector written in Go. It provides a single binary protocol (zero-allocation parsing) and gRPC interface to bridge applications with supported message brokers such as Kafka, NATS, RabbitMQ, Azure Service Bus, Redis, MQTT, and NSQ.
 
-Module: `github.com/fujin-io/fujin` | Go 1.25.1
+Module: `github.com/fujin-io/fujin` | Go version is defined by `go.mod`.
 
 ## Build & Run
 
@@ -88,16 +88,17 @@ Each plugin type has an `all/` package that imports every implementation. The `c
 ### Request Flow
 
 1. Client connects via transport (TCP/QUIC/Unix) → `internal/proto/inbound.go` parses the byte stream (state machine, zero-alloc)
-2. Parsed commands dispatched to `internal/proto/handler.go` (BIND, PRODUCE, SUBSCRIBE, FETCH, ACK, transactions, etc.)
-3. Handler resolves connector via `internal/connectors/manager_v2.go` which pools Writers per client name
-4. Connector middleware wraps Reader/Writer before use
-5. Responses built in `internal/proto/outbound.go` and flushed back via vectored I/O
+2. Parsed commands dispatch to `internal/proto/handler.go`, which delegates session semantics to `internal/core/`
+3. BIND pins an immutable connector generation from `public/plugins/connector.Catalog`; later reloads affect only new BIND operations
+4. `internal/connectors/ManagerV2` manages session-scoped reader/writer leases over the generation-owned runtime and applies connector middleware
+5. Responses are built in `internal/proto/outbound.go` and flushed via vectored I/O
 
 ### Key Internal Packages
 
-- `internal/proto/` — Fujin binary protocol: inbound parser, outbound writer, handler, zero-alloc byte pools (`pool/`)
-- `internal/connectors/` — `ManagerV2` manages connector writer pools and applies middleware
-- `internal/transport/grpc/` — optional gRPC server (build-tagged)
+- `internal/core/` — shared native/gRPC session state machine, capabilities, transactions, delivery, settlement, and bounded cleanup
+- `internal/proto/` — Fujin binary protocol parser, adapter, outbound writer, and zero-allocation byte pools (`pool/`)
+- `internal/connectors/` — session-scoped lease pooling and connector middleware over immutable generation bindings
+- `internal/transport/grpc/` — optional protobuf-to-Core adapter and gRPC server (build-tagged)
 
 ### Configuration
 
@@ -113,7 +114,7 @@ Config defines transports, gRPC settings, and connectors (each with type, overri
 
 ### Hot Reload & Graceful Binary Upgrade
 
-**Hot Reload (Unix only):** `kill -HUP <pid>` reloads connector config from YAML and updates log level. New connections use updated config; existing connections are unaffected. Implemented via `atomic.Pointer` swap in `server.ReloadConnectors()` and `BaseConfigProvider` callback at BIND time.
+**Hot Reload (Unix only):** `kill -HUP <pid>` reloads connector config from YAML and updates log level. The replacement connector generation is compiled and validated before atomic publication. Existing bound sessions remain pinned to their prior generation; later BIND operations use the replacement. Implemented by `connector.Catalog` and `server.ReloadConnectors()`.
 
 **Graceful Binary Upgrade (Unix only):** Zero-downtime binary replacement via FD passing between processes. Implementation in `internal/upgrade/`.
 

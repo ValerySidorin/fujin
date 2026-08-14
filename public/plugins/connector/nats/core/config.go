@@ -4,33 +4,33 @@ import (
 	"fmt"
 )
 
-// CommonSettings contains settings shared across all NATS clients
+// CommonSettings contains settings shared across all NATS routes.
 type CommonSettings struct {
 	URL string `yaml:"url"`
 }
 
-// ClientSpecificSettings contains settings specific to a client
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	Subject string `yaml:"subject"`
 }
 
-// Config is the top-level configuration structure for NATS Core connector
+// Config is the top-level configuration structure for NATS Core connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-// NewConnectorConfig creates a new ConnectorConfig from common and client-specific settings
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+// NewConnectorConfig creates a ConnectorConfig from common and route-specific settings.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
@@ -39,12 +39,12 @@ func (c *Config) Validate() error {
 	if c.Common.URL == "" {
 		return fmt.Errorf("nats_core: url is required")
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("nats_core: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("nats_core: at least one route must be configured")
 	}
-	for name, client := range c.Clients {
-		if client.Subject == "" {
-			return fmt.Errorf("nats_core: client %q: subject is required", name)
+	for name, route := range c.Routes {
+		if route.Subject == "" {
+			return fmt.Errorf("nats_core: route %q: subject is required", name)
 		}
 	}
 	return nil
@@ -54,4 +54,3 @@ func (c *Config) Validate() error {
 func (c *ConnectorConfig) Endpoint() string {
 	return c.URL
 }
-
