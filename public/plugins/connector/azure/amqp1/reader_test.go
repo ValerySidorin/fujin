@@ -42,7 +42,7 @@ func TestDeliveryIdOverwrite(t *testing.T) {
 
 func TestDeliveryIdDoesNotCorruptMessage(t *testing.T) {
 	msg := &amqp.Message{
-		Data: [][]byte{[]byte("hello")},
+		Data:                  [][]byte{[]byte("hello")},
 		ApplicationProperties: map[string]any{"key": "value"},
 	}
 

@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 )
@@ -20,11 +20,9 @@ type GRPCServerWrapper struct {
 	server *GRPCServer
 }
 
-// NewGRPCServerWrapper creates a new gRPC server wrapper
-func NewGRPCServerWrapper(conf serverconfig.GRPCServerConfig, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) *GRPCServerWrapper {
-	return &GRPCServerWrapper{
-		server: NewGRPCServer(conf, baseConfig, l),
-	}
+// NewGRPCServerWrapper creates a new gRPC server wrapper.
+func NewGRPCServerWrapper(conf serverconfig.GRPCServerConfig, catalog *connector.Catalog, l *slog.Logger) *GRPCServerWrapper {
+	return &GRPCServerWrapper{server: NewGRPCServer(conf, catalog, l)}
 }
 
 // ListenAndServe starts the gRPC server
@@ -45,11 +43,6 @@ func (w *GRPCServerWrapper) ReadyForConnections(timeout time.Duration) bool {
 // Done is closed after the gRPC server stops.
 func (w *GRPCServerWrapper) Done() <-chan struct{} {
 	return w.server.Done()
-}
-
-// SetBaseConfigProvider implements transport.HotReloadable.
-func (w *GRPCServerWrapper) SetBaseConfigProvider(p func() connectorconfig.ConnectorsConfig) {
-	w.server.SetBaseConfigProvider(p)
 }
 
 // ListenerFDs implements transport.ListenerFDProvider.

@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("faker", NewFakerConnector); err != nil {
+	if err := connector.Register("faker", descriptor()); err != nil {
 		panic(fmt.Sprintf("failed to register faker connector: %v", err))
 	}
 }

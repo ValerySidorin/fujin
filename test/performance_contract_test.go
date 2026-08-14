@@ -110,9 +110,9 @@ func assertIntsEqual(t *testing.T, got, want []int) {
 }
 
 func TestValidateProduceBenchmarkResponsesHandlesFragmentedFrames(t *testing.T) {
-	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.ERR_CODE_NO)}
+	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0}
 	for range 2 {
-		responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.ERR_CODE_NO))
+		responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.STATUS_OK))
 	}
 	responses = append(responses, byte(v1.RESP_CODE_DISCONNECT))
 
@@ -126,11 +126,12 @@ func TestValidateProduceBenchmarkResponsesHandlesFragmentedFrames(t *testing.T) 
 }
 
 func TestValidateProduceBenchmarkResponsesReturnsProduceError(t *testing.T) {
-	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.ERR_CODE_NO)}
-	responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.ERR_CODE_YES))
+	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0}
+	responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.STATUS_UNAVAILABLE), byte(v1.OUTCOME_UNKNOWN))
+	responses = appendFujinString(responses, "UNAVAILABLE")
 	message := "broker unavailable"
-	responses = binary.BigEndian.AppendUint32(responses, uint32(len(message)))
-	responses = append(responses, message...)
+	responses = appendFujinString(responses, message)
+	responses = binary.BigEndian.AppendUint16(responses, 0)
 
 	count, err := validateProduceBenchmarkResponses(bytes.NewReader(responses))
 	if count != 0 {

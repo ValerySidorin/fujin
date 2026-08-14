@@ -8,63 +8,25 @@ import (
 	"github.com/fujin-io/fujin/public/util"
 )
 
-// jetStreamConnector implements connector.Connector for NATS JetStream.
-type jetStreamConnector struct {
-	config Config
-	l      *slog.Logger
+func descriptor() connector.Descriptor {
+	return connector.Descriptor{Converter: convertConfigValue, Compile: compileConnector}
 }
-
-// newJetStreamConnector creates a new NATS JetStream connector instance.
-func newJetStreamConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	if config == nil {
-		return &jetStreamConnector{
-			config: Config{},
-			l:      l,
-		}, nil
+func compileConnector(raw any) (connector.Compiled, error) {
+	var config Config
+	if parsed, ok := raw.(Config); ok {
+		config = parsed
+	} else if err := util.ConvertConfig(raw, &config); err != nil {
+		return nil, fmt.Errorf("nats_jetstream connector: convert config: %w", err)
 	}
-
-	var typedConfig Config
-	if parsedConfig, ok := config.(Config); ok {
-		typedConfig = parsedConfig
-	} else {
-		if err := util.ConvertConfig(config, &typedConfig); err != nil {
-			return nil, fmt.Errorf("nats_jetstream connector: failed to convert config: %w", err)
-		}
-	}
-	if err := typedConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("nats_jetstream connector: invalid config: %w", err)
 	}
-
-	return &jetStreamConnector{
-		config: typedConfig,
-		l:      l,
-	}, nil
-}
-
-func (c *jetStreamConnector) NewReader(config any, route string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	routeConf, ok := c.config.Routes[route]
-	if !ok {
-		return nil, fmt.Errorf("nats_jetstream: route not found: %s", route)
+	profiles := make(map[string]connector.RouteProfile, len(config.Routes))
+	factories := make(map[string]connector.RouteFactory, len(config.Routes))
+	for route, settings := range config.Routes {
+		conf := NewConnectorConfig(config.Common, settings)
+		profiles[route] = connector.RouteProfile{Produce: true, Subscribe: true, Fetch: true, ManualSettlement: true, ProduceGuarantee: connector.AcceptanceDurable, Settlement: connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackRequeue}}
+		factories[route] = connector.RouteFactory{Reader: func(auto bool, l *slog.Logger) (connector.ReadCloser, error) { return NewReader(conf, auto, l) }, Writer: func(l *slog.Logger) (connector.WriteCloser, error) { return NewWriter(conf, l) }}
 	}
-
-	return NewReader(ConnectorConfig{
-		CommonSettings: c.config.Common,
-		RouteSettings:  routeConf,
-	}, autoCommit, l)
-}
-
-func (c *jetStreamConnector) NewWriter(config any, route string, l *slog.Logger) (connector.WriteCloser, error) {
-	routeConf, ok := c.config.Routes[route]
-	if !ok {
-		return nil, fmt.Errorf("nats_jetstream: route not found: %s", route)
-	}
-
-	return NewWriter(ConnectorConfig{
-		CommonSettings: c.config.Common,
-		RouteSettings:  routeConf,
-	}, l)
-}
-
-func (c *jetStreamConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return convertConfigValue
+	return connector.CompileStatic(profiles, factories)
 }

@@ -44,9 +44,11 @@ func (w *mockWriter) Close() error                       { return nil }
 
 type mockReader struct{}
 
-func (r *mockReader) Subscribe(_ context.Context, _ func([]byte, string, ...any)) error { return nil }
-func (r *mockReader) SubscribeWithHeaders(_ context.Context, _ func([]byte, string, [][]byte, ...any)) error {
-	return nil
+func (r *mockReader) Subscribe(_ context.Context, ready func() error, _ func([]byte, string, ...any)) error {
+	return ready()
+}
+func (r *mockReader) SubscribeWithHeaders(_ context.Context, ready func() error, _ func([]byte, string, [][]byte, ...any)) error {
+	return ready()
 }
 func (r *mockReader) Fetch(_ context.Context, _ uint32, fh func(uint32, error), _ func([]byte, string, ...any)) {
 	fh(0, nil)

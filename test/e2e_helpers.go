@@ -52,42 +52,131 @@ func (p *protoReader) readCID() (uint32, error) {
 	return p.readUint32()
 }
 
-func (p *protoReader) readErrPayload() (string, error) {
-	errLen, err := p.readUint32()
+func (p *protoReader) readString() (string, error) {
+	valueLen, err := p.readUint32()
 	if err != nil {
 		return "", err
 	}
-	errBuf, err := p.readExact(int(errLen))
+	value, err := p.readExact(int(valueLen))
 	if err != nil {
 		return "", err
 	}
-	return string(errBuf), nil
+	return string(value), nil
 }
 
-// readBindResp reads a BIND response: [16, errCode, (errPayload)?]
+func (p *protoReader) readStatus() (*v1.OperationError, error) {
+	status, err := p.readByte()
+	if err != nil {
+		return nil, err
+	}
+	if v1.StatusCode(status) == v1.STATUS_OK {
+		return nil, nil
+	}
+	outcome, err := p.readByte()
+	if err != nil {
+		return nil, err
+	}
+	reason, err := p.readString()
+	if err != nil {
+		return nil, err
+	}
+	message, err := p.readString()
+	if err != nil {
+		return nil, err
+	}
+	detailCount, err := p.readUint16()
+	if err != nil {
+		return nil, err
+	}
+	details := make(map[string]string, int(detailCount))
+	for range detailCount {
+		key, err := p.readString()
+		if err != nil {
+			return nil, err
+		}
+		value, err := p.readString()
+		if err != nil {
+			return nil, err
+		}
+		details[key] = value
+	}
+	return &v1.OperationError{
+		Code: v1.StatusCode(status), Outcome: v1.OperationOutcome(outcome),
+		Reason: reason, Message: message, Details: details,
+	}, nil
+}
+
+type nativeRouteCapabilities struct {
+	Produce          bool
+	Headers          bool
+	Transactions     bool
+	Subscribe        bool
+	Fetch            bool
+	ManualSettlement bool
+	ProduceGuarantee v1.ProduceGuarantee
+	AckGranularity   v1.AckGranularity
+	NackEffect       v1.NackEffect
+}
+
+// readBindResp reads and discards the capability snapshot from a BIND response.
 func (p *protoReader) readBindResp() error {
+	_, err := p.readBindCapabilities()
+	return err
+}
+
+// readBindCapabilities reads: [16, 0, routeCount(u32), route entries].
+// Each route entry is [route string, capability flags, produce guarantee, ACK granularity, NACK effect].
+func (p *protoReader) readBindCapabilities() (map[string]nativeRouteCapabilities, error) {
 	code, err := p.readByte()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if code != byte(v1.RESP_CODE_BIND) {
-		return fmt.Errorf("expected BIND resp code %d, got %d", v1.RESP_CODE_BIND, code)
+		return nil, fmt.Errorf("expected BIND resp code %d, got %d", v1.RESP_CODE_BIND, code)
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("bind status: %w", err)
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, err := p.readErrPayload()
+	if operationErr != nil {
+		return nil, fmt.Errorf("bind failed: %w", operationErr)
+	}
+
+	routeCount, err := p.readUint32()
+	if err != nil {
+		return nil, err
+	}
+	routes := make(map[string]nativeRouteCapabilities, int(routeCount))
+	for range routeCount {
+		routeLen, err := p.readUint32()
 		if err != nil {
-			return fmt.Errorf("bind failed, could not read error: %w", err)
+			return nil, err
 		}
-		return fmt.Errorf("bind failed: %s", errMsg)
+		route, err := p.readExact(int(routeLen))
+		if err != nil {
+			return nil, err
+		}
+		profile, err := p.readExact(4)
+		if err != nil {
+			return nil, err
+		}
+		flags := profile[0]
+		routes[string(route)] = nativeRouteCapabilities{
+			Produce:          flags&v1.ROUTE_CAP_PRODUCE != 0,
+			Headers:          flags&v1.ROUTE_CAP_HEADERS != 0,
+			Transactions:     flags&v1.ROUTE_CAP_TRANSACTIONS != 0,
+			Subscribe:        flags&v1.ROUTE_CAP_SUBSCRIBE != 0,
+			Fetch:            flags&v1.ROUTE_CAP_FETCH != 0,
+			ManualSettlement: flags&v1.ROUTE_CAP_MANUAL_SETTLEMENT != 0,
+			ProduceGuarantee: v1.ProduceGuarantee(profile[1]),
+			AckGranularity:   v1.AckGranularity(profile[2]),
+			NackEffect:       v1.NackEffect(profile[3]),
+		}
 	}
-	return nil
+	return routes, nil
 }
 
-// readProduceResp reads a PRODUCE response: [3, cID(4), errCode, (errPayload)?]
+// readProduceResp reads a PRODUCE response: [3, cID(4), status, (error envelope)?]
 func (p *protoReader) readProduceResp() (cID uint32, err error) {
 	code, err := p.readByte()
 	if err != nil {
@@ -100,18 +189,17 @@ func (p *protoReader) readProduceResp() (cID uint32, err error) {
 	if err != nil {
 		return 0, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, fmt.Errorf("produce error: %s", errMsg)
+	if operationErr != nil {
+		return cID, fmt.Errorf("produce error: %w", operationErr)
 	}
 	return cID, nil
 }
 
-// readHProduceResp reads an HPRODUCE response: [4, cID(4), errCode, (errPayload)?]
+// readHProduceResp reads an HPRODUCE response: [4, cID(4), status, (error envelope)?]
 func (p *protoReader) readHProduceResp() (cID uint32, err error) {
 	code, err := p.readByte()
 	if err != nil {
@@ -124,18 +212,17 @@ func (p *protoReader) readHProduceResp() (cID uint32, err error) {
 	if err != nil {
 		return 0, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, fmt.Errorf("hproduce error: %s", errMsg)
+	if operationErr != nil {
+		return cID, fmt.Errorf("hproduce error: %w", operationErr)
 	}
 	return cID, nil
 }
 
-// readSubscribeResp reads SUBSCRIBE/HSUBSCRIBE response: [code, cID(4), errCode, subID]
+// readSubscribeResp reads SUBSCRIBE/HSUBSCRIBE response: [code, cID(4), status, subID?]
 func (p *protoReader) readSubscribeResp() (cID uint32, subID byte, err error) {
 	code, err := p.readByte()
 	if err != nil {
@@ -148,19 +235,15 @@ func (p *protoReader) readSubscribeResp() (cID uint32, subID byte, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, 0, err
+	}
+	if operationErr != nil {
+		return cID, 0, fmt.Errorf("subscribe error: %w", operationErr)
 	}
 	subID, err = p.readByte()
-	if err != nil {
-		return cID, 0, err
-	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, subID, fmt.Errorf("subscribe error: %s", errMsg)
-	}
-	return cID, subID, nil
+	return cID, subID, err
 }
 
 // fetchedMsg represents a single message from a FETCH response.
@@ -170,7 +253,7 @@ type fetchedMsg struct {
 	Payload []byte
 }
 
-// readFetchResp reads FETCH response: [10, cID(4), errCode, subID, count(4), msgs...]
+// readFetchResp reads FETCH response: [10, cID(4), status, subID, count(4), msgs...]
 // Each msg (autoCommit): [msgLen(4), msg]
 // Each msg (!autoCommit): [msgIDLen(4), msgID, msgLen(4), msg]
 func (p *protoReader) readFetchResp(autoCommit bool) (cID uint32, subID byte, msgs []fetchedMsg, err error) {
@@ -185,13 +268,12 @@ func (p *protoReader) readFetchResp(autoCommit bool) (cID uint32, subID byte, ms
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, 0, nil, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, 0, nil, fmt.Errorf("fetch error: %s", errMsg)
+	if operationErr != nil {
+		return cID, 0, nil, fmt.Errorf("fetch error: %w", operationErr)
 	}
 	subID, err = p.readByte()
 	if err != nil {
@@ -227,7 +309,7 @@ func (p *protoReader) readFetchResp(autoCommit bool) (cID uint32, subID byte, ms
 	return cID, subID, msgs, nil
 }
 
-// readHFetchResp reads HFETCH response: [11, cID(4), errCode, subID, count(4), msgs...]
+// readHFetchResp reads HFETCH response: [11, cID(4), status, subID, count(4), msgs...]
 // Each msg (autoCommit): [headersCount(2), headers..., msgLen(4), msg]
 // Each msg (!autoCommit): [headersCount(2), headers..., msgIDLen(4), msgID, msgLen(4), msg]
 func (p *protoReader) readHFetchResp(autoCommit bool) (cID uint32, subID byte, msgs []fetchedMsg, err error) {
@@ -242,13 +324,12 @@ func (p *protoReader) readHFetchResp(autoCommit bool) (cID uint32, subID byte, m
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, 0, nil, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, 0, nil, fmt.Errorf("hfetch error: %s", errMsg)
+	if operationErr != nil {
+		return cID, 0, nil, fmt.Errorf("hfetch error: %w", operationErr)
 	}
 	subID, err = p.readByte()
 	if err != nil {
@@ -261,7 +342,6 @@ func (p *protoReader) readHFetchResp(autoCommit bool) (cID uint32, subID byte, m
 	msgs = make([]fetchedMsg, 0, count)
 	for i := uint32(0); i < count; i++ {
 		var msg fetchedMsg
-		// Read headers
 		headersCount, err := p.readUint16()
 		if err != nil {
 			return cID, subID, msgs, err
@@ -397,74 +477,35 @@ type ackResult struct {
 	Err   error // nil if success
 }
 
-// readAckResp reads ACK response: [12, cID(4), errCode, count(4), results...]
-// Each result: [msgIDLen(4), msgID, errCode, (errPayload)?]
+// readAckResp reads ACK response: [12, cID(4), status, count(4), results...]
+// Each result: [msgIDLen(4), msgID, status, (error envelope)?]
 func (p *protoReader) readAckResp() (cID uint32, results []ackResult, err error) {
-	code, err := p.readByte()
-	if err != nil {
-		return 0, nil, err
-	}
-	if code != byte(v1.RESP_CODE_ACK) {
-		return 0, nil, fmt.Errorf("expected ACK resp code %d, got %d", v1.RESP_CODE_ACK, code)
-	}
-	cID, err = p.readCID()
-	if err != nil {
-		return 0, nil, err
-	}
-	errCode, err := p.readByte()
-	if err != nil {
-		return cID, nil, err
-	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, nil, fmt.Errorf("ack error: %s", errMsg)
-	}
-	count, err := p.readUint32()
-	if err != nil {
-		return cID, nil, err
-	}
-	results = make([]ackResult, count)
-	for i := uint32(0); i < count; i++ {
-		msgIDLen, err := p.readUint32()
-		if err != nil {
-			return cID, results, err
-		}
-		results[i].MsgID, err = p.readExact(int(msgIDLen))
-		if err != nil {
-			return cID, results, err
-		}
-		ec, err := p.readByte()
-		if err != nil {
-			return cID, results, err
-		}
-		if ec != v1.ERR_CODE_NO {
-			errMsg, _ := p.readErrPayload()
-			results[i].Err = fmt.Errorf("%s", errMsg)
-		}
-	}
-	return cID, results, nil
+	return p.readSettlementResp(v1.RESP_CODE_ACK, "ack")
 }
 
 // readNackResp reads NACK response (same format as ACK but code 13).
 func (p *protoReader) readNackResp() (cID uint32, results []ackResult, err error) {
+	return p.readSettlementResp(v1.RESP_CODE_NACK, "nack")
+}
+
+func (p *protoReader) readSettlementResp(expectedCode v1.RespCode, operation string) (cID uint32, results []ackResult, err error) {
 	code, err := p.readByte()
 	if err != nil {
 		return 0, nil, err
 	}
-	if code != byte(v1.RESP_CODE_NACK) {
-		return 0, nil, fmt.Errorf("expected NACK resp code %d, got %d", v1.RESP_CODE_NACK, code)
+	if code != byte(expectedCode) {
+		return 0, nil, fmt.Errorf("expected %s resp code %d, got %d", operation, expectedCode, code)
 	}
 	cID, err = p.readCID()
 	if err != nil {
 		return 0, nil, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, nil, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, nil, fmt.Errorf("nack error: %s", errMsg)
+	if operationErr != nil {
+		return cID, nil, fmt.Errorf("%s error: %w", operation, operationErr)
 	}
 	count, err := p.readUint32()
 	if err != nil {
@@ -480,19 +521,15 @@ func (p *protoReader) readNackResp() (cID uint32, results []ackResult, err error
 		if err != nil {
 			return cID, results, err
 		}
-		ec, err := p.readByte()
+		results[i].Err, err = p.readStatus()
 		if err != nil {
 			return cID, results, err
-		}
-		if ec != v1.ERR_CODE_NO {
-			errMsg, _ := p.readErrPayload()
-			results[i].Err = fmt.Errorf("%s", errMsg)
 		}
 	}
 	return cID, results, nil
 }
 
-// readTxResp reads TX_BEGIN/TX_COMMIT/TX_ROLLBACK response: [code, cID(4), errCode, (errPayload)?]
+// readTxResp reads a transaction response: [code, cID(4), status, (error envelope)?]
 func (p *protoReader) readTxResp(expectedCode v1.RespCode) (cID uint32, err error) {
 	code, err := p.readByte()
 	if err != nil {
@@ -505,13 +542,12 @@ func (p *protoReader) readTxResp(expectedCode v1.RespCode) (cID uint32, err erro
 	if err != nil {
 		return 0, err
 	}
-	errCode, err := p.readByte()
+	operationErr, err := p.readStatus()
 	if err != nil {
 		return cID, err
 	}
-	if errCode != v1.ERR_CODE_NO {
-		errMsg, _ := p.readErrPayload()
-		return cID, fmt.Errorf("tx error: %s", errMsg)
+	if operationErr != nil {
+		return cID, fmt.Errorf("tx error: %w", operationErr)
 	}
 	return cID, nil
 }

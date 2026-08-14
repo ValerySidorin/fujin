@@ -10,8 +10,12 @@ Connects to NATS JetStream for at-least-once message delivery with durable consu
 - **Durable consumers** for persistent subscriptions
 - **Pull-based Fetch** for controlled message consumption
 - **Push-based Subscribe** via JetStream consumer callbacks
-- **Server-side publish acknowledgment** (unlike NATS Core fire-and-forget)
-- **Headers** support
+- **Server-side publish acknowledgment**
+
+
+## Fujin route capabilities
+
+Each configured route supports `PRODUCE`, `SUBSCRIBE`, `FETCH`, and manual settlement. Produce success uses `durable_accept`; ACK is single-message and NACK requeues. Fujin header-aware operations are not advertised because the canonical Fujin model requires lossless arbitrary binary values and duplicate preservation.
 
 ## Configuration
 
@@ -57,15 +61,14 @@ connectors:
 
 | Feature | `nats_core` | `nats_jetstream` |
 |---------|-------------|------------------|
-| Delivery guarantee | at-most-once | at-least-once |
+| Publish confirmation | local client acceptance | durable server acknowledgment |
 | Fetch (pull) | not supported | supported |
 | Ack/Nack | not supported | supported |
 | Durable consumers | no | yes |
-| Publish confirmation | no (fire-and-forget) | yes (server ack) |
 
 ## Prerequisites
 
-The JetStream stream must exist before Fujin starts. Create it using the NATS CLI:
+The JetStream stream must exist before the first operation opens the connector runtime. Fujin startup and BIND perform no broker I/O. Create the stream using the NATS CLI:
 
 ```bash
 nats stream add ORDERS --subjects "orders.>" --storage file --retention limits

@@ -15,8 +15,8 @@ type Connector struct {
 	conf ConnectorConfig
 	cl   *kgo.Client
 
-	handler         func(r *kgo.Record, h func(message []byte, topic string, args ...any))
-	headeredHandler func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any))
+	handler         func(r *kgo.Record, h func(message []byte, source string, args ...any))
+	headeredHandler func(r *kgo.Record, h func(message []byte, source string, hs [][]byte, args ...any))
 	fetching        atomic.Bool
 	autoCommit      bool
 
@@ -49,10 +49,10 @@ func NewConnector(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Conne
 	}
 
 	if autoCommit {
-		c.handler = func(r *kgo.Record, h func(message []byte, topic string, args ...any)) {
+		c.handler = func(r *kgo.Record, h func(message []byte, source string, args ...any)) {
 			h(r.Value, r.Topic)
 		}
-		c.headeredHandler = func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any)) {
+		c.headeredHandler = func(r *kgo.Record, h func(message []byte, source string, hs [][]byte, args ...any)) {
 			var hs [][]byte
 			for _, kh := range r.Headers {
 				hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(kh.Key)), len(kh.Key)), kh.Value)
@@ -60,10 +60,10 @@ func NewConnector(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Conne
 			h(r.Value, r.Topic, hs)
 		}
 	} else {
-		c.handler = func(r *kgo.Record, h func(message []byte, topic string, args ...any)) {
+		c.handler = func(r *kgo.Record, h func(message []byte, source string, args ...any)) {
 			h(r.Value, r.Topic, r.Partition, r.LeaderEpoch, r.Offset)
 		}
-		c.headeredHandler = func(r *kgo.Record, h func(message []byte, topic string, hs [][]byte, args ...any)) {
+		c.headeredHandler = func(r *kgo.Record, h func(message []byte, source string, hs [][]byte, args ...any)) {
 			var hs [][]byte
 			for _, kh := range r.Headers {
 				hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(kh.Key)), len(kh.Key)), kh.Value)

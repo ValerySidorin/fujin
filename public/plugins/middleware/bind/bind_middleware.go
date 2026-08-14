@@ -5,11 +5,17 @@ package bind
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/fujin-io/fujin/public/plugins/middleware/bind/config"
+)
+
+var (
+	ErrUnauthenticated  = errors.New("authentication required")
+	ErrPermissionDenied = errors.New("authentication failed")
 )
 
 // Middleware processes a BIND request and can reject it.

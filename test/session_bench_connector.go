@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("session_bench", newSessionBenchConnector); err != nil {
+	if err := connector.Register("session_bench", sessionBenchDescriptor()); err != nil {
 		panic(fmt.Sprintf("register session benchmark connector: %v", err))
 	}
 }
@@ -23,53 +23,78 @@ type sessionBenchConnector struct {
 	ackDoneFirst    bool
 }
 
-func newSessionBenchConnector(config any, _ *slog.Logger) (connector.Connector, error) {
-	msgSize := 1
-	var subscribeLimit uint64
-	var subscribeLimits <-chan uint64
-	var subscribeStart <-chan struct{}
-	var ackDoneFirst bool
-	if settings, ok := config.(map[string]any); ok {
-		switch value := settings["msg_size"].(type) {
-		case int:
-			msgSize = value
-		case float64:
-			msgSize = int(value)
-		}
-		switch value := settings["subscribe_limit"].(type) {
-		case int:
-			subscribeLimit = uint64(value)
-		case uint64:
-			subscribeLimit = value
-		case float64:
-			subscribeLimit = uint64(value)
-		}
-		switch value := settings["subscribe_limits"].(type) {
-		case chan uint64:
-			subscribeLimits = value
-		case <-chan uint64:
-			subscribeLimits = value
-		}
-		switch value := settings["subscribe_start"].(type) {
-		case chan struct{}:
-			subscribeStart = value
-		case <-chan struct{}:
-			subscribeStart = value
-		}
-		if value, ok := settings["ack_done_first"].(bool); ok {
-			ackDoneFirst = value
-		}
+func newSessionBenchConnector(config any) *sessionBenchConnector {
+	result := &sessionBenchConnector{msgSize: 1}
+	settings, ok := config.(map[string]any)
+	if !ok {
+		return result
 	}
-	return &sessionBenchConnector{
-		msgSize:         msgSize,
-		subscribeLimit:  subscribeLimit,
-		subscribeLimits: subscribeLimits,
-		subscribeStart:  subscribeStart,
-		ackDoneFirst:    ackDoneFirst,
-	}, nil
+	switch value := settings["msg_size"].(type) {
+	case int:
+		result.msgSize = value
+	case float64:
+		result.msgSize = int(value)
+	}
+	switch value := settings["subscribe_limit"].(type) {
+	case int:
+		result.subscribeLimit = uint64(value)
+	case uint64:
+		result.subscribeLimit = value
+	case float64:
+		result.subscribeLimit = uint64(value)
+	}
+	switch value := settings["subscribe_limits"].(type) {
+	case chan uint64:
+		result.subscribeLimits = value
+	case <-chan uint64:
+		result.subscribeLimits = value
+	}
+	switch value := settings["subscribe_start"].(type) {
+	case chan struct{}:
+		result.subscribeStart = value
+	case <-chan struct{}:
+		result.subscribeStart = value
+	}
+	result.ackDoneFirst, _ = settings["ack_done_first"].(bool)
+	return result
 }
 
-func (c *sessionBenchConnector) NewReader(_ any, _ string, autoCommit bool, _ *slog.Logger) (connector.ReadCloser, error) {
+func sessionBenchDescriptor() connector.Descriptor {
+	return connector.Descriptor{
+		Converter: func(_ string, value string) (any, error) { return value, nil },
+		Compile: func(raw any) (connector.Compiled, error) {
+			compiled := newSessionBenchConnector(raw)
+			profiles := map[string]connector.RouteProfile{
+				"pub": {
+					Produce:          true,
+					Headers:          true,
+					ProduceGuarantee: connector.AcceptanceLocal,
+				},
+				"tx": {
+					Produce:          true,
+					Headers:          true,
+					Transactions:     true,
+					ProduceGuarantee: connector.AcceptanceLocal,
+				},
+				"sub": {
+					Headers:          true,
+					Subscribe:        true,
+					Fetch:            true,
+					ManualSettlement: true,
+					Settlement:       connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackDrop},
+				},
+			}
+			factories := map[string]connector.RouteFactory{
+				"pub": {Writer: compiled.NewWriter},
+				"tx":  {Writer: compiled.NewWriter},
+				"sub": {Reader: compiled.NewReader},
+			}
+			return connector.CompileStatic(profiles, factories)
+		},
+	}
+}
+
+func (c *sessionBenchConnector) NewReader(autoSettle bool, _ *slog.Logger) (connector.ReadCloser, error) {
 	subscribeLimit := c.subscribeLimit
 	if c.subscribeLimits != nil {
 		var ok bool
@@ -81,7 +106,7 @@ func (c *sessionBenchConnector) NewReader(_ any, _ string, autoCommit bool, _ *s
 	return &genReader{
 		msg:            sizedBytes(c.msgSize),
 		headers:        [][]byte{[]byte("content-type"), []byte("application/octet-stream")},
-		autoCommit:     autoCommit,
+		autoCommit:     autoSettle,
 		fetchDoneFirst: true,
 		subscribeLimit: subscribeLimit,
 		subscribeStart: c.subscribeStart,
@@ -89,12 +114,8 @@ func (c *sessionBenchConnector) NewReader(_ any, _ string, autoCommit bool, _ *s
 	}, nil
 }
 
-func (*sessionBenchConnector) NewWriter(any, string, *slog.Logger) (connector.WriteCloser, error) {
+func (*sessionBenchConnector) NewWriter(*slog.Logger) (connector.WriteCloser, error) {
 	return sessionBenchWriter{}, nil
-}
-
-func (*sessionBenchConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return func(_ string, value string) (any, error) { return value, nil }
 }
 
 type sessionBenchWriter struct{}

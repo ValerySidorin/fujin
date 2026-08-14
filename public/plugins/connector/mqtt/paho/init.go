@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("mqtt_paho", newMQTTPahoConnector); err != nil {
+	if err := connector.Register("mqtt_paho", descriptor()); err != nil {
 		panic(fmt.Sprintf("register mqtt_paho connector: %v", err))
 	}
 }

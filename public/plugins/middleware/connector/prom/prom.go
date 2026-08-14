@@ -37,9 +37,9 @@ var (
 	errorsTotal              *prometheus.CounterVec
 	connectorWriteLatencySec *prometheus.HistogramVec
 
-	httpSrv         *http.Server
-	httpSrvOnce     sync.Once
-	httpSrvMu       sync.Mutex
+	httpSrv          *http.Server
+	httpSrvOnce      sync.Once
+	httpSrvMu        sync.Mutex
 	httpShutdownOnce sync.Once
 )
 
@@ -287,10 +287,11 @@ type promReaderWrapper struct {
 	connectorName string
 }
 
-func (d *promReaderWrapper) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (d *promReaderWrapper) Subscribe(ctx context.Context, ready func() error, h func(message []byte, topic string, args ...any)) error {
 	IncOp("subscribe", d.connectorName)
 	return d.r.Subscribe(
 		ctx,
+		ready,
 		func(message []byte, topic string, args ...any) {
 			IncOp("msg", d.connectorName)
 			h(message, topic, args...)
@@ -298,10 +299,11 @@ func (d *promReaderWrapper) Subscribe(ctx context.Context, h func(message []byte
 	)
 }
 
-func (d *promReaderWrapper) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (d *promReaderWrapper) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
 	IncOp("hsubscribe", d.connectorName)
 	return d.r.SubscribeWithHeaders(
 		ctx,
+		ready,
 		func(message []byte, topic string, hs [][]byte, args ...any) {
 			IncOp("hmsg", d.connectorName)
 			h(message, topic, hs, args...)

@@ -69,13 +69,13 @@ func TestSubscribeReaderBusyUnlocks(t *testing.T) {
 	// Fake a non-nil channel to trigger "reader busy"
 	r.channel = &amqp.Channel{}
 
-	err := r.Subscribe(nil, nil)
+	err := r.Subscribe(nil, func() error { return nil }, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 
 	// If the lock was not released, this would deadlock.
-	err = r.Subscribe(nil, nil)
+	err = r.Subscribe(nil, func() error { return nil }, nil)
 	if err == nil {
 		t.Fatal("expected error on second call")
 	}
@@ -85,13 +85,13 @@ func TestSubscribeWithHeadersReaderBusyUnlocks(t *testing.T) {
 	r := &Reader{}
 	r.channel = &amqp.Channel{}
 
-	err := r.SubscribeWithHeaders(nil, nil)
+	err := r.SubscribeWithHeaders(nil, func() error { return nil }, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 
 	// Must not deadlock.
-	err = r.SubscribeWithHeaders(nil, nil)
+	err = r.SubscribeWithHeaders(nil, func() error { return nil }, nil)
 	if err == nil {
 		t.Fatal("expected error on second call")
 	}

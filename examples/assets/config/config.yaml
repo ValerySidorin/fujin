@@ -58,7 +58,7 @@ grpc:
 connectors:
   connector:
     type: kafka_franz
-    # Whitelist of route paths that clients can override via BIND command
+    # Whitelist of route-setting paths that BIND may override in its pinned generation.
     # Supports wildcards: routes.*.field matches routes.pub.field, routes.sub.field, etc.
     overridable:
       - routes.*.produce_topic
@@ -97,6 +97,9 @@ connectors:
           server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
           server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
       routes:
+        # Route names are Fujin client-facing identifiers. Broker destinations remain
+        # connector-specific fields such as produce_topic and consume_topics below.
+        # Delivered messages report their actual broker source, not this route name.
         pub:
           # writer settings
           allow_auto_topic_creation: true

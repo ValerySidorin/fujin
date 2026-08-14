@@ -22,4 +22,5 @@ go run ./cmd/builder \
   $BIND_ARGS \
   $CONN_M_ARGS \
   -tags "$FUJIN_GO_TAGS" \
+  -ldflags "-X main.Version=${FUJIN_VERSION:-dev}" \
   -output ./bin/fujin

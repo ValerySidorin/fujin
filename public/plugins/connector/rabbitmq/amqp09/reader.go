@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/util"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -51,7 +52,7 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Reader, 
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	r.mu.Lock()
 	if r.channel != nil {
 		r.mu.Unlock()
@@ -129,6 +130,9 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	if err != nil {
 		return err
 	}
+	if err := ready(); err != nil {
+		return err
+	}
 
 	var handler func(d amqp.Delivery)
 	if r.AutoCommit() {
@@ -164,7 +168,7 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 	return nil
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	r.mu.Lock()
 	if r.channel != nil {
 		r.mu.Unlock()
@@ -240,6 +244,9 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 		r.conf.Consume.Args,
 	)
 	if err != nil {
+		return err
+	}
+	if err := ready(); err != nil {
 		return err
 	}
 
@@ -310,19 +317,11 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 	return nil
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -336,6 +335,10 @@ func (r *Reader) Ack(
 	ch := r.channel
 	r.mu.Unlock()
 	for _, msgID := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(msgID, r.MsgIDArgsLen(), false); err != nil {
+			ackMsgHandler(msgID, fmt.Errorf("rabbitmq_amqp09: ack: %w", err))
+			continue
+		}
 		ackMsgHandler(msgID, ch.Ack(binary.BigEndian.Uint64(msgID), r.conf.Ack.Multiple))
 	}
 }
@@ -350,11 +353,15 @@ func (r *Reader) Nack(
 	ch := r.channel
 	r.mu.Unlock()
 	for _, msgID := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(msgID, r.MsgIDArgsLen(), false); err != nil {
+			nackMsgHandler(msgID, fmt.Errorf("rabbitmq_amqp09: nack: %w", err))
+			continue
+		}
 		nackMsgHandler(msgID, ch.Nack(binary.BigEndian.Uint64(msgID), r.conf.Nack.Multiple, r.conf.Nack.Requeue))
 	}
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
 	return binary.BigEndian.AppendUint64(buf, args[0].(uint64))
 }
 

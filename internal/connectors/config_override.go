@@ -11,21 +11,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DeepCopyConfig creates a deep copy of the connectors configuration
+// DeepCopyConfig creates a deep copy of the connectors configuration.
 func DeepCopyConfig(original config.ConnectorConfig) (config.ConnectorConfig, error) {
-	// Use YAML marshaling/unmarshaling for deep copy
-	// This works because all config types have YAML tags
-	data, err := yaml.Marshal(original)
-	if err != nil {
-		return config.ConnectorConfig{}, fmt.Errorf("marshal config for deep copy: %w", err)
-	}
-
-	var copy config.ConnectorConfig
-	if err := yaml.Unmarshal(data, &copy); err != nil {
-		return config.ConnectorConfig{}, fmt.Errorf("unmarshal config for deep copy: %w", err)
-	}
-
-	return copy, nil
+	return config.CloneConnectorConfig(original)
 }
 
 // ApplyOverrides applies configuration overrides to a base configuration.

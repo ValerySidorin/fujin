@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -25,6 +26,7 @@ type Reader struct {
 	marshal         func(v any) ([]byte, error)
 	autoCommit      bool
 	streams         map[string]string
+	fetching        atomic.Bool
 	l               *slog.Logger
 }
 
@@ -131,10 +133,12 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 							r.l.Error("redis_rueidis_streams: failed to marshal message", "error", err)
 							continue
 						}
-						metaParts := strings.Split(msg.ID, "-")
-						ts, _ := strconv.ParseInt(metaParts[0], 10, 64)
-						seq, _ := strconv.ParseInt(metaParts[1], 10, 64)
-						h(data, stream, uint32(ts), uint32(seq))
+						ts, seq, err := parseStreamID(msg.ID)
+						if err != nil {
+							r.l.Error("redis_rueidis_streams: invalid message ID", "id", msg.ID, "error", err)
+							continue
+						}
+						h(data, stream, ts, seq)
 					}
 
 					if r.streams[stream] != ">" {
@@ -154,10 +158,12 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 							r.l.Error("redis_rueidis_streams: failed to marshal message", "error", err)
 							continue
 						}
-						metaParts := strings.Split(msg.ID, "-")
-						ts, _ := strconv.ParseInt(metaParts[0], 10, 64)
-						seq, _ := strconv.ParseInt(metaParts[1], 10, 64)
-						h(data, stream, nil, uint32(ts), uint32(seq))
+						ts, seq, err := parseStreamID(msg.ID)
+						if err != nil {
+							r.l.Error("redis_rueidis_streams: invalid message ID", "id", msg.ID, "error", err)
+							continue
+						}
+						h(data, stream, nil, ts, seq)
 					}
 
 					if r.streams[stream] != ">" {
@@ -195,10 +201,12 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 						r.l.Error("redis_rueidis_streams: failed to marshal message", "error", err)
 						continue
 					}
-					metaParts := strings.Split(msg.ID, "-")
-					ts, _ := strconv.ParseUint(metaParts[0], 10, 32)
-					seq, _ := strconv.ParseUint(metaParts[1], 10, 32)
-					h(data, stream, uint32(ts), uint32(seq))
+					ts, seq, err := parseStreamID(msg.ID)
+					if err != nil {
+						r.l.Error("redis_rueidis_streams: invalid message ID", "id", msg.ID, "error", err)
+						continue
+					}
+					h(data, stream, ts, seq)
 				}
 				r.streams[stream] = msg.ID
 			}
@@ -208,13 +216,16 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 	return r, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(msg []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(msg []byte, source string, args ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
+			resp, err := r.client.Do(ctx, r.cmd(r.conf.Count)).AsXRead()
 
 			if err != nil {
 				if rueidis.IsRedisNil(err) {
@@ -231,13 +242,16 @@ func (r *Reader) Subscribe(ctx context.Context, h func(msg []byte, topic string,
 	}
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
+			resp, err := r.client.Do(ctx, r.cmd(r.conf.Count)).AsXRead()
 
 			if err != nil {
 				if rueidis.IsRedisNil(err) {
@@ -254,13 +268,13 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 	}
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
-	resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
-
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
+	if !r.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
+		return
+	}
+	defer r.fetching.Store(false)
+	resp, err := r.client.Do(ctx, r.cmd(int64(n))).AsXRead()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			fetchHandler(0, nil)
@@ -269,24 +283,18 @@ func (r *Reader) Fetch(
 		fetchHandler(0, fmt.Errorf("redis_rueidis_streams: xread: %w", err))
 		return
 	}
-
-	var numMsgs uint32
-	for _, msgs := range resp {
-		for range msgs {
-			numMsgs++
-		}
-	}
-	fetchHandler(numMsgs, nil)
+	resp, count := limitXReadResponse(resp, n)
+	fetchHandler(count, nil)
 	r.handler(resp, msgHandler)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
-	resp, err := r.client.Do(ctx, r.cmd()).AsXRead()
-
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
+	if !r.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
+		return
+	}
+	defer r.fetching.Store(false)
+	resp, err := r.client.Do(ctx, r.cmd(int64(n))).AsXRead()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
 			fetchHandler(0, nil)
@@ -295,15 +303,8 @@ func (r *Reader) FetchWithHeaders(
 		fetchHandler(0, fmt.Errorf("redis_rueidis_streams: xread: %w", err))
 		return
 	}
-
-	var numMsgs uint32
-	for _, msgs := range resp {
-		for range msgs {
-			numMsgs++
-		}
-	}
-	fetchHandler(numMsgs, nil)
-
+	resp, count := limitXReadResponse(resp, n)
+	fetchHandler(count, nil)
 	r.headeredHandler(resp, msgHandler)
 }
 
@@ -314,12 +315,16 @@ func (r *Reader) Ack(
 ) {
 	ackHandler(nil)
 	for _, msgID := range msgIDs {
+		if err := r.validateMessageID(msgID); err != nil {
+			ackMsgHandler(msgID, fmt.Errorf("redis_rueidis_streams: ack: %w", err))
+			continue
+		}
 		id := strings.Join(
 			[]string{
-				strconv.FormatUint(uint64(binary.BigEndian.Uint32(msgID[:4])), 10),
-				strconv.FormatUint(uint64(binary.BigEndian.Uint32(msgID[4:8])), 10),
+				strconv.FormatUint(binary.BigEndian.Uint64(msgID[:8]), 10),
+				strconv.FormatUint(binary.BigEndian.Uint64(msgID[8:16]), 10),
 			}, "-")
-		stream := string(msgID[8:])
+		stream := string(msgID[16:])
 		err := r.client.Do(
 			ctx,
 			r.client.B().Xack().Key(stream).Group(r.conf.Group.Name).Id(id).Build(),
@@ -333,20 +338,41 @@ func (r *Reader) Nack(
 	nackHandler func(error),
 	nackMsgHandler func([]byte, error),
 ) {
-	nackHandler(nil)
-	for _, msgID := range msgIDs {
-		nackMsgHandler(msgID, nil)
+	nackHandler(connector.ErrOperationUnsupported)
+}
+
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
+	buf = binary.BigEndian.AppendUint64(buf, args[0].(uint64))
+	buf = binary.BigEndian.AppendUint64(buf, args[1].(uint64))
+	return append(buf, source...)
+}
+
+func (r *Reader) MsgIDArgsLen() int { return 16 }
+
+func (r *Reader) validateMessageID(id []byte) error {
+	if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), true); err != nil {
+		return err
 	}
+	if _, ok := r.conf.Streams[string(id[16:])]; !ok {
+		return fmt.Errorf("%w: stream is outside the reader scope", connector.ErrInvalidMessageID)
+	}
+	return nil
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, stream string, args ...any) []byte {
-	buf = binary.BigEndian.AppendUint32(buf, args[0].(uint32))
-	buf = binary.BigEndian.AppendUint32(buf, args[1].(uint32))
-	return append(buf, stream...)
-}
-
-func (r *Reader) MsgIDArgsLen() int {
-	return 8
+func parseStreamID(id string) (uint64, uint64, error) {
+	timestamp, sequence, ok := strings.Cut(id, "-")
+	if !ok || timestamp == "" || sequence == "" {
+		return 0, 0, fmt.Errorf("invalid Redis stream ID %q", id)
+	}
+	ts, err := strconv.ParseUint(timestamp, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid Redis stream timestamp %q: %w", timestamp, err)
+	}
+	seq, err := strconv.ParseUint(sequence, 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid Redis stream sequence %q: %w", sequence, err)
+	}
+	return ts, seq, nil
 }
 
 func (r *Reader) AutoCommit() bool {
@@ -358,33 +384,53 @@ func (r *Reader) Close() error {
 	return nil
 }
 
-func (r *Reader) cmd() rueidis.Completed {
+func (r *Reader) cmd(count int64) rueidis.Completed {
 	streams := make([]string, 0, len(r.streams))
 	ids := make([]string, 0, len(r.streams))
 	for k, v := range r.streams {
 		streams = append(streams, k)
 		ids = append(ids, v)
 	}
-
+	if count <= 0 {
+		count = r.conf.Count
+	}
 	if r.conf.Group.Name == "" {
 		return r.client.B().
 			Xread().
-			Count(r.conf.Count).Block(r.conf.Block.Milliseconds()).
+			Count(count).Block(r.conf.Block.Milliseconds()).
 			Streams().Key(streams...).Id(ids...).
 			Build()
 	}
 	if r.autoCommit {
 		return r.client.B().
 			Xreadgroup().Group(r.conf.Group.Name, r.conf.Group.Consumer).
-			Count(r.conf.Count).Block(r.conf.Block.Milliseconds()).Noack().
+			Count(count).Block(r.conf.Block.Milliseconds()).Noack().
 			Streams().Key(streams...).Id(ids...).
 			Build()
 	}
 	return r.client.B().
 		Xreadgroup().Group(r.conf.Group.Name, r.conf.Group.Consumer).
-		Count(r.conf.Count).Block(r.conf.Block.Milliseconds()).
+		Count(count).Block(r.conf.Block.Milliseconds()).
 		Streams().Key(streams...).Id(ids...).
 		Build()
+}
+
+func limitXReadResponse(resp map[string][]rueidis.XRangeEntry, maximum uint32) (map[string][]rueidis.XRangeEntry, uint32) {
+	remaining := int(maximum)
+	count := uint32(0)
+	for stream, messages := range resp {
+		if remaining == 0 {
+			delete(resp, stream)
+			continue
+		}
+		if len(messages) > remaining {
+			messages = messages[:remaining]
+			resp[stream] = messages
+		}
+		count += uint32(len(messages))
+		remaining -= len(messages)
+	}
+	return resp, count
 }
 
 func marshalFunc(proto Marshaller) func(v any) ([]byte, error) {

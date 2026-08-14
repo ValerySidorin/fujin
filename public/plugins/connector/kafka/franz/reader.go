@@ -4,18 +4,22 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
 )
 
-func (c *Connector) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (c *Connector) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	pingCtx, cancel := context.WithTimeout(ctx, c.conf.PingTimeout)
 	defer cancel()
 
 	if err := c.cl.Ping(pingCtx); err != nil {
 		return fmt.Errorf("kafka_franz: ping: %w", err)
+	}
+	if err := ready(); err != nil {
+		return err
 	}
 
 	for {
@@ -39,12 +43,15 @@ func (c *Connector) Subscribe(ctx context.Context, h func(message []byte, topic 
 	}
 }
 
-func (c *Connector) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (c *Connector) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	pingCtx, cancel := context.WithTimeout(ctx, c.conf.PingTimeout)
 	defer cancel()
 
 	if err := c.cl.Ping(pingCtx); err != nil {
 		return fmt.Errorf("kafka_franz: ping: %w", err)
+	}
+	if err := ready(); err != nil {
+		return err
 	}
 
 	for {
@@ -68,17 +75,11 @@ func (c *Connector) SubscribeWithHeaders(ctx context.Context, h func(message []b
 	}
 }
 
-func (c *Connector) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
-	if c.fetching.Load() {
-		fetchHandler(0, nil)
+func (c *Connector) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
+	if !c.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
 		return
 	}
-
-	c.fetching.Store(true)
 	defer c.fetching.Store(false)
 
 	fetches := c.cl.PollRecords(ctx, int(n))
@@ -108,17 +109,11 @@ func (c *Connector) Fetch(
 	}
 }
 
-func (c *Connector) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
-	if c.fetching.Load() {
-		fetchHandler(0, nil)
+func (c *Connector) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
+	if !c.fetching.CompareAndSwap(false, true) {
+		fetchHandler(0, connector.ErrFetchBusy)
 		return
 	}
-
-	c.fetching.Store(true)
 	defer c.fetching.Store(false)
 
 	fetches := c.cl.PollRecords(ctx, int(n))
@@ -156,15 +151,18 @@ func (c *Connector) Ack(
 	msgIDMapping := make(map[string]map[int32][][]byte)
 
 	for _, id := range msgIDs {
-		partition := int32(binary.BigEndian.Uint16(id[:2]))
-		epoch := int32(binary.BigEndian.Uint16(id[2:4]))
-		offset := int64(binary.BigEndian.Uint32(id[4:8]))
-		topic := string(id[8:])
+		if err := c.validateMessageID(id); err != nil {
+			ackHandler(fmt.Errorf("kafka_franz: ack: %w", err))
+			return
+		}
+		partition := int32(binary.BigEndian.Uint32(id[:4]))
+		epoch := int32(binary.BigEndian.Uint32(id[4:8]))
+		offset := int64(binary.BigEndian.Uint64(id[8:16]))
+		topic := string(id[16:])
 
 		if msgIDMapping[topic] == nil {
 			msgIDMapping[topic] = make(map[int32][][]byte)
 		}
-
 		msgIDMapping[topic][partition] = append(msgIDMapping[topic][partition], id)
 
 		toffsets := offsets[topic]
@@ -172,16 +170,10 @@ func (c *Connector) Ack(
 			toffsets = make(map[int32]kgo.EpochOffset)
 			offsets[topic] = toffsets
 		}
-
-		if at, exists := toffsets[partition]; exists {
-			if at.Epoch > epoch || at.Epoch == epoch && at.Offset > offset {
-				continue
-			}
+		if at, exists := toffsets[partition]; exists && (at.Epoch > epoch || at.Epoch == epoch && at.Offset > offset) {
+			continue
 		}
-		toffsets[partition] = kgo.EpochOffset{
-			Epoch:  epoch,
-			Offset: offset + 1,
-		}
+		toffsets[partition] = kgo.EpochOffset{Epoch: epoch, Offset: offset + 1}
 	}
 
 	c.cl.CommitOffsetsSync(ctx, offsets, func(_ *kgo.Client, _ *kmsg.OffsetCommitRequest, resp *kmsg.OffsetCommitResponse, err error) {
@@ -189,12 +181,24 @@ func (c *Connector) Ack(
 		if err != nil {
 			return
 		}
-
-		for _, topic := range resp.Topics {
-			for _, partition := range topic.Partitions {
-				err := kerr.ErrorForCode(partition.ErrorCode)
-				for _, msgID := range msgIDMapping[topic.Topic][partition.Partition] {
-					ackMsgHandler(msgID, err)
+		results := make(map[string]map[int32]error, len(msgIDMapping))
+		if resp != nil {
+			for _, topic := range resp.Topics {
+				partitions := make(map[int32]error, len(topic.Partitions))
+				for _, partition := range topic.Partitions {
+					partitions[partition.Partition] = kerr.ErrorForCode(partition.ErrorCode)
+				}
+				results[topic.Topic] = partitions
+			}
+		}
+		for topic, partitions := range msgIDMapping {
+			for partition, ids := range partitions {
+				result, ok := results[topic][partition]
+				if !ok {
+					result = fmt.Errorf("kafka_franz: offset commit response omitted topic %q partition %d", topic, partition)
+				}
+				for _, id := range ids {
+					ackMsgHandler(id, result)
 				}
 			}
 		}
@@ -206,21 +210,34 @@ func (c *Connector) Nack(
 	nackHandler func(error),
 	nackMsgHandler func([]byte, error),
 ) {
-	nackHandler(nil)
-	for _, msgID := range msgIDs {
-		nackMsgHandler(msgID, nil)
+	nackHandler(connector.ErrOperationUnsupported)
+}
+
+func (c *Connector) EncodeMsgID(buf []byte, source string, args ...any) []byte {
+	buf = binary.BigEndian.AppendUint32(buf, uint32(args[0].(int32)))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(args[1].(int32)))
+	buf = binary.BigEndian.AppendUint64(buf, uint64(args[2].(int64)))
+	return append(buf, source...)
+}
+
+func (c *Connector) MsgIDArgsLen() int { return 16 }
+
+func (c *Connector) validateMessageID(id []byte) error {
+	if err := connector.ValidateMessageIDPayload(id, c.MsgIDArgsLen(), true); err != nil {
+		return err
 	}
-}
-
-func (c *Connector) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
-	buf = binary.BigEndian.AppendUint16(buf, uint16(args[0].(int32)))
-	buf = binary.BigEndian.AppendUint16(buf, uint16(args[1].(int32)))
-	buf = binary.BigEndian.AppendUint32(buf, uint32(args[2].(int64)))
-	return append(buf, topic...)
-}
-
-func (c *Connector) MsgIDArgsLen() int {
-	return 8
+	partition := int32(binary.BigEndian.Uint32(id[:4]))
+	offset := int64(binary.BigEndian.Uint64(id[8:16]))
+	topic := string(id[16:])
+	if partition < 0 || offset < 0 {
+		return connector.ErrInvalidMessageID
+	}
+	for _, configured := range c.conf.ConsumeTopics {
+		if topic == configured {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: topic %q is outside the reader scope", connector.ErrInvalidMessageID, topic)
 }
 
 func (c *Connector) AutoCommit() bool {

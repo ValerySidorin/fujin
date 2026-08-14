@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("nats_core", newNATSCoreConnector); err != nil {
+	if err := connector.Register("nats_core", descriptor()); err != nil {
 		panic(fmt.Sprintf("register nats_core connector: %v", err))
 	}
 }

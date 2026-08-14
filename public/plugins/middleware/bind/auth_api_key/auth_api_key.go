@@ -72,13 +72,13 @@ func (m *authAPIKeyMiddleware) ProcessBind(
 	providedAPIKey, ok := meta[metaKeyAPIKey]
 	if !ok {
 		m.l.Warn("bind rejected: api_key missing in meta")
-		return fmt.Errorf("authentication required: api_key missing in meta")
+		return fmt.Errorf("%w: api_key missing in meta", bmw.ErrUnauthenticated)
 	}
 
 	// Validate API key (constant-time comparison to prevent timing attacks)
 	if subtle.ConstantTimeCompare([]byte(providedAPIKey), []byte(m.apiKey)) != 1 {
 		m.l.Warn("bind rejected: invalid api_key")
-		return fmt.Errorf("authentication failed: invalid api_key")
+		return fmt.Errorf("%w: invalid api_key", bmw.ErrPermissionDenied)
 	}
 
 	m.l.Info("bind authenticated")

@@ -11,7 +11,7 @@ import (
 
 func TestReloadConnectors(t *testing.T) {
 	initial := connectorconfig.ConnectorsConfig{
-		"conn1": {Type: "noop"},
+		"conn1": {Type: "server_test", Settings: map[string]any{"version": "initial"}},
 	}
 
 	conf := testConfig(initial)
@@ -20,34 +20,38 @@ func TestReloadConnectors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Verify initial config
-	got := *s.connectorConfig.Load()
-	if len(got) != 1 || got["conn1"].Type != "noop" {
+	initialGeneration := s.catalog.Current()
+	got, ok := initialGeneration.Config("conn1")
+	if !ok || got.Settings.(map[string]any)["version"] != "initial" {
 		t.Fatalf("initial config mismatch: %v", got)
 	}
 
 	// Reload with new config
 	updated := connectorconfig.ConnectorsConfig{
-		"conn1": {Type: "kafka"},
-		"conn2": {Type: "nats"},
+		"conn1": {Type: "server_test", Settings: map[string]any{"version": "updated"}},
+		"conn2": {Type: "server_test", Settings: map[string]any{"version": "new"}},
 	}
-	s.ReloadConnectors(updated)
+	if err := s.ReloadConnectors(updated); err != nil {
+		t.Fatal(err)
+	}
 
-	got = *s.connectorConfig.Load()
-	if len(got) != 2 {
-		t.Fatalf("expected 2 connectors after reload, got %d", len(got))
+	current := s.catalog.Current()
+	if current == initialGeneration {
+		t.Fatal("reload did not publish a new generation")
 	}
-	if got["conn1"].Type != "kafka" {
-		t.Fatalf("conn1 type should be kafka, got %s", got["conn1"].Type)
+	conn1, ok := current.Config("conn1")
+	if !ok || conn1.Settings.(map[string]any)["version"] != "updated" {
+		t.Fatalf("conn1 config mismatch: %v", conn1)
 	}
-	if got["conn2"].Type != "nats" {
-		t.Fatalf("conn2 type should be nats, got %s", got["conn2"].Type)
+	conn2, ok := current.Config("conn2")
+	if !ok || conn2.Settings.(map[string]any)["version"] != "new" {
+		t.Fatalf("conn2 config mismatch: %v", conn2)
 	}
 }
 
 func TestReloadConnectors_Concurrent(t *testing.T) {
 	initial := connectorconfig.ConnectorsConfig{
-		"conn1": {Type: "v0"},
+		"conn1": {Type: "server_test", Settings: map[string]any{"version": "v0"}},
 	}
 
 	conf := testConfig(initial)
@@ -62,14 +66,13 @@ func TestReloadConnectors_Concurrent(t *testing.T) {
 		wg.Add(2)
 		go func(n int) {
 			defer wg.Done()
-			s.ReloadConnectors(connectorconfig.ConnectorsConfig{
-				"conn1": {Type: "kafka"},
+			_ = s.ReloadConnectors(connectorconfig.ConnectorsConfig{
+				"conn1": {Type: "server_test", Settings: map[string]any{"version": n}},
 			})
 		}(i)
 		go func() {
 			defer wg.Done()
-			cfg := *s.connectorConfig.Load()
-			_ = cfg["conn1"]
+			_, _ = s.catalog.Current().Config("conn1")
 		}()
 	}
 	wg.Wait()

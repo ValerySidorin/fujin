@@ -4,6 +4,7 @@ package test
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -222,6 +223,69 @@ func sessionBenchmarkOperationCounts(workers, operations int) []int {
 		counts[i%workers]++
 	}
 	return counts
+}
+
+const (
+	sessionBenchmarkMessageIDSequenceOffset = 1
+	sessionBenchmarkMessageIDSequenceLen    = 8
+	sessionBenchmarkMessageIDEnvelopeLen    = sessionBenchmarkMessageIDSequenceOffset + sessionBenchmarkMessageIDSequenceLen
+)
+
+func cloneSessionBenchmarkSettlementIDs(seed [][]byte) ([][]byte, error) {
+	ids := make([][]byte, len(seed))
+	for i, id := range seed {
+		if len(id) < sessionBenchmarkMessageIDEnvelopeLen {
+			return nil, fmt.Errorf("settlement message ID %d is %d bytes, want at least %d", i, len(id), sessionBenchmarkMessageIDEnvelopeLen)
+		}
+		ids[i] = append([]byte(nil), id...)
+	}
+	return ids, nil
+}
+
+func advanceSessionBenchmarkSettlementIDs(ids [][]byte) error {
+	increment := uint64(len(ids))
+	for i, id := range ids {
+		if len(id) < sessionBenchmarkMessageIDEnvelopeLen {
+			return fmt.Errorf("settlement message ID %d is %d bytes, want at least %d", i, len(id), sessionBenchmarkMessageIDEnvelopeLen)
+		}
+		sequence := binary.BigEndian.Uint64(id[sessionBenchmarkMessageIDSequenceOffset:sessionBenchmarkMessageIDEnvelopeLen])
+		if sequence > ^uint64(0)-increment {
+			return fmt.Errorf("settlement message ID %d sequence %d overflows uint64", i, sequence)
+		}
+		binary.BigEndian.PutUint64(id[sessionBenchmarkMessageIDSequenceOffset:sessionBenchmarkMessageIDEnvelopeLen], sequence+increment)
+	}
+	return nil
+}
+
+func advanceSessionBenchmarkSettlementFrame(frame []byte) error {
+	const headerLen = 1 + 4 + 1 + 4
+	if len(frame) < headerLen {
+		return fmt.Errorf("settlement frame is %d bytes, want at least %d", len(frame), headerLen)
+	}
+	count := binary.BigEndian.Uint32(frame[6:10])
+	offset := headerLen
+	for i := uint32(0); i < count; i++ {
+		if len(frame)-offset < 4 {
+			return fmt.Errorf("settlement frame message ID %d length is truncated", i)
+		}
+		idLen := int(binary.BigEndian.Uint32(frame[offset : offset+4]))
+		offset += 4
+		if idLen < sessionBenchmarkMessageIDEnvelopeLen || len(frame)-offset < idLen {
+			return fmt.Errorf("settlement frame message ID %d has invalid length %d", i, idLen)
+		}
+		sequenceOffset := offset + sessionBenchmarkMessageIDSequenceOffset
+		sequenceEnd := sequenceOffset + sessionBenchmarkMessageIDSequenceLen
+		sequence := binary.BigEndian.Uint64(frame[sequenceOffset:sequenceEnd])
+		if sequence > ^uint64(0)-uint64(count) {
+			return fmt.Errorf("settlement frame message ID %d sequence %d overflows uint64", i, sequence)
+		}
+		binary.BigEndian.PutUint64(frame[sequenceOffset:sequenceEnd], sequence+uint64(count))
+		offset += idLen
+	}
+	if offset != len(frame) {
+		return fmt.Errorf("settlement frame has %d trailing bytes", len(frame)-offset)
+	}
+	return nil
 }
 
 func runSessionBenchmarkWorkers(b *testing.B, workers []sessionBenchmarkWorker, bytesPerOperation int, warmup bool, beforeStart func()) {
@@ -485,7 +549,12 @@ func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transpor
 			if len(results) != batchSize {
 				return fmt.Errorf("ack results: got %d, want %d", len(results), batchSize)
 			}
-			return nil
+			for _, result := range results {
+				if result.Err != nil {
+					return result.Err
+				}
+			}
+			return advanceSessionBenchmarkSettlementFrame(request)
 		}
 	case benchmarkTransaction:
 		begin := buildTxBeginCmd(1, "tx")
@@ -588,7 +657,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 	if err := stream.Send(&pb.FujinRequest{Request: &pb.FujinRequest_Bind{Bind: &pb.BindRequest{Connector: "connector"}}}); err != nil {
 		b.Fatal(err)
 	}
-	if response, err := stream.Recv(); err != nil || response.GetBind() == nil || response.GetBind().Error != "" {
+	if response, err := stream.Recv(); err != nil || response.GetBind() == nil || response.GetBind().Error != nil {
 		b.Fatalf("grpc bind: response=%v err=%v", response, err)
 	}
 	payload := sizedBytes(payloadSize)
@@ -598,7 +667,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 		request := &pb.FujinRequest{Request: &pb.FujinRequest_Produce{Produce: &pb.ProduceRequest{CorrelationId: 1, Route: "pub", Message: payload}}}
 		run = grpcRoundTrip(stream, request, func(response *pb.FujinResponse) error {
 			value := response.GetProduce()
-			if value == nil || value.Error != "" {
+			if value == nil || value.Error != nil {
 				return fmt.Errorf("produce response: %v", response)
 			}
 			return nil
@@ -607,7 +676,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 		request := &pb.FujinRequest{Request: &pb.FujinRequest_Hproduce{Hproduce: &pb.HProduceRequest{CorrelationId: 1, Route: "pub", Message: payload, Headers: []*pb.KV{{Key: []byte("content-type"), Value: []byte("application/octet-stream")}}}}}
 		run = grpcRoundTrip(stream, request, func(response *pb.FujinResponse) error {
 			value := response.GetHproduce()
-			if value == nil || value.Error != "" {
+			if value == nil || value.Error != nil {
 				return fmt.Errorf("hproduce response: %v", response)
 			}
 			return nil
@@ -623,7 +692,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 		run = grpcRoundTrip(stream, request, func(response *pb.FujinResponse) error {
 			if withHeaders {
 				value := response.GetHfetch()
-				if value == nil || value.Error != "" || len(value.Messages) != batchSize {
+				if value == nil || value.Error != nil || len(value.Messages) != batchSize {
 					return fmt.Errorf("hfetch response: %v", response)
 				}
 				for _, message := range value.Messages {
@@ -634,7 +703,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 				return nil
 			}
 			value := response.GetFetch()
-			if value == nil || value.Error != "" || len(value.Messages) != batchSize {
+			if value == nil || value.Error != nil || len(value.Messages) != batchSize {
 				return fmt.Errorf("fetch response: %v", response)
 			}
 			for _, message := range value.Messages {
@@ -651,7 +720,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 				b.Fatal(err)
 			}
 			response, err := stream.Recv()
-			if err != nil || response.GetHsubscribe() == nil || response.GetHsubscribe().Error != "" {
+			if err != nil || response.GetHsubscribe() == nil || response.GetHsubscribe().Error != nil {
 				b.Fatalf("hsubscribe response: %v %v", response, err)
 			}
 			subscriptionID := response.GetHsubscribe().SubscriptionId
@@ -671,7 +740,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 				b.Fatal(err)
 			}
 			response, err := stream.Recv()
-			if err != nil || response.GetSubscribe() == nil || response.GetSubscribe().Error != "" {
+			if err != nil || response.GetSubscribe() == nil || response.GetSubscribe().Error != nil {
 				b.Fatalf("subscribe response: %v %v", response, err)
 			}
 			subscriptionID := response.GetSubscribe().SubscriptionId
@@ -692,13 +761,17 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 			b.Fatal(err)
 		}
 		response, err := stream.Recv()
-		if err != nil || response.GetFetch() == nil || response.GetFetch().Error != "" || len(response.GetFetch().Messages) != batchSize {
+		if err != nil || response.GetFetch() == nil || response.GetFetch().Error != nil || len(response.GetFetch().Messages) != batchSize {
 			b.Fatalf("ack fetch setup: %v %v", response, err)
 		}
 		fetch := response.GetFetch()
-		ids := make([][]byte, len(fetch.Messages))
+		seedIDs := make([][]byte, len(fetch.Messages))
 		for i := range fetch.Messages {
-			ids[i] = fetch.Messages[i].MessageId
+			seedIDs[i] = fetch.Messages[i].MessageId
+		}
+		ids, err := cloneSessionBenchmarkSettlementIDs(seedIDs)
+		if err != nil {
+			b.Fatal(err)
 		}
 		var request *pb.FujinRequest
 		if operation == benchmarkNack {
@@ -706,20 +779,35 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 		} else {
 			request = &pb.FujinRequest{Request: &pb.FujinRequest_Ack{Ack: &pb.AckRequest{CorrelationId: 2, SubscriptionId: fetch.SubscriptionId, MessageIds: ids}}}
 		}
-		run = grpcRoundTrip(stream, request, func(response *pb.FujinResponse) error {
-			if operation == benchmarkNack {
-				value := response.GetNack()
-				if value == nil || value.Error != "" || len(value.Results) != batchSize {
-					return fmt.Errorf("nack response: %v", response)
+		run = func() error {
+			if err := grpcRoundTrip(stream, request, func(response *pb.FujinResponse) error {
+				if operation == benchmarkNack {
+					value := response.GetNack()
+					if value == nil || value.Error != nil || len(value.Results) != batchSize {
+						return fmt.Errorf("nack response: %v", response)
+					}
+					for _, result := range value.Results {
+						if result.Error != nil {
+							return fmt.Errorf("nack result: %v", result.Error)
+						}
+					}
+					return nil
+				}
+				value := response.GetAck()
+				if value == nil || value.Error != nil || len(value.Results) != batchSize {
+					return fmt.Errorf("ack response: %v", response)
+				}
+				for _, result := range value.Results {
+					if result.Error != nil {
+						return fmt.Errorf("ack result: %v", result.Error)
+					}
 				}
 				return nil
+			})(); err != nil {
+				return err
 			}
-			value := response.GetAck()
-			if value == nil || value.Error != "" || len(value.Results) != batchSize {
-				return fmt.Errorf("ack response: %v", response)
-			}
-			return nil
-		})
+			return advanceSessionBenchmarkSettlementIDs(ids)
+		}
 	case benchmarkTransaction:
 		begin := &pb.FujinRequest{Request: &pb.FujinRequest_BeginTx{BeginTx: &pb.BeginTxRequest{CorrelationId: 1, Route: "tx"}}}
 		produce := &pb.FujinRequest{Request: &pb.FujinRequest_TxProduce{TxProduce: &pb.TxProduceRequest{CorrelationId: 2, Message: payload}}}
@@ -728,19 +816,19 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 			if err := stream.Send(begin); err != nil {
 				return err
 			}
-			if response, err := stream.Recv(); err != nil || response.GetBeginTx() == nil || response.GetBeginTx().Error != "" {
+			if response, err := stream.Recv(); err != nil || response.GetBeginTx() == nil || response.GetBeginTx().Error != nil {
 				return fmt.Errorf("begin response: %v %v", response, err)
 			}
 			if err := stream.Send(produce); err != nil {
 				return err
 			}
-			if response, err := stream.Recv(); err != nil || response.GetTxProduce() == nil || response.GetTxProduce().Error != "" {
+			if response, err := stream.Recv(); err != nil || response.GetTxProduce() == nil || response.GetTxProduce().Error != nil {
 				return fmt.Errorf("tx produce response: %v %v", response, err)
 			}
 			if err := stream.Send(commit); err != nil {
 				return err
 			}
-			if response, err := stream.Recv(); err != nil || response.GetCommitTx() == nil || response.GetCommitTx().Error != "" {
+			if response, err := stream.Recv(); err != nil || response.GetCommitTx() == nil || response.GetCommitTx().Error != nil {
 				return fmt.Errorf("commit response: %v %v", response, err)
 			}
 			return nil

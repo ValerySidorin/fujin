@@ -50,4 +50,3 @@ func (w *Writer) RollbackTx(_ context.Context) error {
 func (w *Writer) Close() error {
 	return nil
 }
-

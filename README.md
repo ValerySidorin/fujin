@@ -17,24 +17,23 @@ Fujin decouples applications from brokers. Your app talks to Fujin over a simple
 
 ## Supported Brokers
 
-| Broker | Connector |
-|--------|-----------|
-| Kafka | `kafka/franz` |
-| NATS Core | `nats/core` |
-| NATS JetStream | `nats/jetstream` |
+| Broker | Configuration `type` |
+|--------|----------------------|
+| Kafka | `kafka_franz` |
+| NATS Core | `nats_core` |
+| NATS JetStream | `nats_jetstream` |
 | RabbitMQ | `rabbitmq_amqp09` |
 | Azure Service Bus / ActiveMQ | `azure_amqp1` |
-| Redis/Valkey (PubSub) | `resp/pubsub` |
-| Redis/Valkey (Streams) | `resp/streams` |
-| MQTT (EMQX, NanoMQ, etc.) | `mqtt` |
+| Redis/Valkey Pub/Sub | `redis_rueidis_pubsub` |
+| Redis/Valkey Streams | `redis_rueidis_streams` |
+| MQTT (EMQX, NanoMQ, etc.) | `mqtt_paho` |
 | NSQ | `nsq` |
-| ZeroMQ | `zeromq` |
 
 ## Client Interfaces
 
-**Fujin Protocol** — Custom binary protocol over TCP, QUIC, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
+**Fujin Protocol** — Custom binary protocol over TCP, QUIC, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
 
-**gRPC** — Standard gRPC interface. Works with any language that has a gRPC library.
+**gRPC** — Standard gRPC interface. Works with any language that has a gRPC library. `BindResponse.routes` exposes the same pinned capability profile as the native protocol.
 
 ### Transports
 
@@ -82,12 +81,14 @@ Everything is pluggable: transports, connectors, config loaders, and middleware.
 | Plugin type | Examples |
 |-------------|----------|
 | Transports | `tcp`, `quic`, `unix` |
-| Connectors | `kafka/franz`, `nats/core`, `rabbitmq_amqp09`, ... |
+| Connectors | `kafka_franz`, `nats_core`, `rabbitmq_amqp09`, ... |
 | Configurators | `yaml`, `env` |
 | Bind middleware | `auth_api_key` |
 | Connector middleware | `prom`, `otel`, `schema/json`, `transform/jq`, `filter/jq`, `dedup`, `compress/zstd`, `rate_limit/token_bucket` |
 
 Write your own plugins — see [`examples/plugins/`](examples/plugins/) for a complete example with a custom connector and rate-limiting middleware. Each plugin has a README with configuration examples in its package directory under [`public/plugins/`](public/plugins/).
+
+Connector plugins expose a side-effect-free descriptor. Fujin compiles settings and route capabilities without broker I/O, then lazily opens generation-owned runtimes when an operation first needs broker resources. A successful BIND proves local configuration validity and returns the pinned route profiles to native and gRPC clients; it does not prove broker availability.
 
 ### Cross-Platform
 
@@ -134,7 +135,7 @@ See [`deploy/helm/fujin/values.yaml`](deploy/helm/fujin/values.yaml) for all opt
 kill -HUP $(pgrep fujin)
 ```
 
-Reloads connector configuration and log level from YAML. Existing connections are unaffected; new connections use updated config.
+Reloads connector configuration and log level from YAML. A connector reload compiles and validates the complete replacement before publication. Failed reloads retain the current generation; existing bound sessions remain pinned to their prior immutable generation, while later BIND operations use the replacement.
 
 ### Graceful Binary Upgrade
 

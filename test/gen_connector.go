@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("gen", newGenConnector); err != nil {
+	if err := connector.Register("gen", genDescriptor()); err != nil {
 		panic(fmt.Sprintf("register gen connector: %v", err))
 	}
 }
@@ -22,35 +22,66 @@ type GenConfig struct {
 	SubscribeLimit uint64 `yaml:"subscribe_limit"`
 }
 
-// genConnector generates messages as fast as possible for benchmarking subscribe throughput.
+// genConnector is immutable compiled test configuration.
 type genConnector struct {
 	msgSize        int
 	subscribeLimit uint64
 }
 
-func newGenConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	msgSize := 32 // default
-	var subscribeLimit uint64
-	if m, ok := config.(GenConfig); ok {
-		msgSize = m.MsgSize
-		subscribeLimit = m.SubscribeLimit
+func newGenConnector(raw any) (*genConnector, error) {
+	config := GenConfig{MsgSize: 32}
+	switch value := raw.(type) {
+	case GenConfig:
+		config = value
+	case map[string]any:
+		if msgSize, ok := integerSetting(value["msg_size"]); ok {
+			config.MsgSize = int(msgSize)
+		}
+		if subscribeLimit, ok := integerSetting(value["subscribe_limit"]); ok {
+			config.SubscribeLimit = subscribeLimit
+		}
 	}
-	if msgSize <= 0 {
-		msgSize = 1
+	if config.MsgSize <= 0 {
+		config.MsgSize = 1
 	}
-	return &genConnector{msgSize: msgSize, subscribeLimit: subscribeLimit}, nil
+	return &genConnector{msgSize: config.MsgSize, subscribeLimit: config.SubscribeLimit}, nil
 }
 
-func (g *genConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	return &genReader{msg: sizedBytes(g.msgSize), autoCommit: autoCommit, subscribeLimit: g.subscribeLimit}, nil
+func integerSetting(value any) (uint64, bool) {
+	switch value := value.(type) {
+	case int:
+		return uint64(value), value >= 0
+	case uint64:
+		return value, true
+	case float64:
+		return uint64(value), value >= 0
+	default:
+		return 0, false
+	}
 }
 
-func (g *genConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	return newWriter(), nil
+func genDescriptor() connector.Descriptor {
+	return connector.Descriptor{Compile: func(raw any) (connector.Compiled, error) {
+		compiled, err := newGenConnector(raw)
+		if err != nil {
+			return nil, err
+		}
+		profile := connector.RouteProfile{
+			Headers:          true,
+			Subscribe:        true,
+			Fetch:            true,
+			ManualSettlement: true,
+			Settlement:       connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackDrop},
+		}
+		return connector.CompileStatic(
+			map[string]connector.RouteProfile{"sub": profile},
+			map[string]connector.RouteFactory{"sub": {Reader: compiled.NewReader}},
+		)
+	}}
 }
 
-func (g *genConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return func(settingPath, value string) (any, error) { return nil, nil }
+func (g *genConnector) NewReader(autoSettle bool, _ *slog.Logger) (connector.ReadCloser, error) {
+	return &genReader{msg: sizedBytes(g.msgSize), autoCommit: autoSettle, subscribeLimit: g.subscribeLimit}, nil
 }
 
 // genReader generates messages in a tight loop until context is cancelled.
@@ -76,7 +107,10 @@ func (r *genReader) waitForSubscribeStart(ctx context.Context) bool {
 		return true
 	}
 }
-func (r *genReader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) error {
+func (r *genReader) Subscribe(ctx context.Context, ready func() error, h func([]byte, string, ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	if !r.waitForSubscribeStart(ctx) {
 		return nil
 	}
@@ -99,7 +133,10 @@ func (r *genReader) Subscribe(ctx context.Context, h func([]byte, string, ...any
 	}
 }
 
-func (r *genReader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *genReader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, headers [][]byte, args ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	if !r.waitForSubscribeStart(ctx) {
 		return nil
 	}
@@ -197,5 +234,4 @@ func (r *genReader) Close() error {
 	return nil
 }
 
-var _ connector.Connector = (*genConnector)(nil)
 var _ connector.ReadCloser = (*genReader)(nil)

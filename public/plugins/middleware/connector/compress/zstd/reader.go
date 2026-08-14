@@ -13,8 +13,8 @@ type zstdReaderWrapper struct {
 	l  *slog.Logger
 }
 
-func (r *zstdReaderWrapper) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	return r.r.Subscribe(ctx, func(message []byte, topic string, args ...any) {
+func (r *zstdReaderWrapper) Subscribe(ctx context.Context, ready func() error, h func(message []byte, topic string, args ...any)) error {
+	return r.r.Subscribe(ctx, ready, func(message []byte, topic string, args ...any) {
 		out, err := r.mw.decompress(message)
 		if err != nil {
 			r.l.Warn("subscribe: decompress failed, message skipped", "topic", topic, "error", err.Error())
@@ -24,8 +24,8 @@ func (r *zstdReaderWrapper) Subscribe(ctx context.Context, h func(message []byte
 	})
 }
 
-func (r *zstdReaderWrapper) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	return r.r.SubscribeWithHeaders(ctx, func(message []byte, topic string, hs [][]byte, args ...any) {
+func (r *zstdReaderWrapper) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	return r.r.SubscribeWithHeaders(ctx, ready, func(message []byte, topic string, hs [][]byte, args ...any) {
 		out, err := r.mw.decompress(message)
 		if err != nil {
 			r.l.Warn("subscribe: decompress failed, message skipped", "topic", topic, "error", err.Error())

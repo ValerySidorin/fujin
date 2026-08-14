@@ -210,6 +210,7 @@ func generateMain(p pluginsByType) string {
 	sb.WriteString(")\n\n")
 	sb.WriteString("var Version string\n\n")
 	sb.WriteString(`func main() {
+	service.Version = Version
 	ctx, cancel := signal.NotifyContext(context.Background(), service.ShutdownSignals()...)
 	defer cancel()
 	service.RunCLI(ctx)

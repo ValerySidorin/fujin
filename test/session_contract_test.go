@@ -5,10 +5,12 @@ package test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/fujin-io/fujin/public/plugins/connector/config"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	pb "github.com/fujin-io/fujin/public/proto/grpc/v1"
@@ -41,7 +43,9 @@ func testNativeSessionContract(t *testing.T) {
 	defer conn.Close()
 	reader := newProtoReader(conn)
 	nativeWrite(t, conn, bindCmd("connector", nil, nil))
-	require.NoError(t, reader.readBindResp())
+	routes, err := reader.readBindCapabilities()
+	require.NoError(t, err)
+	assertNativeSessionBenchCapabilities(t, routes)
 
 	nativeWrite(t, conn, buildProduceCmd(1, "pub", "message"))
 	cid, err := reader.readProduceResp()
@@ -94,26 +98,32 @@ func testNativeSessionContract(t *testing.T) {
 	assert.Equal(t, uint32(10), cid)
 	require.Len(t, results, len(ids))
 
-	nativeWrite(t, conn, buildNackCmd(11, subID, ids))
-	cid, results, err = reader.readNackResp()
+	nativeWrite(t, conn, buildHFetchCmd(11, false, "sub", 3))
+	cid, nackSubID, hmessages, err := reader.readHFetchResp(false)
 	require.NoError(t, err)
 	assert.Equal(t, uint32(11), cid)
-	require.Len(t, results, len(ids))
-
-	nativeWrite(t, conn, buildHFetchCmd(12, false, "sub", 3))
-	cid, _, hmessages, err := reader.readHFetchResp(false)
-	require.NoError(t, err)
-	assert.Equal(t, uint32(12), cid)
 	require.Len(t, hmessages, 3)
-	for _, message := range hmessages {
+	nackIDs := make([][]byte, len(hmessages))
+	for i, message := range hmessages {
 		assert.Equal(t, [][]byte{[]byte("content-type"), []byte("application/octet-stream")}, message.Headers)
 		assert.Len(t, message.Payload, 64)
+		require.NotEmpty(t, message.MsgID)
+		nackIDs[i] = message.MsgID
 	}
+	nativeWrite(t, conn, buildNackCmd(12, nackSubID, nackIDs))
+	cid, results, err = reader.readNackResp()
+	require.NoError(t, err)
+	assert.Equal(t, uint32(12), cid)
+	require.Len(t, results, len(nackIDs))
 
 	nativeWrite(t, conn, buildAckCmd(13, 254, [][]byte{[]byte("unknown")}))
 	_, _, err = reader.readAckResp()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "subscription not found")
+	var nativeOperationErr *v1.OperationError
+	require.ErrorAs(t, err, &nativeOperationErr)
+	assert.Equal(t, v1.STATUS_NOT_FOUND, nativeOperationErr.Code)
+	assert.Equal(t, v1.OUTCOME_NOT_APPLIED, nativeOperationErr.Outcome)
+	assert.Equal(t, "SUBSCRIPTION_NOT_FOUND", nativeOperationErr.Reason)
+	assert.Contains(t, nativeOperationErr.Message, "subscription not found")
 
 	testNativeSubscribeContract(t, false)
 	testNativeSubscribeContract(t, true)
@@ -161,6 +171,7 @@ func testGRPCSessionContract(t *testing.T) {
 	bind := grpcReceive(t, stream).GetBind()
 	require.NotNil(t, bind)
 	require.Empty(t, bind.Error)
+	assertGRPCSessionBenchCapabilities(t, bind.Routes)
 
 	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Produce{Produce: &pb.ProduceRequest{CorrelationId: 1, Route: "pub", Message: []byte("message")}}})
 	produce := grpcReceive(t, stream).GetProduce()
@@ -207,32 +218,71 @@ func testGRPCSessionContract(t *testing.T) {
 	require.Empty(t, ack.Error)
 	require.Len(t, ack.Results, len(ids))
 
-	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Nack{Nack: &pb.NackRequest{CorrelationId: 11, SubscriptionId: fetch.SubscriptionId, MessageIds: ids}}})
-	nack := grpcReceive(t, stream).GetNack()
-	require.NotNil(t, nack)
-	require.Empty(t, nack.Error)
-	require.Len(t, nack.Results, len(ids))
-
-	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Hfetch{Hfetch: &pb.HFetchRequest{CorrelationId: 12, Route: "sub", AutoCommit: false, BatchSize: 3}}})
+	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Hfetch{Hfetch: &pb.HFetchRequest{CorrelationId: 11, Route: "sub", AutoCommit: false, BatchSize: 3}}})
 	hfetch := grpcReceive(t, stream).GetHfetch()
 	require.NotNil(t, hfetch)
 	require.Empty(t, hfetch.Error)
 	require.Len(t, hfetch.Messages, 3)
-	for _, message := range hfetch.Messages {
+	nackIDs := make([][]byte, len(hfetch.Messages))
+	for i, message := range hfetch.Messages {
 		assert.Len(t, message.Payload, 64)
 		require.Len(t, message.Headers, 1)
 		assert.Equal(t, []byte("content-type"), message.Headers[0].Key)
 		assert.Equal(t, []byte("application/octet-stream"), message.Headers[0].Value)
+		require.NotEmpty(t, message.MessageId)
+		nackIDs[i] = message.MessageId
 	}
+
+	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Nack{Nack: &pb.NackRequest{CorrelationId: 12, SubscriptionId: hfetch.SubscriptionId, MessageIds: nackIDs}}})
+	nack := grpcReceive(t, stream).GetNack()
+	require.NotNil(t, nack)
+	require.Empty(t, nack.Error)
+	require.Len(t, nack.Results, len(nackIDs))
 
 	grpcSend(t, stream, &pb.FujinRequest{Request: &pb.FujinRequest_Ack{Ack: &pb.AckRequest{CorrelationId: 13, SubscriptionId: 254, MessageIds: [][]byte{[]byte("unknown")}}}})
 	unknown := grpcReceive(t, stream).GetAck()
 	require.NotNil(t, unknown)
-	assert.Contains(t, unknown.Error, "subscription not found")
+	require.NotNil(t, unknown.Error)
+	assert.Equal(t, pb.StatusCode_STATUS_NOT_FOUND, unknown.Error.Code)
+	assert.Equal(t, pb.OperationOutcome_OUTCOME_NOT_APPLIED, unknown.Error.Outcome)
+	assert.Equal(t, "SUBSCRIPTION_NOT_FOUND", unknown.Error.Reason)
+	assert.Contains(t, unknown.Error.Message, "subscription not found")
 	assert.Empty(t, unknown.Results)
 
 	testGRPCSubscribeContract(t, client, false)
 	testGRPCSubscribeContract(t, client, true)
+}
+
+func assertNativeSessionBenchCapabilities(t *testing.T, routes map[string]nativeRouteCapabilities) {
+	t.Helper()
+	require.Len(t, routes, 3)
+	assert.Equal(t, nativeRouteCapabilities{
+		Produce: true, Headers: true, ProduceGuarantee: v1.PRODUCE_GUARANTEE_LOCAL_ACCEPT,
+	}, routes["pub"])
+	assert.Equal(t, nativeRouteCapabilities{
+		Produce: true, Headers: true, Transactions: true, ProduceGuarantee: v1.PRODUCE_GUARANTEE_LOCAL_ACCEPT,
+	}, routes["tx"])
+	assert.Equal(t, nativeRouteCapabilities{
+		Headers: true, Subscribe: true, Fetch: true, ManualSettlement: true,
+		AckGranularity: v1.ACK_GRANULARITY_SINGLE, NackEffect: v1.NACK_EFFECT_DROP,
+	}, routes["sub"])
+}
+
+func assertGRPCSessionBenchCapabilities(t *testing.T, routes map[string]*pb.RouteCapabilities) {
+	t.Helper()
+	require.Len(t, routes, 3)
+	assert.Equal(t, &pb.RouteCapabilities{
+		Produce: true, Headers: true, ProduceGuarantee: pb.ProduceGuarantee_PRODUCE_GUARANTEE_LOCAL_ACCEPT,
+	}, routes["pub"])
+	assert.Equal(t, &pb.RouteCapabilities{
+		Produce: true, Headers: true, Transactions: true,
+		ProduceGuarantee: pb.ProduceGuarantee_PRODUCE_GUARANTEE_LOCAL_ACCEPT,
+	}, routes["tx"])
+	assert.Equal(t, &pb.RouteCapabilities{
+		Headers: true, Subscribe: true, Fetch: true, ManualSettlement: true,
+		AckGranularity: pb.AckGranularity_ACK_GRANULARITY_SINGLE,
+		NackEffect:     pb.NackEffect_NACK_EFFECT_DROP,
+	}, routes["sub"])
 }
 
 func testGRPCSubscribeContract(t *testing.T, client pb.FujinServiceClient, withHeaders bool) {
@@ -279,7 +329,7 @@ func TestSessionBenchSubscribeWaitsForStart(t *testing.T) {
 	received := make(chan struct{}, 1)
 	done := make(chan error, 1)
 	go func() {
-		done <- reader.Subscribe(ctx, func([]byte, string, ...any) {
+		done <- reader.Subscribe(ctx, func() error { return nil }, func([]byte, string, ...any) {
 			received <- struct{}{}
 			cancel()
 		})
@@ -299,10 +349,22 @@ func TestSessionBenchSubscribeWaitsForStart(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestGenConnectorSubscribeLimitStopsUntilCancellation(t *testing.T) {
-	connectorInstance, err := newGenConnector(GenConfig{MsgSize: 8, SubscribeLimit: 3}, nil)
+func TestGenConnectorUsesClonedMapSettings(t *testing.T) {
+	cloned, err := config.CloneConnectorConfig(config.ConnectorConfig{
+		Type: "gen", Settings: GenConfig{MsgSize: 8, SubscribeLimit: 3},
+	})
 	require.NoError(t, err)
-	readerInstance, err := connectorInstance.NewReader(nil, "sub", true, nil)
+
+	connectorInstance, err := newGenConnector(cloned.Settings)
+	require.NoError(t, err)
+	assert.Equal(t, 8, connectorInstance.msgSize)
+	assert.Equal(t, uint64(3), connectorInstance.subscribeLimit)
+}
+
+func TestGenConnectorSubscribeLimitStopsUntilCancellation(t *testing.T) {
+	connectorInstance, err := newGenConnector(GenConfig{MsgSize: 8, SubscribeLimit: 3})
+	require.NoError(t, err)
+	readerInstance, err := connectorInstance.NewReader(true, nil)
 	require.NoError(t, err)
 	reader := readerInstance.(*genReader)
 
@@ -310,7 +372,7 @@ func TestGenConnectorSubscribeLimitStopsUntilCancellation(t *testing.T) {
 	done := make(chan error, 1)
 	received := make(chan int, 3)
 	go func() {
-		done <- reader.Subscribe(ctx, func(message []byte, _ string, _ ...any) {
+		done <- reader.Subscribe(ctx, func() error { return nil }, func(message []byte, _ string, _ ...any) {
 			received <- len(message)
 		})
 	}()
@@ -366,19 +428,48 @@ func TestSessionBenchmarkOperationCountsDistributeExactTotal(t *testing.T) {
 	assert.Equal(t, []int{7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6}, counts)
 }
 
+func TestSessionBenchmarkSettlementIDsAdvanceWithoutMutatingSeed(t *testing.T) {
+	seed := [][]byte{
+		{1, 0, 0, 0, 1, 0, 0, 0, 10},
+		{1, 0, 0, 0, 1, 0, 0, 0, 11},
+	}
+	original := [][]byte{append([]byte(nil), seed[0]...), append([]byte(nil), seed[1]...)}
+
+	ids, err := cloneSessionBenchmarkSettlementIDs(seed)
+	require.NoError(t, err)
+	require.NoError(t, advanceSessionBenchmarkSettlementIDs(ids))
+
+	assert.Equal(t, original, seed)
+	assert.Equal(t, uint64(1)<<32|12, binary.BigEndian.Uint64(ids[0][sessionBenchmarkMessageIDSequenceOffset:sessionBenchmarkMessageIDEnvelopeLen]))
+	assert.Equal(t, uint64(1)<<32|13, binary.BigEndian.Uint64(ids[1][sessionBenchmarkMessageIDSequenceOffset:sessionBenchmarkMessageIDEnvelopeLen]))
+	assert.NotSame(t, &seed[0][0], &ids[0][0])
+}
+
+func TestSessionBenchmarkSettlementFrameAdvancesMessageIDs(t *testing.T) {
+	frame := buildAckCmd(2, 7, [][]byte{
+		{1, 0, 0, 0, 1, 0, 0, 0, 10},
+		{1, 0, 0, 0, 1, 0, 0, 0, 11},
+	})
+
+	require.NoError(t, advanceSessionBenchmarkSettlementFrame(frame))
+
+	firstOffset := 10 + 4 + sessionBenchmarkMessageIDSequenceOffset
+	secondOffset := 10 + 4 + sessionBenchmarkMessageIDEnvelopeLen + 4 + sessionBenchmarkMessageIDSequenceOffset
+	assert.Equal(t, uint64(1)<<32|12, binary.BigEndian.Uint64(frame[firstOffset:firstOffset+sessionBenchmarkMessageIDSequenceLen]))
+	assert.Equal(t, uint64(1)<<32|13, binary.BigEndian.Uint64(frame[secondOffset:secondOffset+sessionBenchmarkMessageIDSequenceLen]))
+}
+
 func TestSessionBenchConfigDistributesSubscribeLimitsAcrossConnectors(t *testing.T) {
 	config := makeSessionBenchConfig(1, []int{7, 6}, false, nil)
 	settings := config["connector"].Settings
 
-	firstConnector, err := newSessionBenchConnector(settings, nil)
-	require.NoError(t, err)
-	firstReader, err := firstConnector.NewReader(nil, "sub", true, nil)
+	firstConnector := newSessionBenchConnector(settings)
+	firstReader, err := firstConnector.NewReader(true, nil)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(7), firstReader.(*genReader).subscribeLimit)
 
-	secondConnector, err := newSessionBenchConnector(settings, nil)
-	require.NoError(t, err)
-	secondReader, err := secondConnector.NewReader(nil, "sub", true, nil)
+	secondConnector := newSessionBenchConnector(settings)
+	secondReader, err := secondConnector.NewReader(true, nil)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(6), secondReader.(*genReader).subscribeLimit)
 }

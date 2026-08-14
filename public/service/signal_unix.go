@@ -27,9 +27,11 @@ func startReloadLoop(s *server.Server, logLevelVar *slog.LevelVar, logger *slog.
 				logger.Error("reload config failed", "err", err)
 				continue
 			}
-			s.ReloadConnectors(newConf.Connectors)
+			if err := s.ReloadConnectors(newConf.Connectors); err != nil {
+				logger.Error("reload connectors failed", "err", err)
+				continue
+			}
 			logLevelVar.Set(parseLogLevel(os.Getenv("FUJIN_LOG_LEVEL")))
-			logger.Info("config reloaded successfully")
 		}
 	}()
 }

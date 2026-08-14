@@ -6,144 +6,97 @@ import (
 	"log/slog"
 
 	"github.com/fujin-io/fujin/public/plugins/connector"
-	"github.com/fujin-io/fujin/public/util"
 )
 
 func init() {
-	if err := connector.Register("nop", newNopConnector); err != nil {
+	if err := connector.Register("nop", nopDescriptor()); err != nil {
 		panic(fmt.Sprintf("register nop connector: %v", err))
 	}
 }
 
-// nopConnector implements connector.Connector interface for no op
-type nopConnector struct{}
-
-// newNopConnector creates a new nop connector instance
-func newNopConnector(config any, l *slog.Logger) (connector.Connector, error) {
-	return &nopConnector{}, nil
+func nopDescriptor() connector.Descriptor {
+	return connector.Descriptor{Compile: func(any) (connector.Compiled, error) {
+		profiles := map[string]connector.RouteProfile{
+			"pub": {
+				Produce:          true,
+				Headers:          true,
+				Transactions:     true,
+				ProduceGuarantee: connector.AcceptanceLocal,
+			},
+			"sub": {
+				Headers:          true,
+				Subscribe:        true,
+				Fetch:            true,
+				ManualSettlement: true,
+				Settlement:       connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackDrop},
+			},
+		}
+		factories := map[string]connector.RouteFactory{
+			"pub": {Writer: func(*slog.Logger) (connector.WriteCloser, error) { return newWriter(), nil }},
+			"sub": {Reader: func(bool, *slog.Logger) (connector.ReadCloser, error) { return newReader(), nil }},
+		}
+		return connector.CompileStatic(profiles, factories)
+	}}
 }
 
-// NewReader creates a reader from configuration
-func (n *nopConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (connector.ReadCloser, error) {
-	return newReader(), nil
-}
-
-// NewWriter creates a writer from configuration
-func (n *nopConnector) NewWriter(config any, name string, l *slog.Logger) (connector.WriteCloser, error) {
-	return newWriter(), nil
-}
-
-// GetConfigValueConverter returns the config value converter for no op
-func (n *nopConnector) GetConfigValueConverter() connector.ConfigValueConverterFunc {
-	return func(settingPath, value string) (any, error) { return nil, nil }
-}
-
-// reader implements connector.ReadCloser for no op
 type reader struct{}
 
-// newReader creates a new nop reader
-func newReader() connector.ReadCloser {
-	return &reader{}
-}
+func newReader() connector.ReadCloser { return &reader{} }
 
-func (r *reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) error {
+func (*reader) Subscribe(ctx context.Context, ready func() error, _ func([]byte, string, ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	<-ctx.Done()
 	return nil
 }
 
-func (r *reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (*reader) SubscribeWithHeaders(ctx context.Context, ready func() error, _ func([]byte, string, [][]byte, ...any)) error {
+	if err := ready(); err != nil {
+		return err
+	}
 	<-ctx.Done()
 	return nil
 }
 
-func (r *reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
-	fetchHandler(0, nil)
+func (*reader) Fetch(_ context.Context, _ uint32, done func(uint32, error), _ func([]byte, string, ...any)) {
+	done(0, nil)
 }
 
-func (r *reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
-	fetchHandler(0, nil)
+func (*reader) FetchWithHeaders(_ context.Context, _ uint32, done func(uint32, error), _ func([]byte, string, [][]byte, ...any)) {
+	done(0, nil)
 }
 
-func (r *reader) Ack(
-	ctx context.Context,
-	msgIDs [][]byte,
-	ackHandler func(error),
-	ackMsgHandler func([]byte, error),
-) {
-	ackHandler(nil)
-	for _, id := range msgIDs {
-		ackMsgHandler(id, nil)
+func (*reader) Ack(_ context.Context, ids [][]byte, done func(error), each func([]byte, error)) {
+	done(nil)
+	for _, id := range ids {
+		each(id, nil)
 	}
 }
 
-func (r *reader) Nack(
-	ctx context.Context,
-	msgIDs [][]byte,
-	nackHandler func(error),
-	nackMsgHandler func([]byte, error),
-) {
-	nackHandler(nil)
-	for _, id := range msgIDs {
-		nackMsgHandler(id, nil)
+func (*reader) Nack(_ context.Context, ids [][]byte, done func(error), each func([]byte, error)) {
+	done(nil)
+	for _, id := range ids {
+		each(id, nil)
 	}
 }
 
-func (r *reader) EncodeMsgID(buf []byte, _ string, args ...any) []byte {
-	return buf
-}
+func (*reader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte { return buf }
+func (*reader) MsgIDArgsLen() int                                 { return 0 }
+func (*reader) AutoCommit() bool                                  { return true }
+func (*reader) Close() error                                      { return nil }
 
-func (r *reader) MsgIDArgsLen() int {
-	return 0
-}
-
-func (r *reader) AutoCommit() bool {
-	return true
-}
-
-func (r *reader) Close() error {
-	return nil
-}
-
-// writer implements connector.WriteCloser for no op
 type writer struct{}
 
-// newWriter creates a new nop writer
-func newWriter() connector.WriteCloser {
-	return &writer{}
-}
-
-func (w *writer) Produce(ctx context.Context, msg []byte, callback func(err error)) {
+func newWriter() connector.WriteCloser { return &writer{} }
+func (*writer) Produce(_ context.Context, _ []byte, callback func(error)) {
 	callback(nil)
 }
-
-func (w *writer) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
+func (*writer) HProduce(_ context.Context, _ []byte, _ [][]byte, callback func(error)) {
 	callback(nil)
 }
-
-func (w *writer) Flush(ctx context.Context) error {
-	return nil
-}
-
-func (w *writer) BeginTx(ctx context.Context) error {
-	return util.ErrNotSupported
-}
-
-func (w *writer) CommitTx(ctx context.Context) error {
-	return util.ErrNotSupported
-}
-
-func (w *writer) RollbackTx(ctx context.Context) error {
-	return util.ErrNotSupported
-}
-
-func (w *writer) Close() error {
-	return nil
-}
+func (*writer) Flush(context.Context) error      { return nil }
+func (*writer) BeginTx(context.Context) error    { return nil }
+func (*writer) CommitTx(context.Context) error   { return nil }
+func (*writer) RollbackTx(context.Context) error { return nil }
+func (*writer) Close() error                     { return nil }

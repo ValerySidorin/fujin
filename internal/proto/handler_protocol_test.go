@@ -160,11 +160,11 @@ type mockConnectorReader struct {
 	msgIDArgsLen int
 }
 
-func (r *mockConnectorReader) Subscribe(_ context.Context, _ func([]byte, string, ...any)) error {
-	return nil
+func (r *mockConnectorReader) Subscribe(_ context.Context, ready func() error, _ func([]byte, string, ...any)) error {
+	return ready()
 }
-func (r *mockConnectorReader) SubscribeWithHeaders(_ context.Context, _ func([]byte, string, [][]byte, ...any)) error {
-	return nil
+func (r *mockConnectorReader) SubscribeWithHeaders(_ context.Context, ready func() error, _ func([]byte, string, [][]byte, ...any)) error {
+	return ready()
 }
 func (r *mockConnectorReader) Fetch(_ context.Context, _ uint32, frh func(uint32, error), _ func([]byte, string, ...any)) {
 	frh(0, nil)
@@ -198,6 +198,22 @@ type protocolTestManager struct {
 	reader  connector.ReadCloser
 }
 
+func (*protocolTestManager) RouteProfile(string) (connector.RouteProfile, error) {
+	return connector.RouteProfile{
+		Produce: true, Headers: true, Transactions: true, Subscribe: true, Fetch: true,
+		ManualSettlement: true, ProduceGuarantee: connector.AcceptanceLocal,
+		Settlement: connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackDrop},
+	}, nil
+}
+func (m *protocolTestManager) RouteProfiles() map[string]connector.RouteProfile {
+	profile, _ := m.RouteProfile("")
+	return map[string]connector.RouteProfile{
+		"pub": profile,
+		"sub": profile,
+		"tx":  profile,
+	}
+}
+
 func (m *protocolTestManager) GetReader(string, bool) (connector.ReadCloser, error) {
 	if m.reader == nil {
 		return &mockConnectorReader{}, nil
@@ -214,8 +230,9 @@ func (m *protocolTestManager) GetWriter(name string) (connector.WriteCloser, err
 	return writer, nil
 }
 
-func (*protocolTestManager) PutWriter(connector.WriteCloser, string) {}
-func (*protocolTestManager) Close()                                  {}
+func (*protocolTestManager) PutWriter(connector.WriteCloser, string) error { return nil }
+func (*protocolTestManager) DiscardWriter(w connector.WriteCloser) error   { return w.Close() }
+func (*protocolTestManager) Close(context.Context) error                   { return nil }
 
 func protocolTestConfigs(names ...string) config.ConnectorsConfig {
 	configs := make(config.ConnectorsConfig, len(names))
@@ -257,7 +274,7 @@ func (th *testHarness) setConnected(connectorName string) {
 	th.h.core = core.NewWithManagerFactory(context.Background(), configs, nil, th.h.l, func(config.ConnectorConfig, string, *slog.Logger) core.Manager {
 		return th.manager
 	})
-	if err := th.h.core.Bind(connectorName, nil, nil); err != nil {
+	if _, err := th.h.core.Bind(connectorName, nil, nil); err != nil {
 		panic(err)
 	}
 }
@@ -835,19 +852,26 @@ func TestHandle_Bind_EmptyMeta(t *testing.T) {
 	assert.Equal(t, core.StateConnected, th.h.core.State())
 }
 
-func TestHandle_Bind_Response(t *testing.T) {
+func TestHandle_Bind_ResponseIncludesSortedRouteCapabilities(t *testing.T) {
 	th := newProtocolTestHarness()
 	done := th.startWriteLoop()
 	defer th.close(done)
 
-	frame := buildBindFrame("test-conn", nil, nil)
-	err := th.feed(frame)
-	require.NoError(t, err)
-
+	require.NoError(t, th.feed(buildBindFrame("test-conn", nil, nil)))
 	resp := th.readResponse(50 * time.Millisecond)
-	require.GreaterOrEqual(t, len(resp), 2, "should have at least 2 bytes in response")
-	assert.Equal(t, byte(v1.RESP_CODE_BIND), resp[0], "first byte should be BIND response code")
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[1], "second byte should be ERR_CODE_NO")
+
+	want := []byte{byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 3}
+	for _, route := range []string{"pub", "sub", "tx"} {
+		want = binary.BigEndian.AppendUint32(want, uint32(len(route)))
+		want = append(want, route...)
+		want = append(want,
+			v1.ROUTE_CAP_PRODUCE|v1.ROUTE_CAP_HEADERS|v1.ROUTE_CAP_TRANSACTIONS|v1.ROUTE_CAP_SUBSCRIBE|v1.ROUTE_CAP_FETCH|v1.ROUTE_CAP_MANUAL_SETTLEMENT,
+			byte(v1.PRODUCE_GUARANTEE_LOCAL_ACCEPT),
+			byte(v1.ACK_GRANULARITY_SINGLE),
+			byte(v1.NACK_EFFECT_DROP),
+		)
+	}
+	assert.Equal(t, want, resp)
 }
 
 // ---------------------------------------------------------------------------
@@ -904,7 +928,7 @@ func TestHandle_Produce_DeferredCallbacksPreserveCorrelationIDsAcrossResponseReu
 		offset := responseIndex * 6
 		assert.Equal(t, byte(v1.RESP_CODE_PRODUCE), response[offset])
 		assert.Equal(t, []byte{0, 0, 0, correlationID}, response[offset+1:offset+5])
-		assert.Equal(t, byte(v1.ERR_CODE_NO), response[offset+5])
+		assert.Equal(t, byte(v1.STATUS_OK), response[offset+5])
 	}
 }
 
@@ -972,11 +996,11 @@ func TestHandle_Produce_Response(t *testing.T) {
 	resp := th.readResponse(50 * time.Millisecond)
 	th.close(done)
 
-	// Response: RESP_CODE_PRODUCE(1b) + correlationID(4b) + ERR_CODE_NO(1b)
+	// Response: RESP_CODE_PRODUCE(1b) + correlationID(4b) + STATUS_OK(1b)
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_PRODUCE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_Produce_ByteByByte(t *testing.T) {
@@ -1142,7 +1166,7 @@ func TestHandle_HProduce_Response(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_HPRODUCE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 // ---------------------------------------------------------------------------
@@ -1188,7 +1212,7 @@ func TestHandle_TxBegin_FromConnected(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_BEGIN), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_TxBegin_WhenAlreadyInTx(t *testing.T) {
@@ -1212,7 +1236,7 @@ func TestHandle_TxBegin_WhenAlreadyInTx(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_BEGIN), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
+	assert.Equal(t, byte(v1.STATUS_FAILED_PRECONDITION), resp[5])
 }
 
 func TestHandle_TxProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
@@ -1235,7 +1259,7 @@ func TestHandle_TxProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_PRODUCE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_TxHProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
@@ -1258,7 +1282,7 @@ func TestHandle_TxHProduce_UsesActiveRouteWithoutRouteField(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_HPRODUCE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_TxCommit_InTxState(t *testing.T) {
@@ -1287,7 +1311,7 @@ func TestHandle_TxCommit_InTxState(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_COMMIT), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_TxCommit_OutsideTx(t *testing.T) {
@@ -1309,7 +1333,7 @@ func TestHandle_TxCommit_OutsideTx(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_COMMIT), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
+	assert.Equal(t, byte(v1.STATUS_FAILED_PRECONDITION), resp[5])
 }
 
 func TestHandle_TxRollback_InTxState(t *testing.T) {
@@ -1337,7 +1361,7 @@ func TestHandle_TxRollback_InTxState(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_ROLLBACK), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 }
 
 func TestHandle_TxRollback_OutsideTx(t *testing.T) {
@@ -1356,7 +1380,7 @@ func TestHandle_TxRollback_OutsideTx(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_TX_ROLLBACK), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
+	assert.Equal(t, byte(v1.STATUS_FAILED_PRECONDITION), resp[5])
 }
 
 func TestAppendAutoCommitFetchMessagePacksAcrossLargePoolBoundary(t *testing.T) {
@@ -1532,11 +1556,11 @@ func TestHandle_Ack_ZeroMsgIDs(t *testing.T) {
 	resp := th.readResponse(50 * time.Millisecond)
 	th.close(done)
 
-	// Should get ACK success: RESP_CODE_ACK(1) + cID(4) + ERR_CODE_NO(1) + count(4) = 10 bytes
+	// Should get ACK success: RESP_CODE_ACK(1) + cID(4) + STATUS_OK(1) + count(4) = 10 bytes
 	require.GreaterOrEqual(t, len(resp), 10)
 	assert.Equal(t, byte(v1.RESP_CODE_ACK), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[5])
+	assert.Equal(t, byte(v1.STATUS_OK), resp[5])
 	// Verify count = 0 in response
 	respCount := binary.BigEndian.Uint32(resp[6:10])
 	assert.Equal(t, uint32(0), respCount)
@@ -1770,7 +1794,7 @@ func TestHandle_Unsubscribe_ParsesCorrelationAndSubID(t *testing.T) {
 	require.GreaterOrEqual(t, len(resp), 6)
 	assert.Equal(t, byte(v1.RESP_CODE_UNSUBSCRIBE), resp[0])
 	assert.Equal(t, cID[:], resp[1:5])
-	assert.Equal(t, byte(v1.ERR_CODE_YES), resp[5])
+	assert.Equal(t, byte(v1.STATUS_NOT_FOUND), resp[5])
 }
 
 // ---------------------------------------------------------------------------
@@ -1849,29 +1873,6 @@ func TestHandle_SequentialProduces_AcrossCalls(t *testing.T) {
 	for _, p := range produced {
 		assert.Equal(t, []byte("seq-msg"), p.msg)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// BIND response verification with stream output
-// ---------------------------------------------------------------------------
-
-func TestHandle_Bind_MultipleResponseBytes(t *testing.T) {
-	th := newProtocolTestHarness()
-	done := th.startWriteLoop()
-
-	frame := buildBindFrame("conn", nil, nil)
-	err := th.feed(frame)
-	require.NoError(t, err)
-
-	resp := th.readResponse(50 * time.Millisecond)
-	th.close(done)
-
-	// BIND response is exactly 2 bytes: RESP_CODE_BIND + ERR_CODE_NO
-	require.GreaterOrEqual(t, len(resp), 2)
-
-	// Verify first two bytes
-	assert.Equal(t, byte(v1.RESP_CODE_BIND), resp[0])
-	assert.Equal(t, byte(v1.ERR_CODE_NO), resp[1])
 }
 
 // ---------------------------------------------------------------------------

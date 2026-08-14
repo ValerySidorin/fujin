@@ -48,8 +48,8 @@ func Benchmark_Fetch_Nop_GRPC(b *testing.B) {
 		if !ok {
 			return fmt.Errorf("unexpected response type %T", resp.Response)
 		}
-		if fetch.Fetch.Error != "" {
-			return fmt.Errorf("fetch: %s", fetch.Fetch.Error)
+		if fetch.Fetch.Error != nil {
+			return fmt.Errorf("fetch: %v", fetch.Fetch.Error)
 		}
 		return nil
 	})
@@ -84,8 +84,8 @@ func Benchmark_HProduce_Session_GRPC(b *testing.B) {
 				Headers: []*pb.KV{{Key: []byte("content-type"), Value: []byte("application/octet-stream")}}}}}
 			done := receiveGRPCResponses(ctx, stream, b.N, func(resp *pb.FujinResponse) error {
 				value, ok := resp.Response.(*pb.FujinResponse_Hproduce)
-				if !ok || value.Hproduce.Error != "" {
-					return fmt.Errorf("hproduce response: %T %q", resp.Response, value.Hproduce.Error)
+				if !ok || value.Hproduce.Error != nil {
+					return fmt.Errorf("hproduce response: %T %v", resp.Response, value.Hproduce.Error)
 				}
 				return nil
 			})
@@ -129,14 +129,14 @@ func benchmarkFetchGRPC(b *testing.B, withHeaders bool) {
 				done := receiveGRPCResponses(ctx, stream, b.N, func(resp *pb.FujinResponse) error {
 					if withHeaders {
 						value, ok := resp.Response.(*pb.FujinResponse_Hfetch)
-						if !ok || value.Hfetch.Error != "" || len(value.Hfetch.Messages) != batchSize {
-							return fmt.Errorf("hfetch response: %T error=%q messages=%d", resp.Response, value.Hfetch.Error, len(value.Hfetch.Messages))
+						if !ok || value.Hfetch.Error != nil || len(value.Hfetch.Messages) != batchSize {
+							return fmt.Errorf("hfetch response: %T error=%v messages=%d", resp.Response, value.Hfetch.Error, len(value.Hfetch.Messages))
 						}
 						return nil
 					}
 					value, ok := resp.Response.(*pb.FujinResponse_Fetch)
-					if !ok || value.Fetch.Error != "" || len(value.Fetch.Messages) != batchSize {
-						return fmt.Errorf("fetch response: %T error=%q messages=%d", resp.Response, value.Fetch.Error, len(value.Fetch.Messages))
+					if !ok || value.Fetch.Error != nil || len(value.Fetch.Messages) != batchSize {
+						return fmt.Errorf("fetch response: %T error=%v messages=%d", resp.Response, value.Fetch.Error, len(value.Fetch.Messages))
 					}
 					return nil
 				})
@@ -167,7 +167,7 @@ func Benchmark_HSubscribe_Session_GRPC(b *testing.B) {
 			}
 			if resp, err := stream.Recv(); err != nil {
 				b.Fatal(err)
-			} else if value, ok := resp.Response.(*pb.FujinResponse_Hsubscribe); !ok || value.Hsubscribe.Error != "" {
+			} else if value, ok := resp.Response.(*pb.FujinResponse_Hsubscribe); !ok || value.Hsubscribe.Error != nil {
 				b.Fatalf("hsubscribe response: %T", resp.Response)
 			}
 			b.SetBytes(int64(payloadSize.size))
@@ -208,8 +208,8 @@ func benchmarkAckGRPC(b *testing.B, nack bool) {
 				b.Fatal(err)
 			}
 			fetch, ok := resp.Response.(*pb.FujinResponse_Fetch)
-			if !ok || fetch.Fetch.Error != "" || len(fetch.Fetch.Messages) != batchSize {
-				b.Fatalf("fetch setup: %T error=%q", resp.Response, fetch.Fetch.Error)
+			if !ok || fetch.Fetch.Error != nil || len(fetch.Fetch.Messages) != batchSize {
+				b.Fatalf("fetch setup: %T error=%v", resp.Response, fetch.Fetch.Error)
 			}
 			ids := make([][]byte, batchSize)
 			for i := range fetch.Fetch.Messages {
@@ -224,13 +224,13 @@ func benchmarkAckGRPC(b *testing.B, nack bool) {
 			done := receiveGRPCResponses(ctx, stream, b.N, func(resp *pb.FujinResponse) error {
 				if nack {
 					value, ok := resp.Response.(*pb.FujinResponse_Nack)
-					if !ok || value.Nack.Error != "" || len(value.Nack.Results) != batchSize {
+					if !ok || value.Nack.Error != nil || len(value.Nack.Results) != batchSize {
 						return fmt.Errorf("nack response: %T", resp.Response)
 					}
 					return nil
 				}
 				value, ok := resp.Response.(*pb.FujinResponse_Ack)
-				if !ok || value.Ack.Error != "" || len(value.Ack.Results) != batchSize {
+				if !ok || value.Ack.Error != nil || len(value.Ack.Results) != batchSize {
 					return fmt.Errorf("ack response: %T", resp.Response)
 				}
 				return nil
@@ -256,16 +256,16 @@ func Benchmark_Transaction_Session_GRPC(b *testing.B) {
 	done := receiveGRPCResponses(ctx, stream, b.N*3, func(resp *pb.FujinResponse) error {
 		switch value := resp.Response.(type) {
 		case *pb.FujinResponse_BeginTx:
-			if value.BeginTx.Error != "" {
-				return fmt.Errorf("begin: %s", value.BeginTx.Error)
+			if value.BeginTx.Error != nil {
+				return fmt.Errorf("begin: %v", value.BeginTx.Error)
 			}
 		case *pb.FujinResponse_TxProduce:
-			if value.TxProduce.Error != "" {
-				return fmt.Errorf("tx produce: %s", value.TxProduce.Error)
+			if value.TxProduce.Error != nil {
+				return fmt.Errorf("tx produce: %v", value.TxProduce.Error)
 			}
 		case *pb.FujinResponse_CommitTx:
-			if value.CommitTx.Error != "" {
-				return fmt.Errorf("commit: %s", value.CommitTx.Error)
+			if value.CommitTx.Error != nil {
+				return fmt.Errorf("commit: %v", value.CommitTx.Error)
 			}
 		default:
 			return fmt.Errorf("unexpected transaction response %T", resp.Response)
@@ -307,7 +307,7 @@ func Benchmark_Bind_GRPC(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		if value, ok := resp.Response.(*pb.FujinResponse_Bind); !ok || value.Bind.Error != "" {
+		if value, ok := resp.Response.(*pb.FujinResponse_Bind); !ok || value.Bind.Error != nil {
 			b.Fatalf("bind response: %T", resp.Response)
 		}
 		if err := stream.CloseSend(); err != nil {
@@ -338,8 +338,8 @@ func benchProduceGRPC(b *testing.B, payload []byte) {
 		if !ok {
 			return fmt.Errorf("unexpected response type %T", resp.Response)
 		}
-		if produce.Produce.Error != "" {
-			return fmt.Errorf("produce: %s", produce.Produce.Error)
+		if produce.Produce.Error != nil {
+			return fmt.Errorf("produce: %v", produce.Produce.Error)
 		}
 		return nil
 	})
@@ -453,8 +453,8 @@ func bindGRPCBenchStream(b *testing.B, stream pb.FujinService_StreamClient) {
 	if !ok {
 		b.Fatalf("unexpected response type %T", resp.Response)
 	}
-	if bind.Bind.Error != "" {
-		b.Fatalf("bind: %s", bind.Bind.Error)
+	if bind.Bind.Error != nil {
+		b.Fatalf("bind: %v", bind.Bind.Error)
 	}
 }
 

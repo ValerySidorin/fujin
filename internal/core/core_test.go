@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -22,9 +23,9 @@ var registerContracts sync.Once
 func registerContractPlugins(t *testing.T) {
 	t.Helper()
 	registerContracts.Do(func() {
-		require.NoError(t, connector.Register("session_core_contract", func(any, *slog.Logger) (connector.Connector, error) {
-			return contractConnector{}, nil
-		}))
+		require.NoError(t, connector.Register("session_core_contract", connector.Descriptor{Compile: func(any) (connector.Compiled, error) {
+			return connector.CompileStatic(map[string]connector.RouteProfile{"route": testRouteProfile()}, map[string]connector.RouteFactory{"route": {}})
+		}}))
 		require.NoError(t, bmw.Register("session_core_first", func(any, *slog.Logger) (bmw.Middleware, error) {
 			return bindMiddlewareFunc(func(_ context.Context, meta map[string]string) error {
 				meta["order"] += "1"
@@ -74,6 +75,9 @@ type testManager struct {
 	readerGets    map[string]int
 	writerPuts    map[string]int
 	closeCount    int
+	putErr        error
+	closeErr      error
+	closeGate     <-chan struct{}
 }
 
 func newTestManager() *testManager {
@@ -85,6 +89,20 @@ func newTestManager() *testManager {
 		writerErrs: make(map[string]error),
 		readerErrs: make(map[string]error),
 	}
+}
+func testRouteProfile() connector.RouteProfile {
+	return connector.RouteProfile{
+		Produce: true, Headers: true, Transactions: true, Subscribe: true, Fetch: true,
+		ManualSettlement: true, ProduceGuarantee: connector.AcceptanceLocal,
+		Settlement: connector.SettlementProfile{Ack: connector.AckSingle, Nack: connector.NackDrop},
+	}
+}
+
+func (m *testManager) RouteProfile(string) (connector.RouteProfile, error) {
+	return testRouteProfile(), nil
+}
+func (m *testManager) RouteProfiles() map[string]connector.RouteProfile {
+	return map[string]connector.RouteProfile{"route": testRouteProfile()}
 }
 
 func (m *testManager) GetReader(name string, autoCommit bool) (connector.ReadCloser, error) {
@@ -119,16 +137,33 @@ func (m *testManager) GetWriter(name string) (connector.WriteCloser, error) {
 	return w, nil
 }
 
-func (m *testManager) PutWriter(_ connector.WriteCloser, name string) {
+func (m *testManager) PutWriter(_ connector.WriteCloser, name string) error {
 	m.mu.Lock()
 	m.writerPuts[name]++
+	err := m.putErr
 	m.mu.Unlock()
+	return err
 }
 
-func (m *testManager) Close() {
+func (m *testManager) DiscardWriter(writer connector.WriteCloser) error {
+	return writer.Close()
+}
+
+func (m *testManager) Close(context.Context) error {
 	m.mu.Lock()
 	m.closeCount++
+	err := m.closeErr
 	m.mu.Unlock()
+	if m.closeGate != nil {
+		<-m.closeGate
+	}
+	return err
+}
+
+func (m *testManager) closes() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.closeCount
 }
 
 func readerKey(name string, autoCommit bool) string {
@@ -156,6 +191,8 @@ type testWriter struct {
 	flushErr      error
 	rollbackErr   error
 	commitErr     error
+	closeErr      error
+	closeGate     <-chan struct{}
 	produceGate   <-chan struct{}
 	pending       sync.WaitGroup
 }
@@ -225,15 +262,19 @@ func (w *testWriter) RollbackTx(context.Context) error {
 	return err
 }
 func (w *testWriter) Close() error {
+	if w.closeGate != nil {
+		<-w.closeGate
+	}
 	w.mu.Lock()
 	w.closeCount++
+	err := w.closeErr
 	w.mu.Unlock()
-	return nil
+	return err
 }
 
 type fetchedMessage struct {
-	payload []byte
 	topic   string
+	payload []byte
 	headers [][]byte
 	id      []byte
 }
@@ -243,35 +284,57 @@ type testReader struct {
 	fetch          []fetchedMessage
 	fetchErr       error
 	fetchDoneFirst bool
+	fetchStarted   chan struct{}
+	fetchGate      <-chan struct{}
+	fetchStartOnce sync.Once
+	msgIDArgsLen   int
 	ackErr         error
 	nackErr        error
 	doneFirst      bool
 	ackGate        <-chan struct{}
 	ackEachErr     map[string]error
 	nackEachErr    map[string]error
-	subscribe      func(context.Context, bool, func([]byte, string, [][]byte, ...any)) error
+	subscribe      func(context.Context, bool, func([]byte, string, [][]byte, ...any), func() error) error
 	closeCount     atomic.Int32
+	closeErr       error
+	closeGate      <-chan struct{}
 }
 
-func (r *testReader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) error {
+func (r *testReader) Subscribe(ctx context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	if r.subscribe == nil {
+		if err := ready(); err != nil {
+			return err
+		}
 		<-ctx.Done()
 		return ctx.Err()
 	}
-	return r.subscribe(ctx, false, func(payload []byte, topic string, _ [][]byte, args ...any) {
-		h(payload, topic, args...)
-	})
+	return r.subscribe(ctx, false, func(payload []byte, source string, _ [][]byte, args ...any) {
+		h(payload, source, args...)
+	}, ready)
 }
 
-func (r *testReader) SubscribeWithHeaders(ctx context.Context, h func([]byte, string, [][]byte, ...any)) error {
+func (r *testReader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func([]byte, string, [][]byte, ...any)) error {
 	if r.subscribe == nil {
+		if err := ready(); err != nil {
+			return err
+		}
 		<-ctx.Done()
 		return ctx.Err()
 	}
-	return r.subscribe(ctx, true, h)
+	return r.subscribe(ctx, true, h, ready)
+}
+
+func (r *testReader) waitForFetch() {
+	if r.fetchStarted != nil {
+		r.fetchStartOnce.Do(func() { close(r.fetchStarted) })
+	}
+	if r.fetchGate != nil {
+		<-r.fetchGate
+	}
 }
 
 func (r *testReader) Fetch(_ context.Context, _ uint32, done func(uint32, error), message func([]byte, string, ...any)) {
+	r.waitForFetch()
 	if r.fetchDoneFirst {
 		done(uint32(len(r.fetch)), r.fetchErr)
 	}
@@ -284,6 +347,7 @@ func (r *testReader) Fetch(_ context.Context, _ uint32, done func(uint32, error)
 }
 
 func (r *testReader) FetchWithHeaders(_ context.Context, _ uint32, done func(uint32, error), message func([]byte, string, [][]byte, ...any)) {
+	r.waitForFetch()
 	if r.fetchDoneFirst {
 		done(uint32(len(r.fetch)), r.fetchErr)
 	}
@@ -325,7 +389,7 @@ func (r *testReader) runAck(ids [][]byte, done func(error), each func([]byte, er
 	}()
 }
 
-func (r *testReader) MsgIDArgsLen() int { return 0 }
+func (r *testReader) MsgIDArgsLen() int { return r.msgIDArgsLen }
 func (r *testReader) EncodeMsgID(buf []byte, _ string, args ...any) []byte {
 	if len(args) == 0 {
 		return buf
@@ -333,10 +397,22 @@ func (r *testReader) EncodeMsgID(buf []byte, _ string, args ...any) []byte {
 	id, _ := args[0].([]byte)
 	return append(buf, id...)
 }
+
+func encodedTestMessageID(t *testing.T, core *Core, subscriptionID byte, payload []byte) []byte {
+	t.Helper()
+	core.mu.Lock()
+	reader := core.readers[subscriptionID]
+	core.mu.Unlock()
+	require.NotNil(t, reader)
+	return reader.scoped.EncodeMsgID(nil, "", payload)
+}
 func (r *testReader) AutoCommit() bool { return r.autoCommit }
 func (r *testReader) Close() error {
+	if r.closeGate != nil {
+		<-r.closeGate
+	}
 	r.closeCount.Add(1)
-	return nil
+	return r.closeErr
 }
 
 func newBoundCore(t *testing.T, m *testManager) *Core {
@@ -347,7 +423,8 @@ func newBoundCore(t *testing.T, m *testManager) *Core {
 	core := NewWithManagerFactory(context.Background(), configs, nil, slog.Default(), func(connectorconfig.ConnectorConfig, string, *slog.Logger) Manager {
 		return m
 	})
-	require.NoError(t, core.Bind("connector", nil, nil))
+	_, err := core.Bind("connector", nil, nil)
+	require.NoError(t, err)
 	return core
 }
 
@@ -379,11 +456,13 @@ func TestBindUsesLatestConfigMiddlewareOrderAndOverrides(t *testing.T) {
 		return newTestManager()
 	})
 	meta := map[string]string{}
-	require.NoError(t, core.Bind("new", meta, map[string]string{"routes.pub.topic": "after"}))
+	_, err := core.Bind("new", meta, map[string]string{"routes.pub.topic": "after"})
+	require.NoError(t, err)
 	assert.Equal(t, "12", meta["order"])
 	settings := received.Settings.(map[string]any)
 	assert.Equal(t, "after", settings["routes"].(map[string]any)["pub"].(map[string]any)["topic"])
-	assert.ErrorIs(t, core.Bind("new", nil, nil), ErrAlreadyBound)
+	_, err = core.Bind("new", nil, nil)
+	assert.ErrorIs(t, err, ErrAlreadyBound)
 }
 
 func boolPointer(value bool) *bool { return &value }
@@ -396,8 +475,10 @@ func TestBindRejectsMissingConnectorAndDisallowedOverride(t *testing.T) {
 	core := NewWithManagerFactory(context.Background(), configs, nil, slog.Default(), func(connectorconfig.ConnectorConfig, string, *slog.Logger) Manager {
 		return newTestManager()
 	})
-	assert.ErrorIs(t, core.Bind("missing", nil, nil), ErrConnectorNotFound)
-	assert.Error(t, core.Bind("connector", nil, map[string]string{"forbidden": "value"}))
+	_, err := core.Bind("missing", nil, nil)
+	assert.ErrorIs(t, err, ErrConnectorNotFound)
+	_, err = core.Bind("connector", nil, map[string]string{"forbidden": "value"})
+	assert.Error(t, err)
 	assert.Equal(t, StateUnbound, core.State())
 }
 
@@ -412,7 +493,7 @@ func TestBindMiddlewareRejectionLeavesSessionUnbound(t *testing.T) {
 	core := NewWithManagerFactory(context.Background(), configs, nil, slog.Default(), func(connectorconfig.ConnectorConfig, string, *slog.Logger) Manager {
 		return newTestManager()
 	})
-	err := core.Bind("connector", map[string]string{"api-key": "denied"}, nil)
+	_, err := core.Bind("connector", map[string]string{"api-key": "denied"}, nil)
 	require.ErrorContains(t, err, "bind rejected")
 	assert.Equal(t, StateUnbound, core.State())
 }
@@ -473,27 +554,70 @@ func TestTransactionLifecycleAndInvalidTransitions(t *testing.T) {
 	assert.ErrorIs(t, core.Rollback(), ErrNoTransaction)
 }
 
-func TestTransactionWriterAcquisitionIsLazyAndFailureRemainsInTransaction(t *testing.T) {
+func TestBeginEagerlyInitializesTransactionAndFailsClosed(t *testing.T) {
 	m := newTestManager()
-	unsupported := errors.New("not supported")
-	m.writers["tx"] = &testWriter{beginErr: unsupported}
+	beginErr := errors.New("begin failed")
+	m.writers["tx"] = &testWriter{beginErr: beginErr}
 	core := newBoundCore(t, m)
 
-	require.NoError(t, core.Begin("tx"))
-	assert.Equal(t, StateInTransaction, core.State())
-	assert.Equal(t, 0, m.writerGets["tx"])
-	assert.ErrorIs(t, core.TxProduce([]byte("message"), nil, nil), unsupported)
-	assert.Equal(t, StateInTransaction, core.State())
-	assert.Equal(t, 1, m.writerPuts["tx"])
-	require.NoError(t, core.Rollback())
+	assert.ErrorIs(t, core.Begin("tx"), beginErr)
 	assert.Equal(t, StateConnected, core.State())
+	assert.Equal(t, 1, m.writerGets["tx"])
+	assert.Equal(t, 1, m.writers["tx"].closeCount)
+	assert.ErrorIs(t, core.TxProduce([]byte("message"), nil, nil), ErrNoTransaction)
 
 	m2 := newTestManager()
 	m2.writers["tx"] = &testWriter{rollbackErr: errors.New("rollback failed")}
 	core2 := newBoundCore(t, m2)
 	require.NoError(t, core2.Begin("tx"))
-	require.NoError(t, core2.TxProduce([]byte("message"), nil, nil))
 	require.ErrorContains(t, core2.Close(), "rollback failed")
+	assert.Equal(t, StateClosed, core2.State())
+	assert.Equal(t, 1, m2.writers["tx"].closeCount)
+}
+
+func TestTransactionTerminalErrorsPoisonWriter(t *testing.T) {
+	t.Run("flush failure rolls back without commit", func(t *testing.T) {
+		m := newTestManager()
+		w := &testWriter{flushErr: errors.New("flush failed")}
+		m.writers["tx"] = w
+		core := newBoundCore(t, m)
+		require.NoError(t, core.Begin("tx"))
+		err := core.Commit()
+		assert.ErrorContains(t, err, "transaction aborted after flush")
+		assert.ErrorIs(t, err, ErrTransactionAborted)
+		assert.Equal(t, StateConnected, core.State())
+		assert.Equal(t, 1, w.rollbackCount)
+		assert.Zero(t, w.commitCount)
+		assert.Equal(t, 1, w.closeCount)
+		assert.Zero(t, m.writerPuts["tx"])
+	})
+
+	t.Run("commit failure reports unknown outcome", func(t *testing.T) {
+		m := newTestManager()
+		w := &testWriter{commitErr: errors.New("commit failed")}
+		m.writers["tx"] = w
+		core := newBoundCore(t, m)
+		require.NoError(t, core.Begin("tx"))
+		err := core.Commit()
+		assert.ErrorIs(t, err, ErrCommitOutcomeUnknown)
+		assert.Equal(t, StateConnected, core.State())
+		assert.Zero(t, w.rollbackCount)
+		assert.Equal(t, 1, w.closeCount)
+		assert.Zero(t, m.writerPuts["tx"])
+	})
+
+	t.Run("rollback failure terminates transaction", func(t *testing.T) {
+		m := newTestManager()
+		w := &testWriter{rollbackErr: errors.New("rollback failed")}
+		m.writers["tx"] = w
+		core := newBoundCore(t, m)
+		require.NoError(t, core.Begin("tx"))
+		err := core.Rollback()
+		assert.ErrorContains(t, err, "rollback failed")
+		assert.Equal(t, StateConnected, core.State())
+		assert.Equal(t, 1, w.closeCount)
+		assert.Zero(t, m.writerPuts["tx"])
+	})
 }
 
 func TestFetchCacheKeyAndStableSubscription(t *testing.T) {
@@ -599,16 +723,63 @@ func TestFetchReturnsConnectorResultAfterMessages(t *testing.T) {
 	assert.Equal(t, uint32(2), count)
 	assert.Equal(t, 2, delivered)
 }
+func TestFetchRejectsZeroBoundsOverflowAndContention(t *testing.T) {
+	t.Run("zero batch", func(t *testing.T) {
+		core := newBoundCore(t, newTestManager())
+		_, _, err := core.Fetch("topic", false, false, 0, FetchMessageHandlers{})
+		assert.ErrorIs(t, err, ErrInvalidBatchSize)
+	})
+
+	t.Run("strict maximum", func(t *testing.T) {
+		m := newTestManager()
+		m.readerFactory = func(_ string, autoCommit bool) *testReader {
+			return &testReader{autoCommit: autoCommit, fetch: []fetchedMessage{
+				{payload: []byte("one")}, {payload: []byte("two")}, {payload: []byte("three")},
+			}}
+		}
+		core := newBoundCore(t, m)
+		delivered := 0
+		_, count, err := core.Fetch("topic", false, false, 2, FetchMessageHandlers{Manual: func(byte, connector.Reader, []byte, string, [][]byte, ...any) {
+			delivered++
+		}})
+		assert.ErrorContains(t, err, "fetch contract violated")
+		assert.Equal(t, uint32(2), count)
+		assert.Equal(t, 2, delivered)
+	})
+
+	t.Run("same reader busy", func(t *testing.T) {
+		m := newTestManager()
+		started := make(chan struct{})
+		gate := make(chan struct{})
+		m.readerFactory = func(_ string, autoCommit bool) *testReader {
+			return &testReader{autoCommit: autoCommit, fetchStarted: started, fetchGate: gate}
+		}
+		core := newBoundCore(t, m)
+		first := make(chan error, 1)
+		go func() {
+			_, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
+			first <- err
+		}()
+		<-started
+		_, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
+		assert.ErrorIs(t, err, ErrFetchBusy)
+		close(gate)
+		require.NoError(t, <-first)
+	})
+}
 
 func TestSubscribeUnsubscribeAndCleanupCloseExactlyOnce(t *testing.T) {
 	m := newTestManager()
 	started := make(chan struct{})
 	m.readerFactory = func(_ string, autoCommit bool) *testReader {
-		return &testReader{autoCommit: autoCommit, subscribe: func(ctx context.Context, _ bool, _ func([]byte, string, [][]byte, ...any)) error {
+		return &testReader{autoCommit: autoCommit, subscribe: func(ctx context.Context, _ bool, _ func([]byte, string, [][]byte, ...any), ready func() error) error {
 			select {
 			case <-started:
 			default:
 				close(started)
+			}
+			if err := ready(); err != nil {
+				return err
 			}
 			<-ctx.Done()
 			return ctx.Err()
@@ -629,6 +800,62 @@ func TestSubscribeUnsubscribeAndCleanupCloseExactlyOnce(t *testing.T) {
 	assert.Equal(t, int32(1), m.readers[0].closeCount.Load())
 	assert.Equal(t, 1, m.closeCount)
 }
+func TestSubscribeWaitsForReadinessAndReportsTerminalFailure(t *testing.T) {
+	t.Run("pre-readiness failure", func(t *testing.T) {
+		m := newTestManager()
+		failure := errors.New("subscribe setup failed")
+		m.readerFactory = func(_ string, autoCommit bool) *testReader {
+			return &testReader{autoCommit: autoCommit, subscribe: func(context.Context, bool, func([]byte, string, [][]byte, ...any), func() error) error {
+				return failure
+			}}
+		}
+		core := newBoundCore(t, m)
+		readyCalled := false
+		err := core.Subscribe("topic", false, false, func(byte) error {
+			readyCalled = true
+			return nil
+		}, SubscriptionMessageHandlers{}, nil)
+		assert.ErrorIs(t, err, failure)
+		assert.False(t, readyCalled)
+		assert.Equal(t, int32(1), m.readers[0].closeCount.Load())
+	})
+
+	t.Run("delivery follows readiness and terminal error is observable", func(t *testing.T) {
+		m := newTestManager()
+		terminal := errors.New("receive loop failed")
+		m.readerFactory = func(_ string, autoCommit bool) *testReader {
+			return &testReader{autoCommit: autoCommit, subscribe: func(_ context.Context, _ bool, message func([]byte, string, [][]byte, ...any), ready func() error) error {
+				if err := ready(); err != nil {
+					return err
+				}
+				message([]byte("payload"), "source", nil)
+				return terminal
+			}}
+		}
+		core := newBoundCore(t, m)
+		var mu sync.Mutex
+		var order []string
+		terminalResult := make(chan error, 1)
+		err := core.Subscribe("topic", false, false, func(byte) error {
+			mu.Lock()
+			order = append(order, "ready")
+			mu.Unlock()
+			return nil
+		}, SubscriptionMessageHandlers{Message: func(byte, connector.Reader) func([]byte, string, ...any) {
+			return func([]byte, string, ...any) {
+				mu.Lock()
+				order = append(order, "message")
+				mu.Unlock()
+			}
+		}}, func(err error) { terminalResult <- err })
+		require.NoError(t, err)
+		assert.ErrorIs(t, <-terminalResult, terminal)
+		mu.Lock()
+		assert.Equal(t, []string{"ready", "message"}, order)
+		mu.Unlock()
+		require.Eventually(t, func() bool { return m.readers[0].closeCount.Load() == 1 }, time.Second, time.Millisecond)
+	})
+}
 
 func TestFetchAndSubscribePropagateReaderFailures(t *testing.T) {
 	m := newTestManager()
@@ -643,18 +870,28 @@ func TestFetchAndSubscribePropagateReaderFailures(t *testing.T) {
 func TestAckNackStreamResultsAndZeroBatch(t *testing.T) {
 	m := newTestManager()
 	r := &testReader{
-		ackEachErr:  map[string]error{"bad": errors.New("ack failed")},
-		nackEachErr: map[string]error{"bad": errors.New("nack failed")},
+		ackEachErr:  map[string]error{},
+		nackEachErr: map[string]error{},
 	}
 	m.readerFactory = func(string, bool) *testReader { return r }
 	core := newBoundCore(t, m)
 
 	id, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
 	require.NoError(t, err)
-	ids := [][]byte{[]byte("good"), []byte("bad")}
 	for _, doneFirst := range []bool{false, true} {
 		r.doneFirst = doneFirst
 		for _, nack := range []bool{false, true} {
+			goodPayload := []byte(fmt.Sprintf("good-%t-%t", doneFirst, nack))
+			badPayload := []byte(fmt.Sprintf("bad-%t-%t", doneFirst, nack))
+			if nack {
+				r.nackEachErr[string(badPayload)] = errors.New("nack failed")
+			} else {
+				r.ackEachErr[string(badPayload)] = errors.New("ack failed")
+			}
+			ids := [][]byte{
+				encodedTestMessageID(t, core, id, goodPayload),
+				encodedTestMessageID(t, core, id, badPayload),
+			}
 			var order []string
 			var gotIDs [][]byte
 			var gotErrs []error
@@ -688,48 +925,92 @@ func TestAckNackStreamResultsAndZeroBatch(t *testing.T) {
 		assert.NoError(t, err)
 	}}))
 	assert.True(t, called)
-	assert.ErrorIs(t, core.Ack(254, ids, AckResultHandlers{}), ErrSubscriptionNotFound)
+	assert.ErrorIs(t, core.Ack(254, [][]byte{{1}}, AckResultHandlers{}), ErrSubscriptionNotFound)
 }
 
-func TestAckNackBatchSizesAutoCommitAndTopLevelErrors(t *testing.T) {
+func TestAckNackBatchSizesAutoSettleAndTopLevelErrors(t *testing.T) {
 	m := newTestManager()
-	r := &testReader{autoCommit: true}
+	r := &testReader{}
 	m.readerFactory = func(string, bool) *testReader { return r }
 	core := newBoundCore(t, m)
-	id, _, err := core.Fetch("topic", true, false, 0, FetchMessageHandlers{})
+	id, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
 	require.NoError(t, err)
 	for _, size := range []int{1, 32, 256} {
 		ids := make([][]byte, size)
 		for i := range ids {
-			ids[i] = []byte{byte(i)}
+			ids[i] = encodedTestMessageID(t, core, id, []byte(fmt.Sprintf("%d/%d", size, i)))
 		}
-		for _, nack := range []bool{false, true} {
-			got := 0
-			handlers := AckResultHandlers{
-				Result: func(err error) { require.NoError(t, err) },
-				Message: func([]byte, error) {
-					got++
-				},
-			}
-			if nack {
-				require.NoError(t, core.Nack(id, ids, handlers))
-			} else {
-				require.NoError(t, core.Ack(id, ids, handlers))
-			}
-			assert.Equal(t, size, got)
-		}
+		got := 0
+		require.NoError(t, core.Ack(id, ids, AckResultHandlers{
+			Result:  func(err error) { require.NoError(t, err) },
+			Message: func([]byte, error) { got++ },
+		}))
+		assert.Equal(t, size, got)
 	}
 
 	topErr := errors.New("unsupported")
 	r.ackErr = topErr
 	messageCalls := 0
-	require.NoError(t, core.Ack(id, [][]byte{[]byte("id")}, AckResultHandlers{
-		Result: func(err error) { assert.ErrorIs(t, err, topErr) },
-		Message: func([]byte, error) {
-			messageCalls++
-		},
+	retryID := encodedTestMessageID(t, core, id, []byte("retry"))
+	require.NoError(t, core.Ack(id, [][]byte{retryID}, AckResultHandlers{
+		Result:  func(err error) { assert.ErrorIs(t, err, topErr) },
+		Message: func([]byte, error) { messageCalls++ },
 	}))
 	assert.Zero(t, messageCalls)
+	r.ackErr = nil
+	require.NoError(t, core.Ack(id, [][]byte{retryID}, AckResultHandlers{}))
+
+	autoID, _, err := core.Fetch("auto", true, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+	assert.ErrorIs(t, core.Ack(autoID, [][]byte{{1}}, AckResultHandlers{}), connector.ErrOperationUnsupported)
+	assert.ErrorIs(t, core.Nack(autoID, [][]byte{{1}}, AckResultHandlers{}), connector.ErrOperationUnsupported)
+}
+
+func TestMessageIDValidationScopeAndConsumption(t *testing.T) {
+	m := newTestManager()
+	r := &testReader{}
+	m.readerFactory = func(string, bool) *testReader { return r }
+	core := newBoundCore(t, m)
+	firstID, _, err := core.Fetch("first", false, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+	secondID, _, err := core.Fetch("second", false, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+
+	valid := encodedTestMessageID(t, core, firstID, []byte("valid"))
+	assert.ErrorIs(t, core.Ack(firstID, [][]byte{{messageIDVersion}}, AckResultHandlers{}), ErrInvalidMessageID)
+	wrongVersion := append([]byte(nil), valid...)
+	wrongVersion[0]++
+	assert.ErrorIs(t, core.Ack(firstID, [][]byte{wrongVersion}, AckResultHandlers{}), ErrInvalidMessageID)
+	assert.ErrorIs(t, core.Ack(secondID, [][]byte{valid}, AckResultHandlers{}), ErrInvalidMessageID)
+	assert.ErrorIs(t, core.Ack(firstID, [][]byte{valid, valid}, AckResultHandlers{}), ErrInvalidMessageID)
+
+	require.NoError(t, core.Ack(firstID, [][]byte{valid}, AckResultHandlers{}))
+	assert.ErrorIs(t, core.Ack(firstID, [][]byte{valid}, AckResultHandlers{}), ErrInvalidMessageID)
+}
+
+func TestMessageIDSettlementTracksGapsAndInProgressRequests(t *testing.T) {
+	m := newTestManager()
+	r := &testReader{}
+	m.readerFactory = func(string, bool) *testReader { return r }
+	core := newBoundCore(t, m)
+	id, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+
+	first := encodedTestMessageID(t, core, id, []byte("first"))
+	second := encodedTestMessageID(t, core, id, []byte("second"))
+	third := encodedTestMessageID(t, core, id, []byte("third"))
+	require.NoError(t, core.Ack(id, [][]byte{second}, AckResultHandlers{}))
+	assert.ErrorIs(t, core.Ack(id, [][]byte{second}, AckResultHandlers{}), ErrInvalidMessageID)
+	require.NoError(t, core.Ack(id, [][]byte{first}, AckResultHandlers{}))
+	assert.ErrorIs(t, core.Ack(id, [][]byte{first}, AckResultHandlers{}), ErrInvalidMessageID)
+	require.NoError(t, core.Ack(id, [][]byte{third}, AckResultHandlers{}))
+
+	gate := make(chan struct{})
+	r.ackGate = gate
+	fourth := encodedTestMessageID(t, core, id, []byte("fourth"))
+	require.NoError(t, core.Ack(id, [][]byte{fourth}, AckResultHandlers{}))
+	assert.ErrorIs(t, core.Ack(id, [][]byte{fourth}, AckResultHandlers{}), ErrInvalidMessageID)
+	close(gate)
 }
 
 func TestCleanupWaitsForPendingAck(t *testing.T) {
@@ -738,9 +1019,10 @@ func TestCleanupWaitsForPendingAck(t *testing.T) {
 	r := &testReader{ackGate: gate}
 	m.readerFactory = func(string, bool) *testReader { return r }
 	core := newBoundCore(t, m)
-	id, _, err := core.Fetch("topic", false, false, 0, FetchMessageHandlers{})
+	id, _, err := core.Fetch("topic", false, false, 1, FetchMessageHandlers{})
 	require.NoError(t, err)
-	require.NoError(t, core.Ack(id, [][]byte{[]byte("id")}, AckResultHandlers{}))
+	messageID := encodedTestMessageID(t, core, id, []byte("id"))
+	require.NoError(t, core.Ack(id, [][]byte{messageID}, AckResultHandlers{}))
 
 	done := make(chan struct{})
 	go func() {
@@ -785,15 +1067,52 @@ func TestCleanupFlushesRollsBackAndWaitsForPendingProduce(t *testing.T) {
 		t.Fatal("cleanup did not finish after pending callback")
 	}
 	assert.Equal(t, 1, w.flushCount)
-	assert.Equal(t, 1, m.writerPuts["topic"])
+	assert.Equal(t, 1, w.closeCount)
+	assert.Zero(t, m.writerPuts["topic"])
 	assert.Equal(t, 1, m.closeCount)
 
 	m2 := newTestManager()
 	core2 := newBoundCore(t, m2)
 	require.NoError(t, core2.Begin("tx"))
-	require.NoError(t, core2.TxProduce([]byte("pending"), nil, nil))
 	txWriter := m2.writers["tx"]
 	require.NoError(t, core2.Close())
 	assert.Equal(t, 1, txWriter.rollbackCount)
-	assert.Equal(t, 1, m2.writerPuts["tx"])
+	assert.Equal(t, 1, txWriter.closeCount)
+	assert.Zero(t, m2.writerPuts["tx"])
+}
+
+func TestCleanupAggregatesErrorsAndContinuesAfterDeadline(t *testing.T) {
+	m := newTestManager()
+	blocked := make(chan struct{})
+	flushErr := errors.New("flush failed")
+	closeErr := errors.New("close failed")
+	readerErr := errors.New("reader close failed")
+	managerErr := errors.New("manager close failed")
+	m.writers["writer"] = &testWriter{flushErr: flushErr, closeErr: closeErr}
+	m.readerFactory = func(string, bool) *testReader { return &testReader{closeErr: readerErr} }
+	m.closeErr = managerErr
+	core := newBoundCore(t, m)
+	require.NoError(t, core.Produce("writer", []byte("message"), nil, nil))
+	_, _, err := core.Fetch("reader", false, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+
+	err = core.Close()
+	assert.ErrorIs(t, err, flushErr)
+	assert.ErrorIs(t, err, closeErr)
+	assert.ErrorIs(t, err, readerErr)
+	assert.ErrorIs(t, err, managerErr)
+	assert.Equal(t, 1, m.closes())
+
+	m2 := newTestManager()
+	m2.readerFactory = func(string, bool) *testReader { return &testReader{closeGate: blocked} }
+	core2 := newBoundCore(t, m2)
+	core2.cleanupTimeout = 20 * time.Millisecond
+	_, _, err = core2.Fetch("reader", false, false, 1, FetchMessageHandlers{})
+	require.NoError(t, err)
+	started := time.Now()
+	err = core2.Close()
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Less(t, time.Since(started), time.Second)
+	assert.Equal(t, 1, m2.closes(), "manager cleanup must still be attempted after reader timeout")
+	close(blocked)
 }

@@ -34,64 +34,71 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	sub, err := r.nc.Subscribe(r.conf.Subject, func(msg *nats.Msg) {
 		h(msg.Data, msg.Subject)
 	})
 	if err != nil {
 		return fmt.Errorf("nats: subscribe: %w", err)
 	}
-
+	if err := r.nc.Flush(); err != nil {
+		_ = sub.Unsubscribe()
+		return fmt.Errorf("nats: flush subscription: %w", err)
+	}
+	if err := ready(); err != nil {
+		_ = sub.Unsubscribe()
+		return err
+	}
 	defer func() {
 		if err := sub.Unsubscribe(); err != nil {
 			r.l.Error("unsubscribe", "err", err)
 		}
 	}()
-
 	<-ctx.Done()
 	return nil
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, headers [][]byte, args ...any)) error {
 	sub, err := r.nc.Subscribe(r.conf.Subject, func(msg *nats.Msg) {
-		var hs [][]byte
-		for k, headers := range msg.Header {
-			hs = append(hs, unsafe.Slice((*byte)(unsafe.StringData(k)), len(k)))
-			var vals [][]byte
-			for _, hdr := range headers {
-				vals = append(vals, unsafe.Slice((*byte)(unsafe.StringData(hdr)), len(hdr)))
-			}
-			hs = append(hs, joinBytes(vals, ','))
-		}
-		h(msg.Data, msg.Subject, hs)
+		h(msg.Data, msg.Subject, natsHeadersToSlice(msg.Header))
 	})
 	if err != nil {
 		return fmt.Errorf("nats: subscribe: %w", err)
 	}
-
+	if err := r.nc.Flush(); err != nil {
+		_ = sub.Unsubscribe()
+		return fmt.Errorf("nats: flush subscription: %w", err)
+	}
+	if err := ready(); err != nil {
+		_ = sub.Unsubscribe()
+		return err
+	}
 	defer func() {
 		if err := sub.Unsubscribe(); err != nil {
 			r.l.Error("unsubscribe", "err", err)
 		}
 	}()
-
 	<-ctx.Done()
 	return nil
 }
+func natsHeadersToSlice(headers nats.Header) [][]byte {
+	var result [][]byte
+	for key, values := range headers {
+		for _, value := range values {
+			result = append(result,
+				unsafe.Slice((*byte)(unsafe.StringData(key)), len(key)),
+				unsafe.Slice((*byte)(unsafe.StringData(value)), len(value)),
+			)
+		}
+	}
+	return result
+}
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -113,7 +120,7 @@ func (r *Reader) Nack(
 	nackHandler(util.ErrNotSupported)
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
 	return buf
 }
 

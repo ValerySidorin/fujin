@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/handler"
@@ -26,10 +26,8 @@ var (
 )
 
 type FujinServer struct {
-	conf       serverconfig.QUICServerConfig
-	baseConfig connectorconfig.ConnectorsConfig
-
-	configProvider func() connectorconfig.ConnectorsConfig
+	conf    serverconfig.QUICServerConfig
+	catalog *connector.Catalog
 
 	udpConn *net.UDPConn // stored for ListenerFDs
 
@@ -39,23 +37,18 @@ type FujinServer struct {
 	l *slog.Logger
 }
 
-func NewServer(conf serverconfig.QUICServerConfig, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) *FujinServer {
+func NewServer(conf serverconfig.QUICServerConfig, catalog *connector.Catalog, l *slog.Logger) *FujinServer {
 	return &FujinServer{
-		conf:       conf,
-		baseConfig: baseConfig,
-		ready:      make(chan struct{}),
-		done:       make(chan struct{}),
-		l:          l.With("server", "fujin_quic"),
+		conf:    conf,
+		catalog: catalog,
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
+		l:       l.With("server", "fujin_quic"),
 	}
 }
 
 // FDKey implements transport.FDKeyProvider.
 func (s *FujinServer) FDKey() string { return "udp:" + s.conf.Addr }
-
-// SetBaseConfigProvider implements transport.HotReloadable.
-func (s *FujinServer) SetBaseConfigProvider(p func() connectorconfig.ConnectorsConfig) {
-	s.configProvider = p
-}
 
 // ListenerFDs implements transport.ListenerFDProvider.
 func (s *FujinServer) ListenerFDs() ([]transport.ListenerFD, error) {
@@ -236,8 +229,8 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 					connWg.Add(1)
 					go func() {
 						handler.HandleStream(connCtx, str, session.StreamOptions{
-							BaseConfig:            s.baseConfig,
-							BaseConfigProvider:    s.configProvider,
+							BaseGeneration:        s.catalog.Current(),
+							GenerationProvider:    s.catalog.Current,
 							PingInterval:          s.conf.Fujin.PingInterval,
 							PingTimeout:           s.conf.Fujin.PingTimeout,
 							PingStream:            s.conf.Fujin.PingStream,

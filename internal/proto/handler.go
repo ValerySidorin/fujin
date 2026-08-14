@@ -5,14 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/fujin-io/fujin/internal/core"
 	"github.com/fujin-io/fujin/internal/proto/pool"
 	"github.com/fujin-io/fujin/public/plugins/connector"
-	"github.com/fujin-io/fujin/public/plugins/connector/config"
 	v1 "github.com/fujin-io/fujin/public/proto/fujin/v1"
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/session"
 )
@@ -75,8 +74,6 @@ const (
 	OP_ACK_CORRELATION_ID_ARG
 	OP_ACK_SUBSCRIPTION_ID_ARG
 	OP_ACK_ARG
-	OP_ACK_MSG_ID_TOPIC_ARG
-	OP_ACK_MSG_ID_TOPIC_PAYLOAD
 	OP_ACK_MSG_ID_ARG
 	OP_ACK_MSG_ID_PAYLOAD
 
@@ -84,8 +81,6 @@ const (
 	OP_NACK_CORRELATION_ID_ARG
 	OP_NACK_SUBSCRIPTION_ID_ARG
 	OP_NACK_ARG
-	OP_NACK_MSG_ID_TOPIC_ARG
-	OP_NACK_MSG_ID_TOPIC_PAYLOAD
 	OP_NACK_MSG_ID_ARG
 	OP_NACK_MSG_ID_PAYLOAD
 
@@ -227,13 +222,13 @@ type Handler struct {
 func NewHandler(
 	ctx context.Context,
 	pingInterval time.Duration, pingTimeout time.Duration, pingStream bool,
-	baseConfig config.ConnectorsConfig,
-	baseConfigProvider func() config.ConnectorsConfig,
+	baseGeneration *connector.Generation,
+	generationProvider core.GenerationProvider,
 	out *Outbound, str session.Stream, l *slog.Logger,
 ) *Handler {
 	h := &Handler{
 		ctx:          ctx,
-		core:         core.New(ctx, baseConfig, baseConfigProvider, l),
+		core:         core.New(ctx, baseGeneration, generationProvider, l),
 		pingInterval: pingInterval,
 		pingTimeout:  pingTimeout,
 		pingStream:   pingStream,
@@ -1297,7 +1292,7 @@ func (h *Handler) handle(buf []byte) error {
 			var err error
 			h.ps.sa.autoCommit, err = parseBool(b)
 			if err != nil {
-				enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, v1.ERR_CODE_YES, err)
+				enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, err)
 				return err
 			}
 
@@ -1309,7 +1304,7 @@ func (h *Handler) handle(buf []byte) error {
 				if err := h.parseSubscribeRouteLenArg(); err != nil {
 					pool.Put(h.ps.argBuf)
 					h.ps.argBuf, h.ps.sa, h.ps.state = nil, subscribeArgs{}, OP_START
-					enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, v1.ERR_CODE_YES, err)
+					enqueueSubscribeErr(h.out, h.ps.ca.cID, v1.RESP_CODE_SUBSCRIBE, err)
 					return err
 				}
 				pool.Put(h.ps.argBuf)
@@ -1355,8 +1350,8 @@ func (h *Handler) handle(buf []byte) error {
 								enqueueAutoCommitSubscriptionMessage(h.out, subscriptionID, true, payload, headers)
 							}
 						}
-						return func(payload []byte, topic string, headers [][]byte, args ...any) {
-							enqueueSubscriptionMessage(h.out, subscriptionID, reader, true, payload, topic, headers, args...)
+						return func(payload []byte, source string, headers [][]byte, args ...any) {
+							enqueueSubscriptionMessage(h.out, subscriptionID, reader, true, payload, source, headers, args...)
 						}
 					}
 				} else {
@@ -1366,16 +1361,17 @@ func (h *Handler) handle(buf []byte) error {
 								enqueueAutoCommitSubscriptionMessage(h.out, subscriptionID, false, payload, nil)
 							}
 						}
-						return func(payload []byte, topic string, args ...any) {
-							enqueueSubscriptionMessage(h.out, subscriptionID, reader, false, payload, topic, nil, args...)
+						return func(payload []byte, source string, args ...any) {
+							enqueueSubscriptionMessage(h.out, subscriptionID, reader, false, payload, source, nil, args...)
 						}
 					}
 				}
 				err := h.core.Subscribe(h.ps.sa.route, h.ps.sa.autoCommit, headered, ready, handlers, func(err error) {
-					h.l.Error("subscribe retry", "route", h.ps.sa.route, "err", err)
+					h.l.Error("subscription ended", "route", h.ps.sa.route, "err", err)
+					_ = h.str.Close()
 				})
 				if err != nil {
-					enqueueSubscribeErr(h.out, h.ps.ca.cID, code, v1.ERR_CODE_YES, err)
+					enqueueSubscribeErr(h.out, h.ps.ca.cID, code, err)
 				}
 				pool.Put(h.ps.ca.cID)
 				h.ps.ca.cID, h.ps.payloadBuf, h.ps.sa, h.ps.state = nil, nil, subscribeArgs{}, OP_START
@@ -1420,20 +1416,19 @@ func (h *Handler) handle(buf []byte) error {
 
 // handleBind delegates connector selection, middleware, overrides, and cleanup to Session Core.
 func (h *Handler) handleBind(meta map[string]string, configOverrides map[string]string) error {
-	err := h.core.Bind(h.ps.ba.connectorNameValue, meta, configOverrides)
-	buf := pool.Get(2)[:2]
-	buf[0] = byte(v1.RESP_CODE_BIND)
-	buf[1] = v1.ERR_CODE_NO
+	result, err := h.core.Bind(h.ps.ba.connectorNameValue, meta, configOverrides)
 	if err != nil {
-		buf[1] = v1.ERR_CODE_YES
-		errBuf := errProtoBuf(err)
-		h.out.EnqueueProtoMulti(buf, errBuf)
-		pool.Put(buf)
+		header := pool.Get(1)
+		header = append(header, byte(v1.RESP_CODE_BIND))
+		errBuf := operationErrorBuf(err)
+		h.out.EnqueueProtoMulti(header, errBuf)
+		pool.Put(header)
 		pool.Put(errBuf)
 		return nil
 	}
 
-	h.out.EnqueueProtoMulti(buf)
+	buf := encodeBindSuccess(result.Routes)
+	h.out.EnqueueProto(buf)
 	pool.Put(buf)
 	h.disconnect = func() {
 		h.fetches.Wait()
@@ -1443,6 +1438,55 @@ func (h *Handler) handleBind(meta map[string]string, configOverrides map[string]
 		h.out.EnqueueProto(v1.DISCONNECT_RESP)
 	}
 	return nil
+}
+
+func encodeBindSuccess(routes map[string]connector.RouteProfile) []byte {
+	names := make([]string, 0, len(routes))
+	capacity := 2 + v1.Uint32Len
+	for route := range routes {
+		names = append(names, route)
+		capacity += v1.Uint32Len + len(route) + 4
+	}
+	sort.Strings(names)
+
+	buf := pool.Get(capacity)
+	buf = append(buf, byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK))
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(names)))
+	for _, route := range names {
+		profile := routes[route]
+		buf = binary.BigEndian.AppendUint32(buf, uint32(len(route)))
+		buf = append(buf, route...)
+		buf = append(buf,
+			routeCapabilityFlags(profile),
+			byte(profile.ProduceGuarantee),
+			byte(profile.Settlement.Ack),
+			byte(profile.Settlement.Nack),
+		)
+	}
+	return buf
+}
+
+func routeCapabilityFlags(profile connector.RouteProfile) byte {
+	var flags byte
+	if profile.Produce {
+		flags |= v1.ROUTE_CAP_PRODUCE
+	}
+	if profile.Headers {
+		flags |= v1.ROUTE_CAP_HEADERS
+	}
+	if profile.Transactions {
+		flags |= v1.ROUTE_CAP_TRANSACTIONS
+	}
+	if profile.Subscribe {
+		flags |= v1.ROUTE_CAP_SUBSCRIBE
+	}
+	if profile.Fetch {
+		flags |= v1.ROUTE_CAP_FETCH
+	}
+	if profile.ManualSettlement {
+		flags |= v1.ROUTE_CAP_MANUAL_SETTLEMENT
+	}
+	return flags
 }
 
 type ackResponse struct {
@@ -1466,9 +1510,8 @@ func (r *ackResponse) onResult(err error) {
 	header = append(header, r.op)
 	header = append(header, r.cID...)
 	if err != nil {
-		header = append(header, v1.ERR_CODE_YES)
 		r.h.out.QueueOutboundNoLock(header)
-		errBuf := errProtoBuf(err)
+		errBuf := operationErrorBuf(err)
 		r.h.out.QueueOutboundNoLock(errBuf)
 		pool.Put(errBuf)
 		r.h.out.SignalFlush()
@@ -1478,7 +1521,7 @@ func (r *ackResponse) onResult(err error) {
 		return
 	}
 
-	header = append(header, v1.ERR_CODE_NO)
+	header = append(header, byte(v1.STATUS_OK))
 	r.h.out.QueueOutboundNoLock(header)
 	countBuf := pool.Get(v1.Uint32Len)
 	countBuf = binary.BigEndian.AppendUint32(countBuf, uint32(r.remaining))
@@ -1498,18 +1541,16 @@ func (r *ackResponse) onMessage(messageID []byte, err error) {
 	r.h.out.QueueOutboundNoLock(lenBuf)
 	r.h.out.QueueOutboundNoLock(messageID)
 	pool.Put(lenBuf)
-	flag := pool.Get(1)
 	if err == nil {
-		flag = append(flag, v1.ERR_CODE_NO)
+		flag := pool.Get(1)
+		flag = append(flag, byte(v1.STATUS_OK))
 		r.h.out.QueueOutboundNoLock(flag)
+		pool.Put(flag)
 	} else {
-		flag = append(flag, v1.ERR_CODE_YES)
-		r.h.out.QueueOutboundNoLock(flag)
-		errBuf := errProtoBuf(err)
+		errBuf := operationErrorBuf(err)
 		r.h.out.QueueOutboundNoLock(errBuf)
 		pool.Put(errBuf)
 	}
-	pool.Put(flag)
 	r.h.out.SignalFlush()
 
 	r.remaining--
@@ -1598,9 +1639,9 @@ func (h *Handler) putProduceResponse(response *produceResponse) {
 func (r *produceResponse) respond(err error) {
 	pool.Put(r.message)
 	if err != nil {
-		r.response[5] = v1.ERR_CODE_YES
-		errBuf := errProtoBuf(err)
-		r.h.out.EnqueueProtoMulti(r.response, errBuf)
+		header := r.response[:5]
+		errBuf := operationErrorBuf(err)
+		r.h.out.EnqueueProtoMulti(header, errBuf)
 		pool.Put(errBuf)
 	} else {
 		r.h.out.EnqueueProto(r.response)
@@ -1616,7 +1657,7 @@ func (h *Handler) produce(msg []byte, headers [][]byte) {
 	buf := pool.Get(6)
 	buf = append(buf, byte(op))
 	buf = append(buf, h.ps.ca.cID...)
-	buf = append(buf, v1.ERR_CODE_NO)
+	buf = append(buf, byte(v1.STATUS_OK))
 	response.h, response.message, response.response = h, msg, buf
 
 	var err error
@@ -1654,7 +1695,7 @@ func (h *Handler) fetch(route string, autoCommit bool, n uint32) {
 	header := pool.Get(11)[:11]
 	header[0] = byte(op)
 	binary.BigEndian.PutUint32(header[1:5], correlationID)
-	header[5] = v1.ERR_CODE_NO
+	header[5] = byte(v1.STATUS_OK)
 	messages.bufs = append(messages.bufs, header)
 	flush := func(subscriptionID byte, count uint32, fetchErr error) {
 		h.out.Lock()
@@ -1662,11 +1703,10 @@ func (h *Handler) fetch(route string, autoCommit bool, n uint32) {
 			for _, messageBuf := range messages.bufs {
 				pool.Put(messageBuf)
 			}
-			header := pool.Get(6)[:0]
+			header := pool.Get(5)[:0]
 			header = append(header, byte(op))
 			header = binary.BigEndian.AppendUint32(header, correlationID)
-			header = append(header, v1.ERR_CODE_YES)
-			errBuf := errProtoBuf(fetchErr)
+			errBuf := operationErrorBuf(fetchErr)
 			h.out.QueueOutboundOwnedMultiNoLock(header, errBuf)
 		} else {
 			header[6] = subscriptionID
@@ -1691,8 +1731,8 @@ func (h *Handler) fetch(route string, autoCommit bool, n uint32) {
 				appendAutoCommitFetchMessage(messages, payload)
 			}
 		default:
-			handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, messageTopic string, headers [][]byte, args ...any) {
-				appendFetchMessage(messages, reader, false, headered, payload, messageTopic, headers, args...)
+			handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, source string, headers [][]byte, args ...any) {
+				appendFetchMessage(messages, reader, false, headered, payload, source, headers, args...)
 			}
 		}
 		subscriptionID, count, fetchErr := h.core.Fetch(route, autoCommit, headered, n, handlers)
@@ -1746,7 +1786,7 @@ func appendFetchMessage(
 	autoCommit bool,
 	headered bool,
 	payload []byte,
-	topic string,
+	source string,
 	headers [][]byte,
 	args ...any,
 ) {
@@ -1758,7 +1798,7 @@ func appendFetchMessage(
 	}
 	messageIDSize := 0
 	if !autoCommit {
-		messageIDSize = len(topic) + reader.MsgIDArgsLen()
+		messageIDSize = len(source) + reader.MsgIDArgsLen()
 	}
 	size := len(payload) + v1.Uint32Len + headersSize
 	if headered {
@@ -1769,7 +1809,7 @@ func appendFetchMessage(
 	}
 	ensureFetchBufferCapacity(messages, size)
 	buffer := &messages.bufs[len(messages.bufs)-1]
-	*buffer = encodeFetchMessage(*buffer, reader, autoCommit, headered, payload, topic, headers, messageIDSize, args...)
+	*buffer = encodeFetchMessage(*buffer, reader, autoCommit, headered, payload, source, headers, messageIDSize, args...)
 }
 
 func encodeFetchMessage(
@@ -1778,7 +1818,7 @@ func encodeFetchMessage(
 	autoCommit bool,
 	headered bool,
 	payload []byte,
-	topic string,
+	source string,
 	headers [][]byte,
 	messageIDSize int,
 	args ...any,
@@ -1792,7 +1832,7 @@ func encodeFetchMessage(
 	}
 	if !autoCommit {
 		buffer = binary.BigEndian.AppendUint32(buffer, uint32(messageIDSize))
-		buffer = reader.EncodeMsgID(buffer, topic, args...)
+		buffer = reader.EncodeMsgID(buffer, source, args...)
 	}
 	buffer = binary.BigEndian.AppendUint32(buffer, uint32(len(payload)))
 	return append(buffer, payload...)
@@ -1868,16 +1908,13 @@ func (h *Handler) parseSubscribeRouteLenArg() error {
 }
 
 func (h *Handler) enqueueWriteErrResponse(err error) {
-	errPayload := err.Error()
-	errLen := len(errPayload)
-	buf := pool.Get(10 + errLen)
-	buf = append(buf, byte(h.writeResponseCode()))
-	buf = append(buf, h.ps.ca.cID...)
-	buf = append(buf, v1.ERR_CODE_YES)
-	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
-	buf = append(buf, unsafe.Slice(unsafe.StringData(errPayload), len(errPayload))...)
-	h.out.EnqueueProto(buf)
-	pool.Put(buf)
+	header := pool.Get(5)
+	header = append(header, byte(h.writeResponseCode()))
+	header = append(header, h.ps.ca.cID...)
+	errBuf := operationErrorBuf(err)
+	h.out.EnqueueProtoMulti(header, errBuf)
+	pool.Put(header)
+	pool.Put(errBuf)
 }
 
 func (h *Handler) enqueueStop() {
@@ -1888,79 +1925,81 @@ func (h *Handler) enqueueTxBeginSuccess(cID []byte) {
 	header := pool.Get(6)
 	header = append(header, byte(v1.RESP_CODE_TX_BEGIN))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
+	header = append(header, byte(v1.STATUS_OK))
 	h.out.EnqueueProto(header)
 	pool.Put(header)
 }
 
 func (h *Handler) enqueueTxBeginErr(cID []byte, err error) {
-	header := pool.Get(6)
+	header := pool.Get(5)
 	header = append(header, byte(v1.RESP_CODE_TX_BEGIN))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_YES)
-	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	errBuf := operationErrorBuf(err)
+	h.out.EnqueueProtoMulti(header, errBuf)
 	pool.Put(header)
+	pool.Put(errBuf)
 }
 
 func (h *Handler) enqueueTxCommitSuccess(cID []byte) {
 	header := pool.Get(6)
 	header = append(header, byte(v1.RESP_CODE_TX_COMMIT))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
+	header = append(header, byte(v1.STATUS_OK))
 	h.out.EnqueueProto(header)
 	pool.Put(header)
 }
 
 func (h *Handler) enqueueTxCommitErr(cID []byte, err error) {
-	header := pool.Get(6)
+	header := pool.Get(5)
 	header = append(header, byte(v1.RESP_CODE_TX_COMMIT))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_YES)
-	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	errBuf := operationErrorBuf(err)
+	h.out.EnqueueProtoMulti(header, errBuf)
 	pool.Put(header)
+	pool.Put(errBuf)
 }
 
 func (h *Handler) enqueueTxRollbackSuccess(cID []byte) {
 	header := pool.Get(6)
 	header = append(header, byte(v1.RESP_CODE_TX_ROLLBACK))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_NO)
+	header = append(header, byte(v1.STATUS_OK))
 	h.out.EnqueueProto(header)
 	pool.Put(header)
 }
 
 func (h *Handler) enqueueTxRollbackErr(cID []byte, err error) {
-	header := pool.Get(6)
+	header := pool.Get(5)
 	header = append(header, byte(v1.RESP_CODE_TX_ROLLBACK))
 	header = append(header, cID...)
-	header = append(header, v1.ERR_CODE_YES)
-	h.out.EnqueueProtoMulti(header, errProtoBuf(err))
+	errBuf := operationErrorBuf(err)
+	h.out.EnqueueProtoMulti(header, errBuf)
 	pool.Put(header)
+	pool.Put(errBuf)
 }
 
 func enqueueSubscribeSuccess(out *Outbound, code v1.RespCode, cID []byte, subID byte) {
 	sbuf := pool.Get(v1.Uint32Len)
 	sbuf = append(sbuf, byte(code))
 	sbuf = append(sbuf, cID...)
-	sbuf = append(sbuf, v1.ERR_CODE_NO, subID)
+	sbuf = append(sbuf, byte(v1.STATUS_OK), subID)
 	out.EnqueueProto(sbuf)
 	pool.Put(sbuf)
 }
 
 func enqueueUnsubscribeResponse(out *Outbound, cID []byte, err error) {
-	buf := pool.Get(6)
-	buf = append(buf, byte(v1.RESP_CODE_UNSUBSCRIBE))
-	buf = append(buf, cID...)
+	header := pool.Get(6)
+	header = append(header, byte(v1.RESP_CODE_UNSUBSCRIBE))
+	header = append(header, cID...)
 	if err == nil {
-		buf = append(buf, v1.ERR_CODE_NO)
-		out.EnqueueProto(buf)
-		pool.Put(buf)
+		header = append(header, byte(v1.STATUS_OK))
+		out.EnqueueProto(header)
+		pool.Put(header)
 		return
 	}
-	buf = append(buf, v1.ERR_CODE_YES)
-	errBuf := errProtoBuf(err)
-	out.EnqueueProtoMulti(buf, errBuf)
-	pool.Put(buf)
+	errBuf := operationErrorBuf(err)
+	out.EnqueueProtoMulti(header, errBuf)
+	pool.Put(header)
 	pool.Put(errBuf)
 }
 
@@ -1970,7 +2009,7 @@ func enqueueSubscriptionMessage(
 	reader connector.Reader,
 	headered bool,
 	payload []byte,
-	topic string,
+	source string,
 	headers [][]byte,
 	args ...any,
 ) {
@@ -1979,12 +2018,12 @@ func enqueueSubscriptionMessage(
 		return
 	}
 
-	messageIDSize := len(topic) + reader.MsgIDArgsLen()
+	messageIDSize := len(source) + reader.MsgIDArgsLen()
 	capacity := subscriptionFrameSize(headered, payload, headers) + v1.Uint32Len + messageIDSize
 	buf := pool.Get(capacity)
 	buf = appendSubscriptionFramePrefix(buf, subscriptionID, headered, headers)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(messageIDSize))
-	buf = reader.EncodeMsgID(buf, topic, args...)
+	buf = reader.EncodeMsgID(buf, source, args...)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
 	buf = append(buf, payload...)
 	out.EnqueueProto(buf)
@@ -2037,25 +2076,40 @@ func appendSubscriptionFramePrefix(buf []byte, subscriptionID byte, headered boo
 	return buf
 }
 
-func enqueueSubscribeErr(out *Outbound, cID []byte, respCode v1.RespCode, errCode v1.ErrCode, err error) {
-	errPayload := err.Error()
-	errLen := len(errPayload)
-	buf := pool.Get(10 + errLen) // cmd (1) + correlation ID (4) + err nil (1) + err len (4) + err payload (errLen)
-	buf = append(buf, byte(respCode))
-	buf = append(buf, cID...)
-	buf = append(buf, byte(errCode))
-	buf = binary.BigEndian.AppendUint32(buf, uint32(errLen))
-	buf = append(buf, unsafe.Slice(unsafe.StringData(errPayload), len(errPayload))...)
-	out.EnqueueProto(buf)
-	pool.Put(buf)
+func enqueueSubscribeErr(out *Outbound, cID []byte, respCode v1.RespCode, err error) {
+	header := pool.Get(5)
+	header = append(header, byte(respCode))
+	header = append(header, cID...)
+	errBuf := operationErrorBuf(err)
+	out.EnqueueProtoMulti(header, errBuf)
+	pool.Put(header)
+	pool.Put(errBuf)
 }
 
-func errProtoBuf(err error) []byte {
-	errPayload := err.Error()
-	errLen := len(errPayload)
-	errBuf := pool.Get(v1.Uint32Len + errLen) // err len + err payload
-	errBuf = binary.BigEndian.AppendUint32(errBuf, uint32(errLen))
-	return append(errBuf, unsafe.Slice(unsafe.StringData(errPayload), len(errPayload))...)
+func operationErrorBuf(err error) []byte {
+	operationErr := core.ClassifyError(err)
+	capacity := 2 + 2*v1.Uint32Len + len(operationErr.Reason) + len(operationErr.Message) + v1.Uint16Len
+	keys := make([]string, 0, len(operationErr.Details))
+	for key, value := range operationErr.Details {
+		keys = append(keys, key)
+		capacity += 2*v1.Uint32Len + len(key) + len(value)
+	}
+	sort.Strings(keys)
+	buf := pool.Get(capacity)
+	buf = append(buf, byte(operationErr.Code), byte(operationErr.Outcome))
+	buf = appendProtocolString(buf, operationErr.Reason)
+	buf = appendProtocolString(buf, operationErr.Message)
+	buf = binary.BigEndian.AppendUint16(buf, uint16(len(keys)))
+	for _, key := range keys {
+		buf = appendProtocolString(buf, key)
+		buf = appendProtocolString(buf, operationErr.Details[key])
+	}
+	return buf
+}
+
+func appendProtocolString(buf []byte, value string) []byte {
+	buf = binary.BigEndian.AppendUint32(buf, uint32(len(value)))
+	return append(buf, value...)
 }
 
 func parseBool(b byte) (bool, error) {

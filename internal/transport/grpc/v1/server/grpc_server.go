@@ -5,9 +5,14 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/fujin-io/fujin/internal/core"
 	"github.com/fujin-io/fujin/public/plugins/connector"
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	pb "github.com/fujin-io/fujin/public/proto/grpc/v1"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	"google.golang.org/grpc"
@@ -15,21 +20,15 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/keepalive"
-	"io"
-	"log/slog"
-	"net"
-	"sync"
-	"time"
 )
 
 // GRPCServer implements the Fujin gRPC service
 type GRPCServer struct {
 	pb.UnimplementedFujinServiceServer
 
-	conf             serverconfig.GRPCServerConfig
-	connectorsConfig connectorconfig.ConnectorsConfig
-	configProvider   func() connectorconfig.ConnectorsConfig
-	l                *slog.Logger
+	conf    serverconfig.GRPCServerConfig
+	catalog *connector.Catalog
+	l       *slog.Logger
 
 	lis        net.Listener // stored for ListenerFDs
 	grpcServer *grpc.Server
@@ -38,20 +37,15 @@ type GRPCServer struct {
 	done       chan struct{}
 }
 
-// NewGRPCServer creates a new gRPC server instance
-func NewGRPCServer(conf serverconfig.GRPCServerConfig, connectorsConfig connectorconfig.ConnectorsConfig, l *slog.Logger) *GRPCServer {
+// NewGRPCServer creates a new gRPC server instance.
+func NewGRPCServer(conf serverconfig.GRPCServerConfig, catalog *connector.Catalog, l *slog.Logger) *GRPCServer {
 	return &GRPCServer{
-		conf:             conf,
-		connectorsConfig: connectorsConfig,
-		l:                l.With("server", "grpc"),
-		ready:            make(chan struct{}),
-		done:             make(chan struct{}),
+		conf:    conf,
+		catalog: catalog,
+		l:       l.With("server", "grpc"),
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
 	}
-}
-
-// SetBaseConfigProvider enables hot reload of connectors config.
-func (s *GRPCServer) SetBaseConfigProvider(p func() connectorconfig.ConnectorsConfig) {
-	s.configProvider = p
 }
 
 // ListenAndServe starts the gRPC server
@@ -197,11 +191,15 @@ func (s *GRPCServer) Done() <-chan struct{} {
 
 // Stream implements the bidirectional streaming RPC.
 func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
 	ss := &streamSession{
-		stream: stream,
-		core:   core.New(stream.Context(), s.connectorsConfig, s.configProvider, s.l),
-		l:      s.l,
-		ctx:    stream.Context(),
+		stream:   stream,
+		core:     core.New(ctx, s.catalog.Current(), s.catalog.Current, s.l),
+		l:        s.l,
+		ctx:      ctx,
+		cancel:   cancel,
+		terminal: make(chan error, 1),
 	}
 
 	err := ss.receiveLoop()
@@ -216,11 +214,13 @@ func (s *GRPCServer) Stream(stream pb.FujinService_StreamServer) error {
 
 // streamSession is a thin protobuf and stream-lifecycle adapter around Session Core.
 type streamSession struct {
-	stream pb.FujinService_StreamServer
-	core   *core.Core
-	l      *slog.Logger
-	ctx    context.Context
-	sendMu sync.Mutex
+	stream   pb.FujinService_StreamServer
+	core     *core.Core
+	l        *slog.Logger
+	ctx      context.Context
+	cancel   context.CancelFunc
+	terminal chan error
+	sendMu   sync.Mutex
 }
 
 type grpcFetchLease struct {
@@ -257,16 +257,30 @@ func putGRPCFetchLease(lease *grpcFetchLease) {
 }
 
 func (s *streamSession) receiveLoop() error {
+	type receiveResult struct {
+		request *pb.FujinRequest
+		err     error
+	}
+	received := make(chan receiveResult, 1)
 	for {
-		req, err := s.stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return io.EOF
+		go func() {
+			request, err := s.stream.Recv()
+			received <- receiveResult{request: request, err: err}
+		}()
+		select {
+		case err := <-s.terminal:
+			s.cancel()
+			return fmt.Errorf("subscription ended: %w", err)
+		case result := <-received:
+			if result.err != nil {
+				if result.err == io.EOF {
+					return io.EOF
+				}
+				return fmt.Errorf("receive error: %w", result.err)
 			}
-			return fmt.Errorf("receive error: %w", err)
-		}
-		if err := s.handleRequest(req); err != nil {
-			return fmt.Errorf("handle request: %w", err)
+			if err := s.handleRequest(result.request); err != nil {
+				return fmt.Errorf("handle request: %w", err)
+			}
 		}
 	}
 }
@@ -309,10 +323,32 @@ func (s *streamSession) handleRequest(req *pb.FujinRequest) error {
 }
 
 func (s *streamSession) handleBind(req *pb.BindRequest) error {
-	err := s.core.Bind(req.Connector, req.Meta, req.ConfigOverrides)
+	result, err := s.core.Bind(req.Connector, req.Meta, req.ConfigOverrides)
+	response := &pb.BindResponse{Error: grpcOperationError(err)}
+	if err == nil {
+		response.Routes = grpcRouteCapabilities(result.Routes)
+	}
 	return s.sendResponse(&pb.FujinResponse{
-		Response: &pb.FujinResponse_Bind{Bind: &pb.BindResponse{Error: errorString(err)}},
+		Response: &pb.FujinResponse_Bind{Bind: response},
 	})
+}
+
+func grpcRouteCapabilities(routes map[string]connector.RouteProfile) map[string]*pb.RouteCapabilities {
+	result := make(map[string]*pb.RouteCapabilities, len(routes))
+	for route, profile := range routes {
+		result[route] = &pb.RouteCapabilities{
+			Produce:          profile.Produce,
+			Headers:          profile.Headers,
+			Transactions:     profile.Transactions,
+			Subscribe:        profile.Subscribe,
+			Fetch:            profile.Fetch,
+			ManualSettlement: profile.ManualSettlement,
+			ProduceGuarantee: pb.ProduceGuarantee(profile.ProduceGuarantee),
+			AckGranularity:   pb.AckGranularity(profile.Settlement.Ack),
+			NackEffect:       pb.NackEffect(profile.Settlement.Nack),
+		}
+	}
+	return result
 }
 
 func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
@@ -320,7 +356,7 @@ func (s *streamSession) handleProduce(req *pb.ProduceRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Produce{Produce: &pb.ProduceResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 			}},
 		}); sendErr != nil {
 			s.l.Error("send produce response", "err", sendErr)
@@ -338,7 +374,7 @@ func (s *streamSession) handleHProduce(req *pb.HProduceRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Hproduce{Hproduce: &pb.HProduceResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 			}},
 		}); sendErr != nil {
 			s.l.Error("send hproduce response", "err", sendErr)
@@ -355,7 +391,7 @@ func (s *streamSession) handleTxProduce(req *pb.TxProduceRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_TxProduce{TxProduce: &pb.TxProduceResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 			}},
 		}); sendErr != nil {
 			s.l.Error("send tx produce response", "err", sendErr)
@@ -373,7 +409,7 @@ func (s *streamSession) handleTxHProduce(req *pb.TxHProduceRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_TxHproduce{TxHproduce: &pb.TxHProduceResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 			}},
 		}); sendErr != nil {
 			s.l.Error("send tx hproduce response", "err", sendErr)
@@ -390,7 +426,7 @@ func (s *streamSession) handleBeginTx(req *pb.BeginTxRequest) error {
 	return s.sendResponse(&pb.FujinResponse{
 		Response: &pb.FujinResponse_BeginTx{BeginTx: &pb.BeginTxResponse{
 			CorrelationId: req.CorrelationId,
-			Error:         errorString(err),
+			Error:         grpcOperationError(err),
 		}},
 	})
 }
@@ -400,7 +436,7 @@ func (s *streamSession) handleCommitTx(req *pb.CommitTxRequest) error {
 	return s.sendResponse(&pb.FujinResponse{
 		Response: &pb.FujinResponse_CommitTx{CommitTx: &pb.CommitTxResponse{
 			CorrelationId: req.CorrelationId,
-			Error:         errorString(err),
+			Error:         grpcOperationError(err),
 		}},
 	})
 }
@@ -410,7 +446,7 @@ func (s *streamSession) handleRollbackTx(req *pb.RollbackTxRequest) error {
 	return s.sendResponse(&pb.FujinResponse{
 		Response: &pb.FujinResponse_RollbackTx{RollbackTx: &pb.RollbackTxResponse{
 			CorrelationId: req.CorrelationId,
-			Error:         errorString(err),
+			Error:         grpcOperationError(err),
 		}},
 	})
 }
@@ -444,8 +480,8 @@ func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit
 	handlers := core.SubscriptionMessageHandlers{}
 	if withHeaders {
 		handlers.MessageWithHeaders = func(subscriptionID byte, reader connector.Reader) func([]byte, string, [][]byte, ...any) {
-			return func(payload []byte, topic string, headers [][]byte, args ...any) {
-				messageID := encodeMessageID(reader, autoCommit, topic, args...)
+			return func(payload []byte, source string, headers [][]byte, args ...any) {
+				messageID := encodeMessageID(reader, autoCommit, source, args...)
 				if err := s.sendResponse(&pb.FujinResponse{
 					Response: &pb.FujinResponse_Hmessage{Hmessage: &pb.HMessage{
 						SubscriptionId: uint32(subscriptionID),
@@ -460,8 +496,8 @@ func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit
 		}
 	} else {
 		handlers.Message = func(subscriptionID byte, reader connector.Reader) func([]byte, string, ...any) {
-			return func(payload []byte, topic string, args ...any) {
-				messageID := encodeMessageID(reader, autoCommit, topic, args...)
+			return func(payload []byte, source string, args ...any) {
+				messageID := encodeMessageID(reader, autoCommit, source, args...)
 				if err := s.sendResponse(&pb.FujinResponse{
 					Response: &pb.FujinResponse_Message{Message: &pb.Message{
 						SubscriptionId: uint32(subscriptionID),
@@ -476,7 +512,11 @@ func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit
 	}
 
 	err := s.core.Subscribe(route, autoCommit, withHeaders, ready, handlers, func(err error) {
-		s.l.Error("subscribe retry", "route", route, "err", err)
+		s.l.Error("subscription ended", "route", route, "err", err)
+		select {
+		case s.terminal <- err:
+		default:
+		}
 	})
 	if err == nil {
 		return nil
@@ -485,14 +525,14 @@ func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit
 		return s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Hsubscribe{Hsubscribe: &pb.HSubscribeResponse{
 				CorrelationId: correlationID,
-				Error:         err.Error(),
+				Error:         grpcOperationError(err),
 			}},
 		})
 	}
 	return s.sendResponse(&pb.FujinResponse{
 		Response: &pb.FujinResponse_Subscribe{Subscribe: &pb.SubscribeResponse{
 			CorrelationId: correlationID,
-			Error:         err.Error(),
+			Error:         grpcOperationError(err),
 		}},
 	})
 }
@@ -522,8 +562,8 @@ func (s *streamSession) fetch(correlationID uint32, route string, autoCommit, wi
 			lease.messages = append(lease.messages, &pb.FetchMessage{Payload: payload})
 		}
 	default:
-		handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, messageTopic string, headers [][]byte, args ...any) {
-			messageID := encodeMessageID(reader, false, messageTopic, args...)
+		handlers.Manual = func(_ byte, reader connector.Reader, payload []byte, source string, headers [][]byte, args ...any) {
+			messageID := encodeMessageID(reader, false, source, args...)
 			if withHeaders {
 				lease.hmessages = append(lease.hmessages, &pb.HFetchMessage{
 					MessageId: messageID,
@@ -540,7 +580,7 @@ func (s *streamSession) fetch(correlationID uint32, route string, autoCommit, wi
 	if withHeaders {
 		response := &pb.HFetchResponse{
 			CorrelationId:  correlationID,
-			Error:          errorString(fetchErr),
+			Error:          grpcOperationError(fetchErr),
 			SubscriptionId: uint32(subscriptionID),
 			Messages:       lease.hmessages,
 		}
@@ -553,7 +593,7 @@ func (s *streamSession) fetch(correlationID uint32, route string, autoCommit, wi
 	}
 	response := &pb.FetchResponse{
 		CorrelationId:  correlationID,
-		Error:          errorString(fetchErr),
+		Error:          grpcOperationError(fetchErr),
 		SubscriptionId: uint32(subscriptionID),
 		Messages:       lease.messages,
 	}
@@ -570,7 +610,7 @@ func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
 	return s.sendResponse(&pb.FujinResponse{
 		Response: &pb.FujinResponse_Unsubscribe{Unsubscribe: &pb.UnsubscribeResponse{
 			CorrelationId: req.CorrelationId,
-			Error:         errorString(err),
+			Error:         grpcOperationError(err),
 		}},
 	})
 }
@@ -582,7 +622,7 @@ func (s *streamSession) handleAck(req *pb.AckRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Ack{Ack: &pb.AckResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 				Results:       results,
 			}},
 		}); sendErr != nil {
@@ -596,7 +636,7 @@ func (s *streamSession) handleAck(req *pb.AckRequest) error {
 			}
 		},
 		Message: func(messageID []byte, err error) {
-			results = append(results, &pb.AckMessageResult{MessageId: messageID, Error: errorString(err)})
+			results = append(results, &pb.AckMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
 			remaining--
 			if remaining == 0 {
 				respond(nil)
@@ -616,7 +656,7 @@ func (s *streamSession) handleNack(req *pb.NackRequest) error {
 		if sendErr := s.sendResponse(&pb.FujinResponse{
 			Response: &pb.FujinResponse_Nack{Nack: &pb.NackResponse{
 				CorrelationId: req.CorrelationId,
-				Error:         errorString(err),
+				Error:         grpcOperationError(err),
 				Results:       results,
 			}},
 		}); sendErr != nil {
@@ -630,7 +670,7 @@ func (s *streamSession) handleNack(req *pb.NackRequest) error {
 			}
 		},
 		Message: func(messageID []byte, err error) {
-			results = append(results, &pb.NackMessageResult{MessageId: messageID, Error: errorString(err)})
+			results = append(results, &pb.NackMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
 			remaining--
 			if remaining == 0 {
 				respond(nil)
@@ -678,17 +718,24 @@ func connectorHeadersToProto(headers [][]byte) []*pb.KV {
 	return result
 }
 
-func encodeMessageID(reader connector.Reader, autoCommit bool, topic string, args ...any) []byte {
+func encodeMessageID(reader connector.Reader, autoCommit bool, source string, args ...any) []byte {
 	if autoCommit {
 		return nil
 	}
-	buf := make([]byte, 0, len(topic)+reader.MsgIDArgsLen())
-	return reader.EncodeMsgID(buf, topic, args...)
+	buf := make([]byte, 0, len(source)+reader.MsgIDArgsLen())
+	return reader.EncodeMsgID(buf, source, args...)
 }
 
-func errorString(err error) string {
+func grpcOperationError(err error) *pb.OperationError {
 	if err == nil {
-		return ""
+		return nil
 	}
-	return err.Error()
+	operationErr := core.ClassifyError(err)
+	return &pb.OperationError{
+		Code:    pb.StatusCode(operationErr.Code),
+		Outcome: pb.OperationOutcome(operationErr.Outcome),
+		Reason:  operationErr.Reason,
+		Message: operationErr.Message,
+		Details: operationErr.Details,
+	}
 }

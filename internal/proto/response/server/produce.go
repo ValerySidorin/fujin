@@ -7,5 +7,5 @@ import (
 func ProduceResponseSuccess(buf []byte, cID []byte) []byte {
 	buf = append(buf, byte(v1.RESP_CODE_PRODUCE))
 	buf = append(buf, cID...)
-	return append(buf, byte(v1.ERR_CODE_NO))
+	return append(buf, byte(v1.STATUS_OK))
 }

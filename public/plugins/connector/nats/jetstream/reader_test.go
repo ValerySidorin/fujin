@@ -9,22 +9,13 @@ func TestEncodeMsgID(t *testing.T) {
 	r := &Reader{}
 
 	var seq uint64 = 42
-	topic := "test.subject"
+	buf := r.EncodeMsgID(nil, "test.subject", seq)
 
-	buf := r.EncodeMsgID(nil, topic, seq)
-
-	if len(buf) != 8+len(topic) {
-		t.Fatalf("expected length %d, got %d", 8+len(topic), len(buf))
+	if len(buf) != 8 {
+		t.Fatalf("expected length 8, got %d", len(buf))
 	}
-
-	gotSeq := binary.BigEndian.Uint64(buf[:8])
-	if gotSeq != seq {
-		t.Fatalf("expected seq %d, got %d", seq, gotSeq)
-	}
-
-	gotTopic := string(buf[8:])
-	if gotTopic != topic {
-		t.Fatalf("expected topic %q, got %q", topic, gotTopic)
+	if got := binary.BigEndian.Uint64(buf); got != seq {
+		t.Fatalf("expected seq %d, got %d", seq, got)
 	}
 }
 
@@ -32,18 +23,10 @@ func TestEncodeMsgID_LargeSequence(t *testing.T) {
 	r := &Reader{}
 
 	var seq uint64 = 1<<63 - 1
-	topic := "orders.created"
+	buf := r.EncodeMsgID(nil, "orders.created", seq)
 
-	buf := r.EncodeMsgID(nil, topic, seq)
-
-	gotSeq := binary.BigEndian.Uint64(buf[:8])
-	if gotSeq != seq {
-		t.Fatalf("expected seq %d, got %d", seq, gotSeq)
-	}
-
-	gotTopic := string(buf[8:])
-	if gotTopic != topic {
-		t.Fatalf("expected topic %q, got %q", topic, gotTopic)
+	if got := binary.BigEndian.Uint64(buf); got != seq {
+		t.Fatalf("expected seq %d, got %d", seq, got)
 	}
 }
 

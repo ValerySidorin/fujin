@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"unsafe"
 
 	"github.com/fujin-io/fujin/public/plugins/connector"
@@ -47,49 +48,69 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (connector
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			if err := r.client.Receive(ctx, r.subscribe, func(msg rueidis.PubSubMessage) {
-				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel)
-			}); err != nil {
-				return fmt.Errorf("redis_rueidis_pubsub: receive: %w", err)
-			}
-		}
-	}
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
+	return r.receive(ctx, ready, func(msg rueidis.PubSubMessage) {
+		h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel)
+	})
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			if err := r.client.Receive(ctx, r.subscribe, func(msg rueidis.PubSubMessage) {
-				h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel, nil)
-			}); err != nil {
-				return fmt.Errorf("redis_rueidis_pubsub: receive: %w", err)
-			}
-		}
-	}
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, headers [][]byte, args ...any)) error {
+	return r.receive(ctx, ready, func(msg rueidis.PubSubMessage) {
+		h(unsafe.Slice((*byte)(unsafe.StringData(msg.Message)), len(msg.Message)), msg.Channel, nil)
+	})
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) receive(ctx context.Context, ready func() error, h func(rueidis.PubSubMessage)) error {
+	receiveCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	wanted := make(map[string]struct{}, len(r.conf.Channels))
+	for _, channel := range r.conf.Channels {
+		wanted[channel] = struct{}{}
+	}
+	confirmed := make(map[string]struct{}, len(wanted))
+	var mu sync.Mutex
+	var readyOnce sync.Once
+	var readyErr error
+	receiveCtx = rueidis.WithOnSubscriptionHook(receiveCtx, func(subscription rueidis.PubSubSubscription) {
+		if subscription.Kind != "subscribe" {
+			return
+		}
+		if _, ok := wanted[subscription.Channel]; !ok {
+			return
+		}
+		mu.Lock()
+		confirmed[subscription.Channel] = struct{}{}
+		if len(confirmed) == len(wanted) {
+			readyOnce.Do(func() {
+				readyErr = ready()
+				if readyErr != nil {
+					cancel()
+				}
+			})
+		}
+		mu.Unlock()
+	})
+	err := r.client.Receive(receiveCtx, r.subscribe, h)
+	mu.Lock()
+	callbackErr := readyErr
+	mu.Unlock()
+	if callbackErr != nil {
+		return callbackErr
+	}
+	if ctx.Err() != nil {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("redis_rueidis_pubsub: receive: %w", err)
+	}
+	return nil
+}
+
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -111,7 +132,7 @@ func (r *Reader) Nack(
 	nackHandler(util.ErrNotSupported)
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
 	return buf
 }
 

@@ -682,16 +682,12 @@ func validateProduceBenchmarkResponses(reader io.Reader) (int, error) {
 		if correlationID != 0 {
 			return operation, fmt.Errorf("produce response %d: correlation ID %d, want 0", operation, correlationID)
 		}
-		errCode, err := responses.readByte()
+		operationErr, err := responses.readStatus()
 		if err != nil {
-			return operation, fmt.Errorf("produce response %d error code: %w", operation, err)
+			return operation, fmt.Errorf("produce response %d status: %w", operation, err)
 		}
-		if errCode != v1.ERR_CODE_NO {
-			message, readErr := responses.readErrPayload()
-			if readErr != nil {
-				return operation, fmt.Errorf("produce response %d error payload: %w", operation, readErr)
-			}
-			return operation, fmt.Errorf("produce response %d: produce error: %s", operation, message)
+		if operationErr != nil {
+			return operation, fmt.Errorf("produce response %d: produce error: %w", operation, operationErr)
 		}
 	}
 }
@@ -756,7 +752,7 @@ func benchFetchQUIC(b *testing.B, typ, route string) {
 	b.StopTimer()
 	p.Close()
 	_ = c.CloseWithError(0x0, "")
-	// fetch response: RESP_CODE_FETCH(1) + cID(4) + ERR_CODE_NO(1) + subID(1) + count(4) = 11 bytes
+	// fetch response: RESP_CODE_FETCH(1) + cID(4) + STATUS_OK(1) + subID(1) + count(4) = 11 bytes
 	// bind(2) + disconnect(1) = 3
 	expected := b.N*11 + 3
 	if res != expected {
@@ -960,27 +956,58 @@ func buildSubscribeCmd(topic string) []byte {
 	return cmd
 }
 
-func finishSubscribeBenchmark(b *testing.B, rw io.ReadWriter, subscriptionID byte) {
+func readAutoCommitMessages(b *testing.B, reader *protoReader, count, payloadSize int) {
+	b.Helper()
+	for range count {
+		code, err := reader.readByte()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if code != byte(v1.RESP_CODE_MSG) {
+			b.Fatalf("message response code: got %d, want %d", code, v1.RESP_CODE_MSG)
+		}
+		if _, err := reader.readByte(); err != nil {
+			b.Fatal(err)
+		}
+		messageSize, err := reader.readUint32()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if int(messageSize) != payloadSize {
+			b.Fatalf("message payload size: got %d, want %d", messageSize, payloadSize)
+		}
+		if _, err := reader.readExact(int(messageSize)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func finishSubscribeBenchmark(b *testing.B, rw io.Writer, reader *protoReader, subscriptionID byte) {
 	b.Helper()
 	unsubscribe := []byte{byte(v1.OP_CODE_UNSUBSCRIBE), 0, 0, 0, 1, subscriptionID}
 	if _, err := rw.Write(unsubscribe); err != nil {
 		b.Fatal(err)
 	}
-	response := make([]byte, 6)
-	if _, err := io.ReadFull(rw, response); err != nil {
+	response, err := reader.readExact(5)
+	if err != nil {
 		b.Fatal(err)
 	}
-	if response[0] != byte(v1.RESP_CODE_UNSUBSCRIBE) || response[5] != byte(v1.ERR_CODE_NO) {
+	if response[0] != byte(v1.RESP_CODE_UNSUBSCRIBE) {
 		b.Fatalf("unsubscribe response: %v", response)
+	}
+	if operationErr, err := reader.readStatus(); err != nil {
+		b.Fatal(err)
+	} else if operationErr != nil {
+		b.Fatalf("unsubscribe response: %v", operationErr)
 	}
 	if _, err := rw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)}); err != nil {
 		b.Fatal(err)
 	}
-	disconnect := make([]byte, 1)
-	if _, err := io.ReadFull(rw, disconnect); err != nil {
+	disconnect, err := reader.readByte()
+	if err != nil {
 		b.Fatal(err)
 	}
-	if disconnect[0] != byte(v1.RESP_CODE_DISCONNECT) {
+	if disconnect != byte(v1.RESP_CODE_DISCONNECT) {
 		b.Fatalf("disconnect response: %v", disconnect)
 	}
 }
@@ -999,6 +1026,10 @@ func benchSubscribeTCP(b *testing.B, msgSize int) {
 
 	c := createTCPClientConn(PERF_TCP_ADDR)
 	doDefaultBindTCP(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	// MSG response (autoCommit=true): RESP_CODE_MSG(1) + subID(1) + msgLen(4) + msg(N)
 	msgRespSize := 6 + msgSize
@@ -1008,27 +1039,18 @@ func benchSubscribeTCP(b *testing.B, msgSize int) {
 	subCmd := buildSubscribeCmd("sub")
 	c.Write(subCmd)
 
-	// Read subscribe response: RESP_CODE_SUBSCRIBE(1) + cID(4) + ERR_CODE_NO(1) + subID(1) = 7 bytes
-	// + bind response: RESP_CODE_BIND(1) + ERR_CODE_NO(1) = 2 bytes
-	header := make([]byte, 9)
-	io.ReadFull(c, header)
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.StartTimer()
 
-	// Read exactly b.N MSG responses
-	remaining := b.N * msgRespSize
-	buf := make([]byte, defaultRecvBufSize)
-	for remaining > 0 {
-		n, err := c.Read(buf)
-		if err != nil {
-			b.Fatal(err)
-		}
-		remaining -= n
-	}
+	readAutoCommitMessages(b, reader, b.N, msgSize)
 
 	b.StopTimer()
 
-	finishSubscribeBenchmark(b, c, header[8])
+	finishSubscribeBenchmark(b, c, reader, subscriptionID)
 	if err := c.Close(); err != nil {
 		b.Fatal(err)
 	}
@@ -1048,6 +1070,10 @@ func benchSubscribeUnix(b *testing.B, msgSize int) {
 
 	c := createUnixClientConn(PERF_UNIX_PATH)
 	doDefaultBindUnix(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	msgRespSize := 6 + msgSize
 	b.SetBytes(int64(msgRespSize))
@@ -1055,24 +1081,18 @@ func benchSubscribeUnix(b *testing.B, msgSize int) {
 	subCmd := buildSubscribeCmd("sub")
 	c.Write(subCmd)
 
-	header := make([]byte, 9)
-	io.ReadFull(c, header)
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.StartTimer()
 
-	remaining := b.N * msgRespSize
-	buf := make([]byte, defaultRecvBufSize)
-	for remaining > 0 {
-		n, err := c.Read(buf)
-		if err != nil {
-			b.Fatal(err)
-		}
-		remaining -= n
-	}
+	readAutoCommitMessages(b, reader, b.N, msgSize)
 
 	b.StopTimer()
 
-	finishSubscribeBenchmark(b, c, header[8])
+	finishSubscribeBenchmark(b, c, reader, subscriptionID)
 	if err := c.Close(); err != nil {
 		b.Fatal(err)
 	}
@@ -1092,6 +1112,10 @@ func benchSubscribeQUIC(b *testing.B, msgSize int) {
 
 	c := createClientConn(ctx, PERF_ADDR)
 	p := doDefaultBind(c)
+	reader := newProtoReader(p)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	msgRespSize := 6 + msgSize
 	b.SetBytes(int64(msgRespSize))
@@ -1099,24 +1123,18 @@ func benchSubscribeQUIC(b *testing.B, msgSize int) {
 	subCmd := buildSubscribeCmd("sub")
 	p.Write(subCmd)
 
-	header := make([]byte, 9)
-	io.ReadFull(p, header)
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
 
 	b.StartTimer()
 
-	remaining := b.N * msgRespSize
-	buf := make([]byte, defaultRecvBufSize)
-	for remaining > 0 {
-		n, err := p.Read(buf)
-		if err != nil {
-			b.Fatal(err)
-		}
-		remaining -= n
-	}
+	readAutoCommitMessages(b, reader, b.N, msgSize)
 
 	b.StopTimer()
 
-	finishSubscribeBenchmark(b, p, header[8])
+	finishSubscribeBenchmark(b, p, reader, subscriptionID)
 	p.CancelRead(v1.NoErr)
 	p.CancelWrite(v1.NoErr)
 	if err := c.CloseWithError(0x0, ""); err != nil {

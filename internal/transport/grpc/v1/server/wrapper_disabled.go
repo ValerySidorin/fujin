@@ -4,10 +4,11 @@ package server
 
 import (
 	"context"
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
-	serverconfig "github.com/fujin-io/fujin/public/server/config"
 	"log/slog"
 	"time"
+
+	"github.com/fujin-io/fujin/public/plugins/connector"
+	serverconfig "github.com/fujin-io/fujin/public/server/config"
 )
 
 // GRPCServerWrapper wraps the gRPC server to implement the GRPCServer interface
@@ -16,11 +17,9 @@ type GRPCServerWrapper struct {
 	server *GRPCServer
 }
 
-// NewGRPCServerWrapper creates a new gRPC server wrapper (stub version)
-func NewGRPCServerWrapper(conf serverconfig.GRPCServerConfig, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) *GRPCServerWrapper {
-	return &GRPCServerWrapper{
-		server: NewGRPCServer(conf, baseConfig, l),
-	}
+// NewGRPCServerWrapper creates a new gRPC server wrapper (stub version).
+func NewGRPCServerWrapper(conf serverconfig.GRPCServerConfig, catalog *connector.Catalog, l *slog.Logger) *GRPCServerWrapper {
+	return &GRPCServerWrapper{server: NewGRPCServer(conf, catalog, l)}
 }
 
 // ListenAndServe starts the gRPC server (stub version)

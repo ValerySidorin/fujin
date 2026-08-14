@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/handler"
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/session"
@@ -20,10 +20,8 @@ import (
 )
 
 type Server struct {
-	conf       serverconfig.UnixServerConfig
-	baseConfig connectorconfig.ConnectorsConfig
-
-	configProvider func() connectorconfig.ConnectorsConfig
+	conf    serverconfig.UnixServerConfig
+	catalog *connector.Catalog
 
 	ln net.Listener // stored for ListenerFDs
 
@@ -33,23 +31,18 @@ type Server struct {
 	l *slog.Logger
 }
 
-func NewServer(conf serverconfig.UnixServerConfig, baseConfig connectorconfig.ConnectorsConfig, l *slog.Logger) *Server {
+func NewServer(conf serverconfig.UnixServerConfig, catalog *connector.Catalog, l *slog.Logger) *Server {
 	return &Server{
-		conf:       conf,
-		baseConfig: baseConfig,
-		ready:      make(chan struct{}),
-		done:       make(chan struct{}),
-		l:          l.With("server", "fujin_unix"),
+		conf:    conf,
+		catalog: catalog,
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
+		l:       l.With("server", "fujin_unix"),
 	}
 }
 
 // FDKey implements transport.FDKeyProvider.
 func (s *Server) FDKey() string { return "unix:" + s.conf.Path }
-
-// SetBaseConfigProvider implements transport.HotReloadable.
-func (s *Server) SetBaseConfigProvider(p func() connectorconfig.ConnectorsConfig) {
-	s.configProvider = p
-}
 
 // ListenerFDs implements transport.ListenerFDProvider.
 func (s *Server) ListenerFDs() ([]transport.ListenerFD, error) {
@@ -157,8 +150,8 @@ func (s *Server) acceptLoop(ctx context.Context, ln net.Listener, removeOnClose 
 			}()
 
 			handler.HandleStream(ctx, conn, session.StreamOptions{
-				BaseConfig:            s.baseConfig,
-				BaseConfigProvider:    s.configProvider,
+				BaseGeneration:        s.catalog.Current(),
+				GenerationProvider:    s.catalog.Current,
 				PingInterval:          s.conf.Fujin.PingInterval,
 				PingTimeout:           s.conf.Fujin.PingTimeout,
 				WriteDeadline:         s.conf.Fujin.WriteDeadline,

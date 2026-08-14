@@ -112,6 +112,7 @@ help:
 	@echo "  make test                                 Run all tests."
 	@echo "  make cross-build                          Verify cross-compilation (Windows, Linux, Darwin)."
 	@echo "  make bench                                Run benchmarks."
+	@echo "  make sdk-compat                           Build the server and verify fujin-go over native QUIC and gRPC."
 	@echo ""
 	@echo "Variables:"
 	@echo "  VERSION (default: git describe || dev) Version tag for builds."
@@ -121,6 +122,7 @@ help:
 	@echo "  BIND_MIDDLEWARES (default: all)        Comma-separated bind middleware names for builder."
 	@echo "  CONNECTOR_MIDDLEWARES (default: all)   Comma-separated connector middleware names for builder."
 	@echo "  BOOTCONF (optional)                    Bootstrap config."
+	@echo "  FUJIN_GO_ROOT (default: ../fujin-go)    Path to the coordinated Go SDK checkout."
 	@echo ""
 	@echo "Platform: $(DETECTED_OS)"
 	@echo "Binary: $(BINARY)"
@@ -248,3 +250,9 @@ e2e-mqtt_paho:
 e2e-nsq:
 	docker compose -f resources/docker-compose.nsq.yaml up -d --wait
 	@status=0; FUJIN_E2E=1 go test -v -tags=${GO_BUILD_TAGS} -run TestE2E_NSQ -timeout ${E2E_TIMEOUT} ./test || status=$$?; cleanup=0; docker compose -f resources/docker-compose.nsq.yaml down --remove-orphans || cleanup=$$?; test $$status -eq 0 || exit $$status; exit $$cleanup
+
+FUJIN_GO_ROOT ?= ../fujin-go
+
+.PHONY: sdk-compat
+sdk-compat:
+	@$(MAKE) -C "$(FUJIN_GO_ROOT)" compat-server FUJIN_SERVER_ROOT="$(CURDIR)"

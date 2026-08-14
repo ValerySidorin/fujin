@@ -13,8 +13,8 @@ type dedupReaderWrapper struct {
 	l  *slog.Logger
 }
 
-func (r *dedupReaderWrapper) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	return r.r.Subscribe(ctx, func(message []byte, topic string, args ...any) {
+func (r *dedupReaderWrapper) Subscribe(ctx context.Context, ready func() error, h func(message []byte, topic string, args ...any)) error {
+	return r.r.Subscribe(ctx, ready, func(message []byte, topic string, args ...any) {
 		key, err := r.mw.computeKey(message, nil)
 		if err != nil {
 			r.l.Warn("subscribe: dedup key computation failed, message skipped", "topic", topic, "error", err.Error())
@@ -28,8 +28,8 @@ func (r *dedupReaderWrapper) Subscribe(ctx context.Context, h func(message []byt
 	})
 }
 
-func (r *dedupReaderWrapper) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	return r.r.SubscribeWithHeaders(ctx, func(message []byte, topic string, hs [][]byte, args ...any) {
+func (r *dedupReaderWrapper) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+	return r.r.SubscribeWithHeaders(ctx, ready, func(message []byte, topic string, hs [][]byte, args ...any) {
 		key, err := r.mw.computeKey(message, hs)
 		if err != nil {
 			r.l.Warn("subscribe: dedup key computation failed, message skipped", "topic", topic, "error", err.Error())

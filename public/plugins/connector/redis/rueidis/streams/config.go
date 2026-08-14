@@ -31,16 +31,12 @@ type CommonSettings struct {
 
 // RouteSettings contains settings specific to a route.
 type RouteSettings struct {
-	// Reader settings
 	Streams map[string]StreamConf `yaml:"streams,omitempty"`
 	Block   time.Duration         `yaml:"block,omitempty"`
 	Count   int64                 `yaml:"count,omitempty"`
 	Group   GroupConf             `yaml:"group,omitempty"`
+	Stream  string                `yaml:"stream,omitempty"`
 
-	// Writer settings
-	Stream string `yaml:"stream,omitempty"`
-
-	// Common settings
 	Marshaller Marshaller `yaml:"marshaller,omitempty"`
 }
 
@@ -56,7 +52,10 @@ type ConnectorConfig struct {
 	RouteSettings
 }
 
-// Validate validates the Redis Rueidis Streams configuration.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
+	return ConnectorConfig{CommonSettings: common, RouteSettings: route}
+}
+
 func (c *Config) Validate() error {
 	if err := c.Common.RedisConfig.Validate(); err != nil {
 		return fmt.Errorf("redis_rueidis_streams: %w", err)
@@ -67,12 +66,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Endpoint returns the Redis endpoint.
-func (c *ConnectorConfig) Endpoint() string {
-	return c.RedisConfig.Endpoint()
-}
+func (c *ConnectorConfig) Endpoint() string { return c.RedisConfig.Endpoint() }
 
-// ValidateWriter validates writer-specific settings.
 func (c *ConnectorConfig) ValidateWriter() error {
 	c.WriterBatchConfig.ApplyBatchDefaults()
 	if err := c.WriterBatchConfig.ValidateBatch(); err != nil {
@@ -84,7 +79,6 @@ func (c *ConnectorConfig) ValidateWriter() error {
 	return nil
 }
 
-// ValidateReader validates reader-specific settings.
 func (c *ConnectorConfig) ValidateReader() error {
 	if len(c.Streams) == 0 {
 		return fmt.Errorf("redis_rueidis_streams: at least one stream is required for reader")
