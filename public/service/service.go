@@ -151,7 +151,8 @@ func ShutdownSignals() []os.Signal { return shutdownSignals }
 func RunCLI(ctx context.Context) {
 	log.Printf("version: %s", Version)
 
-	if err := loadConfig(&conf); err != nil {
+	loader, err := loadConfig(ctx, &conf)
+	if err != nil {
 		log.Fatal(err)
 	}
 	serverConf, err := conf.parse()
@@ -166,6 +167,12 @@ func RunCLI(ctx context.Context) {
 
 	logRegisteredPlugins(logger)
 
+	bootstrapSnapshot, err := connectorBootstrapSnapshot(loader, conf.Connectors)
+	if err != nil {
+		logger.Error("connector bootstrap snapshot", "err", err)
+		os.Exit(1)
+	}
+
 	// If in upgrade mode, request FDs from old process before creating server
 	us, err := requestUpgradeFromOld(logger)
 	if err != nil {
@@ -178,19 +185,24 @@ func RunCLI(ctx context.Context) {
 		logger.Error("new server", "err", err)
 		os.Exit(1)
 	}
+	controller, err := newConnectorRuntimeController(s, bootstrapSnapshot)
+	if err != nil {
+		logger.Error("new runtime connector controller", "err", err)
+		os.Exit(1)
+	}
 
 	// Pass inherited FDs to server if in upgrade mode
 	us.applyTo(s)
 
-	// Use a cancellable context for the server so drain can stop it
+	// Use a cancellable context for the server and every runtime source so drain stops both.
 	serverCtx, serverCancel := context.WithCancel(ctx)
 	defer serverCancel()
 
-	// Start control socket for future upgrades (drain triggers serverCancel)
-	startUpgradeListener(ctx, s, serverCancel, logger)
+	// Start control socket for future upgrades (drain triggers serverCancel).
+	startUpgradeListener(serverCtx, s, serverCancel, logger)
 
-	// SIGHUP reload loop (Unix only, no-op on other platforms)
-	startReloadLoop(s, logLevelVar, logger)
+	// SIGHUP reuses the selected configurator instance (Unix only, no-op elsewhere).
+	startReloadLoop(serverCtx, loader, controller, logLevelVar, logger)
 
 	// Start serving (blocks until context cancelled or error)
 	serveDone := make(chan error, 1)
@@ -198,10 +210,27 @@ func RunCLI(ctx context.Context) {
 		serveDone <- s.ListenAndServe(serverCtx)
 	}()
 
-	// Wait for server to be ready, then signal old process if upgrading
+	// Runtime connector watching starts only after every listener is ready.
+	var watcherSettled <-chan struct{}
 	if s.ReadyForConnections(30 * time.Second) {
 		if us != nil {
 			signalOldProcessReady(us, logger)
+		}
+		if watcherDone := startConnectorWatcher(serverCtx, loader, controller); watcherDone != nil {
+			settled := make(chan struct{})
+			watcherSettled = settled
+			go func() {
+				defer close(settled)
+				err := <-watcherDone
+				if serverCtx.Err() != nil || errors.Is(err, context.Canceled) {
+					return
+				}
+				if err != nil {
+					logger.Error("connector watcher terminated", "err", err)
+				} else {
+					logger.Warn("connector watcher terminated")
+				}
+			}()
 		}
 	} else {
 		logger.Error("server did not become ready in time")
@@ -209,6 +238,10 @@ func RunCLI(ctx context.Context) {
 
 	if err := <-serveDone; err != nil {
 		logger.Error("listen and serve", "err", err)
+	}
+	serverCancel()
+	if watcherSettled != nil {
+		<-watcherSettled
 	}
 }
 
@@ -247,44 +280,38 @@ func configureLogger(logLevel, logType string) *slog.Logger {
 	return configureLoggerWithLevelVar(logType, level)
 }
 
-// loadConfig loads configuration
-func loadConfig(cfg *Config) error {
-	ctx := context.Background()
-
-	if loaderType := os.Getenv("FUJIN_CONFIGURATOR"); loaderType != "" {
-		if err := loadConfigWithLoader(ctx, loaderType, cfg); err != nil {
-			return fmt.Errorf("load config from env: loader type %s: %w", loaderType, err)
-		}
-		log.Printf("loaded config using configurator from environment: %s\n", loaderType)
-		return nil
+// loadConfig constructs the selected configurator once and retains it for runtime use.
+func loadConfig(ctx context.Context, cfg *Config) (configurator.Configurator, error) {
+	loaderType := os.Getenv("FUJIN_CONFIGURATOR")
+	if loaderType == "" {
+		return nil, errors.New("failed to load config: configurator not specified")
 	}
-
-	return errors.New("failed to load config: configurator not specified")
+	loader, err := loadConfigWithLoader(ctx, loaderType, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("load config from env: loader type %s: %w", loaderType, err)
+	}
+	log.Printf("loaded config using configurator from environment: %s\n", loaderType)
+	return loader, nil
 }
 
-// loadConfigWithLoader loads configuration using a configurator plugin.
-// The loader directly fills the provided config struct.
-func loadConfigWithLoader(ctx context.Context, loaderType string, cfg *Config) error {
+// loadConfigWithLoader constructs one configurator and loads bootstrap configuration with it.
+func loadConfigWithLoader(ctx context.Context, loaderType string, cfg *Config) (configurator.Configurator, error) {
 	factory, ok := configurator.Get(loaderType)
 	if !ok {
-		return fmt.Errorf("configurator %q not found (available: %v)", loaderType, configurator.List())
+		return nil, fmt.Errorf("configurator %q not found (available: %v)", loaderType, configurator.List())
 	}
 
-	// Create a temporary logger for config loading
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
-
 	loader, err := factory(logger)
 	if err != nil {
-		return fmt.Errorf("create configurator: %w", err)
+		return nil, fmt.Errorf("create configurator: %w", err)
 	}
-
 	if err := loader.Load(ctx, cfg); err != nil {
-		return fmt.Errorf("load config: %w", err)
+		return nil, fmt.Errorf("load config: %w", err)
 	}
-
-	return nil
+	return loader, nil
 }
 
 // logRegisteredPlugins logs all registered connectors, connector middlewares, bind middlewares, and configurators

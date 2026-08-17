@@ -943,22 +943,6 @@ func (c *Core) Fetch(
 	op.message = handlers.Manual
 	delivered := uint32(0)
 	overflow := false
-	deliver := func(payload []byte, source string, args ...any) {
-		if delivered >= batchSize {
-			overflow = true
-			return
-		}
-		delivered++
-		op.onMessage(payload, source, args...)
-	}
-	deliverHeaders := func(payload []byte, source string, headers [][]byte, args ...any) {
-		if delivered >= batchSize {
-			overflow = true
-			return
-		}
-		delivered++
-		op.onMessageWithHeaders(payload, source, headers, args...)
-	}
 	switch {
 	case autoSettle && withHeaders && handlers.AutoCommitWithHeaders != nil:
 		rs.reader.FetchWithHeaders(c.ctx, batchSize, op.respond, func(payload []byte, source string, headers [][]byte, args ...any) {
@@ -979,9 +963,23 @@ func (c *Core) Fetch(
 			handlers.AutoCommit(payload, source, args...)
 		})
 	case withHeaders:
-		rs.reader.FetchWithHeaders(c.ctx, batchSize, op.respond, deliverHeaders)
+		rs.reader.FetchWithHeaders(c.ctx, batchSize, op.respond, func(payload []byte, source string, headers [][]byte, args ...any) {
+			if delivered >= batchSize {
+				overflow = true
+				return
+			}
+			delivered++
+			op.onMessageWithHeaders(payload, source, headers, args...)
+		})
 	default:
-		rs.reader.Fetch(c.ctx, batchSize, op.respond, deliver)
+		rs.reader.Fetch(c.ctx, batchSize, op.respond, func(payload []byte, source string, args ...any) {
+			if delivered >= batchSize {
+				overflow = true
+				return
+			}
+			delivered++
+			op.onMessage(payload, source, args...)
+		})
 	}
 	count, fetchErr := op.count, op.fetchErr
 	if overflow || count > batchSize || count != delivered {

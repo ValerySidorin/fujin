@@ -97,6 +97,9 @@ func testNativeSessionContract(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint32(10), cid)
 	require.Len(t, results, len(ids))
+	for _, result := range results {
+		assert.NoError(t, result.Err)
+	}
 
 	nativeWrite(t, conn, buildHFetchCmd(11, false, "sub", 3))
 	cid, nackSubID, hmessages, err := reader.readHFetchResp(false)
@@ -115,6 +118,9 @@ func testNativeSessionContract(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint32(12), cid)
 	require.Len(t, results, len(nackIDs))
+	for _, result := range results {
+		assert.NoError(t, result.Err)
+	}
 
 	nativeWrite(t, conn, buildAckCmd(13, 254, [][]byte{[]byte("unknown")}))
 	_, _, err = reader.readAckResp()

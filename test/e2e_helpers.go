@@ -521,9 +521,12 @@ func (p *protoReader) readSettlementResp(expectedCode v1.RespCode, operation str
 		if err != nil {
 			return cID, results, err
 		}
-		results[i].Err, err = p.readStatus()
+		operationErr, err := p.readStatus()
 		if err != nil {
 			return cID, results, err
+		}
+		if operationErr != nil {
+			results[i].Err = operationErr
 		}
 	}
 	return cID, results, nil

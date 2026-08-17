@@ -54,9 +54,8 @@ func (o *Outbound) WriteLoop() {
 		}
 
 		if o.IsClosed() {
-			// Detach remaining pending buffers.
-			o.wv = append(o.wv, o.v...)
-			o.v = nil
+			// Detach remaining pending buffers without discarding either vector's capacity.
+			o.detachPendingNoLock()
 			o.Unlock()
 
 			// Final write without lock.
@@ -76,9 +75,9 @@ func (o *Outbound) WriteLoop() {
 			return
 		}
 
-		// Detach pending buffers under lock.
-		o.wv = append(o.wv, o.v...)
-		o.v = nil
+		// Swap empty working and pending vectors on the hot path. If a prior
+		// write stopped partially, append preserves wire order.
+		o.detachPendingNoLock()
 		o.Unlock()
 
 		// I/O without lock — wv is only accessed from WriteLoop.
@@ -92,6 +91,16 @@ func (o *Outbound) WriteLoop() {
 		}
 		o.Unlock()
 	}
+}
+
+func (o *Outbound) detachPendingNoLock() {
+	if len(o.wv) == 0 {
+		o.v, o.wv = o.wv[:0], o.v
+		return
+	}
+	o.wv = append(o.wv, o.v...)
+	clear(o.v)
+	o.v = o.v[:0]
 }
 
 func (o *Outbound) EnqueueProto(proto []byte) {

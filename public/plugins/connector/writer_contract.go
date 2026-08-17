@@ -8,11 +8,20 @@ import (
 
 var ErrWriterClosed = errors.New("connector writer closed")
 
+// WriterContractCompliant marks writers that natively provide exactly-once callbacks,
+// snapshot Flush semantics, and deterministic pending resolution on Close.
+type WriterContractCompliant interface {
+	WriterContractCompliant()
+}
+
 // EnforceWriterContract wraps a writer with exactly-once callbacks, snapshot Flush,
 // and deterministic pending-callback resolution on Close.
 func EnforceWriterContract(writer WriteCloser) WriteCloser {
 	if writer == nil {
 		return nil
+	}
+	if _, ok := writer.(WriterContractCompliant); ok {
+		return writer
 	}
 	return newContractWriter(writer)
 }

@@ -11,7 +11,7 @@ Broker client libraries are heavy, language-specific, and tightly coupled to you
 Fujin decouples applications from brokers. Your app talks to Fujin over a simple TCP/QUIC connection or gRPC — Fujin handles the rest. This gives you:
 
 - **Any language, any broker.** No need for a native Kafka or NATS client in every language. If your app can open a TCP socket or call gRPC, it can produce and consume messages.
-- **Centralized operations.** Observability (Prometheus, OpenTelemetry), auth (API key middleware), and broker client upgrades happen in one place — without touching application code.
+- **Centralized operations.** Observability, authorization, broker client upgrades, and versioned connector desired state can be managed centrally without redeploying application clients.
 - **Minimal overhead.** Zero-allocation protocol parser. TCP transport pushes ~840 MB/s on 32KB payloads through Kafka on Apple M2. The protocol layer adds negligible latency.
 - **Zero-downtime deployments.** Graceful binary upgrade via FD passing (Unix). Hot config reload via SIGHUP. No dropped connections.
 
@@ -137,6 +137,14 @@ kill -HUP $(pgrep fujin)
 
 Reloads connector configuration and log level from YAML. A connector reload compiles and validates the complete replacement before publication. Failed reloads retain the current generation; existing bound sessions remain pinned to their prior immutable generation, while later BIND operations use the replacement.
 
+### Control Plane
+
+Fujin v0.3.0 adds public runtime-configurator contracts and generation lifecycle reporting for external management planes. [`fujin-control-plane`](https://github.com/fujin-io/fujin-control-plane) provides mTLS Sync, versioned desired snapshots, optimistic-concurrency updates, node status, audit records, and a `control_plane` configurator plugin.
+
+Delivered connector snapshots are compiled completely before atomic publication. Invalid snapshots retain the active generation; existing BIND sessions continue on their pinned generation until it drains.
+
+The control-plane repository documents the custom binary build and node bootstrap configuration.
+
 ### Graceful Binary Upgrade
 
 Zero-downtime binary replacement on Unix systems. The new process inherits listener file descriptors from the old one via SCM_RIGHTS — no connections are dropped.
@@ -182,6 +190,8 @@ Apple M2, macOS arm64, single connection, localhost. Raw results: [`test/bench_t
 - [Native Protocol Specification](protocol.md)
 - [gRPC Proto Definition](public/proto/grpc/v1/fujin.proto)
 - [Configuration Example](examples/assets/config/config.yaml)
+- [Fujin Control Plane](https://github.com/fujin-io/fujin-control-plane)
+
 - Plugin docs — each plugin has a README in its package under [`public/plugins/`](public/plugins/)
 
 ## License

@@ -89,6 +89,24 @@ func TestNewOutbound(t *testing.T) {
 	assert.Nil(t, o.wv)
 }
 
+func TestOutboundDetachPendingReusesCompletedVector(t *testing.T) {
+	o := newTestOutbound(&mockStream{})
+	o.v = make(net.Buffers, 1, 64)
+	o.v[0] = []byte("first")
+
+	o.detachPendingNoLock()
+	require.Len(t, o.wv, 1)
+	assert.Zero(t, cap(o.v))
+
+	// While the first vector is being written, producers populate the other.
+	o.v = append(o.v, []byte("second"))
+	o.wv = o.wv[:0] // successful write consumed the first vector
+	o.detachPendingNoLock()
+
+	require.Equal(t, net.Buffers{[]byte("second")}, o.wv)
+	assert.Equal(t, 64, cap(o.v), "completed vector capacity should return to producers")
+}
+
 func TestEnqueueProto_SingleMessage(t *testing.T) {
 	str := &mockStream{}
 	o := newTestOutbound(str)

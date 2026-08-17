@@ -59,6 +59,10 @@ func (w *testWriter) complete(index int, err error) {
 	callback(err)
 }
 
+type compliantTestWriter struct{ testWriter }
+
+func (*compliantTestWriter) WriterContractCompliant() {}
+
 func testDescriptor(profile RouteProfile, runtime Runtime, closed *atomic.Int32) Descriptor {
 	return Descriptor{
 		Converter: func(_ string, value string) (any, error) { return value, nil },
@@ -194,6 +198,68 @@ func TestRetiredGenerationClosesAfterLastBinding(t *testing.T) {
 	defer cancel()
 	require.NoError(t, generation.WaitClosed(ctx))
 	assert.Equal(t, int32(1), closed.Load())
+}
+
+func TestCatalogStatusTracksImmediateGenerationRetirement(t *testing.T) {
+	name := "connector_catalog_status_immediate_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"old": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	oldID := catalog.Current().ID()
+
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"new": {Type: name}}))
+	require.Eventually(t, func() bool {
+		status := catalog.Status()
+		return status.RetiredTotal == 1 && len(status.Draining) == 0
+	}, time.Second, time.Millisecond)
+
+	status := catalog.Status()
+	require.NotNil(t, status.Current)
+	assert.NotEqual(t, oldID, status.Current.ID)
+	counts := map[GenerationState]int{}
+	for _, transition := range status.RecentTransitions {
+		if transition.ID == oldID {
+			counts[transition.State]++
+		}
+	}
+	assert.Equal(t, 1, counts[GenerationPublished])
+	assert.Equal(t, 1, counts[GenerationDraining])
+	assert.Equal(t, 1, counts[GenerationRetired])
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogStatusTracksDrainingBinding(t *testing.T) {
+	name := "connector_catalog_status_draining_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	binding, err := old.Acquire("connector")
+	require.NoError(t, err)
+
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {Type: name}}))
+	status := catalog.Status()
+	require.Len(t, status.Draining, 1)
+	assert.Equal(t, old.ID(), status.Draining[0].ID)
+	assert.Equal(t, int64(1), status.Draining[0].Bindings)
+
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	require.Eventually(t, func() bool {
+		status := catalog.Status()
+		return status.RetiredTotal == 1 && len(status.Draining) == 0
+	}, time.Second, time.Millisecond)
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestWriterContractCompliantWriterIsNotWrapped(t *testing.T) {
+	underlying := &compliantTestWriter{}
+	assert.Same(t, underlying, EnforceWriterContract(underlying))
 }
 
 func TestWriterContractFlushIsSnapshotBarrier(t *testing.T) {
