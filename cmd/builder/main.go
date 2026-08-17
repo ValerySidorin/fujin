@@ -20,6 +20,7 @@ var (
 	transports      stringSlice
 	bindMiddlewares stringSlice
 	connMiddlewares stringSlice
+	replacements    stringSlice
 	output          = flag.String("output", "fujin", "Output binary path")
 	buildTags       = flag.String("tags", "netgo,osusergo", "Build tags for the final binary (e.g. fujin,grpc for transports)")
 	extraLdflags    = flag.String("ldflags", "", "Extra ldflags (e.g. -X main.Version=1.0.0)")
@@ -41,6 +42,7 @@ func init() {
 	flag.Var(&connectors, "connector", "Connector plugins")
 	flag.Var(&bindMiddlewares, "bind-middleware", "Bind middleware plugins")
 	flag.Var(&connMiddlewares, "connector-middleware", "Connector middleware plugins")
+	flag.Var(&replacements, "replace", "Local module replacement module=path (repeatable)")
 }
 
 func main() {
@@ -54,6 +56,7 @@ func main() {
 	if err := runBuild(buildOpts{
 		outputPath:   *output,
 		plugins:      collectPlugins(),
+		replacements: replacements,
 		tags:         *buildTags,
 		extraLdflags: *extraLdflags,
 		cgoEnabled:   *cgoEnabled,
@@ -69,6 +72,7 @@ func main() {
 type buildOpts struct {
 	outputPath   string
 	plugins      []string
+	replacements []string
 	tags         string
 	extraLdflags string
 	cgoEnabled   bool
@@ -85,13 +89,22 @@ func runBuild(opts buildOpts) error {
 	if err := runGo(tmpDir, "mod", "init", moduleName); err != nil {
 		return err
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working dir: %w", err)
+	}
 	if opts.localModule {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working dir: %w", err)
-		}
 		if err := runGo(tmpDir, "mod", "edit", "-replace", "github.com/fujin-io/fujin="+cwd); err != nil {
-			return fmt.Errorf("add replace directive: %w", err)
+			return fmt.Errorf("add Fujin replace directive: %w", err)
+		}
+	}
+	for _, replacement := range opts.replacements {
+		normalized, err := normalizeReplacement(replacement, cwd)
+		if err != nil {
+			return err
+		}
+		if err := runGo(tmpDir, "mod", "edit", "-replace", normalized); err != nil {
+			return fmt.Errorf("add replace directive %q: %w", replacement, err)
 		}
 	}
 	if err := runGo(tmpDir, "get", fujinService); err != nil {
@@ -157,7 +170,29 @@ func validateInputs() error {
 			return fmt.Errorf("plugin package path cannot be empty")
 		}
 	}
+	for _, replacement := range replacements {
+		if _, err := normalizeReplacement(replacement, "."); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func normalizeReplacement(replacement, baseDir string) (string, error) {
+	parts := strings.SplitN(replacement, "=", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		return "", fmt.Errorf("invalid replacement %q: expected module=path", replacement)
+	}
+	module := strings.TrimSpace(parts[0])
+	path := strings.TrimSpace(parts[1])
+	if !filepath.IsAbs(path) {
+		absolute, err := filepath.Abs(filepath.Join(baseDir, path))
+		if err != nil {
+			return "", fmt.Errorf("resolve replacement %q: %w", replacement, err)
+		}
+		path = absolute
+	}
+	return module + "=" + path, nil
 }
 
 func collectPlugins() []string {

@@ -22,6 +22,7 @@ type performanceContract struct {
 	InconclusiveSamples  int
 	RegressionAlpha      float64
 	AllocationRegression bool
+	InterleaveVariants   bool
 }
 
 var approvedPerformanceContract = performanceContract{
@@ -36,6 +37,7 @@ var approvedPerformanceContract = performanceContract{
 	InconclusiveSamples:  20,
 	RegressionAlpha:      0.05,
 	AllocationRegression: false,
+	InterleaveVariants:   true,
 }
 
 func TestPerformanceContract(t *testing.T) {
@@ -59,6 +61,9 @@ func TestPerformanceContract(t *testing.T) {
 	}
 	if contract.AllocationRegression {
 		t.Fatal("allocation increases must block the performance gate")
+	}
+	if !contract.InterleaveVariants {
+		t.Fatal("baseline and current samples must be interleaved to control run-order bias")
 	}
 }
 

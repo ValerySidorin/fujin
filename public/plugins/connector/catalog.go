@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,12 +14,57 @@ import (
 	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
 )
 
-const defaultRuntimeCleanupTimeout = 30 * time.Second
+const (
+	defaultRuntimeCleanupTimeout = 30 * time.Second
+	generationTransitionLimit    = 64
+)
+
+var generationSequence atomic.Uint64
 
 // Catalog atomically publishes immutable connector configuration generations.
 type Catalog struct {
 	current atomic.Pointer[Generation]
 	l       *slog.Logger
+
+	reloadMu      sync.Mutex
+	statusMu      sync.RWMutex
+	draining      map[GenerationID]*Generation
+	transitionSeq uint64
+	status        CatalogStatus
+}
+
+// GenerationID is one stable process-local connector generation identity.
+type GenerationID uint64
+
+// GenerationState is an observable connector generation lifecycle state.
+type GenerationState string
+
+const (
+	GenerationPublished GenerationState = "published"
+	GenerationDraining  GenerationState = "draining"
+	GenerationRetired   GenerationState = "retired"
+)
+
+// GenerationStatus is a detached readonly generation lifecycle projection.
+type GenerationStatus struct {
+	ID       GenerationID
+	State    GenerationState
+	Bindings int64
+	Error    string
+}
+
+// GenerationTransition is one ordered process-local lifecycle transition.
+type GenerationTransition struct {
+	Sequence uint64
+	GenerationStatus
+}
+
+// CatalogStatus is a detached readonly connector catalog lifecycle projection.
+type CatalogStatus struct {
+	Current           *GenerationStatus
+	Draining          []GenerationStatus
+	RetiredTotal      uint64
+	RecentTransitions []GenerationTransition
 }
 
 // CompileCatalog validates every connector without broker I/O and publishes generation one.
@@ -30,8 +76,8 @@ func CompileCatalog(config connectorconfig.ConnectorsConfig, l *slog.Logger) (*C
 	if err != nil {
 		return nil, err
 	}
-	catalog := &Catalog{l: l}
-	catalog.current.Store(generation)
+	catalog := &Catalog{l: l, draining: make(map[GenerationID]*Generation)}
+	catalog.publish(generation)
 	return catalog, nil
 }
 
@@ -43,31 +89,109 @@ func (c *Catalog) Current() *Generation {
 	return c.current.Load()
 }
 
+// Status returns a detached readonly connector generation lifecycle projection.
+func (c *Catalog) Status() CatalogStatus {
+	if c == nil {
+		return CatalogStatus{}
+	}
+	c.statusMu.RLock()
+	defer c.statusMu.RUnlock()
+	status := CatalogStatus{
+		RetiredTotal:      c.status.RetiredTotal,
+		RecentTransitions: append([]GenerationTransition(nil), c.status.RecentTransitions...),
+	}
+	if current := c.current.Load(); current != nil {
+		currentStatus := current.status(GenerationPublished)
+		status.Current = &currentStatus
+	}
+	status.Draining = make([]GenerationStatus, 0, len(c.draining))
+	for _, generation := range c.draining {
+		status.Draining = append(status.Draining, generation.status(GenerationDraining))
+	}
+	sort.Slice(status.Draining, func(i, j int) bool { return status.Draining[i].ID < status.Draining[j].ID })
+	return status
+}
+
 // Reload compiles a complete replacement before atomically publishing it.
 func (c *Catalog) Reload(config connectorconfig.ConnectorsConfig) error {
+	c.reloadMu.Lock()
+	defer c.reloadMu.Unlock()
 	next, err := CompileGeneration(config, c.l)
 	if err != nil {
 		return err
 	}
+	next.onClosed = c.generationClosed
 	previous := c.current.Swap(next)
+	c.recordPublished(next)
 	if previous != nil {
-		previous.Retire()
+		c.retire(previous)
 	}
 	return nil
 }
 
 // Close retires the current generation and waits for generation-owned cleanup.
 func (c *Catalog) Close(ctx context.Context) error {
+	c.reloadMu.Lock()
 	generation := c.current.Swap(nil)
+	if generation != nil {
+		c.retire(generation)
+	}
+	c.reloadMu.Unlock()
 	if generation == nil {
 		return nil
 	}
-	generation.Retire()
 	return generation.WaitClosed(ctx)
+}
+
+func (c *Catalog) publish(generation *Generation) {
+	generation.onClosed = c.generationClosed
+	c.current.Store(generation)
+	c.recordPublished(generation)
+}
+
+func (c *Catalog) recordPublished(generation *Generation) {
+	status := generation.status(GenerationPublished)
+	c.statusMu.Lock()
+	c.appendTransitionLocked(status)
+	c.statusMu.Unlock()
+	c.l.Info("connector generation published", "generation_id", status.ID)
+}
+
+func (c *Catalog) retire(generation *Generation) {
+	status := generation.status(GenerationDraining)
+	c.statusMu.Lock()
+	c.draining[generation.id] = generation
+	c.appendTransitionLocked(status)
+	c.statusMu.Unlock()
+	c.l.Info("connector generation draining", "generation_id", status.ID, "bindings", status.Bindings)
+	generation.Retire()
+}
+
+func (c *Catalog) generationClosed(generation *Generation) {
+	status := generation.status(GenerationRetired)
+	c.statusMu.Lock()
+	delete(c.draining, generation.id)
+	c.status.RetiredTotal++
+	c.appendTransitionLocked(status)
+	c.statusMu.Unlock()
+	c.l.Info("connector generation retired", "generation_id", status.ID, "error", status.Error)
+}
+
+func (c *Catalog) appendTransitionLocked(status GenerationStatus) {
+	c.transitionSeq++
+	c.status.RecentTransitions = append(c.status.RecentTransitions, GenerationTransition{
+		Sequence:         c.transitionSeq,
+		GenerationStatus: status,
+	})
+	if excess := len(c.status.RecentTransitions) - generationTransitionLimit; excess > 0 {
+		copy(c.status.RecentTransitions, c.status.RecentTransitions[excess:])
+		c.status.RecentTransitions = c.status.RecentTransitions[:generationTransitionLimit]
+	}
 }
 
 // Generation is an immutable compiled connector snapshot.
 type Generation struct {
+	id         GenerationID
 	connectors map[string]*compiledConnector
 	l          *slog.Logger
 
@@ -77,6 +201,7 @@ type Generation struct {
 	closed    chan struct{}
 	closeMu   sync.Mutex
 	closeErr  error
+	onClosed  func(*Generation)
 }
 
 type compiledConnector struct {
@@ -96,6 +221,7 @@ func CompileGeneration(configs connectorconfig.ConnectorsConfig, l *slog.Logger)
 		l = slog.Default()
 	}
 	generation := &Generation{
+		id:         GenerationID(generationSequence.Add(1)),
 		connectors: make(map[string]*compiledConnector, len(configs)),
 		l:          l,
 		closed:     make(chan struct{}),
@@ -136,6 +262,26 @@ func CompileGeneration(configs connectorconfig.ConnectorsConfig, l *slog.Logger)
 		}
 	}
 	return generation, nil
+}
+
+// ID returns the stable process-local identity assigned during compilation.
+func (g *Generation) ID() GenerationID {
+	if g == nil {
+		return 0
+	}
+	return g.id
+}
+
+func (g *Generation) status(state GenerationState) GenerationStatus {
+	status := GenerationStatus{ID: g.id, State: state, Bindings: g.refs.Load()}
+	if state == GenerationRetired {
+		g.closeMu.Lock()
+		if g.closeErr != nil {
+			status.Error = g.closeErr.Error()
+		}
+		g.closeMu.Unlock()
+	}
+	return status
 }
 
 // Config returns a caller-owned copy of one connector's immutable raw configuration.
@@ -232,6 +378,9 @@ func (g *Generation) finishClose() {
 	g.closeErr = errors.Join(errs...)
 	g.closeMu.Unlock()
 	close(g.closed)
+	if g.onClosed != nil {
+		g.onClosed(g)
+	}
 }
 
 func (c *compiledConnector) openRuntime(l *slog.Logger) (Runtime, error) {

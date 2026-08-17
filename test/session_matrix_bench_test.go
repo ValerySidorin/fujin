@@ -150,7 +150,7 @@ func benchmarkNativeSessionMatrix(b *testing.B, operation sessionBenchmarkOperat
 						for i := range workers {
 							workers[i] = newNativeSessionBenchmarkWorker(b, ctx, transport, operation, payload.size, batchSize, sharedQUIC)
 						}
-						runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, !isSubscription, func() {
+						runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, sessionBenchmarkNeedsWarmup(operation), func() {
 							if subscribeStart != nil {
 								close(subscribeStart)
 							}
@@ -194,7 +194,7 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 					for i := range workers {
 						workers[i] = newGRPCSessionBenchmarkWorker(b, ctx, conn, operation, payload.size, batchSize)
 					}
-					runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, !isSubscription, func() {
+					runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, sessionBenchmarkNeedsWarmup(operation), func() {
 						if subscribeStart != nil {
 							close(subscribeStart)
 						}
@@ -203,6 +203,10 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 			}
 		}
 	}
+}
+
+func sessionBenchmarkNeedsWarmup(operation sessionBenchmarkOperation) bool {
+	return operation != benchmarkSubscribe && operation != benchmarkHSubscribe && operation != benchmarkAck && operation != benchmarkNack
 }
 
 func sessionBenchmarkPayloadEnabled(name string) bool {
@@ -547,11 +551,11 @@ func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transpor
 				return err
 			}
 			if len(results) != batchSize {
-				return fmt.Errorf("ack results: got %d, want %d", len(results), batchSize)
+				return fmt.Errorf("settlement results: got %d, want %d", len(results), batchSize)
 			}
 			for _, result := range results {
 				if result.Err != nil {
-					return result.Err
+					return fmt.Errorf("settlement result message_id=%x error=%#v", result.MsgID, result.Err)
 				}
 			}
 			return advanceSessionBenchmarkSettlementFrame(request)

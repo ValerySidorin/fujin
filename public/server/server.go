@@ -81,6 +81,14 @@ func (s *Server) ReloadConnectors(cc connectorconfig.ConnectorsConfig) error {
 	return nil
 }
 
+// ConnectorCatalogStatus returns a detached generation lifecycle projection.
+func (s *Server) ConnectorCatalogStatus() connector.CatalogStatus {
+	if s == nil || s.catalog == nil {
+		return connector.CatalogStatus{}
+	}
+	return s.catalog.Status()
+}
+
 // SetInheritedFDs sets file descriptors inherited from a previous process
 // during a graceful binary upgrade. Keys are "type:addr", e.g. "tcp::4850".
 func (s *Server) SetInheritedFDs(fds map[string]*os.File) {

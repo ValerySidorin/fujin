@@ -131,6 +131,7 @@ func (sessionBenchWriter) BeginTx(context.Context) error    { return nil }
 func (sessionBenchWriter) CommitTx(context.Context) error   { return nil }
 func (sessionBenchWriter) RollbackTx(context.Context) error { return nil }
 func (sessionBenchWriter) Close() error                     { return nil }
+func (sessionBenchWriter) WriterContractCompliant()         {}
 
 func MakeSessionBenchConfig(msgSize int) connectorconfig.ConnectorsConfig {
 	return connectorconfig.ConnectorsConfig{

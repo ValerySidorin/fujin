@@ -257,30 +257,21 @@ func putGRPCFetchLease(lease *grpcFetchLease) {
 }
 
 func (s *streamSession) receiveLoop() error {
-	type receiveResult struct {
-		request *pb.FujinRequest
-		err     error
-	}
-	received := make(chan receiveResult, 1)
 	for {
-		go func() {
-			request, err := s.stream.Recv()
-			received <- receiveResult{request: request, err: err}
-		}()
-		select {
-		case err := <-s.terminal:
-			s.cancel()
-			return fmt.Errorf("subscription ended: %w", err)
-		case result := <-received:
-			if result.err != nil {
-				if result.err == io.EOF {
-					return io.EOF
-				}
-				return fmt.Errorf("receive error: %w", result.err)
+		request, err := s.stream.Recv()
+		if err != nil {
+			select {
+			case terminalErr := <-s.terminal:
+				return fmt.Errorf("subscription ended: %w", terminalErr)
+			default:
 			}
-			if err := s.handleRequest(result.request); err != nil {
-				return fmt.Errorf("handle request: %w", err)
+			if err == io.EOF {
+				return io.EOF
 			}
+			return fmt.Errorf("receive error: %w", err)
+		}
+		if err := s.handleRequest(request); err != nil {
+			return fmt.Errorf("handle request: %w", err)
 		}
 	}
 }
@@ -517,6 +508,7 @@ func (s *streamSession) subscribe(correlationID uint32, route string, autoCommit
 		case s.terminal <- err:
 		default:
 		}
+		s.cancel()
 	})
 	if err == nil {
 		return nil
