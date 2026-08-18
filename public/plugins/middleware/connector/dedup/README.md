@@ -16,10 +16,9 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: dedup
-        config:
-          ttl: 5m                     # how long to remember a message (default: 5m)
-          cleanup_interval: 1m        # expired entry cleanup interval (default: 1m)
-          key: content_hash           # dedup key strategy (default: content_hash)
+        ttl: 5m                     # how long to remember a message (default: 5m)
+        cleanup_interval: 1m        # expired entry cleanup interval (default: 1m)
+        key: content_hash           # dedup key strategy (default: content_hash)
 ```
 
 | Field | Default | Description |

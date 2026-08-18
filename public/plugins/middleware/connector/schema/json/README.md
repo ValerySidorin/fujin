@@ -14,12 +14,11 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: schema_json
-        config:
-          # Inline JSON Schema:
-          schema: '{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}'
+        # Inline JSON Schema:
+        schema: '{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}'
 
-          # Or load from file:
-          # schema_path: /path/to/schema.json
+        # Or load from file:
+        # schema_path: /path/to/schema.json
 ```
 
 | Field | Description |

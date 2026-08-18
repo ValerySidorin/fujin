@@ -11,13 +11,12 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: otel
-        config:
-          otlp_endpoint: localhost:4317
-          insecure: true
-          sample_ratio: 0.1
-          service_name: fujin
-          service_version: "1.0.0"
-          environment: production
+        otlp_endpoint: localhost:4317
+        insecure: true
+        sample_ratio: 0.1
+        service_name: fujin
+        service_version: "1.0.0"
+        environment: production
 ```
 
 | Field | Default | Description |

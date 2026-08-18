@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
-	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
 )
 
 const (
@@ -23,10 +23,12 @@ var generationSequence atomic.Uint64
 
 // Catalog atomically publishes immutable connector configuration generations.
 type Catalog struct {
-	current atomic.Pointer[Generation]
-	l       *slog.Logger
+	current            atomic.Pointer[Generation]
+	middlewareCompiler MiddlewareCompileFunc
+	l                  *slog.Logger
 
 	reloadMu      sync.Mutex
+	closed        bool
 	statusMu      sync.RWMutex
 	draining      map[GenerationID]*Generation
 	transitionSeq uint64
@@ -67,16 +69,32 @@ type CatalogStatus struct {
 	RecentTransitions []GenerationTransition
 }
 
-// CompileCatalog validates every connector without broker I/O and publishes generation one.
-func CompileCatalog(config connectorconfig.ConnectorsConfig, l *slog.Logger) (*Catalog, error) {
+// CompileCatalog compiles every connector, preflights opt-in runtimes, and publishes generation one.
+func CompileCatalog(
+	config connectorconfig.ConnectorsConfig,
+	l *slog.Logger,
+	middlewareCompilers ...MiddlewareCompileFunc,
+) (*Catalog, error) {
 	if l == nil {
 		l = slog.Default()
 	}
-	generation, err := CompileGeneration(config, l)
+	var middlewareCompiler MiddlewareCompileFunc
+	if len(middlewareCompilers) > 0 {
+		middlewareCompiler = middlewareCompilers[0]
+	}
+	generation, err := CompileGeneration(config, l, middlewareCompiler)
 	if err != nil {
 		return nil, err
 	}
-	catalog := &Catalog{l: l, draining: make(map[GenerationID]*Generation)}
+	catalog := &Catalog{
+		l:                  l,
+		draining:           make(map[GenerationID]*Generation),
+		middlewareCompiler: middlewareCompiler,
+	}
+	if err := catalog.prepareGeneration(generation, nil); err != nil {
+		cleanupErr := abortGeneration(generation)
+		return nil, errors.Join(err, cleanupErr)
+	}
 	catalog.publish(generation)
 	return catalog, nil
 }
@@ -116,12 +134,20 @@ func (c *Catalog) Status() CatalogStatus {
 func (c *Catalog) Reload(config connectorconfig.ConnectorsConfig) error {
 	c.reloadMu.Lock()
 	defer c.reloadMu.Unlock()
-	next, err := CompileGeneration(config, c.l)
+	if c.closed {
+		return errors.New("connector catalog closed")
+	}
+	next, err := CompileGeneration(config, c.l, c.middlewareCompiler)
 	if err != nil {
 		return err
 	}
+	previous := c.current.Load()
+	if err := c.prepareGeneration(next, previous); err != nil {
+		cleanupErr := abortGeneration(next)
+		return errors.Join(err, cleanupErr)
+	}
 	next.onClosed = c.generationClosed
-	previous := c.current.Swap(next)
+	previous = c.current.Swap(next)
 	c.recordPublished(next)
 	if previous != nil {
 		c.retire(previous)
@@ -129,9 +155,80 @@ func (c *Catalog) Reload(config connectorconfig.ConnectorsConfig) error {
 	return nil
 }
 
+func (c *Catalog) prepareGeneration(next, previous *Generation) error {
+	names := make([]string, 0, len(next.connectors))
+	for name := range next.connectors {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		compiled := next.connectors[name]
+		eager, ok := compiled.compiled.(EagerRuntimeCompiled)
+		if !ok || !eager.OpenRuntimeEagerly() {
+			continue
+		}
+		if previous != nil {
+			prior := previous.connectors[name]
+			if prior != nil && prior.config.Type == compiled.config.Type && reflect.DeepEqual(prior.config.Settings, compiled.config.Settings) {
+				prior.runtimeMu.Lock()
+				owner := prior.runtime
+				if owner != nil {
+					owner.retain()
+				}
+				prior.runtimeMu.Unlock()
+				if owner != nil {
+					compiled.runtime = owner
+					continue
+				}
+			}
+			if conflict := exclusiveRuntimeConflict(compiled.compiled, previous); conflict != "" {
+				return fmt.Errorf("connector %q exclusive resource %q: %w", name, conflict, ErrRuntimeDrainRequired)
+			}
+		}
+		if _, err := compiled.openRuntime(c.l); err != nil {
+			return fmt.Errorf("connector %q: eager runtime preflight: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func exclusiveRuntimeConflict(candidate Compiled, previous *Generation) string {
+	exclusive, ok := candidate.(ExclusiveRuntimeCompiled)
+	if !ok {
+		return ""
+	}
+	active := make(map[string]struct{})
+	for _, compiled := range previous.connectors {
+		priorExclusive, ok := compiled.compiled.(ExclusiveRuntimeCompiled)
+		if !ok {
+			continue
+		}
+		for _, key := range priorExclusive.ExclusiveRuntimeKeys() {
+			active[key] = struct{}{}
+		}
+	}
+	for _, key := range exclusive.ExclusiveRuntimeKeys() {
+		if _, exists := active[key]; exists {
+			return key
+		}
+	}
+	return ""
+}
+
+func abortGeneration(generation *Generation) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRuntimeCleanupTimeout)
+	defer cancel()
+	return generation.abort(ctx)
+}
+
 // Close retires the current generation and waits for generation-owned cleanup.
 func (c *Catalog) Close(ctx context.Context) error {
 	c.reloadMu.Lock()
+	if c.closed {
+		c.reloadMu.Unlock()
+		return nil
+	}
+	c.closed = true
 	generation := c.current.Swap(nil)
 	if generation != nil {
 		c.retire(generation)
@@ -191,9 +288,10 @@ func (c *Catalog) appendTransitionLocked(status GenerationStatus) {
 
 // Generation is an immutable compiled connector snapshot.
 type Generation struct {
-	id         GenerationID
-	connectors map[string]*compiledConnector
-	l          *slog.Logger
+	middlewareCompiler MiddlewareCompileFunc
+	id                 GenerationID
+	connectors         map[string]*compiledConnector
+	l                  *slog.Logger
 
 	refs      atomic.Int64
 	retired   atomic.Bool
@@ -204,28 +302,81 @@ type Generation struct {
 	onClosed  func(*Generation)
 }
 
+type runtimeOwner struct {
+	mu       sync.Mutex
+	runtime  Runtime
+	refs     int
+	closeErr error
+}
+
+func newRuntimeOwner(runtime Runtime) *runtimeOwner {
+	return &runtimeOwner{runtime: runtime, refs: 1}
+}
+
+func (o *runtimeOwner) retain() {
+	o.mu.Lock()
+	o.refs++
+	o.mu.Unlock()
+}
+
+func (o *runtimeOwner) release(ctx context.Context) error {
+	o.mu.Lock()
+	o.refs--
+	refs := o.refs
+	if refs < 0 {
+		o.mu.Unlock()
+		return errors.New("connector runtime released too many times")
+	}
+	if refs > 0 {
+		o.mu.Unlock()
+		return nil
+	}
+	runtime := o.runtime
+	o.runtime = nil
+	o.mu.Unlock()
+	if runtime != nil {
+		o.closeErr = runtime.Close(ctx)
+	}
+	return o.closeErr
+}
+
 type compiledConnector struct {
 	name        string
 	config      connectorconfig.ConnectorConfig
 	compiled    Compiled
 	profiles    map[string]RouteProfile
-	middlewares []cmwconfig.Config
+	middlewares MiddlewareChain
 
 	runtimeMu sync.Mutex
-	runtime   Runtime
+	runtime   *runtimeOwner
 }
 
-// CompileGeneration decodes and validates all connector settings and route profiles.
-func CompileGeneration(configs connectorconfig.ConnectorsConfig, l *slog.Logger) (*Generation, error) {
+// CompileGeneration decodes and validates all connector settings, route profiles, and middleware chains.
+func CompileGeneration(
+	configs connectorconfig.ConnectorsConfig,
+	l *slog.Logger,
+	middlewareCompilers ...MiddlewareCompileFunc,
+) (*Generation, error) {
 	if l == nil {
 		l = slog.Default()
 	}
-	generation := &Generation{
-		id:         GenerationID(generationSequence.Add(1)),
-		connectors: make(map[string]*compiledConnector, len(configs)),
-		l:          l,
-		closed:     make(chan struct{}),
+	var middlewareCompiler MiddlewareCompileFunc
+	if len(middlewareCompilers) > 0 {
+		middlewareCompiler = middlewareCompilers[0]
 	}
+	generation := &Generation{
+		id:                 GenerationID(generationSequence.Add(1)),
+		connectors:         make(map[string]*compiledConnector, len(configs)),
+		l:                  l,
+		closed:             make(chan struct{}),
+		middlewareCompiler: middlewareCompiler,
+	}
+	complete := false
+	defer func() {
+		if !complete {
+			generation.closeMiddlewareChains(context.Background())
+		}
+	}()
 	for name, config := range configs {
 		immutableConfig, err := connectorconfig.CloneConnectorConfig(config)
 		if err != nil {
@@ -253,14 +404,25 @@ func CompileGeneration(configs connectorconfig.ConnectorsConfig, l *slog.Logger)
 			}
 			profiles[route] = profile
 		}
+		var middlewares MiddlewareChain
+		if len(immutableConfig.ConnectorMiddlewares) > 0 {
+			if middlewareCompiler == nil {
+				return nil, fmt.Errorf("connector %q: connector middleware compiler is unavailable", name)
+			}
+			middlewares, err = middlewareCompiler(immutableConfig.ConnectorMiddlewares, l)
+			if err != nil {
+				return nil, fmt.Errorf("connector %q: compile middlewares: %w", name, err)
+			}
+		}
 		generation.connectors[name] = &compiledConnector{
 			name:        name,
 			config:      immutableConfig,
 			compiled:    compiled,
 			profiles:    profiles,
-			middlewares: immutableConfig.ConnectorMiddlewares,
+			middlewares: middlewares,
 		}
 	}
+	complete = true
 	return generation, nil
 }
 
@@ -298,6 +460,30 @@ func (g *Generation) Config(name string) (connectorconfig.ConnectorConfig, bool)
 		return connectorconfig.ConnectorConfig{}, false
 	}
 	return config, true
+}
+
+// CompileDerived validates and preflights a private generation using the same
+// plugin compiler and runtime ownership rules as its parent.
+func (g *Generation) CompileDerived(
+	configs connectorconfig.ConnectorsConfig,
+	l *slog.Logger,
+) (*Generation, error) {
+	if g == nil {
+		return nil, errors.New("parent generation is nil")
+	}
+	if l == nil {
+		l = g.l
+	}
+	next, err := CompileGeneration(configs, l, g.middlewareCompiler)
+	if err != nil {
+		return nil, err
+	}
+	catalog := &Catalog{l: l}
+	if err := catalog.prepareGeneration(next, g); err != nil {
+		cleanupErr := abortGeneration(next)
+		return nil, errors.Join(err, cleanupErr)
+	}
+	return next, nil
 }
 
 // Acquire pins this generation and returns a session-scoped connector binding.
@@ -355,27 +541,8 @@ func (g *Generation) startClose() {
 func (g *Generation) finishClose() {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRuntimeCleanupTimeout)
 	defer cancel()
-	var errs []error
-	for name, compiled := range g.connectors {
-		compiled.runtimeMu.Lock()
-		runtime := compiled.runtime
-		compiled.runtime = nil
-		compiled.runtimeMu.Unlock()
-		if runtime != nil {
-			result := make(chan error, 1)
-			go func() { result <- runtime.Close(ctx) }()
-			select {
-			case err := <-result:
-				if err != nil {
-					errs = append(errs, fmt.Errorf("close connector runtime %q: %w", name, err))
-				}
-			case <-ctx.Done():
-				errs = append(errs, fmt.Errorf("close connector runtime %q: %w", name, ctx.Err()))
-			}
-		}
-	}
 	g.closeMu.Lock()
-	g.closeErr = errors.Join(errs...)
+	g.closeErr = errors.Join(g.closeRuntimes(ctx), g.closeMiddlewareChains(ctx))
 	g.closeMu.Unlock()
 	close(g.closed)
 	if g.onClosed != nil {
@@ -383,17 +550,59 @@ func (g *Generation) finishClose() {
 	}
 }
 
+func (g *Generation) abort(ctx context.Context) error {
+	return errors.Join(g.closeRuntimes(ctx), g.closeMiddlewareChains(ctx))
+}
+
+func (g *Generation) closeRuntimes(ctx context.Context) error {
+	var errs []error
+	for name, compiled := range g.connectors {
+		compiled.runtimeMu.Lock()
+		owner := compiled.runtime
+		compiled.runtime = nil
+		compiled.runtimeMu.Unlock()
+		if owner == nil {
+			continue
+		}
+		result := make(chan error, 1)
+		go func() { result <- owner.release(ctx) }()
+		select {
+		case err := <-result:
+			if err != nil {
+				errs = append(errs, fmt.Errorf("close connector runtime %q: %w", name, err))
+			}
+		case <-ctx.Done():
+			errs = append(errs, fmt.Errorf("close connector runtime %q: %w", name, ctx.Err()))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (g *Generation) closeMiddlewareChains(ctx context.Context) error {
+	var errs []error
+	for name, compiled := range g.connectors {
+		if compiled.middlewares == nil {
+			continue
+		}
+		if err := compiled.middlewares.Close(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("close connector middlewares %q: %w", name, err))
+		}
+		compiled.middlewares = nil
+	}
+	return errors.Join(errs...)
+}
+
 func (c *compiledConnector) openRuntime(l *slog.Logger) (Runtime, error) {
 	c.runtimeMu.Lock()
 	defer c.runtimeMu.Unlock()
 	if c.runtime != nil {
-		return c.runtime, nil
+		return c.runtime.runtime, nil
 	}
 	runtime, err := c.compiled.OpenRuntime(l)
 	if err != nil {
 		return nil, err
 	}
-	c.runtime = runtime
+	c.runtime = newRuntimeOwner(runtime)
 	return runtime, nil
 }
 
@@ -423,14 +632,6 @@ func (b *Binding) RouteProfiles() map[string]RouteProfile {
 	return profiles
 }
 
-func (b *Binding) Middlewares() []cmwconfig.Config {
-	config, err := connectorconfig.CloneConnectorConfig(b.compiled.config)
-	if err != nil {
-		return nil
-	}
-	return config.ConnectorMiddlewares
-}
-
 func (b *Binding) NewReader(route string, autoSettle bool, l *slog.Logger) (ReadCloser, error) {
 	runtime, err := b.compiled.openRuntime(l)
 	if err != nil {
@@ -439,12 +640,26 @@ func (b *Binding) NewReader(route string, autoSettle bool, l *slog.Logger) (Read
 	return runtime.NewReader(route, autoSettle, l)
 }
 
+func (b *Binding) WrapReader(r ReadCloser, l *slog.Logger) (ReadCloser, error) {
+	if b.compiled.middlewares == nil {
+		return r, nil
+	}
+	return b.compiled.middlewares.WrapReader(r, b.compiled.name, l)
+}
+
 func (b *Binding) NewWriter(route string, l *slog.Logger) (WriteCloser, error) {
 	runtime, err := b.compiled.openRuntime(l)
 	if err != nil {
 		return nil, err
 	}
 	return runtime.NewWriter(route, l)
+}
+
+func (b *Binding) WrapWriter(w WriteCloser, l *slog.Logger) (WriteCloser, error) {
+	if b.compiled.middlewares == nil {
+		return w, nil
+	}
+	return b.compiled.middlewares.WrapWriter(w, b.compiled.name, l)
 }
 
 // Close releases the generation pin. Generation-owned cleanup is asynchronous.

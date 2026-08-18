@@ -38,6 +38,19 @@ func DefaultTCPTransportConfig() transport.Config {
 	}
 }
 
+// DefaultWebSocketTransportConfig returns a transport.Config for WebSocket.
+func DefaultWebSocketTransportConfig() transport.Config {
+	return transport.Config{
+		Type:    "websocket",
+		Enabled: ptr(true),
+		Settings: map[string]any{
+			"addr":              PERF_WEBSOCKET_ADDR,
+			"path":              PERF_WEBSOCKET_PATH,
+			"max_message_bytes": 4 << 20,
+		},
+	}
+}
+
 // DefaultUnixTransportConfig returns a transport.Config for Unix socket.
 func DefaultUnixTransportConfig() transport.Config {
 	return transport.Config{
@@ -90,6 +103,14 @@ func MakeConfigWithGRPCAndOptionalTCP(connectors connector_config.ConnectorsConf
 func MakeConfigWithTCP(connectors connector_config.ConnectorsConfig) serverconfig.Config {
 	return serverconfig.Config{
 		Transports: []transport.Config{DefaultTCPTransportConfig()},
+		Connectors: connectors,
+	}
+}
+
+// MakeConfigWithWebSocket creates a server Config with WebSocket transport.
+func MakeConfigWithWebSocket(connectors connector_config.ConnectorsConfig) serverconfig.Config {
+	return serverconfig.Config{
+		Transports: []transport.Config{DefaultWebSocketTransportConfig()},
 		Connectors: connectors,
 	}
 }

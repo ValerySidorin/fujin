@@ -12,6 +12,7 @@ import (
 	grpc_server "github.com/fujin-io/fujin/internal/transport/grpc/v1/server"
 	"github.com/fujin-io/fujin/public/plugins/connector"
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	cmw "github.com/fujin-io/fujin/public/plugins/middleware/connector"
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	"github.com/fujin-io/fujin/public/server/config"
 	"golang.org/x/sync/errgroup"
@@ -45,7 +46,7 @@ type GRPCServer interface {
 // NewServer creates a new server instance and validates the complete connector generation.
 func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 	conf.SetDefaults()
-	catalog, err := connector.CompileCatalog(conf.Connectors, l)
+	catalog, err := connector.CompileCatalog(conf.Connectors, l, cmw.Compile)
 	if err != nil {
 		return nil, fmt.Errorf("compile connectors: %w", err)
 	}

@@ -1,0 +1,61 @@
+name: ZeroMQ pebbe connector
+
+on:
+  pull_request:
+    paths:
+      - "go.mod"
+      - "go.sum"
+      - "cmd/builder/**"
+      - "public/plugins/connector/**"
+      - "Dockerfile.zeromq-pebbe"
+      - "resources/docker-compose.zeromq-pebbe.yaml"
+      - ".github/workflows/zeromq-pebbe.yml"
+  push:
+    branches: [main]
+    paths:
+      - "go.mod"
+      - "go.sum"
+      - "cmd/builder/**"
+      - "public/plugins/connector/**"
+      - "Dockerfile.zeromq-pebbe"
+      - "resources/docker-compose.zeromq-pebbe.yaml"
+      - ".github/workflows/zeromq-pebbe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.1"
+          cache: true
+      - name: Install native and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libzmq3-dev libsodium-dev python3-zmq
+      - name: Verify default CGO-free connector build
+        run: CGO_ENABLED=0 go test ./public/plugins/connector ./public/plugins/connector/all
+      - name: Run catalog and ZeroMQ race suites
+        run: go test -race -tags=zeromq_pebbe ./public/plugins/connector ./public/plugins/connector/zeromq/pebbe
+      - name: Run independent pyzmq interoperability
+        env:
+          FUJIN_ZEROMQ_PYZMQ: "1"
+          FUJIN_ZEROMQ_PYTHON: python3
+        run: go test -tags=zeromq_pebbe -run '^TestPyZMQInteroperabilityMatrix$' ./public/plugins/connector/zeromq/pebbe
+      - name: Smoke test focused benchmarks
+        run: go test -tags=zeromq_pebbe -run '^$' -bench '^BenchmarkFujinV1Framing$' -benchtime=10x ./public/plugins/connector/zeromq/pebbe
+      - name: Build opt-in binary
+        run: |
+          go run ./cmd/builder \
+            -local -cgo \
+            -tags fujin,grpc,zeromq_pebbe \
+            -configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml \
+            -connector github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe \
+            -transport github.com/fujin-io/fujin/public/plugins/transport/all \
+            -output /tmp/fujin-zeromq
+      - name: Build Alpine runtime image
+        run: docker build -f Dockerfile.zeromq-pebbe -t fujin:zeromq-pebbe-test .

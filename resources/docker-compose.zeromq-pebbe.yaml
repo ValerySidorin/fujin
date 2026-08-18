@@ -1,0 +1,28 @@
+services:
+  fujin:
+    image: fujin:zeromq-pebbe-${BUILD_TAG:-v0.4.0}
+    build:
+      context: ..
+      dockerfile: Dockerfile.zeromq-pebbe
+      args:
+        VERSION: ${BUILD_TAG:-v0.4.0}
+    environment:
+      FUJIN_CONFIGURATOR: yaml
+      FUJIN_CONFIGURATOR_YAML_PATHS: /assets/config/config-zeromq-pebbe.yaml
+    ports:
+      - "4848:4848/udp"
+      - "4849:4849"
+      - "4850:4850"
+      - "5555:5555"
+      - "5556:5556"
+    volumes:
+      - ./assets:/assets:ro
+
+  pyzmq:
+    image: python:3.13-alpine
+    command: sh -c "pip install --no-cache-dir pyzmq==27.1.0 && sleep infinity"
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace:ro
+    depends_on:
+      - fujin

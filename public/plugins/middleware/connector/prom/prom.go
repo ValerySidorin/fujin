@@ -5,12 +5,11 @@
 //
 // Configure in YAML:
 //
-//	connector_middlewares:
-//	  - name: prom
-//	    config:
-//	      enabled: true
-//	      addr: ":9090"      # HTTP server address for /metrics endpoint
-//	      path: "/metrics"   # Metrics endpoint path
+//		connector_middlewares:
+//		  - name: prom
+//	     enabled: true
+//	     addr: ":9090"      # HTTP server address for /metrics endpoint
+//	     path: "/metrics"   # Metrics endpoint path
 //
 // Only one http server will be started to serve metrics.
 package prom

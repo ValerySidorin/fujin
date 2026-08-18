@@ -127,8 +127,38 @@ help:
 	@echo "Platform: $(DETECTED_OS)"
 	@echo "Binary: $(BINARY)"
 
+# Opt-in CGO ZeroMQ connector.
+ZEROMQ_PEBBE_PACKAGE := github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe
+ZEROMQ_PYTHON ?= python3
+
+.PHONY: build-zeromq-pebbe test-zeromq-pebbe e2e-zeromq-pebbe bench-zeromq-pebbe up-zeromq-pebbe down-zeromq-pebbe
+build-zeromq-pebbe:
+	@go run ./cmd/builder \
+		-local -cgo \
+		-tags "$(GO_BUILD_TAGS),zeromq_pebbe" \
+		-configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml \
+		-connector $(ZEROMQ_PEBBE_PACKAGE) \
+		-transport github.com/fujin-io/fujin/public/plugins/transport/all \
+		-output ./$(BIN_DIR)/fujin-zeromq-pebbe
+
+test-zeromq-pebbe:
+	@go test -race -tags=zeromq_pebbe ./public/plugins/connector ./public/plugins/connector/zeromq/pebbe
+
+e2e-zeromq-pebbe:
+	@$(ZEROMQ_PYTHON) -c 'import zmq'
+	@FUJIN_ZEROMQ_PYZMQ=1 FUJIN_ZEROMQ_PYTHON="$(ZEROMQ_PYTHON)" go test -tags=zeromq_pebbe -run '^TestPyZMQInteroperabilityMatrix$$' ./public/plugins/connector/zeromq/pebbe
+
+bench-zeromq-pebbe:
+	@go test -tags=zeromq_pebbe -run '^$$' -bench '^BenchmarkFujinV1Framing$$' -benchmem ./public/plugins/connector/zeromq/pebbe
+
+up-zeromq-pebbe:
+	docker compose -f resources/docker-compose.zeromq-pebbe.yaml up -d --build
+
+down-zeromq-pebbe:
+	docker compose -f resources/docker-compose.zeromq-pebbe.yaml down --remove-orphans
+
 # Broker management commands
-.PHONY: up-kafka_franz down-kafka_franz up-nats_core down-nats_core up-rabbitmq_amqp09 down-rabbitmq_amqp09 up-azure_amqp1 down-azure_amqp1 up-mqtt_paho down-mqtt_paho up-nsq down-nsq
+.PHONY: up-kafka_franz down-kafka_franz up-nats_core down-nats_core up-rabbitmq_amqp09 down-rabbitmq_amqp09 up-azure_amqp1 down-azure_amqp1 up-mqtt_paho down-mqtt_paho up-nsq down-nsq up-zeromq-pebbe down-zeromq-pebbe
 
 # Kafka
 up-kafka_franz:
@@ -203,8 +233,8 @@ broker-help:
 	@echo "  make down-redis_rueidis_streams - Stop ValKey"
 	@echo "  make up-nsq           - Start NSQ cluster"
 	@echo "  make down-nsq         - Stop NSQ cluster"
-	@echo "  make up-zeromq        - Start Fujin and ZeroMQ socket"
-	@echo "  make down-zeromq      - Stop Fujin and ZeroMQ socket"
+	@echo "  make up-zeromq-pebbe   - Build and start Fujin plus a pyzmq fixture container"
+	@echo "  make down-zeromq-pebbe - Stop the ZeroMQ fixture stack"
 
 .PHONY: bench
 bench:

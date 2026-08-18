@@ -38,3 +38,22 @@ func TestNormalizeReplacementRejectsMissingPath(t *testing.T) {
 		t.Fatal("expected invalid replacement error")
 	}
 }
+
+func TestValidatePluginRequirementsForZeroMQPebbe(t *testing.T) {
+	const plugin = "github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe"
+	if err := validatePluginRequirements([]string{plugin}, "fujin,zeromq_pebbe", false); err == nil || !strings.Contains(err.Error(), "requires -cgo") {
+		t.Fatalf("expected -cgo requirement, got %v", err)
+	}
+	if err := validatePluginRequirements([]string{plugin}, "fujin", true); err == nil || !strings.Contains(err.Error(), "requires build tag zeromq_pebbe") {
+		t.Fatalf("expected build-tag requirement, got %v", err)
+	}
+	if err := validatePluginRequirements([]string{plugin}, "fujin,zeromq_pebbe", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidatePluginRequirementsLeavesOrdinaryConnectorsUnchanged(t *testing.T) {
+	if err := validatePluginRequirements([]string{"github.com/fujin-io/fujin/public/plugins/connector/all"}, "fujin", false); err != nil {
+		t.Fatal(err)
+	}
+}

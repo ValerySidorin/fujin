@@ -5,13 +5,12 @@
 //
 // Configure in YAML:
 //
-//	connectors:
-//	  my_connector:
-//	    type: kafka_franz
-//	    bind_middlewares:
-//	      - name: auth_api_key
-//	        config:
-//	          api_key: my-secret-api-key
+//		connectors:
+//		  my_connector:
+//		    type: kafka_franz
+//		    bind_middlewares:
+//		      - name: auth_api_key
+//	         api_key: my-secret-api-key
 //
 // The client must provide the API key in the BIND request meta field:
 // meta["api_key"] = "my-secret-api-key"

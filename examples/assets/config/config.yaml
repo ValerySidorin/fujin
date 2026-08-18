@@ -28,6 +28,18 @@ fujin:
           ping_max_retries: 5
           write_deadline: 10s
           force_terminate_timeout: 15s
+    - type: websocket
+      enabled: false
+      settings:
+        addr: :4851
+        path: /fujin
+        allowed_origins: [https://app.example.com]
+        max_message_bytes: 4194304
+        fujin:
+          ping_interval: 5s
+          ping_timeout: 10s
+          write_deadline: 10s
+          force_terminate_timeout: 15s
     - type: unix
       enabled: true
       settings:

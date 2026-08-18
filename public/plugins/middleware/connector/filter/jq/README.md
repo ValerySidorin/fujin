@@ -16,12 +16,11 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: filter_jq
-        config:
-          # jq expression for outgoing messages (produce):
-          produce: '.priority == "high" or .retry_count < 3'
+        # jq expression for outgoing messages (produce):
+        produce: '.priority == "high" or .retry_count < 3'
 
-          # jq expression for incoming messages (consume):
-          consume: '.country == "US"'
+        # jq expression for incoming messages (consume):
+        consume: '.country == "US"'
 ```
 
 | Field | Description |

@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+
+	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
 	"unicode/utf8"
 )
 
@@ -190,11 +192,38 @@ type Runtime interface {
 	Close(context.Context) error
 }
 
+// MiddlewareChain is a generation-scoped, prevalidated connector middleware chain.
+// Implementations own any compiled plugin resources until Close is called after generation drain.
+type MiddlewareChain interface {
+	WrapReader(ReadCloser, string, *slog.Logger) (ReadCloser, error)
+	WrapWriter(WriteCloser, string, *slog.Logger) (WriteCloser, error)
+	Close(context.Context) error
+}
+
+// MiddlewareCompileFunc validates and compiles one connector's complete middleware chain.
+type MiddlewareCompileFunc func([]cmwconfig.Config, *slog.Logger) (MiddlewareChain, error)
+
 // Compiled is side-effect-free validated connector configuration.
 type Compiled interface {
 	Routes() map[string]RouteProfile
 	OpenRuntime(l *slog.Logger) (Runtime, error)
 }
+
+// EagerRuntimeCompiled opts a connector into opening its generation runtime before
+// publication. Compile must remain side-effect-free; broker I/O belongs in OpenRuntime.
+type EagerRuntimeCompiled interface {
+	OpenRuntimeEagerly() bool
+}
+
+// ExclusiveRuntimeCompiled reports resources that cannot be opened while an
+// older generation owns them, such as ZeroMQ bind endpoints.
+type ExclusiveRuntimeCompiled interface {
+	ExclusiveRuntimeKeys() []string
+}
+
+// ErrRuntimeDrainRequired means an active generation must retire before the
+// requested runtime can claim an unchanged exclusive resource.
+var ErrRuntimeDrainRequired = errors.New("connector runtime drain required")
 
 // CompileFunc decodes, normalizes, and validates connector settings without broker I/O.
 type CompileFunc func(settings any) (Compiled, error)

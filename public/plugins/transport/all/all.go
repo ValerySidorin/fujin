@@ -11,4 +11,5 @@ import (
 	_ "github.com/fujin-io/fujin/public/plugins/transport/quic"
 	_ "github.com/fujin-io/fujin/public/plugins/transport/tcp"
 	_ "github.com/fujin-io/fujin/public/plugins/transport/unix"
+	_ "github.com/fujin-io/fujin/public/plugins/transport/websocket"
 )

@@ -13,6 +13,7 @@ import (
 	_ "github.com/fujin-io/fujin/public/plugins/middleware/connector/schema/json"
 	// transform/jq connector middleware - provides jq-based message transformation
 	_ "github.com/fujin-io/fujin/public/plugins/middleware/connector/transform/jq"
+	_ "github.com/fujin-io/fujin/public/plugins/middleware/connector/transform/wasm"
 	// dedup connector middleware - provides message deduplication
 	_ "github.com/fujin-io/fujin/public/plugins/middleware/connector/dedup"
 	// filter/jq connector middleware - provides jq-based message filtering

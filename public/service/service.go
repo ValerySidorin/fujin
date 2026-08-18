@@ -194,17 +194,37 @@ func RunCLI(ctx context.Context) {
 	// Pass inherited FDs to server if in upgrade mode
 	us.applyTo(s)
 
-	// Use a cancellable context for the server and every runtime source so drain stops both.
-	serverCtx, serverCancel := context.WithCancel(ctx)
+	// Runtime sources and listeners share one lifecycle but stop in a strict order:
+	// settle runtime-source work before canceling the server and closing its catalog.
+	lifecycleBase := context.WithoutCancel(ctx)
+	serverCtx, serverCancel := context.WithCancel(lifecycleBase)
 	defer serverCancel()
+	runtimeCtx, runtimeCancel := context.WithCancel(lifecycleBase)
+	defer runtimeCancel()
+	startupComplete := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			serverCancel()
+		case <-startupComplete:
+		}
+	}()
 
-	// Start control socket for future upgrades (drain triggers serverCancel).
-	startUpgradeListener(serverCtx, s, serverCancel, logger)
+	shutdownRequested := make(chan struct{}, 1)
+	requestShutdown := func() {
+		select {
+		case shutdownRequested <- struct{}{}:
+		default:
+		}
+	}
+
+	// Start control socket for future upgrades. A drain request follows the same
+	// runtime-source-before-server shutdown order as process-signal cancellation.
+	upgradeSettled := startUpgradeListener(serverCtx, s, requestShutdown, logger)
 
 	// SIGHUP reuses the selected configurator instance (Unix only, no-op elsewhere).
-	startReloadLoop(serverCtx, loader, controller, logLevelVar, logger)
+	reloadSettled := startReloadLoop(runtimeCtx, loader, controller, logLevelVar, logger)
 
-	// Start serving (blocks until context cancelled or error)
 	serveDone := make(chan error, 1)
 	go func() {
 		serveDone <- s.ListenAndServe(serverCtx)
@@ -212,17 +232,22 @@ func RunCLI(ctx context.Context) {
 
 	// Runtime connector watching starts only after every listener is ready.
 	var watcherSettled <-chan struct{}
-	if s.ReadyForConnections(30 * time.Second) {
+	ready := s.ReadyForConnections(30 * time.Second)
+	if ctx.Err() != nil {
+		serverCancel()
+	}
+	close(startupComplete)
+	if ready && ctx.Err() == nil {
 		if us != nil {
 			signalOldProcessReady(us, logger)
 		}
-		if watcherDone := startConnectorWatcher(serverCtx, loader, controller); watcherDone != nil {
+		if watcherDone := startConnectorWatcher(runtimeCtx, loader, controller); watcherDone != nil {
 			settled := make(chan struct{})
 			watcherSettled = settled
 			go func() {
 				defer close(settled)
 				err := <-watcherDone
-				if serverCtx.Err() != nil || errors.Is(err, context.Canceled) {
+				if runtimeCtx.Err() != nil || errors.Is(err, context.Canceled) {
 					return
 				}
 				if err != nil {
@@ -232,16 +257,40 @@ func RunCLI(ctx context.Context) {
 				}
 			}()
 		}
-	} else {
+	} else if ctx.Err() == nil {
 		logger.Error("server did not become ready in time")
 	}
 
-	if err := <-serveDone; err != nil {
-		logger.Error("listen and serve", "err", err)
+	var serveErr error
+	serverStopped := false
+	select {
+	case serveErr = <-serveDone:
+		serverStopped = true
+	case <-ctx.Done():
+	case <-shutdownRequested:
 	}
+
+	stopRuntimeSources(runtimeCancel, watcherSettled, reloadSettled)
 	serverCancel()
-	if watcherSettled != nil {
-		<-watcherSettled
+	waitForSettlement(upgradeSettled)
+	if !serverStopped {
+		serveErr = <-serveDone
+	}
+	if serveErr != nil {
+		logger.Error("listen and serve", "err", serveErr)
+	}
+}
+
+func stopRuntimeSources(cancel context.CancelFunc, settled ...<-chan struct{}) {
+	cancel()
+	waitForSettlement(settled...)
+}
+
+func waitForSettlement(channels ...<-chan struct{}) {
+	for _, settled := range channels {
+		if settled != nil {
+			<-settled
+		}
 	}
 }
 

@@ -24,6 +24,16 @@ type QUICServerConfig struct {
 	Fujin   FujinProtocolConfig
 }
 
+type WebSocketServerConfig struct {
+	Enabled         bool
+	Addr            string
+	Path            string
+	TLS             *tls.Config
+	AllowedOrigins  []string
+	MaxMessageBytes int64
+	Fujin           FujinProtocolConfig
+}
+
 type TCPServerConfig struct {
 	Enabled bool
 	Addr    string

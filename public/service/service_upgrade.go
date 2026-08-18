@@ -61,14 +61,17 @@ func signalOldProcessReady(us *upgradeState, l *slog.Logger) {
 }
 
 // startUpgradeListener starts the control socket for future upgrades.
-func startUpgradeListener(ctx context.Context, s *server.Server, drainFn func(), l *slog.Logger) {
+func startUpgradeListener(ctx context.Context, s *server.Server, drainFn func(), l *slog.Logger) <-chan struct{} {
+	settled := make(chan struct{})
 	sockPath := upgradeSockPath()
 	upgrader := upgrade.NewUpgrader(sockPath, s, drainFn, l)
 	go func() {
+		defer close(settled)
 		if err := upgrader.ListenForUpgrade(ctx); err != nil {
 			l.Error("upgrade listener", "err", err)
 		}
 	}()
+	return settled
 }
 
 func upgradeSockPath() string {

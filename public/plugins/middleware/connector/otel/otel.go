@@ -5,10 +5,9 @@
 //
 // Configure in YAML:
 //
-//	connector_middlewares:
-//	  - name: otel
-//	    config:
-//	      enabled: true
+//		connector_middlewares:
+//		  - name: otel
+//	     enabled: true
 package otel
 
 import (

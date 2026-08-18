@@ -1,2 +1,0 @@
-PASS
-ok  	github.com/fujin-io/fujin/test	0.582s

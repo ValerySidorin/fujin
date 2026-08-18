@@ -72,6 +72,19 @@ func (m *boundedWriteStream) Write(p []byte) (int, error) {
 	return m.mockStream.Write(p)
 }
 
+type shortWriteStream struct {
+	mockStream
+	limit int
+}
+
+func (m *shortWriteStream) Write(p []byte) (int, error) {
+	if m.limit > 0 && len(p) > m.limit {
+		n, _ := m.mockStream.Write(p[:m.limit])
+		return n, io.ErrShortWrite
+	}
+	return m.mockStream.Write(p)
+}
+
 func newTestOutbound(str *mockStream) *Outbound {
 	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	return NewOutbound(str, 5*time.Second, l)
@@ -213,6 +226,36 @@ func TestEnqueueProtoMulti_IgnoredAfterClose(t *testing.T) {
 
 	o.EnqueueProtoMulti([]byte("a"), []byte("b"))
 	assert.Empty(t, str.written())
+}
+
+func TestEnqueueOwnedWritesTransferredBuffer(t *testing.T) {
+	str := &mockStream{}
+	o := newTestOutbound(str)
+	done := make(chan struct{})
+	go func() {
+		o.WriteLoop()
+		close(done)
+	}()
+
+	buffer := pool.Get(5)
+	buffer = append(buffer, "owned"...)
+	o.EnqueueOwned(buffer)
+	o.Close()
+	<-done
+
+	assert.Equal(t, []byte("owned"), str.written())
+}
+
+func TestEnqueueOwnedCoalescesPoolSizedFrames(t *testing.T) {
+	o := newTestOutbound(&mockStream{})
+	for range 2 {
+		buffer := pool.Get(100)
+		buffer = append(buffer, make([]byte, 100)...)
+		o.EnqueueOwned(buffer)
+	}
+
+	require.Len(t, o.v, 1)
+	assert.Len(t, o.v[0], 200)
 }
 
 func TestWriteLoop_ExitsOnClose(t *testing.T) {
@@ -379,6 +422,7 @@ func TestQueueOutbound_BlocksAtPendingLimit(t *testing.T) {
 	o.Unlock()
 
 	enqueued := make(chan struct{})
+
 	go func() {
 		o.EnqueueProto([]byte("x"))
 		close(enqueued)
@@ -408,6 +452,27 @@ func TestQueueOutbound_BlocksAtPendingLimit(t *testing.T) {
 	o.Close()
 	<-done
 	assert.Equal(t, []byte("x"), str.written())
+}
+func TestQueueOutbound_AllowsMediumFrameBurstBeyondDefaultLimit(t *testing.T) {
+	o := newTestOutbound(&mockStream{})
+	o.Lock()
+	o.pb = maximumPendingBytes
+	o.Unlock()
+
+	enqueued := make(chan struct{})
+	go func() {
+		o.EnqueueProto(make([]byte, 32*1024))
+		close(enqueued)
+	}()
+
+	select {
+	case <-enqueued:
+	case <-time.After(time.Second):
+		t.Fatal("medium frame blocked at the default pending-byte limit")
+	}
+	for _, buffer := range o.v {
+		pool.Put(buffer)
+	}
 }
 func TestQueueOutboundOwnedMulti_BlocksWholeFrameAtPendingLimit(t *testing.T) {
 	str := &mockStream{}
@@ -504,6 +569,16 @@ func TestSelectWriteBatchBoundsBytesAndVectors(t *testing.T) {
 	assert.Len(t, batch, MaxVectorSize)
 }
 
+func TestNextWriteBatchPreallocatesReusableVectorCapacity(t *testing.T) {
+	o := &Outbound{wv: net.Buffers{[]byte("first")}}
+
+	batch, usedStorage := o.nextWriteBatch(0)
+
+	require.True(t, usedStorage)
+	require.Len(t, batch, 1)
+	assert.Equal(t, MaxVectorSize, cap(o.batchStorage))
+}
+
 func TestWriteBuffers_RetriesENOBUFSWithBoundedBatch(t *testing.T) {
 	str := &boundedWriteStream{maxWrite: fallbackWriteBatchLen}
 	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
@@ -517,6 +592,26 @@ func TestWriteBuffers_RetriesENOBUFSWithBoundedBatch(t *testing.T) {
 	assert.Equal(t, int32(1), str.enobufs.Load())
 	assert.Equal(t, payload, str.written())
 	assert.Empty(t, o.wv)
+}
+
+func TestWriteBuffers_PreservesPooledBufferAcrossPartialWrite(t *testing.T) {
+	str := &shortWriteStream{limit: 3}
+	l := slog.New(slog.NewTextHandler(io.Discard, nil))
+	o := NewOutbound(str, 5*time.Second, l)
+	buffer := pool.Get(6)
+	buffer = append(buffer, []byte("abcdef")...)
+	o.wv = append(o.wv, buffer)
+
+	assert.Equal(t, int64(3), o.writeBuffers())
+	require.Len(t, o.wv, 1)
+	assert.Equal(t, 3, o.wvOffset)
+	assert.Equal(t, []byte("abc"), str.written())
+
+	str.limit = 0
+	assert.Equal(t, int64(3), o.writeBuffers())
+	assert.Empty(t, o.wv)
+	assert.Zero(t, o.wvOffset)
+	assert.Equal(t, []byte("abcdef"), str.written())
 }
 
 func TestWriteBuffers_NilStream(t *testing.T) {

@@ -170,12 +170,38 @@ func validateInputs() error {
 			return fmt.Errorf("plugin package path cannot be empty")
 		}
 	}
+	if err := validatePluginRequirements(connectors, *buildTags, *cgoEnabled); err != nil {
+		return err
+	}
 	for _, replacement := range replacements {
 		if _, err := normalizeReplacement(replacement, "."); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validatePluginRequirements(connectorPackages []string, tags string, cgo bool) error {
+	const zeromqPebbe = "github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe"
+	selected := false
+	for _, pkg := range connectorPackages {
+		if pkg == zeromqPebbe {
+			selected = true
+			break
+		}
+	}
+	if !selected {
+		return nil
+	}
+	if !cgo {
+		return fmt.Errorf("connector %s requires -cgo", zeromqPebbe)
+	}
+	for _, tag := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if tag == "zeromq_pebbe" {
+			return nil
+		}
+	}
+	return fmt.Errorf("connector %s requires build tag zeromq_pebbe", zeromqPebbe)
 }
 
 func normalizeReplacement(replacement, baseDir string) (string, error) {

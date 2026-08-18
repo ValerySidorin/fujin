@@ -1,10 +1,12 @@
 package connector
 
 import (
+	"context"
 	"log/slog"
 	"testing"
 
 	"github.com/fujin-io/fujin/public/plugins/connector"
+	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
 )
 
 // mockMiddleware is a test connector middleware
@@ -21,6 +23,40 @@ func (m *mockMiddleware) WrapWriter(w connector.WriteCloser, connectorName strin
 func (m *mockMiddleware) WrapReader(r connector.ReadCloser, connectorName string) connector.ReadCloser {
 	m.readerCalls++
 	return r
+}
+
+type mockCompiledMiddleware struct {
+	middleware Middleware
+	closed     int
+}
+
+func (m *mockCompiledMiddleware) Open(*slog.Logger) (Middleware, error) {
+	return m.middleware, nil
+}
+
+func (m *mockCompiledMiddleware) Close(context.Context) error {
+	m.closed++
+	return nil
+}
+
+func TestCompilePreparesAndClosesGenerationMiddleware(t *testing.T) {
+	compiled := &mockCompiledMiddleware{middleware: &mockMiddleware{}}
+	name := "compiled_connector_middleware"
+	if err := RegisterCompiled(name, func(any, *slog.Logger) (Compiled, error) {
+		return compiled, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	chain, err := Compile([]cmwconfig.Config{{Name: name}}, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := chain.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if compiled.closed != 1 {
+		t.Fatalf("compiled middleware closed %d times, want 1", compiled.closed)
+	}
 }
 
 func TestRegister(t *testing.T) {

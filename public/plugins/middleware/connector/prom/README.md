@@ -11,9 +11,8 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: prom
-        config:
-          addr: ":9090"
-          path: /metrics
+        addr: ":9090"
+        path: /metrics
 ```
 
 | Field | Default | Description |

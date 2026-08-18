@@ -14,9 +14,8 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: rate_limit_token_bucket
-        config:
-          rate: 1000      # requests per second
-          burst: 100      # max burst size
+        rate: 1000      # requests per second
+        burst: 100      # max burst size
 ```
 
 | Field | Description |
