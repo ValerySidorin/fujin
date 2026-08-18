@@ -240,6 +240,10 @@ broker-help:
 bench:
 	@go test -bench=${BENCH_FUNC} -benchtime=${BENCH_TIME} -tags=${GO_BUILD_TAGS} ./test
 
+.PHONY: bench-report
+bench-report:
+	@test/generate_bench_report.sh
+
 # Broker-backed E2E tests. Targets set FUJIN_E2E=1 and require Docker.
 E2E_TIMEOUT ?= 120s
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -152,7 +153,7 @@ func benchmarkNativeSessionTransports(
 					if !sessionBenchmarkConcurrencyEnabled(concurrency) {
 						continue
 					}
-					name := fmt.Sprintf("transport=%s/payload=%s/batch=%d/concurrency=%d", transport, payload.name, batchSize, concurrency)
+					name := fmt.Sprintf("connector=%s/transport=%s/payload=%s/batch=%d/concurrency=%d", sessionBenchmarkConnectorName(operation), transport, payload.name, batchSize, concurrency)
 					b.Run(name, func(b *testing.B) {
 						isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
 						workerCount := sessionBenchmarkWorkerCount(concurrency, b.N)
@@ -162,7 +163,7 @@ func benchmarkNativeSessionTransports(
 							subscribeLimits = sessionBenchmarkOperationCounts(workerCount, b.N)
 							subscribeStart = make(chan struct{})
 						}
-						config := makeSessionBenchConfig(payload.size, subscribeLimits, true, subscribeStart)
+						config := sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, true, subscribeStart)
 						ctx, cleanupServer := startNativeSessionBenchmarkServer(b, transport, config)
 						defer cleanupServer()
 						var sharedQUIC *quicgo.Conn
@@ -203,7 +204,7 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 				if !sessionBenchmarkConcurrencyEnabled(concurrency) {
 					continue
 				}
-				name := fmt.Sprintf("payload=%s/batch=%d/concurrency=%d", payload.name, batchSize, concurrency)
+				name := fmt.Sprintf("connector=%s/payload=%s/batch=%d/concurrency=%d", sessionBenchmarkConnectorName(operation), payload.name, batchSize, concurrency)
 				b.Run(name, func(b *testing.B) {
 					isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
 					workerCount := sessionBenchmarkWorkerCount(concurrency, b.N)
@@ -213,7 +214,7 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 						subscribeLimits = sessionBenchmarkOperationCounts(workerCount, b.N)
 						subscribeStart = make(chan struct{})
 					}
-					ctx, cleanupServer := startGRPCSessionBenchmarkServer(b, makeSessionBenchConfig(payload.size, subscribeLimits, false, subscribeStart))
+					ctx, cleanupServer := startGRPCSessionBenchmarkServer(b, sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, false, subscribeStart))
 					defer cleanupServer()
 					conn, err := grpc.NewClient(perfGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 					if err != nil {
@@ -240,13 +241,58 @@ func sessionBenchmarkNeedsWarmup(operation sessionBenchmarkOperation) bool {
 }
 
 func sessionBenchmarkBatchEnabled(batchSize int) bool {
-	filter := os.Getenv("FUJIN_BENCH_BATCH")
-	return filter == "" || filter == strconv.Itoa(batchSize)
+	return sessionBenchmarkValueEnabled(strconv.Itoa(batchSize), os.Getenv("FUJIN_BENCH_BATCH"))
+}
+
+func sessionBenchmarkConnectorName(operation sessionBenchmarkOperation) string {
+	if operation == benchmarkProduce {
+		return "nop"
+	}
+	return "session_bench"
+}
+
+func sessionBenchmarkConnectors(operation sessionBenchmarkOperation, msgSize int, limits []int, ackDoneFirst bool, subscribeStart <-chan struct{}) connectorconfig.ConnectorsConfig {
+	if operation == benchmarkProduce {
+		return connectorconfig.ConnectorsConfig{"connector": {Type: "nop"}}
+	}
+	return makeSessionBenchConfig(msgSize, limits, ackDoneFirst, subscribeStart)
 }
 
 func sessionBenchmarkConcurrencyEnabled(concurrency int) bool {
-	filter := os.Getenv("FUJIN_BENCH_CONCURRENCY")
-	return filter == "" || filter == strconv.Itoa(concurrency)
+	return sessionBenchmarkValueEnabled(strconv.Itoa(concurrency), os.Getenv("FUJIN_BENCH_CONCURRENCY"))
+}
+
+func sessionBenchmarkValueEnabled(value, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	for _, candidate := range strings.Split(filter, ",") {
+		if strings.TrimSpace(candidate) == value {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSessionBenchmarkValueEnabled(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		value  string
+		filter string
+		want   bool
+	}{
+		{name: "empty filter", value: "16", want: true},
+		{name: "single matching value", value: "16", filter: "16", want: true},
+		{name: "multiple matching values", value: "16", filter: "1,16,128", want: true},
+		{name: "whitespace", value: "16", filter: "1, 16, 128", want: true},
+		{name: "missing value", value: "16", filter: "1,128", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := sessionBenchmarkValueEnabled(test.value, test.filter); got != test.want {
+				t.Fatalf("sessionBenchmarkValueEnabled(%q, %q): got %t, want %t", test.value, test.filter, got, test.want)
+			}
+		})
+	}
 }
 
 func sessionBenchmarkWorkerCount(concurrency, operations int) int {

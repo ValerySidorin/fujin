@@ -100,3 +100,5 @@ func (*writer) BeginTx(context.Context) error    { return nil }
 func (*writer) CommitTx(context.Context) error   { return nil }
 func (*writer) RollbackTx(context.Context) error { return nil }
 func (*writer) Close() error                     { return nil }
+
+func (*writer) WriterContractCompliant() {}

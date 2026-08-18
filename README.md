@@ -243,7 +243,23 @@ Endpoints:
 
 ## Benchmarks
 
-Apple M2, macOS arm64, single connection, localhost. Raw results: [`test/bench_test.txt`](test/bench_test.txt).
+[`test/bench_report.md`](test/bench_report.md) is a reproducible local Session Core data-plane snapshot, not a cross-machine or broker-throughput comparison. It measures synchronous produce against the built-in `nop` connector over native TCP, QUIC, Unix sockets, and gRPC.
+
+`nop` accepts messages immediately and performs no broker I/O. The report therefore isolates Fujin's protocol, session, scheduling, and callback overhead. It includes operations per second, payload throughput, p99 operation latency, and allocations.
+
+Regenerate it with:
+
+```bash
+make bench-report
+```
+
+The default report captures 1 B, 128 B, and 1 MiB payloads at 1, 16, and 128 concurrent sessions, with a 3-second sample per subtest. It also records a 1 B, 1,000,000-message TCP pipeline peak. Override the scope for a longer focused run:
+
+```bash
+BENCHTIME=10s FUJIN_BENCH_PAYLOAD=1MiB FUJIN_BENCH_CONCURRENCY=128 make bench-report
+```
+
+The report records its exact source revision, Go toolchain, host, and parameters. Broker-backed benchmarks remain separate because broker topology, durability, and container state materially affect their figures.
 
 ## Documentation
 
