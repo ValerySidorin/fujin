@@ -1,6 +1,6 @@
 # Fujin protocol
 
-This document specifies Fujin native protocol v1. It is an incremental, length-prefixed binary protocol used over TCP, QUIC, and Unix domain sockets. The gRPC API has a separate protobuf wire format but delegates the same session semantics to Session Core.
+This document specifies Fujin native protocol v1. It is an incremental, length-prefixed binary protocol used over TCP, QUIC, WebSocket, and Unix domain sockets. The gRPC API has a separate protobuf wire format but delegates the same session semantics to Session Core.
 
 The server parser consumes an arbitrary byte stream without command delimiters and uses pooled buffers on protocol hot paths.
 
@@ -95,11 +95,12 @@ The command and response frames below are identical on every native transport:
 
 - **QUIC:** one bidirectional QUIC stream carries one Fujin session. A connection-level health probe uses a dedicated server-opened stream. If `ping_stream` is enabled, the server additionally emits in-band PING frames on each messaging stream.
 - **TCP:** one connection carries one Fujin session. Fujin-level PING emission is not currently enabled; the transport enables TCP keepalive.
+- **WebSocket:** one WebSocket connection carries one Fujin session. Binary WebSocket message payloads are concatenated into the protocol byte stream; text messages are rejected.
 - **Unix:** one Unix domain socket connection carries one Fujin session. Fujin-level PING emission is not currently enabled.
 
 ## Versioning
 
-QUIC negotiates native protocol v1 through ALPN value `fujin/1`. The server rejects a missing or unsupported ALPN value. TCP and Unix connections implicitly use v1 and perform no protocol negotiation.
+QUIC negotiates native protocol v1 through ALPN value `fujin/1`. The server rejects a missing or unsupported ALPN value. TCP, WebSocket, and Unix connections implicitly use v1 and perform no protocol negotiation.
 
 The opcodes, field encodings, and semantics in this document are the current `fujin/1` contract. Until Fujin declares the native protocol stable, coordinated server and SDK releases may evolve this contract while retaining the `fujin/1` identifier; clients and servers must therefore use compatible release lines. After that stability declaration, an incompatible wire or semantic change requires a new negotiated protocol version.
 

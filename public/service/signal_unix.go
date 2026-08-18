@@ -25,11 +25,13 @@ func startReloadLoop(
 	controller *connectorRuntimeController,
 	logLevelVar *slog.LevelVar,
 	logger *slog.Logger,
-) {
+) <-chan struct{} {
+	settled := make(chan struct{})
 	sighup := make(chan os.Signal, 1)
 	signal.Notify(sighup, syscall.SIGHUP)
 	localRevision := controller.ActiveRevision()
 	go func() {
+		defer close(settled)
 		defer signal.Stop(sighup)
 		for {
 			select {
@@ -44,4 +46,5 @@ func startReloadLoop(
 			}
 		}
 	}()
+	return settled
 }

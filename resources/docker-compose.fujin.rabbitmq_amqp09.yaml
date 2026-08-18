@@ -1,10 +1,11 @@
 services:
   fujin:
-    image: fujin:rabbitmq_amqp09-${BUILD_TAG}
+    image: fujin:rabbitmq_amqp09-${BUILD_TAG:-v0.4.0}
     build:
       context: ..
       dockerfile: Dockerfile
       args:
+        VERSION: ${BUILD_TAG:-v0.4.0}
         FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/rabbitmq/amqp09
         FUJIN_GO_TAGS: fujin,grpc,unix
     container_name: fujin

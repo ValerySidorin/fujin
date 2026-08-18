@@ -15,22 +15,25 @@ import (
 )
 
 const (
-	MaxVectorSize         = 1024
-	fallbackWriteBatchLen = 64 * 1024
-	maximumPendingBytes   = fallbackWriteBatchLen
-	minimumWriteBatchLen  = 4 * 1024
+	MaxVectorSize                  = 1024
+	fallbackWriteBatchLen          = 64 * 1024
+	maximumPendingBytes            = 4 * 1024 * 1024
+	maximumMediumFramePendingBytes = 64 * 1024 * 1024
+	minimumWriteBatchLen           = 4 * 1024
 )
 
 type Outbound struct {
 	sync.Mutex
-	v      net.Buffers   // vector
-	wv     net.Buffers   // working vector
-	wdl    time.Duration // write deadline
-	c      *sync.Cond
-	pb     int64 // pending bytes
-	str    session.Stream
-	closed atomic.Bool
-	l      *slog.Logger
+	v            net.Buffers   // vector
+	wv           net.Buffers   // working vector
+	wvOffset     int           // bytes already written from wv[0]
+	batchStorage net.Buffers   // allocated only after partial writes or ENOBUFS
+	wdl          time.Duration // write deadline
+	c            *sync.Cond
+	pb           int64 // pending bytes
+	str          session.Stream
+	closed       atomic.Bool
+	l            *slog.Logger
 }
 
 func NewOutbound(
@@ -61,7 +64,6 @@ func (o *Outbound) WriteLoop() {
 			// Final write without lock.
 			o.writeBuffers()
 
-			// Return any remaining buffers to pool.
 			o.Lock()
 			for i := range o.v {
 				pool.Put(o.v[i])
@@ -71,6 +73,7 @@ func (o *Outbound) WriteLoop() {
 				pool.Put(o.wv[i])
 			}
 			o.wv = nil
+			o.wvOffset = 0
 			o.Unlock()
 			return
 		}
@@ -107,6 +110,25 @@ func (o *Outbound) EnqueueProto(proto []byte) {
 	o.queueOutbound(proto)
 }
 
+// EnqueueOwned transfers ownership of a pool-backed buffer to the outbound queue.
+// Pool-sized frames retain queue coalescing; larger frames avoid a full copy.
+func (o *Outbound) EnqueueOwned(buffer []byte) {
+	o.Lock()
+	defer o.Unlock()
+	if o.IsClosed() || !o.waitForQueueSpaceNoLock(len(buffer)) {
+		pool.Put(buffer)
+		return
+	}
+	if cap(buffer) <= pool.SIZE_LARGE {
+		o.QueueOutboundNoLock(buffer)
+		pool.Put(buffer)
+	} else {
+		o.pb += int64(len(buffer))
+		o.v = append(o.v, buffer)
+	}
+	o.c.Signal()
+}
+
 func (o *Outbound) EnqueueProtoMulti(protos ...[]byte) {
 	o.Lock()
 	defer o.Unlock()
@@ -133,24 +155,13 @@ func (o *Outbound) writeBuffers() int64 {
 		return 0
 	}
 
-	var originalStorage [MaxVectorSize][]byte
-	original := append(originalStorage[:0], o.wv...)
-	startOfWv := o.wv[0:]
-	var batchStorage [MaxVectorSize][]byte
-
+	startOfWv := o.wv
 	start := time.Now()
 	maxBatchLen := 0
 	var n int64
 
 	for len(o.wv) > 0 {
-		batch := o.wv
-		if maxBatchLen == 0 {
-			if len(batch) > MaxVectorSize {
-				batch = batch[:MaxVectorSize]
-			}
-		} else {
-			batch = selectWriteBatch(batchStorage[:0], batch, maxBatchLen)
-		}
+		batch, usedStorage := o.nextWriteBatch(maxBatchLen)
 		if len(batch) == 0 {
 			break
 		}
@@ -160,7 +171,11 @@ func (o *Outbound) writeBuffers() int64 {
 		_ = o.str.SetWriteDeadline(time.Time{})
 
 		n += wn
-		consumeWriteBuffers(&o.wv, wn)
+		o.consumeWritten(wn)
+		if usedStorage {
+			clear(o.batchStorage)
+			o.batchStorage = o.batchStorage[:0]
+		}
 		if err == nil {
 			continue
 		}
@@ -177,18 +192,33 @@ func (o *Outbound) writeBuffers() int64 {
 		break
 	}
 
-	for i := 0; i < len(original)-len(o.wv); i++ {
-		pool.Put(original[i])
-	}
-
 	o.wv = append(startOfWv[:0], o.wv...)
-
 	return n
 }
 
 func selectWriteBatch(dst, src net.Buffers, maxBytes int) net.Buffers {
+	return selectWriteBatchAtOffset(dst, src, 0, maxBytes)
+}
+
+func (o *Outbound) nextWriteBatch(maxBytes int) (net.Buffers, bool) {
+	if o.batchStorage == nil {
+		o.batchStorage = make(net.Buffers, 0, MaxVectorSize)
+	}
+	if o.wvOffset == 0 && maxBytes == 0 {
+		count := min(len(o.wv), MaxVectorSize)
+		o.batchStorage = append(o.batchStorage[:0], o.wv[:count]...)
+		return o.batchStorage, true
+	}
+	o.batchStorage = selectWriteBatchAtOffset(o.batchStorage[:0], o.wv, o.wvOffset, maxBytes)
+	return o.batchStorage, true
+}
+
+func selectWriteBatchAtOffset(dst, src net.Buffers, firstOffset, maxBytes int) net.Buffers {
 	total := 0
-	for _, chunk := range src {
+	for index, chunk := range src {
+		if index == 0 && firstOffset > 0 {
+			chunk = chunk[firstOffset:]
+		}
 		if len(chunk) == 0 {
 			continue
 		}
@@ -213,16 +243,18 @@ func selectWriteBatch(dst, src net.Buffers, maxBytes int) net.Buffers {
 	return dst
 }
 
-func consumeWriteBuffers(buffers *net.Buffers, written int64) {
-	for written > 0 && len(*buffers) > 0 {
-		chunkLen := int64(len((*buffers)[0]))
-		if written < chunkLen {
-			(*buffers)[0] = (*buffers)[0][written:]
+func (o *Outbound) consumeWritten(written int64) {
+	for written > 0 && len(o.wv) > 0 {
+		remaining := int64(len(o.wv[0]) - o.wvOffset)
+		if written < remaining {
+			o.wvOffset += int(written)
 			return
 		}
-		written -= chunkLen
-		(*buffers)[0] = nil
-		*buffers = (*buffers)[1:]
+		written -= remaining
+		pool.Put(o.wv[0])
+		o.wv[0] = nil
+		o.wv = o.wv[1:]
+		o.wvOffset = 0
 	}
 }
 
@@ -263,7 +295,11 @@ func (o *Outbound) QueueOutboundNoLock(data []byte) {
 }
 
 func (o *Outbound) waitForQueueSpaceNoLock(size int) bool {
-	for !o.IsClosed() && o.pb > 0 && o.pb+int64(size) > maximumPendingBytes {
+	limit := int64(maximumPendingBytes)
+	if size > minimumWriteBatchLen && size <= pool.SIZE_LARGE {
+		limit = maximumMediumFramePendingBytes
+	}
+	for !o.IsClosed() && o.pb > 0 && o.pb+int64(size) > limit {
 		o.c.Wait()
 	}
 	return !o.IsClosed()

@@ -14,12 +14,11 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: transform_jq
-        config:
-          # jq expression for outgoing messages (produce):
-          produce: '{temperature: .t, humidity: .h, device_id: .dev, unit: "celsius"}'
+        # jq expression for outgoing messages (produce):
+        produce: '{temperature: .t, humidity: .h, device_id: .dev, unit: "celsius"}'
 
-          # jq expression for incoming messages (consume):
-          consume: '{userName: .user_name, age: .age}'
+        # jq expression for incoming messages (consume):
+        consume: '{userName: .user_name, age: .age}'
 ```
 
 | Field | Description |

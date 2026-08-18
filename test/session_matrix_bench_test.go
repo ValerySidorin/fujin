@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -80,6 +81,14 @@ func Benchmark_Session_Transaction_Native(b *testing.B) {
 	benchmarkNativeSessionMatrix(b, benchmarkTransaction, false)
 }
 
+func Benchmark_Session_Produce_TCP_WebSocket(b *testing.B) {
+	benchmarkNativeSessionTransports(b, benchmarkProduce, false, []string{"tcp", "websocket"})
+}
+
+func Benchmark_Session_Fetch_TCP_WebSocket(b *testing.B) {
+	benchmarkNativeSessionTransports(b, benchmarkFetch, true, []string{"tcp", "websocket"})
+}
+
 func Benchmark_Session_Produce_GRPC(b *testing.B) {
 	benchmarkGRPCSessionMatrix(b, benchmarkProduce, false)
 }
@@ -117,7 +126,16 @@ func Benchmark_Session_Transaction_GRPC(b *testing.B) {
 }
 
 func benchmarkNativeSessionMatrix(b *testing.B, operation sessionBenchmarkOperation, batched bool) {
-	for _, transport := range []string{"tcp", "quic", "unix"} {
+	benchmarkNativeSessionTransports(b, operation, batched, []string{"tcp", "quic", "unix"})
+}
+
+func benchmarkNativeSessionTransports(
+	b *testing.B,
+	operation sessionBenchmarkOperation,
+	batched bool,
+	transports []string,
+) {
+	for _, transport := range transports {
 		for _, payload := range benchmarkPayloadSizes {
 			if !sessionBenchmarkPayloadEnabled(payload.name) {
 				continue
@@ -127,7 +145,13 @@ func benchmarkNativeSessionMatrix(b *testing.B, operation sessionBenchmarkOperat
 				batchSizes = benchmarkBatchSizes(payload.size)
 			}
 			for _, batchSize := range batchSizes {
+				if !sessionBenchmarkBatchEnabled(batchSize) {
+					continue
+				}
 				for _, concurrency := range approvedPerformanceContract.Concurrency {
+					if !sessionBenchmarkConcurrencyEnabled(concurrency) {
+						continue
+					}
 					name := fmt.Sprintf("transport=%s/payload=%s/batch=%d/concurrency=%d", transport, payload.name, batchSize, concurrency)
 					b.Run(name, func(b *testing.B) {
 						isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
@@ -172,7 +196,13 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 			batchSizes = benchmarkBatchSizes(payload.size)
 		}
 		for _, batchSize := range batchSizes {
+			if !sessionBenchmarkBatchEnabled(batchSize) {
+				continue
+			}
 			for _, concurrency := range approvedPerformanceContract.Concurrency {
+				if !sessionBenchmarkConcurrencyEnabled(concurrency) {
+					continue
+				}
 				name := fmt.Sprintf("payload=%s/batch=%d/concurrency=%d", payload.name, batchSize, concurrency)
 				b.Run(name, func(b *testing.B) {
 					isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
@@ -209,9 +239,14 @@ func sessionBenchmarkNeedsWarmup(operation sessionBenchmarkOperation) bool {
 	return operation != benchmarkSubscribe && operation != benchmarkHSubscribe && operation != benchmarkAck && operation != benchmarkNack
 }
 
-func sessionBenchmarkPayloadEnabled(name string) bool {
-	filter := os.Getenv("FUJIN_BENCH_PAYLOAD")
-	return filter == "" || filter == name
+func sessionBenchmarkBatchEnabled(batchSize int) bool {
+	filter := os.Getenv("FUJIN_BENCH_BATCH")
+	return filter == "" || filter == strconv.Itoa(batchSize)
+}
+
+func sessionBenchmarkConcurrencyEnabled(concurrency int) bool {
+	filter := os.Getenv("FUJIN_BENCH_CONCURRENCY")
+	return filter == "" || filter == strconv.Itoa(concurrency)
 }
 
 func sessionBenchmarkWorkerCount(concurrency, operations int) int {
@@ -413,6 +448,8 @@ func startNativeSessionBenchmarkServer(b *testing.B, transport string, connector
 		config = MakeConfigWithQUIC(connectors)
 	case "unix":
 		config = MakeConfigWithUnix(connectors)
+	case "websocket":
+		config = MakeConfigWithWebSocket(connectors)
 	default:
 		b.Fatalf("unknown transport %q", transport)
 	}
@@ -536,27 +573,21 @@ func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transpor
 		if operation == benchmarkNack {
 			request = buildNackCmd(2, subscriptionID, ids)
 		}
+		settlementScratch := make([]byte, 0, 64)
 		run = func() error {
 			if err := writeBenchmarkFrame(session.rw, request); err != nil {
 				return err
 			}
-			var results []ackResult
-			var err error
+			expectedCode := v1.RESP_CODE_ACK
 			if operation == benchmarkNack {
-				_, results, err = session.reader.readNackResp()
-			} else {
-				_, results, err = session.reader.readAckResp()
+				expectedCode = v1.RESP_CODE_NACK
 			}
+			count, err := readBenchmarkSettlementResp(session.reader, expectedCode, &settlementScratch)
 			if err != nil {
 				return err
 			}
-			if len(results) != batchSize {
-				return fmt.Errorf("settlement results: got %d, want %d", len(results), batchSize)
-			}
-			for _, result := range results {
-				if result.Err != nil {
-					return fmt.Errorf("settlement result message_id=%x error=%#v", result.MsgID, result.Err)
-				}
+			if count != batchSize {
+				return fmt.Errorf("settlement results: got %d, want %d", count, batchSize)
 			}
 			return advanceSessionBenchmarkSettlementFrame(request)
 		}
@@ -602,6 +633,8 @@ func openNativeBenchmarkSession(b *testing.B, ctx context.Context, transport str
 	switch transport {
 	case "tcp":
 		rw = createTCPClientConn(PERF_TCP_ADDR)
+	case "websocket":
+		rw = createWebSocketBenchmarkConn()
 	case "unix":
 		rw = createUnixClientConn(PERF_UNIX_PATH)
 	case "quic":
@@ -871,6 +904,51 @@ func validateFetchedPayloads(messages []fetchedMsg, payloadSize int, withHeaders
 		}
 	}
 	return nil
+}
+func readBenchmarkSettlementResp(reader *protoReader, expectedCode v1.RespCode, scratch *[]byte) (int, error) {
+	code, err := reader.readByte()
+	if err != nil {
+		return 0, err
+	}
+	if code != byte(expectedCode) {
+		return 0, fmt.Errorf("expected settlement response code %d, got %d", expectedCode, code)
+	}
+	if _, err := reader.readCID(); err != nil {
+		return 0, err
+	}
+	status, err := reader.readByte()
+	if err != nil {
+		return 0, err
+	}
+	if status != byte(v1.STATUS_OK) {
+		return 0, fmt.Errorf("settlement response status %d", status)
+	}
+	count, err := reader.readUint32()
+	if err != nil {
+		return 0, err
+	}
+	for range count {
+		messageIDLen, err := reader.readUint32()
+		if err != nil {
+			return 0, err
+		}
+		if cap(*scratch) < int(messageIDLen) {
+			*scratch = make([]byte, int(messageIDLen))
+		} else {
+			*scratch = (*scratch)[:messageIDLen]
+		}
+		if _, err := io.ReadFull(reader.r, *scratch); err != nil {
+			return 0, err
+		}
+		status, err := reader.readByte()
+		if err != nil {
+			return 0, err
+		}
+		if status != byte(v1.STATUS_OK) {
+			return 0, fmt.Errorf("settlement result status %d", status)
+		}
+	}
+	return int(count), nil
 }
 
 func writeBenchmarkFrame(writer io.Writer, frame []byte) error {

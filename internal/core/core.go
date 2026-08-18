@@ -371,6 +371,7 @@ type ackOp struct {
 	sequences  []uint64
 	successful []bool
 	matched    []bool
+	seen       map[uint64]struct{}
 	expected   int
 	received   int
 	buffered   []ackMessageResult
@@ -475,6 +476,7 @@ func (op *ackOp) finish() {
 	clear(op.sequences)
 	clear(op.successful)
 	clear(op.matched)
+	clear(op.seen)
 	clear(op.buffered)
 	op.messageIDs = op.messageIDs[:0]
 	op.payloads = op.payloads[:0]
@@ -584,7 +586,7 @@ func (c *Core) Bind(connectorName string, meta, overrides map[string]string) (Bi
 		if err != nil {
 			return BindResult{}, err
 		}
-		generation, err = connector.CompileGeneration(connectorconfig.ConnectorsConfig{connectorName: modified}, c.l)
+		generation, err = generation.CompileDerived(connectorconfig.ConnectorsConfig{connectorName: modified}, c.l)
 		if err != nil {
 			return BindResult{}, err
 		}
@@ -1212,6 +1214,8 @@ func (c *Core) acknowledge(subscriptionID byte, messageIDs [][]byte, nack bool, 
 		op.successful = op.successful[:len(messageIDs)]
 		op.matched = op.matched[:len(messageIDs)]
 	}
+	strictlyIncreasing := true
+	var previousSequence uint64
 	for i, id := range messageIDs {
 		payload, sequence, err := decodeMessageID(id, rs.incarnation, rs.reader.MsgIDArgsLen())
 		if err != nil {
@@ -1222,22 +1226,30 @@ func (c *Core) acknowledge(subscriptionID byte, messageIDs [][]byte, nack bool, 
 		op.messageIDs[i] = id
 		op.payloads[i] = payload
 		op.sequences[i] = sequence
+		if i > 0 && sequence <= previousSequence {
+			strictlyIncreasing = false
+		}
+		previousSequence = sequence
 	}
 	rs.settlementMu.Lock()
-	for i, sequence := range op.sequences {
+	for _, sequence := range op.sequences {
 		if sequence == 0 || rs.containsSettlement(sequence) {
 			rs.settlementMu.Unlock()
 			op.finished = true
 			op.finish()
 			return fmt.Errorf("%w: message ID already settled or in progress", ErrInvalidMessageID)
 		}
-		for _, prior := range op.sequences[:i] {
-			if prior == sequence {
+		if !strictlyIncreasing && len(op.sequences) > 1 {
+			if op.seen == nil {
+				op.seen = make(map[uint64]struct{}, len(op.sequences))
+			}
+			if _, duplicate := op.seen[sequence]; duplicate {
 				rs.settlementMu.Unlock()
 				op.finished = true
 				op.finish()
 				return fmt.Errorf("%w: duplicate message ID in request", ErrInvalidMessageID)
 			}
+			op.seen[sequence] = struct{}{}
 		}
 	}
 	rs.addActiveSettlement(op)

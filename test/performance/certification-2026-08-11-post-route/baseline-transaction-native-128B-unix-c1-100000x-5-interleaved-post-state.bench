@@ -1,9 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/fujin-io/fujin/test
-cpu: Apple M2
-Benchmark_Session_Transaction_Native/transport=unix/payload=128B/batch=1/concurrency=1-8	100000	     39006 ns/op	   3.28 MB/s	    140959 p99-ns	   82291 B/op	      15 allocs/op
-Benchmark_Session_Transaction_Native/transport=unix/payload=128B/batch=1/concurrency=1-8	100000	     39134 ns/op	   3.27 MB/s	    139375 p99-ns	   82290 B/op	      15 allocs/op
-Benchmark_Session_Transaction_Native/transport=unix/payload=128B/batch=1/concurrency=1-8	100000	     39083 ns/op	   3.28 MB/s	    142209 p99-ns	   82289 B/op	      15 allocs/op
-Benchmark_Session_Transaction_Native/transport=unix/payload=128B/batch=1/concurrency=1-8	100000	     39458 ns/op	   3.24 MB/s	    143709 p99-ns	   82288 B/op	      15 allocs/op
-Benchmark_Session_Transaction_Native/transport=unix/payload=128B/batch=1/concurrency=1-8	100000	     38818 ns/op	   3.30 MB/s	    146542 p99-ns	   82287 B/op	      15 allocs/op

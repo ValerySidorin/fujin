@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -96,6 +97,29 @@ func TestPerformanceBatchMatrixBoundsWirePayload(t *testing.T) {
 			t.Fatalf("batch size %d is not covered", batchSize)
 		}
 	}
+}
+
+func TestSessionBenchmarkPayloadFilterAcceptsCommaSeparatedValues(t *testing.T) {
+	t.Setenv("FUJIN_BENCH_PAYLOAD", "1B, 1MiB")
+	if !sessionBenchmarkPayloadEnabled("1B") || !sessionBenchmarkPayloadEnabled("1MiB") {
+		t.Fatal("listed payload was not enabled")
+	}
+	if sessionBenchmarkPayloadEnabled("128B") {
+		t.Fatal("unlisted payload was enabled")
+	}
+}
+
+func sessionBenchmarkPayloadEnabled(name string) bool {
+	filter := os.Getenv("FUJIN_BENCH_PAYLOAD")
+	if filter == "" {
+		return true
+	}
+	for value := range strings.SplitSeq(filter, ",") {
+		if strings.TrimSpace(value) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPerformanceEnvironmentFingerprint(t *testing.T) {

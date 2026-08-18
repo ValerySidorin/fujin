@@ -10,6 +10,7 @@ import (
 	"time"
 
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,12 +91,70 @@ func (r *testRuntime) Close(context.Context) error {
 	return nil
 }
 
+type eagerTestSettings struct {
+	endpoint string
+	version  string
+	fail     bool
+}
+
+type eagerTestCompiled struct {
+	open      func() (Runtime, error)
+	exclusive []string
+}
+
+func (*eagerTestCompiled) Routes() map[string]RouteProfile {
+	return map[string]RouteProfile{"route": validProfile()}
+}
+
+func (c *eagerTestCompiled) OpenRuntime(*slog.Logger) (Runtime, error) { return c.open() }
+func (*eagerTestCompiled) OpenRuntimeEagerly() bool                    { return true }
+func (c *eagerTestCompiled) ExclusiveRuntimeKeys() []string {
+	return append([]string(nil), c.exclusive...)
+}
+
+func eagerTestDescriptor(opens, closes *atomic.Int32) Descriptor {
+	return Descriptor{Compile: func(value any) (Compiled, error) {
+		settings := value.(eagerTestSettings)
+		compiled := &eagerTestCompiled{}
+		if settings.endpoint != "" {
+			compiled.exclusive = []string{settings.endpoint}
+		}
+		compiled.open = func() (Runtime, error) {
+			opens.Add(1)
+			if settings.fail {
+				return nil, errors.New("runtime open failed")
+			}
+			return &testRuntime{closed: closes}, nil
+		}
+		return compiled, nil
+	}}
+}
+
 func validProfile() RouteProfile {
 	return RouteProfile{
 		Produce: true, Headers: true, Transactions: true, Subscribe: true, Fetch: true,
 		ManualSettlement: true, ProduceGuarantee: AcceptancePeer,
 		Settlement: SettlementProfile{Ack: AckSingle, Nack: NackRequeue},
 	}
+}
+
+type testMiddlewareChain struct {
+	wrappedWriters atomic.Int32
+	closed         atomic.Int32
+}
+
+func (c *testMiddlewareChain) WrapReader(r ReadCloser, _ string, _ *slog.Logger) (ReadCloser, error) {
+	return r, nil
+}
+
+func (c *testMiddlewareChain) WrapWriter(w WriteCloser, _ string, _ *slog.Logger) (WriteCloser, error) {
+	c.wrappedWriters.Add(1)
+	return w, nil
+}
+
+func (c *testMiddlewareChain) Close(context.Context) error {
+	c.closed.Add(1)
+	return nil
 }
 
 func TestValidateHeadersCanonicalMultimap(t *testing.T) {
@@ -136,6 +195,222 @@ func TestCatalogReloadPublishesOnlyValidGeneration(t *testing.T) {
 	assert.Same(t, old, catalog.Current())
 	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"new": {Type: name}}))
 	assert.NotSame(t, old, catalog.Current())
+}
+
+func TestCatalogReloadRejectsInvalidMiddlewareBeforePublication(t *testing.T) {
+	name := "connector_catalog_middleware_compile_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	compileMiddlewares := func(configs []cmwconfig.Config, _ *slog.Logger) (MiddlewareChain, error) {
+		if len(configs) > 0 {
+			return nil, errors.New("middleware compile failed")
+		}
+		return nil, nil
+	}
+	catalog, err := CompileCatalog(
+		connectorconfig.ConnectorsConfig{"old": {Type: name}},
+		slog.Default(),
+		compileMiddlewares,
+	)
+	require.NoError(t, err)
+	old := catalog.Current()
+
+	err = catalog.Reload(connectorconfig.ConnectorsConfig{"new": {
+		Type:                 name,
+		ConnectorMiddlewares: []cmwconfig.Config{{Name: "broken"}},
+	}})
+	require.ErrorContains(t, err, "middleware compile failed")
+	assert.Same(t, old, catalog.Current())
+}
+
+func TestCatalogKeepsOrdinaryRuntimeLazy(t *testing.T) {
+	name := "connector_catalog_lazy_runtime_test"
+	var opens atomic.Int32
+	require.NoError(t, Register(name, Descriptor{Compile: func(any) (Compiled, error) {
+		return StaticCompiled(map[string]RouteProfile{"route": validProfile()}, func(*slog.Logger) (Runtime, error) {
+			opens.Add(1)
+			return &testRuntime{}, nil
+		})
+	}}))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	assert.Zero(t, opens.Load())
+	binding, err := catalog.Current().Acquire("connector")
+	require.NoError(t, err)
+	writer, err := binding.NewWriter("route", slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	require.NoError(t, writer.Close())
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogPreflightsEagerRuntime(t *testing.T) {
+	name := "connector_catalog_eager_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{version: "v1"},
+	}}, slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestCatalogReusesUnchangedEagerRuntimeAcrossGenerations(t *testing.T) {
+	name := "connector_catalog_shared_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	config := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	catalog, err := CompileCatalog(config, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	require.NoError(t, catalog.Reload(config))
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestDerivedGenerationReusesParentEagerRuntime(t *testing.T) {
+	name := "connector_derived_shared_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	config := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	catalog, err := CompileCatalog(config, slog.Default())
+	require.NoError(t, err)
+	derived, err := catalog.Current().CompileDerived(config, slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	binding, err := derived.Acquire("connector")
+	require.NoError(t, err)
+	derived.Retire()
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, derived.WaitClosed(ctx))
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestSharedRuntimeKeepsMiddlewareGenerationLocal(t *testing.T) {
+	name := "connector_shared_runtime_middleware_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	var chains []*testMiddlewareChain
+	compileMiddlewares := func([]cmwconfig.Config, *slog.Logger) (MiddlewareChain, error) {
+		chain := &testMiddlewareChain{}
+		chains = append(chains, chain)
+		return chain, nil
+	}
+	settings := eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"}
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: settings, ConnectorMiddlewares: []cmwconfig.Config{{Name: "one"}},
+	}}, slog.Default(), compileMiddlewares)
+	require.NoError(t, err)
+	old := catalog.Current()
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: settings, ConnectorMiddlewares: []cmwconfig.Config{{Name: "two"}},
+	}}))
+	require.Len(t, chains, 2)
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Equal(t, int32(1), chains[0].closed.Load())
+	assert.Zero(t, chains[1].closed.Load())
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), chains[1].closed.Load())
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestCatalogRollsBackPartiallyOpenedCandidate(t *testing.T) {
+	name := "connector_catalog_eager_rollback_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{}, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	err = catalog.Reload(connectorconfig.ConnectorsConfig{
+		"a-open": {Type: name, Settings: eagerTestSettings{version: "open"}},
+		"z-fail": {Type: name, Settings: eagerTestSettings{version: "fail", fail: true}},
+	})
+	require.ErrorContains(t, err, "runtime open failed")
+	assert.Same(t, old, catalog.Current())
+	assert.Equal(t, int32(2), opens.Load())
+	assert.Equal(t, int32(1), closes.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogRequiresDrainForChangedExclusiveRuntime(t *testing.T) {
+	name := "connector_catalog_exclusive_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	oldConfig := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	newConfig := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v2"},
+	}}
+	catalog, err := CompileCatalog(oldConfig, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	err = catalog.Reload(newConfig)
+	require.ErrorIs(t, err, ErrRuntimeDrainRequired)
+	assert.Same(t, old, catalog.Current())
+	assert.Equal(t, int32(1), opens.Load())
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{}))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+	require.NoError(t, catalog.Reload(newConfig))
+	assert.Equal(t, int32(2), opens.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(2), closes.Load())
+}
+
+func TestBindingAppliesCompiledMiddlewareChain(t *testing.T) {
+	name := "connector_binding_compiled_middleware_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	chain := &testMiddlewareChain{}
+	generation, err := CompileGeneration(connectorconfig.ConnectorsConfig{"connector": {
+		Type:                 name,
+		ConnectorMiddlewares: []cmwconfig.Config{{Name: "compiled"}},
+	}}, slog.Default(), func([]cmwconfig.Config, *slog.Logger) (MiddlewareChain, error) {
+		return chain, nil
+	})
+	require.NoError(t, err)
+	binding, err := generation.Acquire("connector")
+	require.NoError(t, err)
+	writer, err := binding.NewWriter("route", slog.Default())
+	require.NoError(t, err)
+	wrapped, err := binding.WrapWriter(writer, slog.Default())
+	require.NoError(t, err)
+	assert.Same(t, writer, wrapped)
+	assert.Equal(t, int32(1), chain.wrappedWriters.Load())
+
+	generation.Retire()
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, generation.WaitClosed(ctx))
+	assert.Equal(t, int32(1), chain.closed.Load())
 }
 func TestGenerationCopiesMutableConfigurationAndProfiles(t *testing.T) {
 	name := "connector_generation_immutability_test"
@@ -229,6 +504,20 @@ func TestCatalogStatusTracksImmediateGenerationRetirement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogRejectsReloadAfterClose(t *testing.T) {
+	name := "connector_catalog_closed_reload_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+	assert.Nil(t, catalog.Current())
+	assert.ErrorContains(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {Type: name}}), "closed")
+	assert.Nil(t, catalog.Current())
 }
 
 func TestCatalogStatusTracksDrainingBinding(t *testing.T) {

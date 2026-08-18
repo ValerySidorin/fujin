@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1
+
+ARG GO_VERSION=1.25.1
+
+FROM golang:${GO_VERSION}-alpine AS builder
+
+ARG VERSION=dev
+ARG FUJIN_GO_TAGS=fujin,grpc,zeromq_pebbe
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN apk add --no-cache build-base zeromq-dev libsodium-dev
+RUN go mod download
+COPY . .
+RUN go run ./cmd/builder \
+    -local \
+    -cgo \
+    -tags "${FUJIN_GO_TAGS}" \
+    -ldflags "-X main.Version=${VERSION}" \
+    -configurator github.com/fujin-io/fujin/public/plugins/configurator/all \
+    -connector github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe \
+    -transport github.com/fujin-io/fujin/public/plugins/transport/all \
+    -bind-middleware github.com/fujin-io/fujin/public/plugins/middleware/bind/all \
+    -connector-middleware github.com/fujin-io/fujin/public/plugins/middleware/connector/all \
+    -output /app/bin/fujin
+
+FROM alpine:3.22 AS runtime
+RUN apk add --no-cache zeromq libsodium ca-certificates
+WORKDIR /
+COPY --from=builder /app/bin/fujin /fujin
+STOPSIGNAL SIGTERM
+EXPOSE 4850/tcp 4848/udp 4849/tcp 5555/tcp 5556/tcp
+ENTRYPOINT ["/fujin"]

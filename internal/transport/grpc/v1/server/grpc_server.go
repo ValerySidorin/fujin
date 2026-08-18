@@ -607,70 +607,126 @@ func (s *streamSession) handleUnsubscribe(req *pb.UnsubscribeRequest) error {
 	})
 }
 
-func (s *streamSession) handleAck(req *pb.AckRequest) error {
-	remaining := len(req.MessageIds)
-	results := make([]*pb.AckMessageResult, 0, remaining)
-	respond := func(err error) {
-		if sendErr := s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Ack{Ack: &pb.AckResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         grpcOperationError(err),
-				Results:       results,
-			}},
-		}); sendErr != nil {
-			s.l.Error("send ack response", "err", sendErr)
+type grpcSettlementResponse struct {
+	session       *streamSession
+	correlationID uint32
+	remaining     int
+	nack          bool
+	handlers      core.AckResultHandlers
+	ackValues     []pb.AckMessageResult
+	ackResults    []*pb.AckMessageResult
+	nackValues    []pb.NackMessageResult
+	nackResults   []*pb.NackMessageResult
+	ackResponse   pb.AckResponse
+	nackResponse  pb.NackResponse
+	ackEnvelope   pb.FujinResponse_Ack
+	nackEnvelope  pb.FujinResponse_Nack
+	response      pb.FujinResponse
+}
+
+var grpcSettlementResponses = sync.Pool{New: func() any {
+	return new(grpcSettlementResponse)
+}}
+
+func getGRPCSettlementResponse(session *streamSession, correlationID uint32, count int, nack bool) *grpcSettlementResponse {
+	response := grpcSettlementResponses.Get().(*grpcSettlementResponse)
+	if response.handlers.Result == nil {
+		response.handlers.Result = response.onResult
+		response.handlers.Message = response.onMessage
+	}
+	response.session = session
+	response.correlationID = correlationID
+	response.remaining = count
+	response.nack = nack
+	if nack {
+		if cap(response.nackValues) < count {
+			response.nackValues = make([]pb.NackMessageResult, 0, count)
+			response.nackResults = make([]*pb.NackMessageResult, 0, count)
 		}
+	} else if cap(response.ackValues) < count {
+		response.ackValues = make([]pb.AckMessageResult, 0, count)
+		response.ackResults = make([]*pb.AckMessageResult, 0, count)
 	}
-	handlers := core.AckResultHandlers{
-		Result: func(err error) {
-			if err != nil || remaining == 0 {
-				respond(err)
-			}
-		},
-		Message: func(messageID []byte, err error) {
-			results = append(results, &pb.AckMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
-			remaining--
-			if remaining == 0 {
-				respond(nil)
-			}
-		},
+	return response
+}
+
+func (r *grpcSettlementResponse) onResult(err error) {
+	if err != nil || r.remaining == 0 {
+		r.respond(err)
 	}
-	if err := s.core.Ack(byte(req.SubscriptionId), req.MessageIds, handlers); err != nil {
-		respond(err)
+}
+
+func (r *grpcSettlementResponse) onMessage(messageID []byte, err error) {
+	if r.nack {
+		r.nackValues = append(r.nackValues, pb.NackMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
+		r.nackResults = append(r.nackResults, &r.nackValues[len(r.nackValues)-1])
+	} else {
+		r.ackValues = append(r.ackValues, pb.AckMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
+		r.ackResults = append(r.ackResults, &r.ackValues[len(r.ackValues)-1])
+	}
+	r.remaining--
+	if r.remaining == 0 {
+		r.respond(nil)
+	}
+}
+
+func (r *grpcSettlementResponse) respond(err error) {
+	if r.nack {
+		r.nackResponse = pb.NackResponse{
+			CorrelationId: r.correlationID,
+			Error:         grpcOperationError(err),
+			Results:       r.nackResults,
+		}
+		r.nackEnvelope = pb.FujinResponse_Nack{Nack: &r.nackResponse}
+		r.response = pb.FujinResponse{Response: &r.nackEnvelope}
+	} else {
+		r.ackResponse = pb.AckResponse{
+			CorrelationId: r.correlationID,
+			Error:         grpcOperationError(err),
+			Results:       r.ackResults,
+		}
+		r.ackEnvelope = pb.FujinResponse_Ack{Ack: &r.ackResponse}
+		r.response = pb.FujinResponse{Response: &r.ackEnvelope}
+	}
+	if sendErr := r.session.sendResponse(&r.response); sendErr != nil {
+		r.session.l.Error("send settlement response", "err", sendErr)
+	}
+	r.release()
+}
+
+func (r *grpcSettlementResponse) release() {
+	clear(r.ackValues)
+	clear(r.ackResults)
+	clear(r.nackValues)
+	clear(r.nackResults)
+	r.ackValues = r.ackValues[:0]
+	r.ackResults = r.ackResults[:0]
+	r.nackValues = r.nackValues[:0]
+	r.nackResults = r.nackResults[:0]
+	r.session = nil
+	r.correlationID = 0
+	r.remaining = 0
+	r.nack = false
+	r.ackResponse = pb.AckResponse{}
+	r.nackResponse = pb.NackResponse{}
+	r.ackEnvelope = pb.FujinResponse_Ack{}
+	r.nackEnvelope = pb.FujinResponse_Nack{}
+	r.response = pb.FujinResponse{}
+	grpcSettlementResponses.Put(r)
+}
+
+func (s *streamSession) handleAck(req *pb.AckRequest) error {
+	response := getGRPCSettlementResponse(s, req.CorrelationId, len(req.MessageIds), false)
+	if err := s.core.Ack(byte(req.SubscriptionId), req.MessageIds, response.handlers); err != nil {
+		response.onResult(err)
 	}
 	return nil
 }
 
 func (s *streamSession) handleNack(req *pb.NackRequest) error {
-	remaining := len(req.MessageIds)
-	results := make([]*pb.NackMessageResult, 0, remaining)
-	respond := func(err error) {
-		if sendErr := s.sendResponse(&pb.FujinResponse{
-			Response: &pb.FujinResponse_Nack{Nack: &pb.NackResponse{
-				CorrelationId: req.CorrelationId,
-				Error:         grpcOperationError(err),
-				Results:       results,
-			}},
-		}); sendErr != nil {
-			s.l.Error("send nack response", "err", sendErr)
-		}
-	}
-	handlers := core.AckResultHandlers{
-		Result: func(err error) {
-			if err != nil || remaining == 0 {
-				respond(err)
-			}
-		},
-		Message: func(messageID []byte, err error) {
-			results = append(results, &pb.NackMessageResult{MessageId: messageID, Error: grpcOperationError(err)})
-			remaining--
-			if remaining == 0 {
-				respond(nil)
-			}
-		},
-	}
-	if err := s.core.Nack(byte(req.SubscriptionId), req.MessageIds, handlers); err != nil {
-		respond(err)
+	response := getGRPCSettlementResponse(s, req.CorrelationId, len(req.MessageIds), true)
+	if err := s.core.Nack(byte(req.SubscriptionId), req.MessageIds, response.handlers); err != nil {
+		response.onResult(err)
 	}
 	return nil
 }

@@ -420,3 +420,30 @@ func TestTerminalWatcherFailureLeavesControllerUsable(t *testing.T) {
 	require.Equal(t, configurator.ApplyAccepted, result.State)
 	require.True(t, result.Changed)
 }
+
+func TestStopRuntimeSourcesWaitsForWatcherSettlement(t *testing.T) {
+	runtimeCtx, runtimeCancel := context.WithCancel(context.Background())
+	settled := make(chan struct{})
+	returned := make(chan struct{})
+	go func() {
+		stopRuntimeSources(runtimeCancel, settled)
+		close(returned)
+	}()
+
+	select {
+	case <-runtimeCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("runtime source was not canceled")
+	}
+	select {
+	case <-returned:
+		t.Fatal("shutdown continued before watcher settlement")
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(settled)
+	select {
+	case <-returned:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not continue after watcher settlement")
+	}
+}

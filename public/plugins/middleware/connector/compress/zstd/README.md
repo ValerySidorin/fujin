@@ -16,8 +16,7 @@ connectors:
   my_connector:
     connector_middlewares:
       - name: compress_zstd
-        config:
-          level: default    # compression level (default: default)
+        level: default    # compression level (default: default)
 ```
 
 | Field | Default | Description |

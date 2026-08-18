@@ -22,5 +22,8 @@ func startReloadLoop(
 	_ *connectorRuntimeController,
 	_ *slog.LevelVar,
 	_ *slog.Logger,
-) {
+) <-chan struct{} {
+	settled := make(chan struct{})
+	close(settled)
+	return settled
 }

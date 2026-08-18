@@ -1566,6 +1566,36 @@ func TestHandle_Ack_ZeroMsgIDs(t *testing.T) {
 	assert.Equal(t, uint32(0), respCount)
 }
 
+func TestAckResponseQueuesSuccessfulBatchAsSingleFrame(t *testing.T) {
+	out := newTestOutbound(&mockStream{})
+	cID := append(pool.Get(v1.Uint32Len), 0, 0, 0, 7)
+	messageIDs := GetBufs()
+	for _, value := range []string{"first", "second"} {
+		messageIDs = append(messageIDs, append(pool.Get(len(value)), value...))
+	}
+	expected := []byte{byte(v1.RESP_CODE_ACK), 0, 0, 0, 7, byte(v1.STATUS_OK), 0, 0, 0, 2}
+	for _, messageID := range messageIDs {
+		expected = binary.BigEndian.AppendUint32(expected, uint32(len(messageID)))
+		expected = append(expected, messageID...)
+		expected = append(expected, byte(v1.STATUS_OK))
+	}
+
+	response := &ackResponse{
+		h:          &Handler{out: out},
+		op:         byte(v1.RESP_CODE_ACK),
+		messageIDs: messageIDs,
+		cID:        cID,
+		remaining:  len(messageIDs),
+	}
+	response.onResult(nil)
+	response.onMessage(messageIDs[0], nil)
+	response.onMessage(messageIDs[1], nil)
+
+	require.Len(t, out.v, 1)
+	assert.Equal(t, expected, out.v[0])
+	pool.Put(out.v[0])
+}
+
 // ---------------------------------------------------------------------------
 // PONG Tests
 // ---------------------------------------------------------------------------

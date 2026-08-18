@@ -1,9 +1,0 @@
-goos: darwin
-goarch: arm64
-pkg: github.com/fujin-io/fujin/test
-cpu: Apple M2
-Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8         	     100	     18815 ns/op	   6.80 MB/s	   1550750 p99-ns	    1774 B/op	      40 allocs/op
-Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8         	     100	     22554 ns/op	   5.68 MB/s	   1907333 p99-ns	    1709 B/op	      40 allocs/op
-Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8         	     100	     22845 ns/op	   5.60 MB/s	   1871333 p99-ns	    1724 B/op	      41 allocs/op
-Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8         	     100	     24335 ns/op	   5.26 MB/s	   1996875 p99-ns	    1733 B/op	      41 allocs/op
-Benchmark_Session_Produce_GRPC/payload=128B/batch=1/concurrency=128-8         	

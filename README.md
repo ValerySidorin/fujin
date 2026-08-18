@@ -4,11 +4,20 @@ High-performance message broker gateway. Sits between your applications and mess
 
 Think of it as Envoy, but for message brokers instead of HTTP.
 
+Current release: **v0.4.0**.
+
+### v0.4.0 highlights
+
+- Unified native and gRPC operations on the generation-pinned Session Core, with explicit route capability and settlement contracts.
+- Added WebSocket transport for the native binary protocol and an opt-in `zeromq_pebbe` connector with PUB/SUB, PUSH/PULL, `fujin_v1` framing, and CURVE security.
+- Added generation-scoped connector middleware compilation, eager runtime preflight, shared runtime ownership, and deterministic drain behavior for exclusive bind endpoints.
+- Certified the Session Core performance change against the pre-cutover baseline across representative 128 B and 1 MiB workloads; sustained native TCP, QUIC, and Unix workloads completed without stalls.
+
 ## Why
 
 Broker client libraries are heavy, language-specific, and tightly coupled to your application. Upgrading a Kafka client, adding metrics, or switching from RabbitMQ to NATS means changing and redeploying every service.
 
-Fujin decouples applications from brokers. Your app talks to Fujin over a simple TCP/QUIC connection or gRPC — Fujin handles the rest. This gives you:
+Fujin decouples applications from brokers. Your app talks to Fujin over TCP, QUIC, WebSocket, Unix sockets, or gRPC — Fujin handles the rest. This gives you:
 
 - **Any language, any broker.** No need for a native Kafka or NATS client in every language. If your app can open a TCP socket or call gRPC, it can produce and consume messages.
 - **Centralized operations.** Observability, authorization, broker client upgrades, and versioned connector desired state can be managed centrally without redeploying application clients.
@@ -28,10 +37,11 @@ Fujin decouples applications from brokers. Your app talks to Fujin over a simple
 | Redis/Valkey Streams | `redis_rueidis_streams` |
 | MQTT (EMQX, NanoMQ, etc.) | `mqtt_paho` |
 | NSQ | `nsq` |
+| ZeroMQ (`libzmq`, opt-in CGO build) | `zeromq_pebbe` |
 
 ## Client Interfaces
 
-**Fujin Protocol** — Custom binary protocol over TCP, QUIC, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
+**Fujin Protocol** — Custom binary protocol over TCP, QUIC, WebSocket, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
 
 **gRPC** — Standard gRPC interface. Works with any language that has a gRPC library. `BindResponse.routes` exposes the same pinned capability profile as the native protocol.
 
@@ -41,6 +51,7 @@ Fujin decouples applications from brokers. Your app talks to Fujin over a simple
 |-----------|----------|
 | TCP | Maximum single-stream throughput. Optional TLS. |
 | QUIC | Multiplexed streams, built-in TLS, connection migration. |
+| WebSocket | Browser and HTTP-infrastructure access to the native binary protocol. |
 | Unix | Same-host IPC (sidecars, pods). Lowest latency. |
 
 ## Quick Start
@@ -78,17 +89,66 @@ Build tags: `fujin` (native protocol transports), `grpc` (gRPC server).
 
 Everything is pluggable: transports, connectors, config loaders, and middleware. Plugins self-register via `init()`. The custom binary builder (`cmd/builder`) generates a `main.go` that imports only selected plugins, keeping the binary small.
 
-| Plugin type | Examples |
-|-------------|----------|
-| Transports | `tcp`, `quic`, `unix` |
-| Connectors | `kafka_franz`, `nats_core`, `rabbitmq_amqp09`, ... |
-| Configurators | `yaml`, `env` |
-| Bind middleware | `auth_api_key` |
-| Connector middleware | `prom`, `otel`, `schema/json`, `transform/jq`, `filter/jq`, `dedup`, `compress/zstd`, `rate_limit/token_bucket` |
+### Built-in Plugin Reference
 
-Write your own plugins — see [`examples/plugins/`](examples/plugins/) for a complete example with a custom connector and rate-limiting middleware. Each plugin has a README with configuration examples in its package directory under [`public/plugins/`](public/plugins/).
+Every built-in plugin has a package-local README containing its registered name, configuration, behavior, limits, and operational notes.
+
+#### Transports
+
+| Registered name | Documentation |
+|---|---|
+| `tcp` | [TCP](public/plugins/transport/tcp/README.md) |
+| `quic` | [QUIC](public/plugins/transport/quic/README.md) |
+| `websocket` | [WebSocket](public/plugins/transport/websocket/README.md) |
+| `unix` | [Unix socket](public/plugins/transport/unix/README.md) |
+
+#### Connectors
+
+| Registered name | Documentation |
+|---|---|
+| `azure_amqp1` | [Azure AMQP 1.0](public/plugins/connector/azure/amqp1/README.md) |
+| `kafka_franz` | [Kafka via franz-go](public/plugins/connector/kafka/franz/README.md) |
+| `mqtt_paho` | [MQTT via Paho](public/plugins/connector/mqtt/paho/README.md) |
+| `nats_core` | [NATS Core](public/plugins/connector/nats/core/README.md) |
+| `nats_jetstream` | [NATS JetStream](public/plugins/connector/nats/jetstream/README.md) |
+| `nsq` | [NSQ](public/plugins/connector/nsq/README.md) |
+| `rabbitmq_amqp09` | [RabbitMQ AMQP 0.9.1](public/plugins/connector/rabbitmq/amqp09/README.md) |
+| `redis_rueidis_pubsub` | [Redis Pub/Sub](public/plugins/connector/redis/rueidis/pubsub/README.md) |
+| `redis_rueidis_streams` | [Redis Streams](public/plugins/connector/redis/rueidis/streams/README.md) |
+| `zeromq_pebbe` | [ZeroMQ via pebbe/zmq4](public/plugins/connector/zeromq/pebbe/README.md) |
+
+#### Configurators
+
+| Registered name | Documentation |
+|---|---|
+| `yaml` | [YAML/JSON files](public/plugins/configurator/yaml/README.md) |
+| `env` | [Environment variable](public/plugins/configurator/env/README.md) |
+
+#### Bind Middleware
+
+| Registered name | Documentation |
+|---|---|
+| `auth_api_key` | [API key authentication](public/plugins/middleware/bind/auth_api_key/README.md) |
+
+#### Connector Middleware
+
+| Registered name | Documentation |
+|---|---|
+| `prom` | [Prometheus metrics](public/plugins/middleware/connector/prom/README.md) |
+| `otel` | [OpenTelemetry tracing](public/plugins/middleware/connector/otel/README.md) |
+| `schema_json` | [JSON Schema validation](public/plugins/middleware/connector/schema/json/README.md) |
+| `transform_jq` | [jq transformation](public/plugins/middleware/connector/transform/jq/README.md) |
+| `transform_wasm` | [WebAssembly transformation](public/plugins/middleware/connector/transform/wasm/README.md) |
+| `filter_jq` | [jq filtering](public/plugins/middleware/connector/filter/jq/README.md) |
+| `dedup` | [Deduplication](public/plugins/middleware/connector/dedup/README.md) |
+| `compress_zstd` | [Zstandard compression](public/plugins/middleware/connector/compress/zstd/README.md) |
+| `rate_limit_token_bucket` | [Token-bucket rate limiting](public/plugins/middleware/connector/rate_limit/token_bucket/README.md) |
+
+Write your own plugins using the examples under [`examples/plugins/`](examples/plugins/). The custom binary builder imports only the selected plugins, keeping the resulting binary small.
 
 Connector plugins expose a side-effect-free descriptor. Fujin compiles settings and route capabilities without broker I/O, then lazily opens generation-owned runtimes when an operation first needs broker resources. A successful BIND proves local configuration validity and returns the pinned route profiles to native and gRPC clients; it does not prove broker availability.
+
+`transform_wasm` runs SHA-256-pinned WebAssembly transforms in wazero without WASI, filesystem, environment, or network imports. The Rust example under [`examples/plugins/middleware/connector/wasm-uppercase`](examples/plugins/middleware/connector/wasm-uppercase) implements the guest ABI.
 
 ### Cross-Platform
 
@@ -98,7 +158,7 @@ Fujin compiles on Linux, macOS, and Windows:
 GOOS=windows GOARCH=amd64 go build -tags=fujin,grpc ./...
 ```
 
-On Windows, Unix-only features (Unix socket transport, SIGHUP reload, graceful binary upgrade) are unavailable. TCP, QUIC, and gRPC work normally.
+On Windows, Unix-only features (Unix socket transport, SIGHUP reload, graceful binary upgrade) are unavailable. TCP, QUIC, WebSocket, and gRPC work normally.
 
 ## Deployment
 
@@ -139,7 +199,7 @@ Reloads connector configuration and log level from YAML. A connector reload comp
 
 ### Control Plane
 
-Fujin v0.3.0 adds public runtime-configurator contracts and generation lifecycle reporting for external management planes. [`fujin-control-plane`](https://github.com/fujin-io/fujin-control-plane) provides mTLS Sync, versioned desired snapshots, optimistic-concurrency updates, node status, audit records, and a `control_plane` configurator plugin.
+Public runtime-configurator contracts and generation lifecycle reporting support external management planes. [`fujin-control-plane`](https://github.com/fujin-io/fujin-control-plane) provides mTLS Sync, versioned desired snapshots, optimistic-concurrency updates, node status, audit records, and a `control_plane` configurator plugin.
 
 Delivered connector snapshots are compiled completely before atomic publication. Invalid snapshots retain the active generation; existing BIND sessions continue on their pinned generation until it drains.
 

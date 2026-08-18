@@ -1496,6 +1496,7 @@ type ackResponse struct {
 	cID        []byte
 	remaining  int
 	handlers   core.AckResultHandlers
+	response   []byte
 }
 
 var ackResponses = sync.Pool{
@@ -1506,58 +1507,55 @@ var ackResponses = sync.Pool{
 
 func (r *ackResponse) onResult(err error) {
 	r.h.out.Lock()
-	header := pool.Get(6)
-	header = append(header, r.op)
-	header = append(header, r.cID...)
+	capacity := 10
+	for _, messageID := range r.messageIDs {
+		capacity += v1.Uint32Len + len(messageID) + 1
+	}
+	r.response = pool.Get(capacity)
+	r.response = append(r.response, r.op)
+	r.response = append(r.response, r.cID...)
 	if err != nil {
-		r.h.out.QueueOutboundNoLock(header)
 		errBuf := operationErrorBuf(err)
-		r.h.out.QueueOutboundNoLock(errBuf)
+		r.response = append(r.response, errBuf...)
 		pool.Put(errBuf)
-		r.h.out.SignalFlush()
+		r.enqueueResponseNoLock()
 		r.h.out.Unlock()
-		pool.Put(header)
 		r.release()
 		return
 	}
 
-	header = append(header, byte(v1.STATUS_OK))
-	r.h.out.QueueOutboundNoLock(header)
-	countBuf := pool.Get(v1.Uint32Len)
-	countBuf = binary.BigEndian.AppendUint32(countBuf, uint32(r.remaining))
-	r.h.out.QueueOutboundNoLock(countBuf)
-	r.h.out.SignalFlush()
-	pool.Put(countBuf)
-	pool.Put(header)
+	r.response = append(r.response, byte(v1.STATUS_OK))
+	r.response = binary.BigEndian.AppendUint32(r.response, uint32(r.remaining))
 	if r.remaining == 0 {
+		r.enqueueResponseNoLock()
 		r.h.out.Unlock()
 		r.release()
 	}
 }
 
 func (r *ackResponse) onMessage(messageID []byte, err error) {
-	lenBuf := pool.Get(v1.Uint32Len)
-	lenBuf = binary.BigEndian.AppendUint32(lenBuf, uint32(len(messageID)))
-	r.h.out.QueueOutboundNoLock(lenBuf)
-	r.h.out.QueueOutboundNoLock(messageID)
-	pool.Put(lenBuf)
+	r.response = binary.BigEndian.AppendUint32(r.response, uint32(len(messageID)))
+	r.response = append(r.response, messageID...)
 	if err == nil {
-		flag := pool.Get(1)
-		flag = append(flag, byte(v1.STATUS_OK))
-		r.h.out.QueueOutboundNoLock(flag)
-		pool.Put(flag)
+		r.response = append(r.response, byte(v1.STATUS_OK))
 	} else {
 		errBuf := operationErrorBuf(err)
-		r.h.out.QueueOutboundNoLock(errBuf)
+		r.response = append(r.response, errBuf...)
 		pool.Put(errBuf)
 	}
-	r.h.out.SignalFlush()
 
 	r.remaining--
 	if r.remaining == 0 {
+		r.enqueueResponseNoLock()
 		r.h.out.Unlock()
 		r.release()
 	}
+}
+
+func (r *ackResponse) enqueueResponseNoLock() {
+	r.h.out.QueueOutboundOwnedMultiNoLock(r.response)
+	r.h.out.SignalFlush()
+	r.response = nil
 }
 
 func (r *ackResponse) release() {
@@ -1568,7 +1566,7 @@ func (r *ackResponse) release() {
 	if r.messageIDs != nil {
 		PutBufs(r.messageIDs)
 	}
-	r.h, r.messageIDs, r.cID = nil, nil, nil
+	r.h, r.messageIDs, r.cID, r.response = nil, nil, nil, nil
 	r.op, r.remaining = 0, 0
 	ackResponses.Put(r)
 }
@@ -1741,14 +1739,37 @@ func (h *Handler) fetch(route string, autoCommit bool, n uint32) {
 }
 
 func appendAutoCommitFetchMessage(messages *bufsLease, payload []byte) {
-	size := uint32(len(payload))
+	messageSize := v1.Uint32Len + len(payload)
+	if fetchBufferHasCapacity(messages, messageSize) {
+		buffer := &messages.bufs[len(messages.bufs)-1]
+		*buffer = binary.BigEndian.AppendUint32(*buffer, uint32(len(payload)))
+		*buffer = append(*buffer, payload...)
+		return
+	}
+
 	var prefix [v1.Uint32Len]byte
-	binary.BigEndian.PutUint32(prefix[:], size)
+	binary.BigEndian.PutUint32(prefix[:], uint32(len(payload)))
 	appendFetchBytes(messages, prefix[:])
 	appendFetchBytes(messages, payload)
 }
 
 func appendAutoCommitHFetchMessage(messages *bufsLease, payload []byte, headers [][]byte) {
+	messageSize := v1.Uint16Len + v1.Uint32Len + len(payload)
+	for _, header := range headers {
+		messageSize += v1.Uint32Len + len(header)
+	}
+	if fetchBufferHasCapacity(messages, messageSize) {
+		buffer := &messages.bufs[len(messages.bufs)-1]
+		*buffer = binary.BigEndian.AppendUint16(*buffer, uint16(len(headers)))
+		for _, header := range headers {
+			*buffer = binary.BigEndian.AppendUint32(*buffer, uint32(len(header)))
+			*buffer = append(*buffer, header...)
+		}
+		*buffer = binary.BigEndian.AppendUint32(*buffer, uint32(len(payload)))
+		*buffer = append(*buffer, payload...)
+		return
+	}
+
 	var count [v1.Uint16Len]byte
 	binary.BigEndian.PutUint16(count[:], uint16(len(headers)))
 	appendFetchBytes(messages, count[:])
@@ -1762,6 +1783,10 @@ func appendAutoCommitHFetchMessage(messages *bufsLease, payload []byte, headers 
 	binary.BigEndian.PutUint32(size[:], uint32(len(payload)))
 	appendFetchBytes(messages, size[:])
 	appendFetchBytes(messages, payload)
+}
+
+func fetchBufferHasCapacity(messages *bufsLease, size int) bool {
+	return len(messages.bufs) > 0 && cap(messages.bufs[len(messages.bufs)-1])-len(messages.bufs[len(messages.bufs)-1]) >= size
 }
 
 func appendFetchBytes(messages *bufsLease, data []byte) {
@@ -2026,8 +2051,7 @@ func enqueueSubscriptionMessage(
 	buf = reader.EncodeMsgID(buf, source, args...)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
 	buf = append(buf, payload...)
-	out.EnqueueProto(buf)
-	pool.Put(buf)
+	out.EnqueueOwned(buf)
 }
 
 func enqueueAutoCommitSubscriptionMessage(out *Outbound, subscriptionID byte, headered bool, payload []byte, headers [][]byte) {
@@ -2045,8 +2069,7 @@ func enqueueAutoCommitSubscriptionMessage(out *Outbound, subscriptionID byte, he
 	buf = appendSubscriptionFramePrefix(buf, subscriptionID, headered, headers)
 	buf = binary.BigEndian.AppendUint32(buf, uint32(len(payload)))
 	buf = append(buf, payload...)
-	out.EnqueueProto(buf)
-	pool.Put(buf)
+	out.EnqueueOwned(buf)
 }
 
 func subscriptionFrameSize(headered bool, payload []byte, headers [][]byte) int {

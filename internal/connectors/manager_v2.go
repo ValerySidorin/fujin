@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/fujin-io/fujin/public/plugins/connector"
-	cmw "github.com/fujin-io/fujin/public/plugins/middleware/connector"
 )
 
 const writerPoolSize = 64
@@ -59,11 +58,7 @@ func (m *ManagerV2) GetReader(route string, autoSettle bool) (connector.ReadClos
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
-	middlewares := m.binding.Middlewares()
-	if len(middlewares) == 0 {
-		return r, nil
-	}
-	wrapped, err := cmw.ChainReader(r, m.binding.Name(), middlewares, m.l)
+	wrapped, err := m.binding.WrapReader(r, m.l)
 	if err != nil {
 		_ = r.Close()
 		return nil, fmt.Errorf("apply connector middlewares: %w", err)
@@ -89,13 +84,10 @@ func (m *ManagerV2) GetWriter(route string) (connector.WriteCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new writer: %w", err)
 	}
-	middlewares := m.binding.Middlewares()
-	if len(middlewares) > 0 {
-		writer, err = cmw.ChainWriter(writer, m.binding.Name(), middlewares, m.l)
-		if err != nil {
-			_ = writer.Close()
-			return nil, fmt.Errorf("apply connector middlewares: %w", err)
-		}
+	writer, err = m.binding.WrapWriter(writer, m.l)
+	if err != nil {
+		_ = writer.Close()
+		return nil, fmt.Errorf("apply connector middlewares: %w", err)
 	}
 	return connector.EnforceWriterContract(writer), nil
 }

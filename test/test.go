@@ -41,10 +41,12 @@ import (
 )
 
 const (
-	defaultSendBufSize = 512 * 1024
-	defaultRecvBufSize = 512 * 1024
-	PERF_TCP_ADDR      = "localhost:4850"
-	PERF_UNIX_PATH     = "/tmp/fujin-bench.sock"
+	defaultSendBufSize  = 512 * 1024
+	defaultRecvBufSize  = 512 * 1024
+	PERF_TCP_ADDR       = "localhost:4850"
+	PERF_UNIX_PATH      = "/tmp/fujin-bench.sock"
+	PERF_WEBSOCKET_ADDR = "localhost:4851"
+	PERF_WEBSOCKET_PATH = "/fujin"
 )
 
 var DefaultQUICServerTestConfig = config.QUICServerConfig{
