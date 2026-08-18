@@ -15,6 +15,8 @@ import (
 
 const perfGRPCAddr = "localhost:4849"
 
+const grpcBenchmarkMaxInFlight = 1024
+
 var benchmarkPayloadSizes = []struct {
 	name string
 	size int
@@ -333,7 +335,11 @@ func benchProduceGRPC(b *testing.B, payload []byte) {
 
 	bindGRPCBenchStream(b, stream)
 	req := &pb.FujinRequest{Request: &pb.FujinRequest_Produce{Produce: &pb.ProduceRequest{CorrelationId: 1, Route: "pub", Message: payload}}}
-	done := receiveGRPCResponses(ctx, stream, b.N, func(resp *pb.FujinResponse) error {
+	credits := make(chan struct{}, grpcBenchmarkMaxInFlight)
+	for range cap(credits) {
+		credits <- struct{}{}
+	}
+	done := receiveGRPCResponsesWithCredits(ctx, stream, b.N, credits, func(resp *pb.FujinResponse) error {
 		produce, ok := resp.Response.(*pb.FujinResponse_Produce)
 		if !ok {
 			return fmt.Errorf("unexpected response type %T", resp.Response)
@@ -346,7 +352,14 @@ func benchProduceGRPC(b *testing.B, payload []byte) {
 
 	b.SetBytes(int64(len(payload)))
 	b.ResetTimer()
-	for b.Loop() {
+	for range b.N {
+		select {
+		case <-credits:
+		case err := <-done:
+			b.Fatal(err)
+		case <-ctx.Done():
+			b.Fatal(ctx.Err())
+		}
 		if err := stream.Send(req); err != nil {
 			b.Fatal(err)
 		}
@@ -474,6 +487,40 @@ func receiveGRPCResponses(
 			}
 			if err := check(resp); err != nil {
 				done <- err
+				return
+			}
+		}
+		select {
+		case done <- nil:
+		case <-ctx.Done():
+		}
+	}()
+	return done
+}
+
+func receiveGRPCResponsesWithCredits(
+	ctx context.Context,
+	stream pb.FujinService_StreamClient,
+	n int,
+	credits chan<- struct{},
+	check func(*pb.FujinResponse) error,
+) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		for range n {
+			resp, err := stream.Recv()
+			if err != nil {
+				done <- err
+				return
+			}
+			if err := check(resp); err != nil {
+				done <- err
+				return
+			}
+			select {
+			case credits <- struct{}{}:
+			case <-ctx.Done():
+				done <- ctx.Err()
 				return
 			}
 		}

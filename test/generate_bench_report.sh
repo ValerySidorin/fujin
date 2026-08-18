@@ -46,12 +46,22 @@ if ! (
 	go test -tags=fujin,grpc -run '^$' -bench '^Benchmark_Produce_1BPayload_Nop_TCP$' \
 		-benchtime="${peak_iterations}x" -count=1 -benchmem ./test
 ) >>"$raw" 2>&1; then
-	printf 'TCP peak benchmark failed; preserved existing report at %s\n' "$output" >&2
+	printf 'TCP pipeline peak benchmark failed; preserved existing report at %s\n' "$output" >&2
 	exit 1
 fi
 
-if ! grep -q '^Benchmark_Produce_1BPayload_Nop_TCP-' "$raw"; then
-	printf 'TCP peak benchmark produced no result; preserved existing report at %s\n' "$output" >&2
+if ! (
+	cd "$root"
+	FUJIN_BENCH_QUIET=1 \
+	go test -tags=fujin,grpc -run '^$' -bench '^Benchmark_Produce_Nop_GRPC$/1B$' \
+		-benchtime="${peak_iterations}x" -count=1 -benchmem ./test
+) >>"$raw" 2>&1; then
+	printf 'gRPC pipeline peak benchmark failed; preserved existing report at %s\n' "$output" >&2
+	exit 1
+fi
+
+if ! grep -q '^Benchmark_Produce_1BPayload_Nop_TCP-' "$raw" || ! grep -q '^Benchmark_Produce_Nop_GRPC/1B-' "$raw"; then
+	printf 'pipeline peak benchmark produced incomplete results; preserved existing report at %s\n' "$output" >&2
 	exit 1
 fi
 
@@ -68,12 +78,12 @@ fi
 
 {
 	printf '%s\n' '# Fujin Nop Connector Performance Report' ''
-	printf '**Generated:** %s  \n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	printf '**Source:** `%s` (%s)  \n' "$(git -C "$root" describe --always --dirty)" "$git_state"
+	printf '**Generated:** %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	printf '**Source:** `%s` (%s)\n' "$(git -C "$root" describe --always --dirty)" "$git_state"
 	printf '**Environment:** `%s` on `%s`\n\n' "$(go version)" "$(uname -srm)"
 	printf '%s\n' '## Scope' ''
-	printf '%s\n' "The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Fujin's Session Core and wire adapters using the built-in **\`nop\` connector**. The connector accepts every message immediately and performs no broker I/O; these figures isolate Fujin’s protocol, session, scheduling, and callback overhead on localhost." ''
-	printf '%s\n' '- **Transports:** native TCP, QUIC, Unix socket, and gRPC' "- **Synchronous matrix payloads:** $payloads" "- **Synchronous concurrent sessions:** $concurrency" '- **Synchronous batch:** 1 message per operation' "- **Synchronous sample duration:** $benchtime per subtest" "- **TCP pipeline peak:** 1 B payload, one session, $peak_iterations messages" ''
+	printf '%s\n' "The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Fujin's Session Core and wire adapters using the built-in **\`nop\` connector**. The connector accepts every message immediately and performs no broker I/O; these figures isolate Fujin’s protocol, session, scheduling, and callback overhead on localhost. The pipeline table measures TCP and gRPC under identical 1 B, one-session, fixed-message-count, full-duplex conditions." ''
+	printf '%s\n' '- **Transports:** native TCP, QUIC, Unix socket, and gRPC' "- **Synchronous matrix payloads:** $payloads" "- **Synchronous concurrent sessions:** $concurrency" '- **Synchronous batch:** 1 message per operation' "- **Synchronous sample duration:** $benchtime per subtest" "- **Pipeline peak:** 1 B payload, one session, $peak_iterations messages for TCP and gRPC" ''
 	printf '%s\n' '> These are single-host performance snapshots, not a cross-machine comparison or a broker durability benchmark. Run broker-backed tests separately when evaluating connector throughput and acknowledgement latency.' ''
 	printf '%s\n' '## Synchronous request/response results' ''
 	printf '%s\n' '| Transport | Payload | Concurrent sessions | Messages/s | Mmsg/s | Throughput | p99 operation latency | Allocations/op | Bytes/op |' '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
@@ -107,8 +117,13 @@ END {
 }
 ' "$raw" >>"$tmp"
 
+{
+	printf '%s\n' '' '### Reading the two result modes' '' 'The synchronous matrix reports each adapter’s request/response behavior at the stated concurrency. It is useful for p99 and concurrent-session capacity, but it does not establish a universal protocol ranking. The 1 B pipeline table below is the direct native-TCP versus gRPC throughput comparison: same payload, one client session, a fixed number of messages, `nop`, and concurrent response draining.'
+} >>"$tmp"
+
 awk '
-/^Benchmark_Produce_1BPayload_Nop_TCP-/ {
+/^Benchmark_Produce_1BPayload_Nop_TCP-|^Benchmark_Produce_Nop_GRPC\/1B-/ {
+	name = $1
 	ns = mbps = bytes = allocs = ""
 	for (i = 2; i <= NF; i++) {
 		if ($(i + 1) == "ns/op") ns = $i
@@ -116,7 +131,12 @@ awk '
 		if ($(i + 1) == "B/op") bytes = $i
 		if ($(i + 1) == "allocs/op") allocs = $i
 	}
-	if (ns > 0) printf "\n## TCP pipelined peak throughput\n\n| Transport | Payload | Session mode | Messages | Messages/s | Mmsg/s | Wire throughput | Allocations/op | Bytes/op |\n| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |\n| TCP | 1 B | One pipelined session | %s | %.0f | %.3f | %s MB/s | %s | %s |\n", iterations, 1000000000 / ns, 1000 / ns, mbps, allocs, bytes
+	transport = name ~ /^Benchmark_Produce_1BPayload_Nop_TCP-/ ? "TCP" : "gRPC"
+	mode = transport == "TCP" ? "One pipelined session" : "One bounded full-duplex session"
+	if (ns > 0) row[transport] = sprintf("| %s | 1 B | %s | %s | %.0f | %.3f | %s MB/s | %s | %s |", transport, mode, iterations, 1000000000 / ns, 1000 / ns, mbps, allocs, bytes)
+}
+END {
+	printf "\n## 1 B pipelined throughput\n\nBoth rows use one client session, exactly %s PRODUCE messages, concurrent response draining, and the nop connector. **This is not a latency comparison.** TCP writes pre-encoded native frames to a buffered stream and relies on socket backpressure; gRPC keeps at most 1,024 operations in flight to respect HTTP/2 flow control. The table therefore shows each adapter’s sustainable pipeline behavior, while the synchronous matrix above is the transport-neutral request/response comparison.\n\n| Transport | Payload | Session mode | Messages | Messages/s | Mmsg/s | Wire throughput | Allocations/op | Bytes/op |\n| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |\n%s\n%s\n", iterations, row["TCP"], row["gRPC"]
 }
 ' iterations="$peak_iterations" "$raw" >>"$tmp"
 
