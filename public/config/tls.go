@@ -16,7 +16,7 @@ var (
 )
 
 type TLSConfig struct {
-	Enabled                    bool   `yaml:"enabled"`
+	Enabled                    *bool  `yaml:"enabled,omitempty"` // nil = false (default)
 	ClientCertsDir             string `yaml:"client_certs_dir"`
 	ServerCertPEMPath          string `yaml:"server_cert_pem_path"`
 	ServerKeyPEMPath           string `yaml:"server_key_pem_path"`
@@ -34,7 +34,7 @@ func (c *TLSConfig) Parse() error {
 		return fmt.Errorf("validate: %w", err)
 	}
 
-	if !c.Enabled {
+	if c.Enabled == nil || !*c.Enabled {
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func (c *TLSConfig) Parse() error {
 }
 
 func (c *TLSConfig) validate() error {
-	if !c.Enabled {
+	if c.Enabled == nil || !*c.Enabled {
 		return nil
 	}
 

@@ -45,6 +45,8 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (*Writer, error) {
 		conf.Exchange.NoWait,
 		conf.Exchange.Args,
 	); err != nil {
+		_ = channel.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("rabbitmq_amqp09: declare exchange: %w", err)
 	}
 
@@ -57,6 +59,8 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (*Writer, error) {
 		conf.Queue.Args,
 	)
 	if err != nil {
+		_ = channel.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("rabbitmq_amqp09: declare queue: %w", err)
 	}
 
@@ -67,6 +71,8 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (*Writer, error) {
 		conf.QueueBind.NoWait,
 		conf.QueueBind.Args,
 	); err != nil {
+		_ = channel.Close()
+		_ = conn.Close()
 		return nil, fmt.Errorf("rabbitmq_amqp09: queue bind: %w", err)
 	}
 

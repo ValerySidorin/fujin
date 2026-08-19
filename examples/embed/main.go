@@ -2,39 +2,43 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	cconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 	nats_core "github.com/fujin-io/fujin/public/plugins/connector/nats/core"
+	"github.com/fujin-io/fujin/public/plugins/transport"
+	_ "github.com/fujin-io/fujin/public/plugins/transport/quic"
 	"github.com/fujin-io/fujin/public/server"
-	"github.com/fujin-io/fujin/public/server/config"
+	serverconfig "github.com/fujin-io/fujin/public/server/config"
+	"github.com/fujin-io/fujin/public/service"
 	nats_server "github.com/nats-io/nats-server/v2/server"
 )
 
-var DefaultQUICServerTestConfig = config.QUICServerConfig{
-	Enabled: true,
-	Addr:    ":4848",
-	TLS:     generateTLSConfig(),
-}
+var defaultEnabled = true
 
-var DefaultGRPCServerTestConfig = config.GRPCServerConfig{
+var DefaultGRPCServerTestConfig = serverconfig.GRPCServerConfig{
 	Enabled: true,
 	Addr:    ":4849",
 	// TLS disabled
 }
 
-var DefaultTestConfigWithNats = config.Config{
-	QUIC: DefaultQUICServerTestConfig,
+var DefaultTestConfigWithNats = serverconfig.Config{
+	Transports: []transport.Config{{
+		Type:    "quic",
+		Enabled: &defaultEnabled,
+		Settings: map[string]any{
+			"addr": ":4848",
+			"tls": map[string]any{
+				"enabled":               true,
+				"server_cert_pem_path":  "examples/assets/certs/fujin.io.pem",
+				"server_key_pem_path":   "examples/assets/certs/fujin.io-key.pem",
+			},
+		},
+	}},
 	GRPC: DefaultGRPCServerTestConfig,
 	Connectors: cconfig.ConnectorsConfig{
 		"nats_core_connector": {
@@ -43,7 +47,7 @@ var DefaultTestConfigWithNats = config.Config{
 				Common: nats_core.CommonSettings{
 					URL: "nats://localhost:4222",
 				},
-				Clients: map[string]nats_core.ClientSpecificSettings{
+				Routes: map[string]nats_core.RouteSettings{
 					"client1": {
 						Subject: "my_subject",
 					},
@@ -60,10 +64,9 @@ var DefaultTestConfigWithNats = config.Config{
 // It includes an embedded NATS broker as the underlying message broker.
 // To run this example:
 // 1. Import the nats/core plugin
-// 2. Build with the "nats_core" tag
-// 3. Run from repo root: go run -tags quic,grpc ./examples/embed/main.go
+// 2. Run from repo root: go run -tags grpc ./examples/embed/main.go
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	ctx, cancel := signal.NotifyContext(context.Background(), service.ShutdownSignals()...)
 	defer cancel()
 
 	s := RunServer(ctx)
@@ -90,7 +93,10 @@ func RunServer(ctx context.Context) *server.Server {
 		Level:     slog.LevelDebug,
 	}))
 
-	s, _ := server.NewServer(DefaultTestConfigWithNats, logger)
+	s, err := server.NewServer(DefaultTestConfigWithNats, logger)
+	if err != nil {
+		panic(fmt.Errorf("unable to create fujin server: %w", err))
+	}
 
 	go func() {
 		if err := s.ListenAndServe(ctx); err != nil {
@@ -103,15 +109,4 @@ func RunServer(ctx context.Context) *server.Server {
 	}
 
 	return s
-}
-
-func generateTLSConfig() *tls.Config {
-	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	template := x509.Certificate{SerialNumber: big.NewInt(1)}
-	cert, _ := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	tlsCert := tls.Certificate{
-		Certificate: [][]byte{cert},
-		PrivateKey:  key,
-	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true}
 }

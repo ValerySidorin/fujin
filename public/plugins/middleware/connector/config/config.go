@@ -5,8 +5,8 @@ type Config struct {
 	// Name is the name of the connector middleware plugin to use.
 	Name string `yaml:"name"`
 
-	// Disabled allows disabling a middleware without removing it from the config.
-	Disabled bool `yaml:"disabled,omitempty"`
+	// Enabled allows enabling/disabling a middleware without removing it. nil = true (enabled by default)
+	Enabled *bool `yaml:"enabled,omitempty"`
 
 	// Config is the plugin-specific configuration.
 	// The structure depends on the middleware plugin type.

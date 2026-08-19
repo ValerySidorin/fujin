@@ -1,0 +1,25 @@
+{{- if eq .Values.mode "standalone" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fujin.fullname" . }}
+  labels:
+    {{- include "fujin.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: tcp
+      port: {{ .Values.ports.tcp }}
+      targetPort: tcp
+      protocol: TCP
+    - name: grpc
+      port: {{ .Values.ports.grpc }}
+      targetPort: grpc
+      protocol: TCP
+    - name: health
+      port: {{ .Values.ports.health }}
+      targetPort: health
+      protocol: TCP
+  selector:
+    {{- include "fujin.selectorLabels" . | nindent 4 }}
+{{- end }}

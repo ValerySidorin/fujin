@@ -1,8 +1,6 @@
 package pool
 
-import (
-	"sync"
-)
+const defaultMaxSize = 64
 
 type Closer interface {
 	Close()
@@ -14,48 +12,54 @@ type ErrCloser interface {
 
 type Pool struct {
 	f  func() (any, error)
-	p  []any
-	mu sync.RWMutex
+	ch chan any
 }
 
 func NewPool(f func() (any, error)) *Pool {
+	return NewPoolWithSize(f, defaultMaxSize)
+}
+
+func NewPoolWithSize(f func() (any, error), maxSize int) *Pool {
 	return &Pool{
-		f: f,
+		f:  f,
+		ch: make(chan any, maxSize),
 	}
 }
 
 func (p *Pool) Get() (any, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if len(p.p) <= 0 {
+	select {
+	case c := <-p.ch:
+		return c, nil
+	default:
 		return p.f()
 	}
-
-	c := p.p[len(p.p)-1]
-	p.p = p.p[:len(p.p)-1]
-	return c, nil
 }
 
 func (p *Pool) Put(c any) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.p = append(p.p, c)
+	select {
+	case p.ch <- c:
+	default:
+		closeItem(c)
+	}
 }
 
 func (p *Pool) Close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	for _, c := range p.p {
-		if closer, ok := c.(Closer); ok {
-			closer.Close()
-			continue
+	for {
+		select {
+		case c := <-p.ch:
+			closeItem(c)
+		default:
+			return
 		}
-		if errCloser, ok := c.(ErrCloser); ok {
-			errCloser.Close()
-			continue
-		}
+	}
+}
 
+func closeItem(c any) {
+	if closer, ok := c.(Closer); ok {
+		closer.Close()
+		return
+	}
+	if errCloser, ok := c.(ErrCloser); ok {
+		errCloser.Close()
 	}
 }

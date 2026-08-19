@@ -23,56 +23,51 @@ type GroupConf struct {
 	Consumer string `yaml:"consumer"`
 }
 
-// CommonSettings contains settings shared across all Redis Rueidis Streams clients.
+// CommonSettings contains settings shared across all Redis Rueidis Streams routes.
 type CommonSettings struct {
 	config.RedisConfig       `yaml:",inline"`
 	config.WriterBatchConfig `yaml:",inline"`
 }
 
-// ClientSpecificSettings contains settings specific to a client.
-type ClientSpecificSettings struct {
-	// Reader settings
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	Streams map[string]StreamConf `yaml:"streams,omitempty"`
 	Block   time.Duration         `yaml:"block,omitempty"`
 	Count   int64                 `yaml:"count,omitempty"`
 	Group   GroupConf             `yaml:"group,omitempty"`
+	Stream  string                `yaml:"stream,omitempty"`
 
-	// Writer settings
-	Stream string `yaml:"stream,omitempty"`
-
-	// Common settings
 	Marshaller Marshaller `yaml:"marshaller,omitempty"`
 }
 
 // Config is the top-level configuration for RESP Streams connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client.
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-// Validate validates the Redis Rueidis Streams configuration.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
+	return ConnectorConfig{CommonSettings: common, RouteSettings: route}
+}
+
 func (c *Config) Validate() error {
 	if err := c.Common.RedisConfig.Validate(); err != nil {
 		return fmt.Errorf("redis_rueidis_streams: %w", err)
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("redis_rueidis_streams: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("redis_rueidis_streams: at least one route must be configured")
 	}
 	return nil
 }
 
-// Endpoint returns the Redis endpoint.
-func (c *ConnectorConfig) Endpoint() string {
-	return c.RedisConfig.Endpoint()
-}
+func (c *ConnectorConfig) Endpoint() string { return c.RedisConfig.Endpoint() }
 
-// ValidateWriter validates writer-specific settings.
 func (c *ConnectorConfig) ValidateWriter() error {
 	c.WriterBatchConfig.ApplyBatchDefaults()
 	if err := c.WriterBatchConfig.ValidateBatch(); err != nil {
@@ -84,7 +79,6 @@ func (c *ConnectorConfig) ValidateWriter() error {
 	return nil
 }
 
-// ValidateReader validates reader-specific settings.
 func (c *ConnectorConfig) ValidateReader() error {
 	if len(c.Streams) == 0 {
 		return fmt.Errorf("redis_rueidis_streams: at least one stream is required for reader")

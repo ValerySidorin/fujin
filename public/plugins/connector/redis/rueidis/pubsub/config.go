@@ -6,37 +6,37 @@ import (
 	"github.com/fujin-io/fujin/public/plugins/connector/redis/rueidis/config"
 )
 
-// CommonSettings contains settings shared across all Redis Rueidis PubSub clients
+// CommonSettings contains settings shared across all Redis Rueidis PubSub routes.
 type CommonSettings struct {
 	config.RedisConfig       `yaml:",inline"`
 	config.WriterBatchConfig `yaml:",inline"`
 }
 
-// ClientSpecificSettings contains settings specific to a client
-type ClientSpecificSettings struct {
+// RouteSettings contains settings specific to a route.
+type RouteSettings struct {
 	// For readers: multiple channels to subscribe
 	Channels []string `yaml:"channels,omitempty"`
 	// For writers: single channel to publish
 	Channel string `yaml:"channel,omitempty"`
 }
 
-// Config is the top-level configuration structure for Redis Rueidis PubSub connector
+// Config is the top-level configuration structure for Redis Rueidis PubSub connector.
 type Config struct {
-	Common  CommonSettings                    `yaml:"common"`
-	Clients map[string]ClientSpecificSettings `yaml:"clients"`
+	Common CommonSettings           `yaml:"common"`
+	Routes map[string]RouteSettings `yaml:"routes"`
 }
 
-// ConnectorConfig combines common and client-specific settings for a single client
+// ConnectorConfig combines common and route-specific settings.
 type ConnectorConfig struct {
 	CommonSettings
-	ClientSpecificSettings
+	RouteSettings
 }
 
-// NewConnectorConfig creates a new ConnectorConfig from common and client-specific settings
-func NewConnectorConfig(common CommonSettings, client ClientSpecificSettings) ConnectorConfig {
+// NewConnectorConfig creates a ConnectorConfig from common and route-specific settings.
+func NewConnectorConfig(common CommonSettings, route RouteSettings) ConnectorConfig {
 	return ConnectorConfig{
-		CommonSettings:         common,
-		ClientSpecificSettings: client,
+		CommonSettings: common,
+		RouteSettings:  route,
 	}
 }
 
@@ -45,8 +45,8 @@ func (c *Config) Validate() error {
 	if err := c.Common.RedisConfig.Validate(); err != nil {
 		return fmt.Errorf("resp_pubsub: %w", err)
 	}
-	if len(c.Clients) == 0 {
-		return fmt.Errorf("resp_pubsub: at least one client must be configured")
+	if len(c.Routes) == 0 {
+		return fmt.Errorf("resp_pubsub: at least one route must be configured")
 	}
 	return nil
 }

@@ -15,7 +15,7 @@ import (
 type Reader struct {
 	conf                   ConnectorConfig
 	consumer               *nsq.Consumer
-	handler                func(msg *nsq.Message, h func(message []byte, topic string, args ...any))
+	handler                func(msg *nsq.Message, h func(message []byte, source string, args ...any))
 	msgs                   sync.Map // msgID string -> *nsq.Message
 	autoAck                bool
 	connectThroughLookupds bool
@@ -41,13 +41,13 @@ func NewReader(conf ConnectorConfig, autoAck bool, l *slog.Logger) (connector.Re
 
 	if autoAck {
 		reader.handler = func(msg *nsq.Message, h func([]byte, string, ...any)) {
-			h(msg.Body, conf.Topic)
+			h(msg.Body, "")
 			msg.Finish()
 		}
 	} else {
 		reader.handler = func(msg *nsq.Message, h func([]byte, string, ...any)) {
 			reader.msgs.Store(string(msg.ID[:]), msg)
-			h(msg.Body, conf.Topic, msg.ID)
+			h(msg.Body, "", msg.ID)
 		}
 	}
 
@@ -58,7 +58,7 @@ func NewReader(conf ConnectorConfig, autoAck bool, l *slog.Logger) (connector.Re
 	return reader, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	r.consumer.AddHandler(nsq.HandlerFunc(func(msg *nsq.Message) error {
 		r.handler(msg, h)
 		return nil
@@ -73,6 +73,11 @@ func (r *Reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) 
 			return fmt.Errorf("connect to nsqds: %w", err)
 		}
 	}
+	if err := ready(); err != nil {
+		r.consumer.Stop()
+		<-r.consumer.StopChan
+		return err
+	}
 
 	<-ctx.Done()
 	r.consumer.Stop()
@@ -80,14 +85,14 @@ func (r *Reader) Subscribe(ctx context.Context, h func([]byte, string, ...any)) 
 	return nil
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	r.consumer.AddHandler(nsq.HandlerFunc(func(msg *nsq.Message) error {
 		if r.autoAck {
-			h(msg.Body, r.conf.Topic, nil)
+			h(msg.Body, "", nil)
 			msg.Finish()
 		} else {
 			r.msgs.Store(string(msg.ID[:]), msg)
-			h(msg.Body, r.conf.Topic, nil, msg.ID)
+			h(msg.Body, "", nil, msg.ID)
 		}
 		return nil
 	}))
@@ -101,6 +106,11 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 			return fmt.Errorf("connect to nsqds: %w", err)
 		}
 	}
+	if err := ready(); err != nil {
+		r.consumer.Stop()
+		<-r.consumer.StopChan
+		return err
+	}
 
 	<-ctx.Done()
 	r.consumer.Stop()
@@ -108,19 +118,11 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 	return nil
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -132,6 +134,10 @@ func (r *Reader) Ack(
 ) {
 	ackHandler(nil)
 	for _, id := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			ackMsgHandler(id, fmt.Errorf("nsq: ack: %w", err))
+			continue
+		}
 		if v, ok := r.msgs.LoadAndDelete(string(id)); ok {
 			if msg, ok := v.(*nsq.Message); ok {
 				msg.Finish()
@@ -151,6 +157,10 @@ func (r *Reader) Nack(
 ) {
 	nackHandler(nil)
 	for _, id := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(id, r.MsgIDArgsLen(), false); err != nil {
+			nackMsgHandler(id, fmt.Errorf("nsq: nack: %w", err))
+			continue
+		}
 		if v, ok := r.msgs.LoadAndDelete(string(id)); ok {
 			if msg, ok := v.(*nsq.Message); ok {
 				msg.Requeue(-1)

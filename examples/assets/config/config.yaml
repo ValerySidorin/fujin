@@ -1,31 +1,134 @@
-quic:
-  enabled: true
-  tls:
-    enabled: true
-    server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
-    server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
-  fujin:
-    ping_interval: 5s
-    ping_timeout: 10s
-tcp:
-  enabled: false
-  addr: :4850
-  fujin:
-    ping_interval: 5s
-    ping_timeout: 10s
+fujin:
+  transports:
+    - type: quic
+      enabled: true
+      settings:
+        addr: :4848
+        max_incoming_streams: 1000
+        max_idle_timeout: 5s
+        keepalive_period: 2s
+        tls:
+          enabled: true
+          server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
+          server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
+        fujin:
+          ping_interval: 5s
+          ping_timeout: 10s
+          ping_stream: false
+          ping_max_retries: 5
+          write_deadline: 10s
+          force_terminate_timeout: 15s
+    - type: tcp
+      enabled: true
+      settings:
+        addr: :4850
+        fujin:
+          ping_interval: 5s
+          ping_timeout: 10s
+          ping_max_retries: 5
+          write_deadline: 10s
+          force_terminate_timeout: 15s
+    - type: websocket
+      enabled: false
+      settings:
+        addr: :4851
+        path: /fujin
+        allowed_origins: [https://app.example.com]
+        max_message_bytes: 4194304
+        fujin:
+          ping_interval: 5s
+          ping_timeout: 10s
+          write_deadline: 10s
+          force_terminate_timeout: 15s
+    - type: unix
+      enabled: true
+      settings:
+        path: /tmp/fujin.sock
+        fujin:
+          ping_interval: 5s
+          ping_timeout: 10s
+          ping_max_retries: 5
+          write_deadline: 10s
+          force_terminate_timeout: 15s
 grpc:
   enabled: true
+  addr: :4849
+  max_recv_msg_size: 4194304
+  max_send_msg_size: 4194304
+  initial_window_size: 1048576
+  initial_conn_window_size: 1048576
+  server_keepalive:
+    time: 2h
+    timeout: 20s
+    max_connection_idle: 15m
+    max_connection_age: 30m
+    max_connection_age_grace: 5s
+  client_keepalive:
+    min_time: 20s
+    permit_without_stream: false
+  observability_enabled: false
 connectors:
-  kafka_connector:
+  connector:
     type: kafka_franz
+    # Whitelist of route-setting paths that BIND may override in its pinned generation.
+    # Supports wildcards: routes.*.field matches routes.pub.field, routes.sub.field, etc.
+    overridable:
+      - routes.*.produce_topic
+      - routes.*.consume_topics
+      - routes.*.group
+      - routes.*.transactional_id
+    # Bind middlewares are applied to the bind request
+    # They are particularly useful for authentication and authorization for example
+    # Available middlewares:
+    #   - auth_api_key: API key authentication
+    # Each bind middleware can be disabled via config:
+    #   - name: example_middleware
+    #     disabled: true
+    bind_middlewares:
+      - name: auth_api_key
+        api_key: supersecretkey
+        enabled: false
+    # Connector middlewares are applied to the connector
+    # Available middlewares:
+    #   - metrics: Prometheus metrics collection
+    #   - tracing: OpenTelemetry distributed tracing
+    # Each connector middleware can be disabled via config:
+    #   - name: metrics
+    #     disabled: true
+    connector_middlewares:
+      - name: prom
+        enabled: false
+      - name: otel
+        enabled: false
     settings:
       common:
-        brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
-      clients:
+        # broker settings
+        brokers: [localhost:9092, localhost:9093, localhost:9094]
+        tls:
+          enabled: false
+          server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
+          server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
+      routes:
+        # Route names are Fujin client-facing identifiers. Broker destinations remain
+        # connector-specific fields such as produce_topic and consume_topics below.
+        # Delivered messages report their actual broker source, not this route name.
         pub:
+          # writer settings
           allow_auto_topic_creation: true
           produce_topic: my_pub_topic
+          linger: 10ms # batching delay
+          # transactional_id: fujin
+          disable_idempotent_write: false
+          max_buffered_records: 10000 # maximum buffered records
+          ping_timeout: 5s # ping timeout
         sub:
+          # reader settings
           consume_topics: [my_pub_topic]
-          group: fujin
-          allow_auto_topic_creation: true
+          group: fujin2
+          max_poll_records: 10000 # maximum poll records
+          auto_commit_interval: 5s # auto commit interval
+          auto_commit_marks: false # auto commit marks
+          block_rebalance_on_poll: false # block rebalance on poll
+          balancers: [cooperative_sticky] # balancers
+          fetch_isolation_level: read_uncommited # fetch isolation level
+          disable_auto_commit: true

@@ -1,204 +1,273 @@
 # Fujin
 
-Fujin is a blazingly fast ([See Benchmarks](#benchmarks)) broker connector that bridges your applications with any message broker through a unified, efficient protocol. It translates between a custom byte-based protocol and various messaging systems, aiming to provide a seamless experience regardless of the underlying broker.
+High-performance message broker gateway. Sits between your applications and message brokers (Kafka, NATS, RabbitMQ, and others), exposing a single efficient protocol and gRPC interface.
 
-> **Note**: This project was created mostly for learning purposes, and it might not be usefull for anyone at all. Experimental. Not production ready.
+Think of it as Envoy, but for message brokers instead of HTTP.
 
-## Pitch
+Current release: **v0.4.1**.
 
-Modern distributed systems often need to work with multiple message brokers, each with its own protocol and quirks. Here are some core features:
+### v0.4.1 highlights
 
-- **Unified Protocol**: A single, efficient byte-based protocol for all your messaging needs
-- **Zero Broker Lock-in**: Switch between brokers without changing your application code
-- **Dual Message Delivery Models**:
-  - Push: Server pushes messages to clients
-  - Pull: Clients request messages from server (not for all brokers)
-- **Transaction Support**: Atomic message production across multiple topics (not for all brokers)
-- **Blazing Speed & Efficiency**: Optimized for processing large volumes of messages efficiently, leveraging techniques like zero-allocation parsing
-- **Plugin support**: Choose from various available default plugins, or write your own, and compile it in binary
-- **Multiple Transports**: QUIC (multiplexed, built-in TLS), TCP (raw throughput), Unix (same-host IPC, fastest for local clients) — same protocol, choose what fits
-- **gRPC Interface**: Modern, language-agnostic RPC interface for easy integration
-- **Keep-Alive Mechanism**: Automatic connection health monitoring
+- Reduced native large-message request/response overhead with adaptive inbound reads and bounded payload-buffer reuse through 1 MiB.
+- Added WebSocket to the canonical native Session Core benchmark matrix and clarified comparable TCP versus gRPC pipeline reporting.
 
-## Supported Connectors
+## Why
 
-- Kafka
-- NATS Core
-- AMQP 0.9.1 (RabbitMQ)
-- AMQP 1.0 (Azure Service Bus, Apache ActiveMQ)
-- RESP (PubSub/Streams)
-- NSQ
-- MQTT
-- ZeroMQ (PUB/SUB)
+Broker client libraries are heavy, language-specific, and tightly coupled to your application. Upgrading a Kafka client, adding metrics, or switching from RabbitMQ to NATS means changing and redeploying every service.
+
+Fujin decouples applications from brokers. Your app talks to Fujin over TCP, QUIC, WebSocket, Unix sockets, or gRPC — Fujin handles the rest. This gives you:
+
+- **Any language, any broker.** No need for a native Kafka or NATS client in every language. If your app can open a TCP socket or call gRPC, it can produce and consume messages.
+- **Centralized operations.** Observability, authorization, broker client upgrades, and versioned connector desired state can be managed centrally without redeploying application clients.
+- **Minimal overhead.** Zero-allocation protocol parser. TCP transport pushes ~840 MB/s on 32KB payloads through Kafka on Apple M2. The protocol layer adds negligible latency.
+- **Zero-downtime deployments.** Graceful binary upgrade via FD passing (Unix). Hot config reload via SIGHUP. No dropped connections.
+
+## Supported Brokers
+
+| Broker | Configuration `type` |
+|--------|----------------------|
+| Kafka | `kafka_franz` |
+| NATS Core | `nats_core` |
+| NATS JetStream | `nats_jetstream` |
+| RabbitMQ | `rabbitmq_amqp09` |
+| Azure Service Bus / ActiveMQ | `azure_amqp1` |
+| Redis/Valkey Pub/Sub | `redis_rueidis_pubsub` |
+| Redis/Valkey Streams | `redis_rueidis_streams` |
+| MQTT (EMQX, NanoMQ, etc.) | `mqtt_paho` |
+| NSQ | `nsq` |
+| ZeroMQ (`libzmq`, opt-in CGO build) | `zeromq_pebbe` |
 
 ## Client Interfaces
 
-Fujin provides multiple client interfaces to suit different needs:
+**Fujin Protocol** — Custom binary protocol over TCP, QUIC, WebSocket, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
 
-### Fujin Native Protocol
+**gRPC** — Standard gRPC interface. Works with any language that has a gRPC library. `BindResponse.routes` exposes the same pinned capability profile as the native protocol.
 
-Optimized binary protocol with minimal overhead. Best for high-performance applications. The protocol layer is transport-agnostic and supports two transports:
+### Transports
 
-- **QUIC** — Multiplexed streams over UDP with built-in TLS. Ideal when you need multiple concurrent streams, built-in encryption, and connection migration.
-- **TCP** — Plain TCP (with optional TLS). Delivers higher raw throughput (~3x faster than QUIC on large payloads). Best when you need maximum single-stream performance over a reliable network.
-- **Unix** — Unix domain sockets. Same-machine only. Best for local IPC (sidecars, containers in same pod).
+| Transport | Best for |
+|-----------|----------|
+| TCP | Maximum single-stream throughput. Optional TLS. |
+| QUIC | Multiplexed streams, built-in TLS, connection migration. |
+| WebSocket | Browser and HTTP-infrastructure access to the native binary protocol. |
+| Unix | Same-host IPC (sidecars, pods). Lowest latency. |
 
-Only Go client is supported right now.
+## Quick Start
 
-### gRPC Interface
-Easy to use, works with any language that supports gRPC.
+```bash
+# Build
+make build
 
-## Use Cases
-
-Fujin is particularly useful for:
-
-- Microservices architectures integrating diverse messaging backends.
-- Systems migrating between message brokers with minimal application changes.
-- Applications requiring a unified messaging API across different cloud providers or on-premise systems.
-- Scenarios demanding high-throughput message processing.
-
-## When to Use Fujin
-
-Fujin is most valuable in these scenarios:
-
-- **Multiple Broker Environment**: When your system needs to work with different message brokers simultaneously
-- **Unified Interface Needed**: When you want a single protocol interface across different brokers
-- **Security Gateways Involved**: When you can connect to broker only through security gateway, not supporting its protocol
-
-## When Not to Use Fujin
-
-Consider alternatives if:
-
-- **Single Broker**: You're only using one message broker
-- **Minimal Layers**: You want to minimize the number of components in your architecture
-- **Ultra-Low Latency**: When every microsecond counts and you can't afford additional overhead
-- **Broker-Specific Features**: When you need direct access to broker-specific features
-
-## Project Structure
-
+# Run (requires a config file)
+FUJIN_CONFIGURATOR=yaml FUJIN_CONFIGURATOR_YAML_PATHS=./config.yaml ./bin/fujin
 ```
-fujin/
-├── cmd/                        # Entry points
-│   ├── main.go                 # Default server (all plugins)
-│   └── builder/                # Custom binary builder (selective plugins)
-├── public/                     # Public API and plugins
-│   ├── plugins/                # Connectors, configurators, middlewares
-│   ├── proto/                  # gRPC and Fujin protocol definitions
-│   ├── server/                 # Server abstraction and config
-│   └── service/                # Core service (RunCLI)
-├── internal/                   # Internal implementation (not exported)
-│   ├── protocol/fujin/         # Fujin binary protocol (transport-agnostic)
-│   │   ├── pool/               # Zero-allocation byte pool
-│   │   └── proto/response/     # Response builders
-│   └── transport/              # Transport implementations
-│       ├── quic/               # QUIC transport (quic-go)
-│       ├── tcp/                # TCP transport
-│       ├── unix/               # Unix domain sockets
-│       └── grpc/               # gRPC transport
-├── examples/                   # Sample configs and runnable examples
-├── resources/                  # Docker Compose, example configs
-└── test/                       # Benchmarks and test helpers
+
+See [`examples/assets/config/config.yaml`](examples/assets/config/config.yaml) for a full configuration example.
+
+## Build Options
+
+Fujin uses build tags and a plugin system. You can build a full binary with all plugins, or a minimal one with only what you need.
+
+```bash
+# Full binary (all transports, all connectors, gRPC)
+make build
+
+# Minimal binary (only Kafka, only TCP, no gRPC)
+go run ./cmd/builder \
+  -transport github.com/fujin-io/fujin/public/plugins/transport/tcp \
+  -configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml \
+  -connector github.com/fujin-io/fujin/public/plugins/connector/kafka/franz \
+  -tags "fujin" \
+  -output ./bin/fujin-minimal
 ```
+
+Build tags: `fujin` (native protocol transports), `grpc` (gRPC server).
+
+### Plugin System
+
+Everything is pluggable: transports, connectors, config loaders, and middleware. Plugins self-register via `init()`. The custom binary builder (`cmd/builder`) generates a `main.go` that imports only selected plugins, keeping the binary small.
+
+### Built-in Plugin Reference
+
+Every built-in plugin has a package-local README containing its registered name, configuration, behavior, limits, and operational notes.
+
+#### Transports
+
+| Registered name | Documentation |
+|---|---|
+| `tcp` | [TCP](public/plugins/transport/tcp/README.md) |
+| `quic` | [QUIC](public/plugins/transport/quic/README.md) |
+| `websocket` | [WebSocket](public/plugins/transport/websocket/README.md) |
+| `unix` | [Unix socket](public/plugins/transport/unix/README.md) |
+
+#### Connectors
+
+| Registered name | Documentation |
+|---|---|
+| `azure_amqp1` | [Azure AMQP 1.0](public/plugins/connector/azure/amqp1/README.md) |
+| `kafka_franz` | [Kafka via franz-go](public/plugins/connector/kafka/franz/README.md) |
+| `mqtt_paho` | [MQTT via Paho](public/plugins/connector/mqtt/paho/README.md) |
+| `nats_core` | [NATS Core](public/plugins/connector/nats/core/README.md) |
+| `nats_jetstream` | [NATS JetStream](public/plugins/connector/nats/jetstream/README.md) |
+| `nsq` | [NSQ](public/plugins/connector/nsq/README.md) |
+| `rabbitmq_amqp09` | [RabbitMQ AMQP 0.9.1](public/plugins/connector/rabbitmq/amqp09/README.md) |
+| `redis_rueidis_pubsub` | [Redis Pub/Sub](public/plugins/connector/redis/rueidis/pubsub/README.md) |
+| `redis_rueidis_streams` | [Redis Streams](public/plugins/connector/redis/rueidis/streams/README.md) |
+| `zeromq_pebbe` | [ZeroMQ via pebbe/zmq4](public/plugins/connector/zeromq/pebbe/README.md) |
+
+#### Configurators
+
+| Registered name | Documentation |
+|---|---|
+| `yaml` | [YAML/JSON files](public/plugins/configurator/yaml/README.md) |
+| `env` | [Environment variable](public/plugins/configurator/env/README.md) |
+
+#### Bind Middleware
+
+| Registered name | Documentation |
+|---|---|
+| `auth_api_key` | [API key authentication](public/plugins/middleware/bind/auth_api_key/README.md) |
+
+#### Connector Middleware
+
+| Registered name | Documentation |
+|---|---|
+| `prom` | [Prometheus metrics](public/plugins/middleware/connector/prom/README.md) |
+| `otel` | [OpenTelemetry tracing](public/plugins/middleware/connector/otel/README.md) |
+| `schema_json` | [JSON Schema validation](public/plugins/middleware/connector/schema/json/README.md) |
+| `transform_jq` | [jq transformation](public/plugins/middleware/connector/transform/jq/README.md) |
+| `transform_wasm` | [WebAssembly transformation](public/plugins/middleware/connector/transform/wasm/README.md) |
+| `filter_jq` | [jq filtering](public/plugins/middleware/connector/filter/jq/README.md) |
+| `dedup` | [Deduplication](public/plugins/middleware/connector/dedup/README.md) |
+| `compress_zstd` | [Zstandard compression](public/plugins/middleware/connector/compress/zstd/README.md) |
+| `rate_limit_token_bucket` | [Token-bucket rate limiting](public/plugins/middleware/connector/rate_limit/token_bucket/README.md) |
+
+Write your own plugins using the examples under [`examples/plugins/`](examples/plugins/). The custom binary builder imports only the selected plugins, keeping the resulting binary small.
+
+Connector plugins expose a side-effect-free descriptor. Fujin compiles settings and route capabilities without broker I/O, then lazily opens generation-owned runtimes when an operation first needs broker resources. A successful BIND proves local configuration validity and returns the pinned route profiles to native and gRPC clients; it does not prove broker availability.
+
+`transform_wasm` runs SHA-256-pinned WebAssembly transforms in wazero without WASI, filesystem, environment, or network imports. The Rust example under [`examples/plugins/middleware/connector/wasm-uppercase`](examples/plugins/middleware/connector/wasm-uppercase) implements the guest ABI.
+
+### Cross-Platform
+
+Fujin compiles on Linux, macOS, and Windows:
+
+```bash
+GOOS=windows GOARCH=amd64 go build -tags=fujin,grpc ./...
+```
+
+On Windows, Unix-only features (Unix socket transport, SIGHUP reload, graceful binary upgrade) are unavailable. TCP, QUIC, WebSocket, and gRPC work normally.
+
+## Deployment
+
+### Docker
+
+```bash
+docker build -t fujin .
+
+# Custom build (Kafka only, Fujin + gRPC)
+docker build --build-arg FUJIN_CONNECTORS=github.com/fujin-io/fujin/public/plugins/connector/kafka/franz -t fujin .
+```
+
+### Kubernetes
+
+Deploy with the Helm chart (see below), or use the Docker Compose example in [`examples/deployment/`](examples/deployment/).
+
+### Helm
+
+```bash
+# Standalone: Fujin as a separate Deployment + Service
+helm install fujin ./deploy/helm/fujin
+
+# Sidecar: ConfigMap + helper templates to embed in your Deployment
+helm install fujin ./deploy/helm/fujin --set mode=sidecar
+```
+
+See [`deploy/helm/fujin/values.yaml`](deploy/helm/fujin/values.yaml) for all options.
+
+## Operations
+
+### Hot Reload
+
+```bash
+kill -HUP $(pgrep fujin)
+```
+
+Reloads connector configuration and log level from YAML. A connector reload compiles and validates the complete replacement before publication. Failed reloads retain the current generation; existing bound sessions remain pinned to their prior immutable generation, while later BIND operations use the replacement.
+
+### Control Plane
+
+Public runtime-configurator contracts and generation lifecycle reporting support external management planes. [`fujin-control-plane`](https://github.com/fujin-io/fujin-control-plane) provides mTLS Sync, versioned desired snapshots, optimistic-concurrency updates, node status, audit records, and a `control_plane` configurator plugin.
+
+Delivered connector snapshots are compiled completely before atomic publication. Invalid snapshots retain the active generation; existing BIND sessions continue on their pinned generation until it drains.
+
+The control-plane repository documents the custom binary build and node bootstrap configuration.
+
+### Graceful Binary Upgrade
+
+Zero-downtime binary replacement on Unix systems. The new process inherits listener file descriptors from the old one via SCM_RIGHTS — no connections are dropped.
+
+```bash
+# 1. Old process is running and listening on the upgrade socket
+
+# 2. Build the new binary
+make build
+
+# 3. Start new process in upgrade mode
+FUJIN_UPGRADE=1 ./bin/fujin
+```
+
+The new process connects to the old process's control socket, receives listener FDs, starts serving, signals ready, and the old process drains and exits.
+
+Custom socket path (default: `/run/fujin/upgrade.sock`):
+```bash
+export FUJIN_UPGRADE_SOCK=/tmp/fujin-upgrade.sock
+```
+
+### Health Checks
+
+HTTP health check server for Kubernetes liveness and readiness probes.
+
+Enable in config:
+```yaml
+health:
+  enabled: true
+  addr: ":8080"
+```
+
+Endpoints:
+- `GET /healthz` — liveness probe, always returns 200
+- `GET /readyz` — readiness probe, returns 200 when all transports are up, 503 otherwise
 
 ## Benchmarks
 
-All benchmarks run on **Apple M2, macOS, arm64**, single-connection localhost, using `go test -bench`.
-Full raw results: [`test/bench_test.txt`](test/bench_test.txt).
+[`test/bench_report.md`](test/bench_report.md) is a reproducible local Session Core data-plane snapshot, not a cross-machine or broker-throughput comparison. It measures synchronous produce against the built-in `nop` connector over native TCP, QUIC, Unix sockets, and gRPC.
+
+`nop` accepts messages immediately and performs no broker I/O. The report therefore isolates Fujin's protocol, session, scheduling, and callback overhead. It includes operations per second, payload throughput, p99 operation latency, and allocations.
+
+Regenerate it with:
+
+```bash
+make bench-report
+```
+
+The default report captures 1 B, 128 B, and 1 MiB payloads at 1, 16, and 128 concurrent sessions, with a 3-second sample per subtest. It also records a 1 B, 1,000,000-message TCP pipeline peak. Override the scope for a longer focused run:
+
+```bash
+BENCHTIME=10s FUJIN_BENCH_PAYLOAD=1MiB FUJIN_BENCH_CONCURRENCY=128 make bench-report
+```
+
+The report records its exact source revision, Go toolchain, host, and parameters. Broker-backed benchmarks remain separate because broker topology, durability, and container state materially affect their figures.
 
 ## Documentation
 
 - [Native Protocol Specification](protocol.md)
-- [gRPC Protocol Specification](public/proto/grpc/v1/fujin.proto)
-- [Configuration Guide](examples/assets/config/config.yaml)
+- [gRPC Proto Definition](public/proto/grpc/v1/fujin.proto)
+- [Configuration Example](examples/assets/config/config.yaml)
+- [Fujin Control Plane](https://github.com/fujin-io/fujin-control-plane)
 
-## Build Options
-
-### Server Build
-
-The server uses Go build tags to conditionally compile transports:
-
-**Available Build Tags:**
-- **Transports**:
-  - `quic` - QUIC transport for the Fujin protocol (multiplexed, built-in TLS)
-  - `tcp` - TCP transport for the Fujin protocol (raw throughput)
-  - `unix` - Unix domain sockets (automatically enabled on Linux/macOS, not available on Windows)
-  - `grpc` - gRPC server (language-agnostic)
-
-The Fujin protocol code compiles when any dependent transport is enabled (`quic`, `tcp`, or on Unix platforms `unix` is implicit).
-
-**Building the server:**
-
-The Makefile uses the [Custom Binary Builder](#custom-binary-builder) to build Fujin.
-
-```bash
-# Build with all transports (default)
-make build
-
-# Build with QUIC only
-make build GO_BUILD_TAGS="quic"
-
-# Build with TCP only
-make build GO_BUILD_TAGS="tcp"
-
-# Build with all transports
-make build GO_BUILD_TAGS="quic,tcp,grpc"
-
-# Build minimal (Kafka only, QUIC+gRPC)
-make build CONNECTORS=github.com/fujin-io/fujin/public/plugins/connector/kafka/franz
-
-# Build with selected connectors
-make build CONNECTORS="github.com/fujin-io/fujin/public/plugins/connector/kafka/franz,github.com/fujin-io/fujin/public/plugins/connector/nats/core"
-```
-
-**Binary Size Comparison (With kafka connector):**
-- With QUIC only: ~10 MB
-- With QUIC + gRPC: ~16 MB (full)
-
-### Custom Binary Builder
-
-The `cmd/builder` tool builds a **minimal Fujin binary** containing only the plugins you need. Instead of compiling all connectors (Kafka, NATS, AMQP, MQTT, NSQ, RESP…), you explicitly choose which ones to include. This yields smaller binaries and fewer dependencies.
-
-**When to use:**
-- You need only 1–2 brokers (e.g. Kafka + NATS)
-- Smaller Docker images or embedded deployments
-- Custom plugins (e.g. from `examples/plugins/`)
-
-**Usage:**
-
-```bash
-go run ./cmd/builder \
-  -configurator github.com/fujin-io/fujin/public/plugins/configurator/file \
-  -connector github.com/fujin-io/fujin/public/plugins/connector/kafka/franz \
-  -connector github.com/fujin-io/fujin/public/plugins/connector/nats/core \
-  -bind-middleware github.com/fujin-io/fujin/public/plugins/middleware/bind/auth_api_key \
-  -connector-middleware github.com/fujin-io/fujin/public/plugins/middleware/connector/metrics \
-  -tags "quic,tcp,grpc" \
-  -output ./bin/fujin-minimal
-```
-
-**Flags:**
-| Flag | Description |
-|------|-------------|
-| `-configurator` | Config loader (at least one required, typically `file`) |
-| `-connector` | Broker connectors (repeat for multiple) |
-| `-bind-middleware` | Bind/auth middleware (e.g. `auth_api_key`) |
-| `-connector-middleware` | Connector middleware (e.g. `metrics`, `tracing`) |
-| `-tags` | Go build tags: `quic`, `tcp`, `grpc` for transports; |
-| `-output` | Output binary path (default: `fujin`) |
-| `-cgo` | Enable CGO (if required by custom plugins) |
-
-**Available default plugins:**
-- Configurators: `public/plugins/configurator/file`
-- Connectors: `kafka`, `nats/core`, `rabbitmq_amqp09`, `azure_amqp1`, `resp/pubsub`, `resp/streams`, `mqtt`, `nsq`, `zeromq/zmq4`
-- Bind middlewares: `auth_api_key`
-- Connector middlewares: `metrics`, `tracing`
-
-Use full package paths, e.g. `github.com/fujin-io/fujin/public/plugins/connector/kafka/franz`.
-
-## Contributing
-
-Fujin is completely open-source, feel free to contribute! If you plan to contribute, please see if there's a `CONTRIBUTING.md` file for guidelines, or start by opening an issue to discuss your proposed changes.
+- Plugin docs — each plugin has a README in its package under [`public/plugins/`](public/plugins/)
 
 ## License
 
-This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).

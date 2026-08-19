@@ -7,4 +7,6 @@ package all
 import (
 	// File configurator plugin
 	_ "github.com/fujin-io/fujin/public/plugins/configurator/yaml"
+	// Env var configurator plugin
+	_ "github.com/fujin-io/fujin/public/plugins/configurator/env"
 )

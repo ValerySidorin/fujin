@@ -3,11 +3,14 @@ package amqp1
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"unsafe"
 
 	"github.com/Azure/go-amqp"
+	"github.com/fujin-io/fujin/public/plugins/connector"
 	"github.com/fujin-io/fujin/public/util"
 )
 
@@ -45,6 +48,7 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Reader, 
 		MaxLinks: conf.Session.MaxLinks,
 	})
 	if err != nil {
+		_ = conn.Close()
 		return nil, fmt.Errorf("azure_amqp1: new session: %w", err)
 	}
 
@@ -66,6 +70,8 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Reader, 
 		SettlementMode:            &settlementMode,
 	})
 	if err != nil {
+		_ = session.Close(context.Background())
+		_ = conn.Close()
 		return nil, fmt.Errorf("azure_amqp1: new receiver: %w", err)
 	}
 
@@ -79,18 +85,21 @@ func NewReader(conf ConnectorConfig, autoCommit bool, l *slog.Logger) (*Reader, 
 	}, nil
 }
 
-func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
+func (r *Reader) Subscribe(ctx context.Context, ready func() error, h func(message []byte, source string, args ...any)) error {
 	var handler func(msg *amqp.Message) error
 	if r.AutoCommit() {
 		handler = func(msg *amqp.Message) error {
-			h(msg.GetData(), r.conf.Receiver.Source)
+			h(msg.GetData(), "")
 			return r.receiver.AcceptMessage(ctx, msg)
 		}
 	} else {
 		handler = func(msg *amqp.Message) error {
-			h(msg.GetData(), r.conf.Receiver.Source, GetDeliveryId(msg))
+			h(msg.GetData(), "", GetDeliveryId(msg))
 			return nil
 		}
+	}
+	if err := ready(); err != nil {
+		return err
 	}
 
 	for {
@@ -98,27 +107,24 @@ func (r *Reader) Subscribe(ctx context.Context, h func(message []byte, topic str
 		if err != nil {
 			return fmt.Errorf("azure_amqp1: receive: %w", err)
 		}
-		if err := r.receiver.AcceptMessage(ctx, msg); err != nil {
-			return err
-		}
 		if err := handler(msg); err != nil {
 			return fmt.Errorf("azure_amqp1: handler: %w", err)
 		}
 	}
 }
 
-func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
+func (r *Reader) SubscribeWithHeaders(ctx context.Context, ready func() error, h func(message []byte, source string, hs [][]byte, args ...any)) error {
 	var handler func(msg *amqp.Message) error
 	if r.AutoCommit() {
 		handler = func(msg *amqp.Message) error {
 			var hs [][]byte
 			if msg.ApplicationProperties != nil {
 				for k, v := range msg.ApplicationProperties {
-					keyBytes := unsafe.Slice((*byte)(unsafe.StringData(k)), len(k))
+					keyBytes := []byte(k)
 					var valueBytes []byte
 					switch val := v.(type) {
 					case string:
-						valueBytes = unsafe.Slice((*byte)(unsafe.StringData(val)), len(val))
+						valueBytes = []byte(val)
 					case []byte:
 						valueBytes = val
 					default:
@@ -127,7 +133,7 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 					hs = append(hs, keyBytes, valueBytes)
 				}
 			}
-			h(msg.GetData(), r.conf.Receiver.Source, hs)
+			h(msg.GetData(), "", hs)
 			return r.receiver.AcceptMessage(ctx, msg)
 		}
 	} else {
@@ -135,11 +141,11 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 			var hs [][]byte
 			if msg.ApplicationProperties != nil {
 				for k, v := range msg.ApplicationProperties {
-					keyBytes := unsafe.Slice((*byte)(unsafe.StringData(k)), len(k))
+					keyBytes := []byte(k)
 					var valueBytes []byte
 					switch val := v.(type) {
 					case string:
-						valueBytes = unsafe.Slice((*byte)(unsafe.StringData(val)), len(val))
+						valueBytes = []byte(val)
 					case []byte:
 						valueBytes = val
 					default:
@@ -148,9 +154,12 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 					hs = append(hs, keyBytes, valueBytes)
 				}
 			}
-			h(msg.GetData(), r.conf.Receiver.Source, hs, GetDeliveryId(msg))
+			h(msg.GetData(), "", hs, GetDeliveryId(msg))
 			return nil
 		}
+	}
+	if err := ready(); err != nil {
+		return err
 	}
 
 	for {
@@ -158,28 +167,17 @@ func (r *Reader) SubscribeWithHeaders(ctx context.Context, h func(message []byte
 		if err != nil {
 			return fmt.Errorf("azure_amqp1: receive: %w", err)
 		}
-		if err := r.receiver.AcceptMessage(ctx, msg); err != nil {
-			return err
-		}
 		if err := handler(msg); err != nil {
 			return fmt.Errorf("azure_amqp1: handler: %w", err)
 		}
 	}
 }
 
-func (r *Reader) Fetch(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, args ...any),
-) {
+func (r *Reader) Fetch(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
-func (r *Reader) FetchWithHeaders(
-	ctx context.Context, n uint32,
-	fetchHandler func(n uint32, err error),
-	msgHandler func(message []byte, topic string, hs [][]byte, args ...any),
-) {
+func (r *Reader) FetchWithHeaders(ctx context.Context, n uint32, fetchHandler func(n uint32, err error), msgHandler func(message []byte, source string, hs [][]byte, args ...any)) {
 	fetchHandler(0, util.ErrNotSupported)
 }
 
@@ -189,16 +187,18 @@ func (r *Reader) Ack(
 	ackMsgHandler func([]byte, error),
 ) {
 	ackHandler(nil)
-	if !r.autoCommit {
-		for _, msgID := range msgIDs {
-			msg := &amqp.Message{}
-			SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
-			ackMsgHandler(msgID, r.receiver.AcceptMessage(ctx, msg))
+	for _, msgID := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(msgID, r.MsgIDArgsLen(), false); err != nil {
+			ackMsgHandler(msgID, fmt.Errorf("azure_amqp1: ack: %w", err))
+			continue
 		}
-	} else {
-		for _, msgID := range msgIDs {
-			ackMsgHandler(msgID, nil)
+		if r.autoCommit {
+			ackMsgHandler(msgID, connector.ErrOperationUnsupported)
+			continue
 		}
+		msg := &amqp.Message{}
+		SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
+		ackMsgHandler(msgID, r.receiver.AcceptMessage(ctx, msg))
 	}
 }
 
@@ -208,25 +208,27 @@ func (r *Reader) Nack(
 	nackMsgHandler func([]byte, error),
 ) {
 	nackHandler(nil)
-	if !r.autoCommit {
-		for _, msgID := range msgIDs {
-			msg := &amqp.Message{}
-			SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
-			nackMsgHandler(msgID, r.receiver.ReleaseMessage(ctx, msg))
+	for _, msgID := range msgIDs {
+		if err := connector.ValidateMessageIDPayload(msgID, r.MsgIDArgsLen(), false); err != nil {
+			nackMsgHandler(msgID, fmt.Errorf("azure_amqp1: nack: %w", err))
+			continue
 		}
-	} else {
-		for _, msgID := range msgIDs {
-			nackMsgHandler(msgID, nil)
+		if r.autoCommit {
+			nackMsgHandler(msgID, connector.ErrOperationUnsupported)
+			continue
 		}
+		msg := &amqp.Message{}
+		SetDeliveryId(msg, binary.BigEndian.Uint32(msgID))
+		nackMsgHandler(msgID, r.receiver.ReleaseMessage(ctx, msg))
 	}
 }
 
-func (r *Reader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
-	return binary.BigEndian.AppendUint32(buf, uint32(args[0].(int64)))
+func (r *Reader) EncodeMsgID(buf []byte, source string, args ...any) []byte {
+	return binary.BigEndian.AppendUint32(buf, args[0].(uint32))
 }
 
 func (r *Reader) MsgIDArgsLen() int {
-	return 8
+	return 4
 }
 
 func (r *Reader) AutoCommit() bool {
@@ -234,30 +236,46 @@ func (r *Reader) AutoCommit() bool {
 }
 
 func (r *Reader) Close() error {
+	var errs []error
 	if r.receiver != nil {
 		if err := r.receiver.Close(context.Background()); err != nil {
-			r.l.Error("azure_amqp1: close receiver", "err", err)
+			errs = append(errs, fmt.Errorf("close receiver: %w", err))
 		}
 	}
 	if r.session != nil {
 		if err := r.session.Close(context.Background()); err != nil {
-			r.l.Error("azure_amqp1: close session", "err", err)
+			errs = append(errs, fmt.Errorf("close session: %w", err))
 		}
 	}
 	if r.conn != nil {
-		_ = r.conn.Close()
+		if err := r.conn.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close conn: %w", err))
+		}
 	}
-	return nil
+	return errors.Join(errs...)
+}
+
+// deliveryIDOffset is computed once at init via reflect, so it stays correct
+// across go-amqp version bumps (the field is unexported).
+var deliveryIDOffset uintptr
+
+func init() {
+	t := reflect.TypeOf(amqp.Message{})
+	f, ok := t.FieldByName("deliveryID")
+	if !ok {
+		panic("azure_amqp1: amqp.Message has no deliveryID field — go-amqp version incompatible")
+	}
+	deliveryIDOffset = f.Offset
 }
 
 func SetDeliveryId(msg *amqp.Message, val uint32) {
 	ptr := unsafe.Pointer(msg)
-	fieldPtr := (*uint32)(unsafe.Pointer(uintptr(ptr) + 84))
+	fieldPtr := (*uint32)(unsafe.Pointer(uintptr(ptr) + deliveryIDOffset))
 	*fieldPtr = val
 }
 
 func GetDeliveryId(msg *amqp.Message) uint32 {
 	ptr := unsafe.Pointer(msg)
-	fieldPtr := (*uint32)(unsafe.Pointer(uintptr(ptr) + 84))
+	fieldPtr := (*uint32)(unsafe.Pointer(uintptr(ptr) + deliveryIDOffset))
 	return *fieldPtr
 }

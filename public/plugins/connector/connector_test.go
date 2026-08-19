@@ -4,466 +4,585 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
-	"github.com/fujin-io/fujin/public/plugins/connector/config"
+	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	cmwconfig "github.com/fujin-io/fujin/public/plugins/middleware/connector/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// mockReadCloser is a test reader implementation
-type mockReadCloser struct {
-	Reader
-	closeCalled bool
-}
+type testReader struct{}
 
-func (m *mockReadCloser) Close() error {
-	m.closeCalled = true
+func (*testReader) Subscribe(context.Context, func() error, func([]byte, string, ...any)) error {
 	return nil
 }
-
-// mockWriteCloser is a test writer implementation
-type mockWriteCloser struct {
-	Writer
-	closeCalled bool
-}
-
-func (m *mockWriteCloser) Close() error {
-	m.closeCalled = true
+func (*testReader) SubscribeWithHeaders(context.Context, func() error, func([]byte, string, [][]byte, ...any)) error {
 	return nil
 }
+func (*testReader) Fetch(context.Context, uint32, func(uint32, error), func([]byte, string, ...any)) {
+}
+func (*testReader) FetchWithHeaders(context.Context, uint32, func(uint32, error), func([]byte, string, [][]byte, ...any)) {
+}
+func (*testReader) Ack(context.Context, [][]byte, func(error), func([]byte, error))  {}
+func (*testReader) Nack(context.Context, [][]byte, func(error), func([]byte, error)) {}
+func (*testReader) MsgIDArgsLen() int                                                { return 0 }
+func (*testReader) EncodeMsgID(buf []byte, _ string, _ ...any) []byte                { return buf }
+func (*testReader) AutoCommit() bool                                                 { return false }
+func (*testReader) Close() error                                                     { return nil }
 
-// mockReader implements reader.Reader interface
-type mockReader struct{}
-
-func (m *mockReader) Subscribe(ctx context.Context, h func(message []byte, topic string, args ...any)) error {
-	return nil
+type testWriter struct {
+	mu        sync.Mutex
+	callbacks []func(error)
+	closed    atomic.Int32
 }
 
-func (m *mockReader) SubscribeWithHeaders(ctx context.Context, h func(message []byte, topic string, hs [][]byte, args ...any)) error {
-	return nil
+func (w *testWriter) Produce(_ context.Context, _ []byte, callback func(error)) {
+	w.mu.Lock()
+	w.callbacks = append(w.callbacks, callback)
+	w.mu.Unlock()
+}
+func (w *testWriter) HProduce(ctx context.Context, _ []byte, _ [][]byte, callback func(error)) {
+	w.Produce(ctx, nil, callback)
+}
+func (*testWriter) Flush(context.Context) error      { return nil }
+func (*testWriter) BeginTx(context.Context) error    { return nil }
+func (*testWriter) CommitTx(context.Context) error   { return nil }
+func (*testWriter) RollbackTx(context.Context) error { return nil }
+func (w *testWriter) Close() error                   { w.closed.Add(1); return nil }
+func (w *testWriter) complete(index int, err error) {
+	w.mu.Lock()
+	callback := w.callbacks[index]
+	w.mu.Unlock()
+	callback(err)
 }
 
-func (m *mockReader) Fetch(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, args ...any)) {
-}
+type compliantTestWriter struct{ testWriter }
 
-func (m *mockReader) FetchWithHeaders(ctx context.Context, n uint32, fetchResponseHandler func(n uint32, err error), msgHandler func(message []byte, topic string, hs [][]byte, args ...any)) {
-}
+func (*compliantTestWriter) WriterContractCompliant() {}
 
-func (m *mockReader) Ack(ctx context.Context, msgIDs [][]byte, ackHandler func(error), ackMsgHandler func([]byte, error)) {
-}
-
-func (m *mockReader) Nack(ctx context.Context, msgIDs [][]byte, nackHandler func(error), nackMsgHandler func([]byte, error)) {
-}
-
-func (m *mockReader) MsgIDArgsLen() int {
-	return 0
-}
-
-func (m *mockReader) EncodeMsgID(buf []byte, topic string, args ...any) []byte {
-	return buf
-}
-
-func (m *mockReader) AutoCommit() bool {
-	return false
-}
-
-// mockWriter implements writer.Writer interface
-type mockWriter struct{}
-
-func (m *mockWriter) Produce(ctx context.Context, msg []byte, callback func(err error)) {
-	if callback != nil {
-		callback(nil)
-	}
-}
-
-func (m *mockWriter) HProduce(ctx context.Context, msg []byte, headers [][]byte, callback func(err error)) {
-	if callback != nil {
-		callback(nil)
-	}
-}
-
-func (m *mockWriter) Flush(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockWriter) BeginTx(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockWriter) CommitTx(ctx context.Context) error {
-	return nil
-}
-
-func (m *mockWriter) RollbackTx(ctx context.Context) error {
-	return nil
-}
-
-func TestRegisterConfigValueConverter(t *testing.T) {
-	// Register a test connector with converter
-	_ = Register("test_protocol_converter", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{
-			converter: func(settingPath string, value string) (any, error) {
-				return value, nil
-			},
-		}, nil
-	})
-
-	// Verify converter is accessible
-	converter := GetConfigValueConverter("test_protocol_converter")
-	if converter == nil {
-		t.Fatal("GetConfigValueConverter() should return converter from connector")
-	}
-
-	// Test the converter
-	result, err := converter("test.path", "test_value")
-	if err != nil {
-		t.Fatalf("converter() error = %v", err)
-	}
-	if result != "test_value" {
-		t.Fatalf("converter() = %v, want test_value", result)
-	}
-}
-
-func TestGetConfigValueConverter(t *testing.T) {
-	// Get non-existent converter
-	converter := GetConfigValueConverter("nonexistent")
-	if converter != nil {
-		t.Fatal("GetConfigValueConverter() should return nil for non-existent protocol")
-	}
-
-	// Register and get
-	_ = Register("test_get", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{
-			converter: func(settingPath string, value string) (any, error) {
-				return value, nil
-			},
-		}, nil
-	})
-
-	converter = GetConfigValueConverter("test_get")
-	if converter == nil {
-		t.Fatal("GetConfigValueConverter() should find registered converter")
-	}
-}
-
-func TestNewWriter(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Register a test writer factory
-	_ = Register("test_new_writer", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-
-	// Test NewWriter with registered protocol
-	conf := config.ConnectorConfig{
-		Type:     "test_new_writer",
-		Settings: "test_settings",
-	}
-
-	w, err := NewWriter(conf, "test_name", l)
-	if err != nil {
-		t.Fatalf("NewWriter() error = %v", err)
-	}
-	if w == nil {
-		t.Fatal("NewWriter() should return a writer")
-	}
-
-	// Test Close
-	if err := w.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-
-	// Test NewWriter with unregistered protocol
-	conf.Type = "nonexistent"
-	_, err = NewWriter(conf, "test_name", l)
-	if err == nil {
-		t.Fatal("NewWriter() should return error for unregistered protocol")
-	}
-}
-
-func TestNewReader(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Register a test reader factory
-	_ = Register("test_new_reader", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-
-	// Test NewReader with registered protocol
-	conf := config.ConnectorConfig{
-		Type:     "test_new_reader",
-		Settings: "test_settings",
-	}
-
-	r, err := NewReader(conf, "test_name", false, l)
-	if err != nil {
-		t.Fatalf("NewReader() error = %v", err)
-	}
-	if r == nil {
-		t.Fatal("NewReader() should return a reader")
-	}
-
-	// Test Close
-	if err := r.Close(); err != nil {
-		t.Fatalf("Close() error = %v", err)
-	}
-
-	// Test NewReader with autoCommit
-	r, err = NewReader(conf, "test_name", true, l)
-	if err != nil {
-		t.Fatalf("NewReader() with autoCommit error = %v", err)
-	}
-	if r == nil {
-		t.Fatal("NewReader() should return a reader")
-	}
-
-	// Test NewReader with unregistered protocol
-	conf.Type = "nonexistent"
-	_, err = NewReader(conf, "test_name", false, l)
-	if err == nil {
-		t.Fatal("NewReader() should return error for unregistered protocol")
-	}
-}
-
-func TestNewReader_WithError(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Test with non-existent protocol
-	conf := config.ConnectorConfig{
-		Type:     "nonexistent_reader",
-		Settings: "test_config",
-	}
-	_, err := NewReader(conf, "test_name", false, l)
-	if err == nil {
-		t.Fatal("NewReader() should have failed for non-existent protocol")
-	}
-
-	// Test with connector that returns error from factory
-	_ = Register("error_factory_reader", func(config any, l *slog.Logger) (Connector, error) {
-		return nil, errors.New("factory error")
-	})
-
-	conf.Type = "error_factory_reader"
-	_, err = NewReader(conf, "test_name", false, l)
-	if err == nil {
-		t.Fatal("NewReader() should return error when factory fails")
-	}
-}
-
-func TestNewWriter_WithError(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Test with non-existent protocol
-	conf := config.ConnectorConfig{
-		Type:     "nonexistent_writer",
-		Settings: "test_config",
-	}
-	_, err := NewWriter(conf, "test_name", l)
-	if err == nil {
-		t.Fatal("NewWriter() should have failed for non-existent protocol")
-	}
-
-	// Test with connector that returns error from factory
-	_ = Register("error_factory", func(config any, l *slog.Logger) (Connector, error) {
-		return nil, errors.New("factory error")
-	})
-
-	conf.Type = "error_factory"
-	_, err = NewWriter(conf, "test_name", l)
-	if err == nil {
-		t.Fatal("NewWriter() should return error when factory fails")
-	}
-}
-
-func TestConnectorConfig(t *testing.T) {
-	// Test config.ConnectorConfig structure
-	conf := config.ConnectorConfig{
-		Type:        "test",
-		Overridable: []string{"path1", "path2"},
-		Settings:    map[string]any{"key": "value"},
-	}
-
-	if conf.Type != "test" {
-		t.Errorf("Protocol = %v, want test", conf.Type)
-	}
-	if len(conf.Overridable) != 2 {
-		t.Errorf("Overridable length = %v, want 2", len(conf.Overridable))
-	}
-	if conf.Settings == nil {
-		t.Fatal("Settings should not be nil")
-	}
-}
-
-func TestConnectorsConfig(t *testing.T) {
-	// Test config.ConnectorsConfig map
-	configs := config.ConnectorsConfig{
-		"connector1": config.ConnectorConfig{
-			Type:     "protocol1",
-			Settings: "settings1",
-		},
-		"connector2": config.ConnectorConfig{
-			Type:     "protocol2",
-			Settings: "settings2",
+func testDescriptor(profile RouteProfile, runtime Runtime, closed *atomic.Int32) Descriptor {
+	return Descriptor{
+		Converter: func(_ string, value string) (any, error) { return value, nil },
+		Compile: func(any) (Compiled, error) {
+			return StaticCompiled(map[string]RouteProfile{"route": profile}, func(*slog.Logger) (Runtime, error) {
+				if runtime != nil {
+					return runtime, nil
+				}
+				return &testRuntime{closed: closed}, nil
+			})
 		},
 	}
+}
 
-	if len(configs) != 2 {
-		t.Errorf("config.ConnectorsConfig length = %v, want 2", len(configs))
+type testRuntime struct{ closed *atomic.Int32 }
+
+func (*testRuntime) NewReader(string, bool, *slog.Logger) (ReadCloser, error) {
+	return &testReader{}, nil
+}
+func (*testRuntime) NewWriter(string, *slog.Logger) (WriteCloser, error) { return &testWriter{}, nil }
+func (r *testRuntime) Close(context.Context) error {
+	if r.closed != nil {
+		r.closed.Add(1)
 	}
+	return nil
+}
 
-	if configs["connector1"].Type != "protocol1" {
-		t.Errorf("connector1.Protocol = %v, want protocol1", configs["connector1"].Type)
+type eagerTestSettings struct {
+	endpoint string
+	version  string
+	fail     bool
+}
+
+type eagerTestCompiled struct {
+	open      func() (Runtime, error)
+	exclusive []string
+}
+
+func (*eagerTestCompiled) Routes() map[string]RouteProfile {
+	return map[string]RouteProfile{"route": validProfile()}
+}
+
+func (c *eagerTestCompiled) OpenRuntime(*slog.Logger) (Runtime, error) { return c.open() }
+func (*eagerTestCompiled) OpenRuntimeEagerly() bool                    { return true }
+func (c *eagerTestCompiled) ExclusiveRuntimeKeys() []string {
+	return append([]string(nil), c.exclusive...)
+}
+
+func eagerTestDescriptor(opens, closes *atomic.Int32) Descriptor {
+	return Descriptor{Compile: func(value any) (Compiled, error) {
+		settings := value.(eagerTestSettings)
+		compiled := &eagerTestCompiled{}
+		if settings.endpoint != "" {
+			compiled.exclusive = []string{settings.endpoint}
+		}
+		compiled.open = func() (Runtime, error) {
+			opens.Add(1)
+			if settings.fail {
+				return nil, errors.New("runtime open failed")
+			}
+			return &testRuntime{closed: closes}, nil
+		}
+		return compiled, nil
+	}}
+}
+
+func validProfile() RouteProfile {
+	return RouteProfile{
+		Produce: true, Headers: true, Transactions: true, Subscribe: true, Fetch: true,
+		ManualSettlement: true, ProduceGuarantee: AcceptancePeer,
+		Settlement: SettlementProfile{Ack: AckSingle, Nack: NackRequeue},
 	}
 }
 
-func TestList(t *testing.T) {
-	// Register some connectors to ensure List() has something to return
-	_ = Register("list_test_connector", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
+type testMiddlewareChain struct {
+	wrappedWriters atomic.Int32
+	closed         atomic.Int32
+}
 
-	protocols := List()
-	if len(protocols) == 0 {
-		t.Fatal("List() should return registered protocols")
+func (c *testMiddlewareChain) WrapReader(r ReadCloser, _ string, _ *slog.Logger) (ReadCloser, error) {
+	return r, nil
+}
+
+func (c *testMiddlewareChain) WrapWriter(w WriteCloser, _ string, _ *slog.Logger) (WriteCloser, error) {
+	c.wrappedWriters.Add(1)
+	return w, nil
+}
+
+func (c *testMiddlewareChain) Close(context.Context) error {
+	c.closed.Add(1)
+	return nil
+}
+
+func TestValidateHeadersCanonicalMultimap(t *testing.T) {
+	require.NoError(t, ValidateHeaders(nil))
+	require.NoError(t, ValidateHeaders([][]byte{[]byte("k"), {0xff}, []byte("k"), []byte("v")}))
+	assert.ErrorIs(t, ValidateHeaders([][]byte{[]byte("k")}), ErrInvalidHeaders)
+	assert.ErrorIs(t, ValidateHeaders([][]byte{nil, []byte("v")}), ErrInvalidHeaders)
+	assert.ErrorIs(t, ValidateHeaders([][]byte{{0xff}, []byte("v")}), ErrInvalidHeaders)
+}
+
+func TestRouteProfileRejectsContradictions(t *testing.T) {
+	assert.Error(t, (RouteProfile{Produce: true}).Validate("route"))
+	assert.Error(t, (RouteProfile{Transactions: true}).Validate("route"))
+	assert.Error(t, (RouteProfile{ManualSettlement: true, Subscribe: true}).Validate("route"))
+	require.NoError(t, validProfile().Validate("route"))
+}
+
+func TestDescriptorRegistryAndConverter(t *testing.T) {
+	name := "connector_descriptor_registry_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	assert.Error(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	descriptor, ok := Get(name)
+	require.True(t, ok)
+	require.NotNil(t, descriptor.Compile)
+	converted, err := GetConfigValueConverter(name)("route", "value")
+	require.NoError(t, err)
+	assert.Equal(t, "value", converted)
+	assert.Contains(t, List(), name)
+}
+
+func TestCatalogReloadPublishesOnlyValidGeneration(t *testing.T) {
+	name := "connector_catalog_reload_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"old": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	require.Error(t, catalog.Reload(connectorconfig.ConnectorsConfig{"bad": {Type: "missing"}}))
+	assert.Same(t, old, catalog.Current())
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"new": {Type: name}}))
+	assert.NotSame(t, old, catalog.Current())
+}
+
+func TestCatalogReloadRejectsInvalidMiddlewareBeforePublication(t *testing.T) {
+	name := "connector_catalog_middleware_compile_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	compileMiddlewares := func(configs []cmwconfig.Config, _ *slog.Logger) (MiddlewareChain, error) {
+		if len(configs) > 0 {
+			return nil, errors.New("middleware compile failed")
+		}
+		return nil, nil
 	}
+	catalog, err := CompileCatalog(
+		connectorconfig.ConnectorsConfig{"old": {Type: name}},
+		slog.Default(),
+		compileMiddlewares,
+	)
+	require.NoError(t, err)
+	old := catalog.Current()
 
-	// Check that our registered protocol is in the list
-	found := false
-	for _, protocol := range protocols {
-		if protocol == "list_test_connector" {
-			found = true
-			break
+	err = catalog.Reload(connectorconfig.ConnectorsConfig{"new": {
+		Type:                 name,
+		ConnectorMiddlewares: []cmwconfig.Config{{Name: "broken"}},
+	}})
+	require.ErrorContains(t, err, "middleware compile failed")
+	assert.Same(t, old, catalog.Current())
+}
+
+func TestCatalogKeepsOrdinaryRuntimeLazy(t *testing.T) {
+	name := "connector_catalog_lazy_runtime_test"
+	var opens atomic.Int32
+	require.NoError(t, Register(name, Descriptor{Compile: func(any) (Compiled, error) {
+		return StaticCompiled(map[string]RouteProfile{"route": validProfile()}, func(*slog.Logger) (Runtime, error) {
+			opens.Add(1)
+			return &testRuntime{}, nil
+		})
+	}}))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	assert.Zero(t, opens.Load())
+	binding, err := catalog.Current().Acquire("connector")
+	require.NoError(t, err)
+	writer, err := binding.NewWriter("route", slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	require.NoError(t, writer.Close())
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogPreflightsEagerRuntime(t *testing.T) {
+	name := "connector_catalog_eager_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{version: "v1"},
+	}}, slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestCatalogReusesUnchangedEagerRuntimeAcrossGenerations(t *testing.T) {
+	name := "connector_catalog_shared_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	config := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	catalog, err := CompileCatalog(config, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	require.NoError(t, catalog.Reload(config))
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestDerivedGenerationReusesParentEagerRuntime(t *testing.T) {
+	name := "connector_derived_shared_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	config := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	catalog, err := CompileCatalog(config, slog.Default())
+	require.NoError(t, err)
+	derived, err := catalog.Current().CompileDerived(config, slog.Default())
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), opens.Load())
+	binding, err := derived.Acquire("connector")
+	require.NoError(t, err)
+	derived.Retire()
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, derived.WaitClosed(ctx))
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestSharedRuntimeKeepsMiddlewareGenerationLocal(t *testing.T) {
+	name := "connector_shared_runtime_middleware_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	var chains []*testMiddlewareChain
+	compileMiddlewares := func([]cmwconfig.Config, *slog.Logger) (MiddlewareChain, error) {
+		chain := &testMiddlewareChain{}
+		chains = append(chains, chain)
+		return chain, nil
+	}
+	settings := eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"}
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: settings, ConnectorMiddlewares: []cmwconfig.Config{{Name: "one"}},
+	}}, slog.Default(), compileMiddlewares)
+	require.NoError(t, err)
+	old := catalog.Current()
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: settings, ConnectorMiddlewares: []cmwconfig.Config{{Name: "two"}},
+	}}))
+	require.Len(t, chains, 2)
+	assert.Equal(t, int32(1), opens.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Equal(t, int32(1), chains[0].closed.Load())
+	assert.Zero(t, chains[1].closed.Load())
+	assert.Zero(t, closes.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(1), chains[1].closed.Load())
+	assert.Equal(t, int32(1), closes.Load())
+}
+
+func TestCatalogRollsBackPartiallyOpenedCandidate(t *testing.T) {
+	name := "connector_catalog_eager_rollback_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{}, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	err = catalog.Reload(connectorconfig.ConnectorsConfig{
+		"a-open": {Type: name, Settings: eagerTestSettings{version: "open"}},
+		"z-fail": {Type: name, Settings: eagerTestSettings{version: "fail", fail: true}},
+	})
+	require.ErrorContains(t, err, "runtime open failed")
+	assert.Same(t, old, catalog.Current())
+	assert.Equal(t, int32(2), opens.Load())
+	assert.Equal(t, int32(1), closes.Load())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogRequiresDrainForChangedExclusiveRuntime(t *testing.T) {
+	name := "connector_catalog_exclusive_runtime_test"
+	var opens, closes atomic.Int32
+	require.NoError(t, Register(name, eagerTestDescriptor(&opens, &closes)))
+	oldConfig := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v1"},
+	}}
+	newConfig := connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: eagerTestSettings{endpoint: "tcp://*:5555", version: "v2"},
+	}}
+	catalog, err := CompileCatalog(oldConfig, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	err = catalog.Reload(newConfig)
+	require.ErrorIs(t, err, ErrRuntimeDrainRequired)
+	assert.Same(t, old, catalog.Current())
+	assert.Equal(t, int32(1), opens.Load())
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{}))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	assert.Equal(t, int32(1), closes.Load())
+	require.NoError(t, catalog.Reload(newConfig))
+	assert.Equal(t, int32(2), opens.Load())
+	require.NoError(t, catalog.Close(ctx))
+	assert.Equal(t, int32(2), closes.Load())
+}
+
+func TestBindingAppliesCompiledMiddlewareChain(t *testing.T) {
+	name := "connector_binding_compiled_middleware_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	chain := &testMiddlewareChain{}
+	generation, err := CompileGeneration(connectorconfig.ConnectorsConfig{"connector": {
+		Type:                 name,
+		ConnectorMiddlewares: []cmwconfig.Config{{Name: "compiled"}},
+	}}, slog.Default(), func([]cmwconfig.Config, *slog.Logger) (MiddlewareChain, error) {
+		return chain, nil
+	})
+	require.NoError(t, err)
+	binding, err := generation.Acquire("connector")
+	require.NoError(t, err)
+	writer, err := binding.NewWriter("route", slog.Default())
+	require.NoError(t, err)
+	wrapped, err := binding.WrapWriter(writer, slog.Default())
+	require.NoError(t, err)
+	assert.Same(t, writer, wrapped)
+	assert.Equal(t, int32(1), chain.wrappedWriters.Load())
+
+	generation.Retire()
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, generation.WaitClosed(ctx))
+	assert.Equal(t, int32(1), chain.closed.Load())
+}
+func TestGenerationCopiesMutableConfigurationAndProfiles(t *testing.T) {
+	name := "connector_generation_immutability_test"
+	profiles := map[string]RouteProfile{"route": validProfile()}
+	require.NoError(t, Register(name, Descriptor{Compile: func(any) (Compiled, error) {
+		return StaticCompiled(profiles, func(*slog.Logger) (Runtime, error) { return &testRuntime{}, nil })
+	}}))
+	settings := map[string]any{"nested": map[string]any{"value": "original"}}
+	config := connectorconfig.ConnectorConfig{Type: name, Overridable: []string{"nested.value"}, Settings: settings}
+	generation, err := CompileGeneration(connectorconfig.ConnectorsConfig{"connector": config}, slog.Default())
+	require.NoError(t, err)
+
+	profiles["route"] = RouteProfile{}
+	settings["nested"].(map[string]any)["value"] = "mutated"
+	config.Overridable[0] = "mutated"
+
+	stored, ok := generation.Config("connector")
+	require.True(t, ok)
+	assert.Equal(t, "original", stored.Settings.(map[string]any)["nested"].(map[string]any)["value"])
+	assert.Equal(t, []string{"nested.value"}, stored.Overridable)
+	binding, err := generation.Acquire("connector")
+	require.NoError(t, err)
+	profile, err := binding.RouteProfile("route")
+	require.NoError(t, err)
+	assert.Equal(t, validProfile(), profile)
+	binding.Close()
+}
+
+func TestGenerationConfigReturnsCallerOwnedCopy(t *testing.T) {
+	name := "connector_generation_config_copy_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	generation, err := CompileGeneration(connectorconfig.ConnectorsConfig{"connector": {
+		Type: name, Settings: map[string]any{"nested": map[string]any{"value": "original"}},
+	}}, slog.Default())
+	require.NoError(t, err)
+
+	first, ok := generation.Config("connector")
+	require.True(t, ok)
+	first.Settings.(map[string]any)["nested"].(map[string]any)["value"] = "mutated"
+	second, ok := generation.Config("connector")
+	require.True(t, ok)
+	assert.Equal(t, "original", second.Settings.(map[string]any)["nested"].(map[string]any)["value"])
+}
+
+func TestRetiredGenerationClosesAfterLastBinding(t *testing.T) {
+	var closed atomic.Int32
+	name := "connector_generation_lifetime_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, &closed)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	generation := catalog.Current()
+	binding, err := generation.Acquire("connector")
+	require.NoError(t, err)
+	_, err = binding.NewWriter("route", slog.Default())
+	require.NoError(t, err)
+	generation.Retire()
+	assert.Zero(t, closed.Load())
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, generation.WaitClosed(ctx))
+	assert.Equal(t, int32(1), closed.Load())
+}
+
+func TestCatalogStatusTracksImmediateGenerationRetirement(t *testing.T) {
+	name := "connector_catalog_status_immediate_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"old": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	oldID := catalog.Current().ID()
+
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"new": {Type: name}}))
+	require.Eventually(t, func() bool {
+		status := catalog.Status()
+		return status.RetiredTotal == 1 && len(status.Draining) == 0
+	}, time.Second, time.Millisecond)
+
+	status := catalog.Status()
+	require.NotNil(t, status.Current)
+	assert.NotEqual(t, oldID, status.Current.ID)
+	counts := map[GenerationState]int{}
+	for _, transition := range status.RecentTransitions {
+		if transition.ID == oldID {
+			counts[transition.State]++
 		}
 	}
-	if !found {
-		t.Fatal("List() should contain 'list_test_connector' protocol")
+	assert.Equal(t, 1, counts[GenerationPublished])
+	assert.Equal(t, 1, counts[GenerationDraining])
+	assert.Equal(t, 1, counts[GenerationRetired])
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestCatalogRejectsReloadAfterClose(t *testing.T) {
+	name := "connector_catalog_closed_reload_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, catalog.Close(ctx))
+	assert.Nil(t, catalog.Current())
+	assert.ErrorContains(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {Type: name}}), "closed")
+	assert.Nil(t, catalog.Current())
+}
+
+func TestCatalogStatusTracksDrainingBinding(t *testing.T) {
+	name := "connector_catalog_status_draining_test"
+	require.NoError(t, Register(name, testDescriptor(validProfile(), nil, nil)))
+	catalog, err := CompileCatalog(connectorconfig.ConnectorsConfig{"connector": {Type: name}}, slog.Default())
+	require.NoError(t, err)
+	old := catalog.Current()
+	binding, err := old.Acquire("connector")
+	require.NoError(t, err)
+
+	require.NoError(t, catalog.Reload(connectorconfig.ConnectorsConfig{"connector": {Type: name}}))
+	status := catalog.Status()
+	require.Len(t, status.Draining, 1)
+	assert.Equal(t, old.ID(), status.Draining[0].ID)
+	assert.Equal(t, int64(1), status.Draining[0].Bindings)
+
+	binding.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, old.WaitClosed(ctx))
+	require.Eventually(t, func() bool {
+		status := catalog.Status()
+		return status.RetiredTotal == 1 && len(status.Draining) == 0
+	}, time.Second, time.Millisecond)
+	require.NoError(t, catalog.Close(ctx))
+}
+
+func TestWriterContractCompliantWriterIsNotWrapped(t *testing.T) {
+	underlying := &compliantTestWriter{}
+	assert.Same(t, underlying, EnforceWriterContract(underlying))
+}
+
+func TestWriterContractFlushIsSnapshotBarrier(t *testing.T) {
+	underlying := &testWriter{}
+	writer := EnforceWriterContract(underlying)
+	var callbacks atomic.Int32
+	writer.Produce(context.Background(), nil, func(error) { callbacks.Add(1) })
+	writer.Produce(context.Background(), nil, func(error) { callbacks.Add(1) })
+
+	done := make(chan error, 1)
+	go func() { done <- writer.Flush(context.Background()) }()
+	select {
+	case <-done:
+		t.Fatal("flush returned before callbacks")
+	case <-time.After(10 * time.Millisecond):
 	}
+	underlying.complete(1, nil)
+	underlying.complete(0, nil)
+	require.NoError(t, <-done)
+	assert.Equal(t, int32(2), callbacks.Load())
 }
 
-// mockConnector is a test connector implementation
-type mockConnector struct {
-	readerCalls int
-	writerCalls int
-	converter   ConfigValueConverterFunc
-}
-
-func (m *mockConnector) NewReader(config any, name string, autoCommit bool, l *slog.Logger) (ReadCloser, error) {
-	m.readerCalls++
-	return &mockReadCloser{Reader: &mockReader{}}, nil
-}
-
-func (m *mockConnector) NewWriter(config any, name string, l *slog.Logger) (WriteCloser, error) {
-	m.writerCalls++
-	return &mockWriteCloser{Writer: &mockWriter{}}, nil
-}
-
-func (m *mockConnector) GetConfigValueConverter() ConfigValueConverterFunc {
-	return m.converter
-}
-
-func TestRegister(t *testing.T) {
-	// Register a test connector
-	err := Register("test_connector", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
+func TestWriterContractCloseResolvesPendingExactlyOnce(t *testing.T) {
+	underlying := &testWriter{}
+	writer := EnforceWriterContract(underlying)
+	var calls atomic.Int32
+	var callbackErr error
+	writer.Produce(context.Background(), nil, func(err error) {
+		calls.Add(1)
+		callbackErr = err
 	})
-	if err != nil {
-		t.Fatalf("Register() error = %v", err)
-	}
-
-	// Try to register again - should fail
-	err = Register("test_connector", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-	if err == nil {
-		t.Fatal("Register() should have failed for duplicate protocol")
-	}
-}
-
-func TestGet(t *testing.T) {
-	// Register a connector for this test
-	_ = Register("get_test_connector", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-
-	// Get existing connector factory
-	factory, ok := Get("get_test_connector")
-	if !ok {
-		t.Fatal("Get() should find registered factory")
-	}
-	if factory == nil {
-		t.Fatal("Get() returned nil factory")
-	}
-
-	// Get non-existent connector factory
-	_, ok = Get("nonexistent_connector")
-	if ok {
-		t.Fatal("Get() should not find non-existent factory")
-	}
-}
-
-func TestNewReaderWithConnector(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Register a connector using the new interface
-	_ = Register("test_connector_reader", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-
-	// Test creating a reader using the connector interface
-	conf := config.ConnectorConfig{
-		Type:     "test_connector_reader",
-		Settings: "test_config",
-	}
-
-	r, err := NewReader(conf, "test_name", false, l)
-	if err != nil {
-		t.Fatalf("NewReader() error = %v", err)
-	}
-	if r == nil {
-		t.Fatal("NewReader() should return a reader")
-	}
-}
-
-func TestNewWriterWithConnector(t *testing.T) {
-	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	// Register a connector using the new interface
-	_ = Register("test_connector_writer", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{}, nil
-	})
-
-	// Test creating a writer using the connector interface
-	conf := config.ConnectorConfig{
-		Type:     "test_connector_writer",
-		Settings: "test_config",
-	}
-
-	w, err := NewWriter(conf, "test_name", l)
-	if err != nil {
-		t.Fatalf("NewWriter() error = %v", err)
-	}
-	if w == nil {
-		t.Fatal("NewWriter() should return a writer")
-	}
-}
-
-func TestConfigValueConverter_ErrorHandling(t *testing.T) {
-	// Register a connector with a converter that returns an error
-	_ = Register("error_converter", func(config any, l *slog.Logger) (Connector, error) {
-		return &mockConnector{
-			converter: func(settingPath string, value string) (any, error) {
-				return nil, errors.New("conversion error")
-			},
-		}, nil
-	})
-
-	converter := GetConfigValueConverter("error_converter")
-	if converter == nil {
-		t.Fatal("GetConfigValueConverter() should return registered converter")
-	}
-
-	_, err := converter("test.path", "test_value")
-	if err == nil {
-		t.Fatal("converter() should return error when conversion fails")
-	}
+	require.NoError(t, writer.Close())
+	assert.ErrorIs(t, callbackErr, ErrWriterClosed)
+	underlying.complete(0, errors.New("late"))
+	assert.Equal(t, int32(1), calls.Load())
+	assert.Equal(t, int32(1), underlying.closed.Load())
 }

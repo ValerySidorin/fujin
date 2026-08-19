@@ -26,7 +26,7 @@ type Writer struct {
 // NewWriter creates a new MQTT writer using paho.golang
 func NewWriter(conf ConnectorConfig, l *slog.Logger) (connector.WriteCloser, error) {
 	if err := conf.ValidateWriter(); err != nil {
-		return nil, fmt.Errorf("matt_paho: validate config: %w", err)
+		return nil, fmt.Errorf("mqtt_paho: validate config: %w", err)
 	}
 
 	serverURL, err := url.Parse(conf.BrokerURL)
@@ -59,11 +59,13 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (connector.WriteCloser, err
 
 	// Wait for connection
 	if err := cm.AwaitConnection(ctx); err != nil {
+		_ = cm.Disconnect(ctx)
 		return nil, fmt.Errorf("mqtt_paho: await connection: %w", err)
 	}
 
 	pool, err := ants.NewPool(conf.Pool.Size, ants.WithPreAlloc(conf.Pool.PreAlloc))
 	if err != nil {
+		_ = cm.Disconnect(ctx)
 		return nil, fmt.Errorf("new pool: %w", err)
 	}
 

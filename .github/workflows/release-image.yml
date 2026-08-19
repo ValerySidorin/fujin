@@ -1,0 +1,77 @@
+name: Publish release image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing Fujin release tag to publish
+        required: true
+        default: v0.4.1
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          case "$VERSION" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "version must be a v-prefixed semantic version" >&2; exit 1 ;;
+          esac
+
+      - name: Check out release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.version }}
+
+      - name: Resolve release commit
+        id: release
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/fujin-io/fujin:${{ inputs.version }}
+          build-args: |
+            VERSION=${{ inputs.version }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/fujin-io/fujin
+            org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
+
+      - name: Verify published manifest
+        env:
+          IMAGE: ghcr.io/fujin-io/fujin:${{ inputs.version }}
+        run: docker buildx imagetools inspect "$IMAGE"
+
+      - name: Smoke test published image
+        env:
+          IMAGE: ghcr.io/fujin-io/fujin:${{ inputs.version }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker pull --platform linux/amd64 "$IMAGE"
+          output=$(docker run --rm --platform linux/amd64 "$IMAGE" 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -F "version: $VERSION"

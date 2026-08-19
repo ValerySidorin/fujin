@@ -41,12 +41,12 @@ fujin/
 │   ├── plugins/                # Connectors, configurators, middlewares
 │   │   ├── connector/          # Kafka, NATS, AMQP, MQTT, NSQ, RESP...
 │   │   ├── configurator/       # File-based config loader
-│   │   └── middleware/         # Bind (auth_api_key) and connector (metrics, tracing)
+│   │   └── middleware/         # Bind (auth_api_key) and connector middlewares (prom, otel)
 │   ├── proto/                  # gRPC and Fujin protocol definitions
 │   ├── server/                 # Server abstraction and config
 │   └── service/                # Core service (RunCLI)
 ├── internal/                   # Internal implementation (not exported)
-│   ├── protocol/fujin/         # Fujin binary protocol (transport-agnostic)
+│   ├── proto/         # Fujin binary protocol (transport-agnostic)
 │   └── transport/              # Transport implementations (quic/, tcp/, grpc/)
 ├── examples/                   # Sample configs and runnable examples
 ├── resources/                  # Docker Compose, Grafana, example configs
@@ -71,7 +71,7 @@ make build CONNECTORS=kafka
 make build CONNECTORS="kafka,nats/core"
 
 # With specific transports
-make build GO_BUILD_TAGS="quic,tcp,grpc"
+make build GO_BUILD_TAGS="fujin,grpc"
 ```
 
 ### Manual Build
@@ -80,23 +80,22 @@ If you prefer not to use Make, use the builder directly:
 
 ```bash
 go run ./cmd/builder -local \
-  -configurator github.com/fujin-io/fujin/public/plugins/configurator/file \
+  -transport github.com/fujin-io/fujin/public/plugins/transport/tcp \
+  -configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml \
   -connector github.com/fujin-io/fujin/public/plugins/connector/kafka/franz \
   -bind-middleware github.com/fujin-io/fujin/public/plugins/middleware/bind/auth_api_key \
-  -connector-middleware github.com/fujin-io/fujin/public/plugins/middleware/connector/metrics \
-  -tags "quic,tcp,grpc" \
+  -connector-middleware github.com/fujin-io/fujin/public/plugins/middleware/connector/prom \
+  -tags "fujin,grpc" \
   -output ./bin/fujin
 ```
 
 ## Build Tags
 
 Fujin uses Go build tags for conditional compilation:
-- `quic` - QUIC transport for the Fujin protocol (multiplexed, built-in TLS)
-- `tcp` - TCP transport for the Fujin protocol (raw throughput)
-- `unix` - Unix domain sockets (implicit on Linux/macOS)
-- `grpc` - gRPC server support
+  - `fujin` - Transport-agnostic Fujin protocol
+  - `grpc` - gRPC server (language-agnostic)
 
-The Fujin protocol code (`internal/protocol/fujin/`) compiles when any dependent transport tag is enabled (`quic`, `tcp`, or `unix` on Unix platforms).
+The Fujin protocol code compiles when `fujin` tag is enabled. 
 
 ## Testing
 
@@ -105,7 +104,7 @@ The Fujin protocol code (`internal/protocol/fujin/`) compiles when any dependent
 make test
 
 # Run tests for specific package
-go test -v -tags="quic,tcp,grpc" ./internal/...
+go test -v -tags="fujin,grpc" ./internal/...
 
 # Run benchmarks
 make bench
@@ -122,21 +121,6 @@ make bench BENCH_FUNC="BenchmarkMyFunction" BENCH_TIME="10s"
 - Run `gofmt` before committing
 - Use meaningful variable names
 - Add comments for exported functions
-
-## Adding New Connectors
-
-To add support for a new message broker:
-
-1. Create new directory: `public/plugins/connector/yourbroker/`
-2. Implement `Reader` and `Writer` interfaces from `public/plugins/connector`
-3. Add `init.go` that registers the connector via `connector.Register()`
-4. Add build tag stub file if using optional compilation: `init_yourbroker_stub.go`
-5. Add actual implementation: `init_yourbroker.go` with build tag (optional)
-6. Add to `public/plugins/connector/all/all.go` if it should be in the default build
-7. Add tests
-8. Update documentation
-
-See existing connectors (e.g., `kafka/`, `nats/core/`, `resp/pubsub/`) for reference.
 
 ## Generating Protocol Buffers
 
@@ -158,13 +142,13 @@ protoc --go_out=. --go_opt=paths=source_relative \
 
 ```bash
 # Start broker (example: Kafka)
-make up-kafka
+make up-kafka_franz
 
 # Run tests
-go test -v -tags="quic,tcp,grpc" ./test/...
+go test -v -tags="fujin,grpc" ./test/...
 
 # Clean up
-make down-kafka
+make down-kafka_franz
 ```
 
 ## Documentation

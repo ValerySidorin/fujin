@@ -17,10 +17,12 @@ const (
 var (
 	configurators   stringSlice
 	connectors      stringSlice
+	transports      stringSlice
 	bindMiddlewares stringSlice
 	connMiddlewares stringSlice
+	replacements    stringSlice
 	output          = flag.String("output", "fujin", "Output binary path")
-	buildTags       = flag.String("tags", "netgo,osusergo", "Build tags for the final binary (e.g. quic,tcp,grpc for transports)")
+	buildTags       = flag.String("tags", "netgo,osusergo", "Build tags for the final binary (e.g. fujin,grpc for transports)")
 	extraLdflags    = flag.String("ldflags", "", "Extra ldflags (e.g. -X main.Version=1.0.0)")
 	cgoEnabled      = flag.Bool("cgo", false, "Enable CGO (required by some plugins)")
 	localModule     = flag.Bool("local", false, "Use local fujin module (for builds from source)")
@@ -36,9 +38,11 @@ func (s *stringSlice) Set(v string) error {
 
 func init() {
 	flag.Var(&configurators, "configurator", "Configurator plugins")
+	flag.Var(&transports, "transport", "Transport plugins")
 	flag.Var(&connectors, "connector", "Connector plugins")
 	flag.Var(&bindMiddlewares, "bind-middleware", "Bind middleware plugins")
 	flag.Var(&connMiddlewares, "connector-middleware", "Connector middleware plugins")
+	flag.Var(&replacements, "replace", "Local module replacement module=path (repeatable)")
 }
 
 func main() {
@@ -52,6 +56,7 @@ func main() {
 	if err := runBuild(buildOpts{
 		outputPath:   *output,
 		plugins:      collectPlugins(),
+		replacements: replacements,
 		tags:         *buildTags,
 		extraLdflags: *extraLdflags,
 		cgoEnabled:   *cgoEnabled,
@@ -67,6 +72,7 @@ func main() {
 type buildOpts struct {
 	outputPath   string
 	plugins      []string
+	replacements []string
 	tags         string
 	extraLdflags string
 	cgoEnabled   bool
@@ -83,13 +89,22 @@ func runBuild(opts buildOpts) error {
 	if err := runGo(tmpDir, "mod", "init", moduleName); err != nil {
 		return err
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working dir: %w", err)
+	}
 	if opts.localModule {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("get working dir: %w", err)
-		}
 		if err := runGo(tmpDir, "mod", "edit", "-replace", "github.com/fujin-io/fujin="+cwd); err != nil {
-			return fmt.Errorf("add replace directive: %w", err)
+			return fmt.Errorf("add Fujin replace directive: %w", err)
+		}
+	}
+	for _, replacement := range opts.replacements {
+		normalized, err := normalizeReplacement(replacement, cwd)
+		if err != nil {
+			return err
+		}
+		if err := runGo(tmpDir, "mod", "edit", "-replace", normalized); err != nil {
+			return fmt.Errorf("add replace directive %q: %w", replacement, err)
 		}
 	}
 	if err := runGo(tmpDir, "get", fujinService); err != nil {
@@ -105,6 +120,7 @@ func runBuild(opts buildOpts) error {
 	mainContent := generateMain(pluginsByType{
 		configurators:   configurators,
 		connectors:      connectors,
+		transports:      transports,
 		bindMiddlewares: bindMiddlewares,
 		connMiddlewares: connMiddlewares,
 	})
@@ -154,13 +170,62 @@ func validateInputs() error {
 			return fmt.Errorf("plugin package path cannot be empty")
 		}
 	}
+	if err := validatePluginRequirements(connectors, *buildTags, *cgoEnabled); err != nil {
+		return err
+	}
+	for _, replacement := range replacements {
+		if _, err := normalizeReplacement(replacement, "."); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func validatePluginRequirements(connectorPackages []string, tags string, cgo bool) error {
+	const zeromqPebbe = "github.com/fujin-io/fujin/public/plugins/connector/zeromq/pebbe"
+	selected := false
+	for _, pkg := range connectorPackages {
+		if pkg == zeromqPebbe {
+			selected = true
+			break
+		}
+	}
+	if !selected {
+		return nil
+	}
+	if !cgo {
+		return fmt.Errorf("connector %s requires -cgo", zeromqPebbe)
+	}
+	for _, tag := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if tag == "zeromq_pebbe" {
+			return nil
+		}
+	}
+	return fmt.Errorf("connector %s requires build tag zeromq_pebbe", zeromqPebbe)
+}
+
+func normalizeReplacement(replacement, baseDir string) (string, error) {
+	parts := strings.SplitN(replacement, "=", 2)
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
+		return "", fmt.Errorf("invalid replacement %q: expected module=path", replacement)
+	}
+	module := strings.TrimSpace(parts[0])
+	path := strings.TrimSpace(parts[1])
+	if !filepath.IsAbs(path) {
+		absolute, err := filepath.Abs(filepath.Join(baseDir, path))
+		if err != nil {
+			return "", fmt.Errorf("resolve replacement %q: %w", replacement, err)
+		}
+		path = absolute
+	}
+	return module + "=" + path, nil
 }
 
 func collectPlugins() []string {
 	var all []string
 	all = append(all, configurators...)
 	all = append(all, connectors...)
+	all = append(all, transports...)
 	all = append(all, bindMiddlewares...)
 	all = append(all, connMiddlewares...)
 	return all
@@ -169,6 +234,7 @@ func collectPlugins() []string {
 type pluginsByType struct {
 	configurators   []string
 	connectors      []string
+	transports      []string
 	bindMiddlewares []string
 	connMiddlewares []string
 }
@@ -178,13 +244,15 @@ func generateMain(p pluginsByType) string {
 	imports = append(imports,
 		`"context"`,
 		`"os/signal"`,
-		`"syscall"`,
 		fmt.Sprintf(`"%s"`, fujinService),
 	)
 	for _, imp := range p.configurators {
 		imports = append(imports, fmt.Sprintf(`_ "%s"`, imp))
 	}
 	for _, imp := range p.connectors {
+		imports = append(imports, fmt.Sprintf(`_ "%s"`, imp))
+	}
+	for _, imp := range p.transports {
 		imports = append(imports, fmt.Sprintf(`_ "%s"`, imp))
 	}
 	for _, imp := range p.bindMiddlewares {
@@ -203,7 +271,8 @@ func generateMain(p pluginsByType) string {
 	sb.WriteString(")\n\n")
 	sb.WriteString("var Version string\n\n")
 	sb.WriteString(`func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	service.Version = Version
+	ctx, cancel := signal.NotifyContext(context.Background(), service.ShutdownSignals()...)
 	defer cancel()
 	service.RunCLI(ctx)
 }

@@ -1,12 +1,13 @@
 services:
   fujin:
-    image: fujin:azure_amqp1-${BUILD_TAG}
+    image: fujin:azure_amqp1-${BUILD_TAG:-v0.4.1}
     build:
       context: ..
       dockerfile: Dockerfile
       args:
+        VERSION: ${BUILD_TAG:-v0.4.1}
         FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/azure/amqp1
-        FUJIN_GO_TAGS: quic,tcp,grpc,unix
+        FUJIN_GO_TAGS: fujin,grpc,unix
     container_name: fujin
     environment:
       FUJIN_CONFIGURATOR: yaml

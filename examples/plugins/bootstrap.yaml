@@ -1,7 +1,0 @@
-# Bootstrap configuration for development
-# This file specifies how to load the main configuration
-config_loader:
-  type: file
-  paths:
-    - ./examples/plugins/config.yaml
-

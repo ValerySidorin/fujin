@@ -9,14 +9,14 @@ import (
 	_ "github.com/fujin-io/fujin/public/plugins/connector/azure/amqp1"
 	// RabbitMQ AMQP0.9.1 connector plugin
 	_ "github.com/fujin-io/fujin/public/plugins/connector/rabbitmq/amqp09"
-	// ZeroMQ connector plugin (go-zeromq/zmq4 implementation)
-	_ "github.com/fujin-io/fujin/public/plugins/connector/zeromq/zmq4"
 	// Kafka franz-go connector plugin
 	_ "github.com/fujin-io/fujin/public/plugins/connector/kafka/franz"
 	// MQTT Paho connector plugin
 	_ "github.com/fujin-io/fujin/public/plugins/connector/mqtt/paho"
 	// NATS Core connector plugin
 	_ "github.com/fujin-io/fujin/public/plugins/connector/nats/core"
+	// NATS JetStream connector plugin
+	_ "github.com/fujin-io/fujin/public/plugins/connector/nats/jetstream"
 	// NSQ connector plugin
 	_ "github.com/fujin-io/fujin/public/plugins/connector/nsq"
 	// Redis Rueidis PubSub connector plugin

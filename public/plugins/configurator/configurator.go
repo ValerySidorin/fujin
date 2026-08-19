@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+
+	"github.com/fujin-io/fujin/public/plugins/connector"
+	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
 )
 
 // Boot loads configuration from a source.
@@ -18,6 +21,62 @@ type Configurator interface {
 	// and parsing it directly into the config struct.
 	// cfg must be a pointer to the configuration struct.
 	Load(ctx context.Context, cfg any) error
+}
+
+// ConnectorSnapshot is one complete immutable desired connector state from a runtime source.
+type ConnectorSnapshot struct {
+	Revision   uint64
+	Connectors connectorconfig.ConnectorsConfig
+}
+
+// ApplyState is the outcome of applying one runtime connector snapshot.
+type ApplyState uint8
+
+const (
+	ApplyAccepted ApplyState = iota
+	ApplyRejected
+	ApplyStale
+	ApplySuperseded
+)
+
+// ApplyResult reports whether one runtime connector snapshot changed the active generation.
+type ApplyResult struct {
+	Revision uint64
+	State    ApplyState
+	Changed  bool
+	Err      error
+}
+
+// ConnectorRuntimeStatus is the detached readonly runtime connector projection.
+type ConnectorRuntimeStatus struct {
+	BuildVersion           string
+	ConnectorTypes         []string
+	ActiveRevision         uint64
+	ActiveDigest           [32]byte
+	LastRejectedRevision   uint64
+	LastRejectedDiagnostic string
+	RuntimeSourceConnected bool
+	Catalog                connector.CatalogStatus
+}
+
+// ConnectorRuntime is the transport-neutral capability offered to runtime sources.
+type ConnectorRuntime interface {
+	// Submit queues a complete snapshot and resolves with its terminal result.
+	Submit(context.Context, ConnectorSnapshot) <-chan ApplyResult
+	SetSourceConnected(bool)
+	Status() ConnectorRuntimeStatus
+}
+
+// ConnectorWatcher is an optional configurator capability for post-start connector snapshots.
+// WatchConnectors blocks until ctx is canceled or the runtime source terminates.
+type ConnectorWatcher interface {
+	WatchConnectors(ctx context.Context, runtime ConnectorRuntime) error
+}
+
+// ConnectorBootstrapSnapshot exposes the versioned snapshot used by Load, when available.
+// The returned snapshot must describe the connector configuration written during bootstrap.
+type ConnectorBootstrapSnapshot interface {
+	InitialConnectorSnapshot() (ConnectorSnapshot, bool)
 }
 
 // Factory creates a configurator from configuration.

@@ -1,0 +1,86 @@
+# Mode: "standalone" (Deployment + Service) or "sidecar" (ConfigMap only)
+mode: standalone
+
+image:
+  repository: ghcr.io/fujin-io/fujin
+  tag: "v0.4.1"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Fujin configuration (rendered into ConfigMap)
+config:
+  fujin:
+    transports:
+      - type: tcp
+        settings:
+          addr: ":4850"
+  grpc:
+    enabled: true
+    addr: ":4849"
+  health:
+    enabled: true
+    addr: ":8080"
+  connectors: {}
+  #  kafka_connector:
+  #    type: kafka_franz
+  #    settings:
+  #      common:
+  #        brokers: ["kafka:9092"]
+  #      clients:
+  #        pub:
+  #          produce_topic: my_topic
+  #        sub:
+  #          consume_topics: [my_topic]
+  #          group: myapp
+
+# Log settings
+log:
+  level: INFO
+  type: json
+
+# Ports exposed by the container / Service
+ports:
+  tcp: 4850
+  grpc: 4849
+  health: 8080
+
+# Health probes (applied in standalone mode)
+probes:
+  liveness:
+    httpGet:
+      path: /healthz
+      port: health
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  readiness:
+    httpGet:
+      path: /readyz
+      port: health
+    initialDelaySeconds: 3
+    periodSeconds: 5
+
+# Resource limits
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+# Service settings (standalone mode only)
+service:
+  type: ClusterIP
+
+# Pod annotations
+podAnnotations: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

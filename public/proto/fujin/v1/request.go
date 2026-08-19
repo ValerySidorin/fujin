@@ -17,6 +17,8 @@ const (
 	OP_CODE_HSUBSCRIBE  OpCode = 12
 	OP_CODE_UNSUBSCRIBE OpCode = 13
 	OP_CODE_DISCONNECT  OpCode = 14
+	OP_CODE_TX_PRODUCE  OpCode = 15
+	OP_CODE_TX_HPRODUCE OpCode = 16
 
 	// Server request opcodes
 	OP_CODE_STOP OpCode = 98

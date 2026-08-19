@@ -1,0 +1,60 @@
+{{- if eq .Values.mode "sidecar" }}
+# Reference sidecar container spec.
+# Add this container to your application Deployment's pod spec.
+# The ConfigMap "{{ include "fujin.fullname" . }}" is created by this chart.
+#
+# Example:
+#   containers:
+#     - name: app
+#       image: myapp:latest
+#     {{`{{- include "fujin.sidecarContainer" . | nindent 4 }}`}}
+#   volumes:
+#     {{`{{- include "fujin.sidecarVolume" . | nindent 4 }}`}}
+{{- end }}
+
+{{- define "fujin.sidecarContainer" -}}
+- name: fujin
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  env:
+    - name: FUJIN_CONFIGURATOR
+      value: "yaml"
+    - name: FUJIN_CONFIGURATOR_YAML_PATHS
+      value: "/config/config.yaml"
+    - name: FUJIN_LOG_LEVEL
+      value: {{ .Values.log.level | quote }}
+    - name: FUJIN_LOG_TYPE
+      value: {{ .Values.log.type | quote }}
+  ports:
+    - name: tcp
+      containerPort: {{ .Values.ports.tcp }}
+      protocol: TCP
+    - name: grpc
+      containerPort: {{ .Values.ports.grpc }}
+      protocol: TCP
+    - name: health
+      containerPort: {{ .Values.ports.health }}
+      protocol: TCP
+  {{- with .Values.probes.liveness }}
+  livenessProbe:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.probes.readiness }}
+  readinessProbe:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  volumeMounts:
+    - name: fujin-config
+      mountPath: /config
+      readOnly: true
+{{- end }}
+
+{{- define "fujin.sidecarVolume" -}}
+- name: fujin-config
+  configMap:
+    name: {{ include "fujin.fullname" . }}
+{{- end }}

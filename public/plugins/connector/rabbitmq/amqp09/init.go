@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("rabbitmq_amqp09", NewRabbitMQAMQP09Connector); err != nil {
+	if err := connector.Register("rabbitmq_amqp09", descriptor()); err != nil {
 		panic(fmt.Sprintf("register rabbitmq_amqp09 connector: %v", err))
 	}
 }

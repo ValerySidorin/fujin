@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("azure_amqp1", newAzureAMQP1Connector); err != nil {
+	if err := connector.Register("azure_amqp1", descriptor()); err != nil {
 		panic(fmt.Sprintf("register azure_amqp1 connector: %v", err))
 	}
 }

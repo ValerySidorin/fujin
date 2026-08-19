@@ -10,6 +10,41 @@ message KV {
   bytes value = 2;
 }
 
+enum StatusCode {
+  STATUS_OK = 0;
+  STATUS_CANCELED = 1;
+  STATUS_UNKNOWN = 2;
+  STATUS_INVALID_ARGUMENT = 3;
+  STATUS_DEADLINE_EXCEEDED = 4;
+  STATUS_NOT_FOUND = 5;
+  STATUS_ALREADY_EXISTS = 6;
+  STATUS_PERMISSION_DENIED = 7;
+  STATUS_RESOURCE_EXHAUSTED = 8;
+  STATUS_FAILED_PRECONDITION = 9;
+  STATUS_ABORTED = 10;
+  STATUS_OUT_OF_RANGE = 11;
+  STATUS_UNIMPLEMENTED = 12;
+  STATUS_INTERNAL = 13;
+  STATUS_UNAVAILABLE = 14;
+  STATUS_DATA_LOSS = 15;
+  STATUS_UNAUTHENTICATED = 16;
+}
+
+enum OperationOutcome {
+  OUTCOME_UNSPECIFIED = 0;
+  OUTCOME_NOT_APPLIED = 1;
+  OUTCOME_APPLIED = 2;
+  OUTCOME_UNKNOWN = 3;
+}
+
+message OperationError {
+  StatusCode code = 1;
+  OperationOutcome outcome = 2;
+  string reason = 3;
+  string message = 4;
+  map<string, string> details = 5;
+}
+
 // Bind request - must be sent first to initialize the stream and configure connectors
 // Config overrides format: "writer.connector_name.setting_path" -> "value"
 // Example: "writer.pub.transactional_id" -> "my-tx-id-12345"
@@ -20,28 +55,62 @@ message BindRequest {
   map<string, string> config_overrides = 3;  // Configuration overrides for connectors
 }
 
-// Bind response
+enum ProduceGuarantee {
+  PRODUCE_GUARANTEE_UNSPECIFIED = 0;
+  PRODUCE_GUARANTEE_LOCAL_ACCEPT = 1;
+  PRODUCE_GUARANTEE_PEER_ACCEPT = 2;
+  PRODUCE_GUARANTEE_DURABLE_ACCEPT = 3;
+}
+
+enum AckGranularity {
+  ACK_GRANULARITY_UNSUPPORTED = 0;
+  ACK_GRANULARITY_SINGLE = 1;
+  ACK_GRANULARITY_CUMULATIVE = 2;
+}
+
+enum NackEffect {
+  NACK_EFFECT_UNSUPPORTED = 0;
+  NACK_EFFECT_REQUEUE = 1;
+  NACK_EFFECT_RELEASE = 2;
+  NACK_EFFECT_DROP = 3;
+}
+
+message RouteCapabilities {
+  bool produce = 1;
+  bool headers = 2;
+  bool transactions = 3;
+  bool subscribe = 4;
+  bool fetch = 5;
+  bool manual_settlement = 6;
+  ProduceGuarantee produce_guarantee = 7;
+  AckGranularity ack_granularity = 8;
+  NackEffect nack_effect = 9;
+}
+
+// Bind response. Routes is populated only on success and describes the exact
+// immutable connector snapshot pinned to this stream.
 message BindResponse {
-  string error = 1;
+  OperationError error = 1;
+  map<string, RouteCapabilities> routes = 2;
 }
 
 // Produce request
 message ProduceRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bytes message = 3;
 }
 
 // Produce response
 message ProduceResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
 
 // HProduceRequest - produce with headers
 message HProduceRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   repeated KV headers = 3;
   bytes message = 4;
 }
@@ -49,18 +118,41 @@ message HProduceRequest {
 // HProduceResponse
 message HProduceResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
-
-// BeginTxRequest - begin transaction
+// BeginTxRequest - eagerly begin a transaction for one route
 message BeginTxRequest {
   uint32 correlation_id = 1;
+  string route = 2;
 }
 
 // BeginTxResponse
 message BeginTxResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
+}
+
+// TxProduceRequest - produce on the active transaction route
+message TxProduceRequest {
+  uint32 correlation_id = 1;
+  bytes message = 2;
+}
+
+message TxProduceResponse {
+  uint32 correlation_id = 1;
+  OperationError error = 2;
+}
+
+// TxHProduceRequest - produce with headers on the active transaction route
+message TxHProduceRequest {
+  uint32 correlation_id = 1;
+  repeated KV headers = 2;
+  bytes message = 3;
+}
+
+message TxHProduceResponse {
+  uint32 correlation_id = 1;
+  OperationError error = 2;
 }
 
 // CommitTxRequest - commit transaction
@@ -71,7 +163,7 @@ message CommitTxRequest {
 // CommitTxResponse
 message CommitTxResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
 
 // RollbackTxRequest - rollback transaction
@@ -82,34 +174,34 @@ message RollbackTxRequest {
 // RollbackTxResponse
 message RollbackTxResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
 
 // Subscribe request
 message SubscribeRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
 }
 
 // Subscribe response
 message SubscribeResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
   uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
 }
 
 // HSubscribe request - subscribe with headers support
 message HSubscribeRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
 }
 
 // HSubscribe response
 message HSubscribeResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
   uint32 subscription_id = 3;  // Limited to 0-255 (byte) to match native protocol, but protobuf requires uint32
 }
 
@@ -122,7 +214,7 @@ message UnsubscribeRequest {
 // Unsubscribe response
 message UnsubscribeResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
 
 // Message delivery
@@ -143,7 +235,7 @@ message HMessage {
 // FetchRequest - request a batch of messages (pull-based)
 message FetchRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
   uint32 batch_size = 4;  // Number of messages to fetch
 }
@@ -151,7 +243,7 @@ message FetchRequest {
 // FetchResponse - response with a batch of messages
 message FetchResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
   uint32 subscription_id = 3;  // Subscription ID for ack/nack (reused across fetches)
   repeated FetchMessage messages = 4;
 }
@@ -165,7 +257,7 @@ message FetchMessage {
 // HFetchRequest - request a batch of messages with headers (pull-based)
 message HFetchRequest {
   uint32 correlation_id = 1;
-  string topic = 2;
+  string route = 2;
   bool auto_commit = 3;
   uint32 batch_size = 4;  // Number of messages to fetch
 }
@@ -173,7 +265,7 @@ message HFetchRequest {
 // HFetchResponse - response with a batch of messages with headers
 message HFetchResponse {
   uint32 correlation_id = 1;
-  string error = 2;
+  OperationError error = 2;
   uint32 subscription_id = 3;  // Subscription ID for ack/nack (reused across fetches)
   repeated HFetchMessage messages = 4;
 }
@@ -195,14 +287,14 @@ message AckRequest {
 // Ack response with per-message results
 message AckResponse {
   uint32 correlation_id = 1;
-  string error = 2;  // General error
+  OperationError error = 2;  // General error
   repeated AckMessageResult results = 3;  // Per-message results
 }
 
 // Ack result for individual message
 message AckMessageResult {
   bytes message_id = 1;
-  string error = 2;  // Error for this specific message (empty if success)
+  OperationError error = 2;  // Error for this specific message
 }
 
 // Nack request
@@ -215,14 +307,14 @@ message NackRequest {
 // Nack response with per-message results
 message NackResponse {
   uint32 correlation_id = 1;
-  string error = 2;  // General error
+  OperationError error = 2;  // General error
   repeated NackMessageResult results = 3;  // Per-message results
 }
 
 // Nack result for individual message
 message NackMessageResult {
   bytes message_id = 1;
-  string error = 2;
+  OperationError error = 2;
 }
 
 // Bidirectional streaming service for async request-response
@@ -247,6 +339,8 @@ message FujinRequest {
     BeginTxRequest begin_tx = 11;
     CommitTxRequest commit_tx = 12;
     RollbackTxRequest rollback_tx = 13;
+    TxProduceRequest tx_produce = 14;
+    TxHProduceRequest tx_hproduce = 15;
   }
 }
 
@@ -268,5 +362,7 @@ message FujinResponse {
     BeginTxResponse begin_tx = 13;
     CommitTxResponse commit_tx = 14;
     RollbackTxResponse rollback_tx = 15;
+    TxProduceResponse tx_produce = 16;
+    TxHProduceResponse tx_hproduce = 17;
   }
 }

@@ -5,11 +5,17 @@ package bind
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/fujin-io/fujin/public/plugins/middleware/bind/config"
+)
+
+var (
+	ErrUnauthenticated  = errors.New("authentication required")
+	ErrPermissionDenied = errors.New("authentication failed")
 )
 
 // Middleware processes a BIND request and can reject it.
@@ -82,8 +88,8 @@ func Chain(
 	l *slog.Logger,
 ) error {
 	for _, cfg := range configs {
-		// Check if middleware is disabled
-		if cfg.Disabled {
+		// Skip if disabled (nil = true = enabled by default)
+		if cfg.Enabled != nil && !*cfg.Enabled {
 			continue
 		}
 

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
+	"io"
 	"testing"
 	"time"
 
@@ -50,6 +50,10 @@ func Benchmark_Produce_32KBPayload_Nop_QUIC(b *testing.B) {
 	benchProduceQUIC(b, "nop", "pub", sizedString(32*1024))
 }
 
+func Benchmark_Produce_1MBPayload_Nop_QUIC(b *testing.B) {
+	benchProduceQUIC(b, "nop", "pub", sizedString(1024*1024))
+}
+
 // No op TCP benchmarks
 func Benchmark_Produce_1BPayload_Nop_TCP(b *testing.B) {
 	benchProduceTCP(b, "nop", "pub", sizedString(1))
@@ -83,6 +87,10 @@ func Benchmark_Produce_32KBPayload_Nop_TCP(b *testing.B) {
 	benchProduceTCP(b, "nop", "pub", sizedString(32*1024))
 }
 
+func Benchmark_Produce_1MBPayload_Nop_TCP(b *testing.B) {
+	benchProduceTCP(b, "nop", "pub", sizedString(1024*1024))
+}
+
 // No op Unix benchmarks
 func Benchmark_Produce_1BPayload_Nop_Unix(b *testing.B) {
 	benchProduceUnix(b, "nop", "pub", sizedString(1))
@@ -114,6 +122,10 @@ func Benchmark_Produce_8KBPayload_Nop_Unix(b *testing.B) {
 
 func Benchmark_Produce_32KBPayload_Nop_Unix(b *testing.B) {
 	benchProduceUnix(b, "nop", "pub", sizedString(32*1024))
+}
+
+func Benchmark_Produce_1MBPayload_Nop_Unix(b *testing.B) {
+	benchProduceUnix(b, "nop", "pub", sizedString(1024*1024))
 }
 
 // Kafka benchmarks
@@ -396,7 +408,7 @@ func Benchmark_Produce_32KBPayload_NSQ_QUIC(b *testing.B) {
 	benchProduceQUIC(b, "nsq", "pub", sizedString(32*1024))
 }
 
-func benchProduceQUIC(b *testing.B, typ, topic, payload string) {
+func benchProduceQUIC(b *testing.B, typ, route, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
@@ -440,10 +452,10 @@ func benchProduceQUIC(b *testing.B, typ, topic, payload string) {
 	}
 
 	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(topic)))
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(route)))
 
 	cmd = append(cmd, lenBuf...)
-	cmd = append(cmd, []byte(topic)...)
+	cmd = append(cmd, route...)
 
 	binary.BigEndian.PutUint32(lenBuf, uint32(len(payload)))
 
@@ -452,33 +464,43 @@ func benchProduceQUIC(b *testing.B, typ, topic, payload string) {
 
 	b.SetBytes(int64(len(cmd)))
 	bw := bufio.NewWriterSize(p, defaultSendBufSize)
-
-	bytes := make(chan int)
-
-	go drainStream(b, p, bytes)
+	if err := p.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		b.Fatal(err)
+	}
+	responses := make(chan produceBenchmarkResult, 1)
+	go func() {
+		count, err := validateProduceBenchmarkResponses(p)
+		responses <- produceBenchmarkResult{count: count, err: err}
+	}()
 
 	b.StartTimer()
-
 	startTime := time.Now()
 	for b.Loop() {
-		bw.Write(cmd)
+		if _, err := bw.Write(cmd); err != nil {
+			b.Fatal(err)
+		}
 	}
-	bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)})
-
-	bw.Flush()
+	if _, err := bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)}); err != nil {
+		b.Fatal(err)
+	}
+	if err := bw.Flush(); err != nil {
+		b.Fatal(err)
+	}
 	elapsed := time.Since(startTime)
 	fmt.Println("seconds to write full buf to quic stream:", elapsed.Seconds())
-	res := <-bytes
+	response := <-responses
+	if response.err != nil {
+		b.Fatal(response.err)
+	}
+	if response.count != b.N {
+		b.Fatalf("produce responses: got %d, want %d", response.count, b.N)
+	}
 	b.StopTimer()
 	p.Close()
 	_ = c.CloseWithError(0x0, "")
-	expected := b.N*6 + 3
-	if res != expected {
-		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
-	}
 }
 
-func benchProduceTCP(b *testing.B, typ, topic, payload string) {
+func benchProduceTCP(b *testing.B, typ, route, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
@@ -508,10 +530,10 @@ func benchProduceTCP(b *testing.B, typ, topic, payload string) {
 	}
 
 	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(topic)))
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(route)))
 
 	cmd = append(cmd, lenBuf...)
-	cmd = append(cmd, []byte(topic)...)
+	cmd = append(cmd, route...)
 
 	binary.BigEndian.PutUint32(lenBuf, uint32(len(payload)))
 
@@ -520,32 +542,42 @@ func benchProduceTCP(b *testing.B, typ, topic, payload string) {
 
 	b.SetBytes(int64(len(cmd)))
 	bw := bufio.NewWriterSize(c, defaultSendBufSize)
-
-	bytes := make(chan int)
-
-	go drainTCPConn(b, c, bytes)
+	if err := c.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		b.Fatal(err)
+	}
+	responses := make(chan produceBenchmarkResult, 1)
+	go func() {
+		count, err := validateProduceBenchmarkResponses(c)
+		responses <- produceBenchmarkResult{count: count, err: err}
+	}()
 
 	b.StartTimer()
-
 	startTime := time.Now()
 	for b.Loop() {
-		bw.Write(cmd)
+		if _, err := bw.Write(cmd); err != nil {
+			b.Fatal(err)
+		}
 	}
-	bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)})
-
-	bw.Flush()
+	if _, err := bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)}); err != nil {
+		b.Fatal(err)
+	}
+	if err := bw.Flush(); err != nil {
+		b.Fatal(err)
+	}
 	elapsed := time.Since(startTime)
 	fmt.Println("seconds to write full buf to tcp conn:", elapsed.Seconds())
-	res := <-bytes
+	response := <-responses
+	if response.err != nil {
+		b.Fatal(response.err)
+	}
+	if response.count != b.N {
+		b.Fatalf("produce responses: got %d, want %d", response.count, b.N)
+	}
 	b.StopTimer()
 	c.Close()
-	expected := b.N*6 + 3
-	if res != expected {
-		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
-	}
 }
 
-func benchProduceUnix(b *testing.B, typ, topic, payload string) {
+func benchProduceUnix(b *testing.B, typ, route, payload string) {
 	ctx, cancel := context.WithCancel(b.Context())
 	defer cancel()
 
@@ -575,15 +607,233 @@ func benchProduceUnix(b *testing.B, typ, topic, payload string) {
 	}
 
 	lenBuf := make([]byte, 4)
-	binary.BigEndian.PutUint32(lenBuf, uint32(len(topic)))
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(route)))
 
 	cmd = append(cmd, lenBuf...)
-	cmd = append(cmd, []byte(topic)...)
+	cmd = append(cmd, route...)
 
 	binary.BigEndian.PutUint32(lenBuf, uint32(len(payload)))
 
 	cmd = append(cmd, lenBuf...)
 	cmd = append(cmd, []byte(payload)...)
+
+	b.SetBytes(int64(len(cmd)))
+	bw := bufio.NewWriterSize(c, defaultSendBufSize)
+	if err := c.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		b.Fatal(err)
+	}
+	responses := make(chan produceBenchmarkResult, 1)
+	go func() {
+		count, err := validateProduceBenchmarkResponses(c)
+		responses <- produceBenchmarkResult{count: count, err: err}
+	}()
+
+	b.StartTimer()
+	startTime := time.Now()
+	for b.Loop() {
+		if _, err := bw.Write(cmd); err != nil {
+			b.Fatal(err)
+		}
+	}
+	if _, err := bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)}); err != nil {
+		b.Fatal(err)
+	}
+	if err := bw.Flush(); err != nil {
+		b.Fatal(err)
+	}
+	elapsed := time.Since(startTime)
+	fmt.Println("seconds to write full buf to unix conn:", elapsed.Seconds())
+	response := <-responses
+	if response.err != nil {
+		b.Fatal(response.err)
+	}
+	if response.count != b.N {
+		b.Fatalf("produce responses: got %d, want %d", response.count, b.N)
+	}
+	b.StopTimer()
+	c.Close()
+}
+
+type produceBenchmarkResult struct {
+	count int
+	err   error
+}
+
+func validateProduceBenchmarkResponses(reader io.Reader) (int, error) {
+	responses := newProtoReader(reader)
+	if err := responses.readBindResp(); err != nil {
+		return 0, fmt.Errorf("bind response: %w", err)
+	}
+	for operation := 0; ; operation++ {
+		code, err := responses.readByte()
+		if err != nil {
+			return operation, fmt.Errorf("response %d: %w", operation, err)
+		}
+		if code == byte(v1.RESP_CODE_DISCONNECT) {
+			return operation, nil
+		}
+		if code != byte(v1.RESP_CODE_PRODUCE) {
+			return operation, fmt.Errorf("response %d: code %d, want %d or %d", operation, code, v1.RESP_CODE_PRODUCE, v1.RESP_CODE_DISCONNECT)
+		}
+		correlationID, err := responses.readCID()
+		if err != nil {
+			return operation, fmt.Errorf("produce response %d correlation ID: %w", operation, err)
+		}
+		if correlationID != 0 {
+			return operation, fmt.Errorf("produce response %d: correlation ID %d, want 0", operation, correlationID)
+		}
+		operationErr, err := responses.readStatus()
+		if err != nil {
+			return operation, fmt.Errorf("produce response %d status: %w", operation, err)
+		}
+		if operationErr != nil {
+			return operation, fmt.Errorf("produce response %d: produce error: %w", operation, operationErr)
+		}
+	}
+}
+
+// Fetch (consumer) benchmarks - Nop
+
+func Benchmark_Fetch_Nop_QUIC(b *testing.B) {
+	benchFetchQUIC(b, "nop", "sub")
+}
+
+func Benchmark_Fetch_Nop_TCP(b *testing.B) {
+	benchFetchTCP(b, "nop", "sub")
+}
+
+func Benchmark_Fetch_Nop_Unix(b *testing.B) {
+	benchFetchUnix(b, "nop", "sub")
+}
+
+func benchFetchQUIC(b *testing.B, typ, route string) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	var s *server.Server
+
+	b.StopTimer()
+	switch typ {
+	case "nop":
+		s = RunDefaultServerWithNopQUIC(ctx)
+	default:
+		panic("invalid typ")
+	}
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createClientConn(ctx, PERF_ADDR)
+	p := doDefaultBind(c)
+
+	cmd := buildFetchCmd(route, 1)
+
+	b.SetBytes(int64(len(cmd)))
+	bw := bufio.NewWriterSize(p, defaultSendBufSize)
+
+	bytes := make(chan int)
+
+	go drainStream(b, p, bytes)
+
+	b.StartTimer()
+
+	startTime := time.Now()
+	for b.Loop() {
+		bw.Write(cmd)
+	}
+	bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)})
+
+	bw.Flush()
+	elapsed := time.Since(startTime)
+	fmt.Println("seconds to write full buf to quic stream:", elapsed.Seconds())
+	res := <-bytes
+	b.StopTimer()
+	p.Close()
+	_ = c.CloseWithError(0x0, "")
+	// fetch response: RESP_CODE_FETCH(1) + cID(4) + STATUS_OK(1) + subID(1) + count(4) = 11 bytes
+	// bind(2) + disconnect(1) = 3
+	expected := b.N*11 + 3
+	if res != expected {
+		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
+	}
+}
+
+func benchFetchTCP(b *testing.B, typ, route string) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	var s *server.Server
+
+	b.StopTimer()
+	switch typ {
+	case "nop":
+		s = RunDefaultServerWithNopTCP(ctx)
+	default:
+		panic("invalid typ")
+	}
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createTCPClientConn(PERF_TCP_ADDR)
+	doDefaultBindTCP(c)
+
+	cmd := buildFetchCmd(route, 1)
+
+	b.SetBytes(int64(len(cmd)))
+	bw := bufio.NewWriterSize(c, defaultSendBufSize)
+
+	bytes := make(chan int)
+
+	go drainTCPConn(b, c, bytes)
+
+	b.StartTimer()
+
+	startTime := time.Now()
+	for b.Loop() {
+		bw.Write(cmd)
+	}
+	bw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)})
+
+	bw.Flush()
+	elapsed := time.Since(startTime)
+	fmt.Println("seconds to write full buf to tcp conn:", elapsed.Seconds())
+	res := <-bytes
+	b.StopTimer()
+	c.Close()
+	expected := b.N*11 + 3
+	if res != expected {
+		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
+	}
+}
+
+func benchFetchUnix(b *testing.B, typ, route string) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	var s *server.Server
+
+	b.StopTimer()
+	switch typ {
+	case "nop":
+		s = RunDefaultServerWithNopUnix(ctx)
+	default:
+		panic("invalid typ")
+	}
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createUnixClientConn(PERF_UNIX_PATH)
+	doDefaultBindUnix(c)
+
+	cmd := buildFetchCmd(route, 1)
 
 	b.SetBytes(int64(len(cmd)))
 	bw := bufio.NewWriterSize(c, defaultSendBufSize)
@@ -606,22 +856,288 @@ func benchProduceUnix(b *testing.B, typ, topic, payload string) {
 	res := <-bytes
 	b.StopTimer()
 	c.Close()
-	expected := b.N*6 + 3
+	expected := b.N*11 + 3
 	if res != expected {
 		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
 	}
 }
 
-var ch = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@$#%^&*()")
-
-func sizedBytes(sz int) []byte {
-	b := make([]byte, sz)
-	for i := range b {
-		b[i] = ch[rand.Intn(len(ch))]
-	}
-	return b
+func buildFetchCmd(route string, n uint32) []byte {
+	cmd := []byte{byte(v1.OP_CODE_FETCH)}
+	// Correlation ID.
+	cmd = append(cmd, 0, 0, 0, 0)
+	// Auto commit.
+	cmd = append(cmd, 1)
+	// Route.
+	lenBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(route)))
+	cmd = append(cmd, lenBuf...)
+	cmd = append(cmd, route...)
+	// Number of messages to fetch.
+	binary.BigEndian.PutUint32(lenBuf, n)
+	cmd = append(cmd, lenBuf...)
+	return cmd
 }
 
-func sizedString(sz int) string {
-	return string(sizedBytes(sz))
+// Subscribe (consumer push) benchmarks - Gen connector
+
+func Benchmark_Subscribe_1BPayload_Gen_TCP(b *testing.B) {
+	benchSubscribeTCP(b, 1)
+}
+
+func Benchmark_Subscribe_1BPayload_Gen_Unix(b *testing.B) {
+	benchSubscribeUnix(b, 1)
+}
+
+func Benchmark_Subscribe_1BPayload_Gen_QUIC(b *testing.B) {
+	benchSubscribeQUIC(b, 1)
+}
+
+func Benchmark_Subscribe_32BPayload_Gen_TCP(b *testing.B) {
+	benchSubscribeTCP(b, 32)
+}
+
+func Benchmark_Subscribe_32BPayload_Gen_Unix(b *testing.B) {
+	benchSubscribeUnix(b, 32)
+}
+
+func Benchmark_Subscribe_32BPayload_Gen_QUIC(b *testing.B) {
+	benchSubscribeQUIC(b, 32)
+}
+
+func Benchmark_Subscribe_1KBPayload_Gen_TCP(b *testing.B) {
+	benchSubscribeTCP(b, 1024)
+}
+
+func Benchmark_Subscribe_1KBPayload_Gen_Unix(b *testing.B) {
+	benchSubscribeUnix(b, 1024)
+}
+
+func Benchmark_Subscribe_1KBPayload_Gen_QUIC(b *testing.B) {
+	benchSubscribeQUIC(b, 1024)
+}
+
+func Benchmark_Subscribe_32KBPayload_Gen_TCP(b *testing.B) {
+	benchSubscribeTCP(b, 32*1024)
+}
+
+func Benchmark_Subscribe_32KBPayload_Gen_Unix(b *testing.B) {
+	benchSubscribeUnix(b, 32*1024)
+}
+
+func Benchmark_Subscribe_32KBPayload_Gen_QUIC(b *testing.B) {
+	benchSubscribeQUIC(b, 32*1024)
+}
+
+func Benchmark_Subscribe_1MBPayload_Gen_TCP(b *testing.B) {
+	benchSubscribeTCP(b, 1024*1024)
+}
+
+func Benchmark_Subscribe_1MBPayload_Gen_Unix(b *testing.B) {
+	benchSubscribeUnix(b, 1024*1024)
+}
+
+func Benchmark_Subscribe_1MBPayload_Gen_QUIC(b *testing.B) {
+	benchSubscribeQUIC(b, 1024*1024)
+}
+
+func buildSubscribeCmd(topic string) []byte {
+	cmd := []byte{byte(v1.OP_CODE_SUBSCRIBE)}
+	// correlation ID (4 bytes)
+	cmd = append(cmd, 0, 0, 0, 0)
+	// autoCommit (1 byte) - true
+	cmd = append(cmd, 1)
+	// topic length (4 bytes)
+	lenBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(lenBuf, uint32(len(topic)))
+	cmd = append(cmd, lenBuf...)
+	// topic
+	cmd = append(cmd, []byte(topic)...)
+	return cmd
+}
+
+func readAutoCommitMessages(b *testing.B, reader *protoReader, count, payloadSize int) {
+	b.Helper()
+	for range count {
+		code, err := reader.readByte()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if code != byte(v1.RESP_CODE_MSG) {
+			b.Fatalf("message response code: got %d, want %d", code, v1.RESP_CODE_MSG)
+		}
+		if _, err := reader.readByte(); err != nil {
+			b.Fatal(err)
+		}
+		messageSize, err := reader.readUint32()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if int(messageSize) != payloadSize {
+			b.Fatalf("message payload size: got %d, want %d", messageSize, payloadSize)
+		}
+		if _, err := reader.readExact(int(messageSize)); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func finishSubscribeBenchmark(b *testing.B, rw io.Writer, reader *protoReader, subscriptionID byte) {
+	b.Helper()
+	unsubscribe := []byte{byte(v1.OP_CODE_UNSUBSCRIBE), 0, 0, 0, 1, subscriptionID}
+	if _, err := rw.Write(unsubscribe); err != nil {
+		b.Fatal(err)
+	}
+	response, err := reader.readExact(5)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if response[0] != byte(v1.RESP_CODE_UNSUBSCRIBE) {
+		b.Fatalf("unsubscribe response: %v", response)
+	}
+	if operationErr, err := reader.readStatus(); err != nil {
+		b.Fatal(err)
+	} else if operationErr != nil {
+		b.Fatalf("unsubscribe response: %v", operationErr)
+	}
+	if _, err := rw.Write([]byte{byte(v1.OP_CODE_DISCONNECT)}); err != nil {
+		b.Fatal(err)
+	}
+	disconnect, err := reader.readByte()
+	if err != nil {
+		b.Fatal(err)
+	}
+	if disconnect != byte(v1.RESP_CODE_DISCONNECT) {
+		b.Fatalf("disconnect response: %v", disconnect)
+	}
+}
+
+func benchSubscribeTCP(b *testing.B, msgSize int) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	b.StopTimer()
+	s := RunServerWithGenTCP(ctx, msgSize, uint64(b.N))
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createTCPClientConn(PERF_TCP_ADDR)
+	doDefaultBindTCP(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
+
+	// MSG response (autoCommit=true): RESP_CODE_MSG(1) + subID(1) + msgLen(4) + msg(N)
+	msgRespSize := 6 + msgSize
+	b.SetBytes(int64(msgRespSize))
+
+	// Send SUBSCRIBE
+	subCmd := buildSubscribeCmd("sub")
+	c.Write(subCmd)
+
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.StartTimer()
+
+	readAutoCommitMessages(b, reader, b.N, msgSize)
+
+	b.StopTimer()
+
+	finishSubscribeBenchmark(b, c, reader, subscriptionID)
+	if err := c.Close(); err != nil {
+		b.Fatal(err)
+	}
+}
+
+func benchSubscribeUnix(b *testing.B, msgSize int) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	b.StopTimer()
+	s := RunServerWithGenUnix(ctx, msgSize, uint64(b.N))
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createUnixClientConn(PERF_UNIX_PATH)
+	doDefaultBindUnix(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
+
+	msgRespSize := 6 + msgSize
+	b.SetBytes(int64(msgRespSize))
+
+	subCmd := buildSubscribeCmd("sub")
+	c.Write(subCmd)
+
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.StartTimer()
+
+	readAutoCommitMessages(b, reader, b.N, msgSize)
+
+	b.StopTimer()
+
+	finishSubscribeBenchmark(b, c, reader, subscriptionID)
+	if err := c.Close(); err != nil {
+		b.Fatal(err)
+	}
+}
+
+func benchSubscribeQUIC(b *testing.B, msgSize int) {
+	ctx, cancel := context.WithCancel(b.Context())
+	defer cancel()
+
+	b.StopTimer()
+	s := RunServerWithGenQUIC(ctx, msgSize, uint64(b.N))
+
+	defer func() {
+		cancel()
+		<-s.Done()
+	}()
+
+	c := createClientConn(ctx, PERF_ADDR)
+	p := doDefaultBind(c)
+	reader := newProtoReader(p)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
+
+	msgRespSize := 6 + msgSize
+	b.SetBytes(int64(msgRespSize))
+
+	subCmd := buildSubscribeCmd("sub")
+	p.Write(subCmd)
+
+	_, subscriptionID, err := reader.readSubscribeResp()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.StartTimer()
+
+	readAutoCommitMessages(b, reader, b.N, msgSize)
+
+	b.StopTimer()
+
+	finishSubscribeBenchmark(b, p, reader, subscriptionID)
+	p.CancelRead(v1.NoErr)
+	p.CancelWrite(v1.NoErr)
+	if err := c.CloseWithError(0x0, ""); err != nil {
+		b.Fatal(err)
+	}
 }

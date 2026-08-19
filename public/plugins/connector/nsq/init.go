@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	if err := connector.Register("nsq", newNSQConnector); err != nil {
+	if err := connector.Register("nsq", descriptor()); err != nil {
 		panic(fmt.Sprintf("register nsq connector: %v", err))
 	}
 }

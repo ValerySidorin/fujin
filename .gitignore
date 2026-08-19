@@ -22,8 +22,14 @@ go.work
 go.work.sum
 
 .vscode
+.cursor
+.claude
 .DS_Store
 bin/
+target/
+test/performance/
+__pycache__/
+*.py[cod]
 
 ## Observability
 grafana

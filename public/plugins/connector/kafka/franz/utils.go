@@ -67,7 +67,7 @@ func kgoOptsFromConf(conf ConnectorConfig, autoCommit bool, tlsConfig *tls.Confi
 		opts = append(opts, kgo.FetchIsolationLevel(kgo.ReadCommitted()))
 	}
 
-	appendBalancersToKgoOpts(opts, conf.Balancers)
+	opts = appendBalancersToKgoOpts(opts, conf.Balancers)
 	return opts
 }
 

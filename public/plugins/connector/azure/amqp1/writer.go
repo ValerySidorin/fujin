@@ -48,6 +48,7 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (*Writer, error) {
 		MaxLinks: conf.Session.MaxLinks,
 	})
 	if err != nil {
+		_ = conn.Close()
 		return nil, fmt.Errorf("azure_amqp1: new session: %w", err)
 	}
 
@@ -69,6 +70,8 @@ func NewWriter(conf ConnectorConfig, l *slog.Logger) (*Writer, error) {
 		TargetExpiryTimeout:         conf.Sender.TargetExpiryTimeout,
 	})
 	if err != nil {
+		_ = session.Close(context.Background())
+		_ = conn.Close()
 		return nil, fmt.Errorf("azure_amqp1: new sender: %w", err)
 	}
 
