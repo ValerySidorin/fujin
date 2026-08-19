@@ -139,7 +139,8 @@ func assertIntsEqual(t *testing.T, got, want []int) {
 }
 
 func TestValidateProduceBenchmarkResponsesHandlesFragmentedFrames(t *testing.T) {
-	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0}
+	responses := successfulHelloResponse("v-test")
+	responses = append(responses, byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0)
 	for range 2 {
 		responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.STATUS_OK))
 	}
@@ -155,7 +156,8 @@ func TestValidateProduceBenchmarkResponsesHandlesFragmentedFrames(t *testing.T) 
 }
 
 func TestValidateProduceBenchmarkResponsesReturnsProduceError(t *testing.T) {
-	responses := []byte{byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0}
+	responses := successfulHelloResponse("v-test")
+	responses = append(responses, byte(v1.RESP_CODE_BIND), byte(v1.STATUS_OK), 0, 0, 0, 0)
 	responses = append(responses, byte(v1.RESP_CODE_PRODUCE), 0, 0, 0, 0, byte(v1.STATUS_UNAVAILABLE), byte(v1.OUTCOME_UNKNOWN))
 	responses = appendFujinString(responses, "UNAVAILABLE")
 	message := "broker unavailable"
@@ -169,6 +171,11 @@ func TestValidateProduceBenchmarkResponsesReturnsProduceError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), message) {
 		t.Fatalf("expected broker error, got %v", err)
 	}
+}
+
+func successfulHelloResponse(serverBuild string) []byte {
+	response := []byte{byte(v1.RESP_CODE_HELLO), byte(v1.STATUS_OK), v1.HelloFormat, byte(v1.Version)}
+	return appendFujinString(response, serverBuild)
 }
 
 type singleByteReader struct {

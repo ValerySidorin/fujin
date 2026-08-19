@@ -51,9 +51,13 @@ func NewServer(conf config.Config, l *slog.Logger) (*Server, error) {
 		return nil, fmt.Errorf("compile connectors: %w", err)
 	}
 
+	if conf.BuildVersion == "" {
+		conf.BuildVersion = "dev"
+	}
 	s := &Server{conf: conf, catalog: catalog, l: l}
+	runtime := transport.Runtime{BuildVersion: conf.BuildVersion}
 	for _, entry := range conf.Transports {
-		srv, err := transport.NewServer(entry, catalog, l)
+		srv, err := transport.NewServer(entry, catalog, runtime, l)
 		if err != nil {
 			_ = catalog.Close(context.Background())
 			return nil, err

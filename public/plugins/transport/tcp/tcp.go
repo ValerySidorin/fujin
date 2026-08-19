@@ -77,10 +77,10 @@ func parseFujin(s fujinSettings) serverconfig.FujinProtocolConfig {
 	return f
 }
 
-func factory(cfg any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
+func factory(cfg any, catalog *connector.Catalog, runtime transport.Runtime, l *slog.Logger) (transport.TransportServer, error) {
 	c := cfg.(serverconfig.TCPServerConfig)
 	if !c.Enabled {
 		return nil, nil
 	}
-	return NewServer(c, catalog, l), nil
+	return NewServer(c, catalog, l, runtime.BuildVersion), nil
 }

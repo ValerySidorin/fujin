@@ -3,6 +3,7 @@ package v1
 type OpCode byte
 
 const (
+	OP_CODE_HELLO       OpCode = 0
 	OP_CODE_BIND        OpCode = 1
 	OP_CODE_PRODUCE     OpCode = 2
 	OP_CODE_HPRODUCE    OpCode = 3

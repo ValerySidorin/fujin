@@ -1002,11 +1002,20 @@ func generateTLSConfig() *tls.Config {
 		Certificate: [][]byte{cert},
 		PrivateKey:  key,
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{v1.Version}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, InsecureSkipVerify: true, NextProtos: []string{v1.Protocol}}
+}
+
+func helloCmd(clientName, clientBuild string, versions ...v1.WireVersion) []byte {
+	buf := []byte{byte(v1.OP_CODE_HELLO), v1.HelloFormat, byte(len(versions))}
+	for _, version := range versions {
+		buf = append(buf, byte(version))
+	}
+	buf = appendFujinString(buf, clientName)
+	return appendFujinString(buf, clientBuild)
 }
 
 func bindCmd(connector string, meta, configOverrides map[string]string) []byte {
-	var buf []byte
+	buf := helloCmd("fujin-test", "dev", v1.Version)
 	buf = append(buf, byte(v1.OP_CODE_BIND))
 	buf = appendFujinString(buf, connector)
 	buf = appendFujinUint16StringArray(buf, meta)

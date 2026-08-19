@@ -727,6 +727,10 @@ func benchFetchQUIC(b *testing.B, typ, route string) {
 
 	c := createClientConn(ctx, PERF_ADDR)
 	p := doDefaultBind(c)
+	reader := newProtoReader(p)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	cmd := buildFetchCmd(route, 1)
 
@@ -753,8 +757,8 @@ func benchFetchQUIC(b *testing.B, typ, route string) {
 	p.Close()
 	_ = c.CloseWithError(0x0, "")
 	// fetch response: RESP_CODE_FETCH(1) + cID(4) + STATUS_OK(1) + subID(1) + count(4) = 11 bytes
-	// bind(2) + disconnect(1) = 3
-	expected := b.N*11 + 3
+	// HELLO and BIND are consumed before timing; DISCONNECT contributes one byte.
+	expected := b.N*11 + 1
 	if res != expected {
 		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
 	}
@@ -781,6 +785,10 @@ func benchFetchTCP(b *testing.B, typ, route string) {
 
 	c := createTCPClientConn(PERF_TCP_ADDR)
 	doDefaultBindTCP(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	cmd := buildFetchCmd(route, 1)
 
@@ -805,7 +813,7 @@ func benchFetchTCP(b *testing.B, typ, route string) {
 	res := <-bytes
 	b.StopTimer()
 	c.Close()
-	expected := b.N*11 + 3
+	expected := b.N*11 + 1
 	if res != expected {
 		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
 	}
@@ -832,6 +840,10 @@ func benchFetchUnix(b *testing.B, typ, route string) {
 
 	c := createUnixClientConn(PERF_UNIX_PATH)
 	doDefaultBindUnix(c)
+	reader := newProtoReader(c)
+	if err := reader.readBindResp(); err != nil {
+		b.Fatal(err)
+	}
 
 	cmd := buildFetchCmd(route, 1)
 
@@ -856,7 +868,7 @@ func benchFetchUnix(b *testing.B, typ, route string) {
 	res := <-bytes
 	b.StopTimer()
 	c.Close()
-	expected := b.N*11 + 3
+	expected := b.N*11 + 1
 	if res != expected {
 		panic(fmt.Errorf("Invalid number of bytes read: bytes: %d, expected: %d", res, expected))
 	}

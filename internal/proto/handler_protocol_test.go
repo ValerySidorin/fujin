@@ -267,6 +267,13 @@ func newProtocolTestHarness() *testHarness {
 	return &testHarness{h: h, str: str, out: out, manager: manager}
 }
 
+func newUnnegotiatedProtocolTestHarness() *testHarness {
+	harness := newProtocolTestHarness()
+	harness.h.ps.state = OP_EXPECT_HELLO
+	harness.h.serverBuild = "v-test"
+	return harness
+}
+
 // setConnected sets handler state to connected (as if BIND completed)
 func (th *testHarness) setConnected(connectorName string) {
 	configs := protocolTestConfigs(connectorName)
@@ -352,6 +359,17 @@ func buildBindFrame(connectorName string, meta map[string]string, overrides map[
 		buf = append(buf, v...)
 	}
 	return buf
+}
+
+func buildHelloFrame(clientName, clientBuild string, versions ...v1.WireVersion) []byte {
+	frame := []byte{byte(v1.OP_CODE_HELLO), v1.HelloFormat, byte(len(versions))}
+	for _, version := range versions {
+		frame = append(frame, byte(version))
+	}
+	frame = binary.BigEndian.AppendUint32(frame, uint32(len(clientName)))
+	frame = append(frame, clientName...)
+	frame = binary.BigEndian.AppendUint32(frame, uint32(len(clientBuild)))
+	return append(frame, clientBuild...)
 }
 
 // buildProduceFrame constructs: PRODUCE opcode + correlationID(4b) + routeLen(u32) + route + msgSize(u32) + msg.
@@ -522,6 +540,46 @@ var (
 // ---------------------------------------------------------------------------
 // State Machine — Opcode Dispatch Tests
 // ---------------------------------------------------------------------------
+
+func TestHandle_RequiresSuccessfulHelloBeforeBind(t *testing.T) {
+	harness := newUnnegotiatedProtocolTestHarness()
+	assert.ErrorIs(t, harness.feed(buildBindFrame("test-connector", nil, nil)), ErrParseProto)
+}
+
+func TestHandle_HelloNegotiatesVersionBeforeBind(t *testing.T) {
+	harness := newUnnegotiatedProtocolTestHarness()
+	done := harness.startWriteLoop()
+	defer harness.close(done)
+
+	frame := append(buildHelloFrame("fujin-go", "v-client", v1.WireVersion(255), v1.Version), buildBindFrame("test-connector", nil, nil)...)
+	for _, value := range frame {
+		require.NoError(t, harness.feed([]byte{value}))
+	}
+	require.Eventually(t, func() bool { return len(harness.str.written()) > 0 }, time.Second, time.Millisecond)
+	response := harness.str.written()
+	require.GreaterOrEqual(t, len(response), 2)
+	assert.Equal(t, byte(v1.RESP_CODE_HELLO), response[0])
+	assert.Equal(t, byte(v1.STATUS_OK), response[1])
+	require.GreaterOrEqual(t, len(response), 4)
+	assert.Equal(t, byte(v1.Version), response[3])
+	assert.Equal(t, OP_START, harness.h.ps.state)
+	assert.Equal(t, core.StateConnected, harness.h.core.State())
+}
+
+func TestHandle_HelloRejectsUnsupportedProtocolVersion(t *testing.T) {
+	harness := newUnnegotiatedProtocolTestHarness()
+	done := harness.startWriteLoop()
+	defer harness.close(done)
+
+	err := harness.feed(buildHelloFrame("fujin-go", "v-client", v1.WireVersion(255)))
+	require.ErrorIs(t, err, ErrClose)
+	require.Eventually(t, func() bool { return len(harness.str.written()) > 0 }, time.Second, time.Millisecond)
+	response := harness.str.written()
+	require.GreaterOrEqual(t, len(response), 2)
+	assert.Equal(t, byte(v1.RESP_CODE_HELLO), response[0])
+	assert.Equal(t, byte(v1.STATUS_UNIMPLEMENTED), response[1])
+	assert.Equal(t, OP_HELLO_CLIENT_BUILD, harness.h.ps.state)
+}
 
 func TestHandle_BindState_AcceptsPong(t *testing.T) {
 	th := newProtocolTestHarness()
@@ -2079,4 +2137,34 @@ func TestHandle_Produce_CorrelationIDPreservedInResponse(t *testing.T) {
 			assert.Equal(t, cID[:], resp[1:5], "correlation ID should be preserved in response")
 		})
 	}
+}
+
+func BenchmarkHandleHelloAllocations(b *testing.B) {
+	harness := newUnnegotiatedProtocolTestHarness()
+	frame := buildHelloFrame("fujin-go", "v-client", v1.Version)
+	// Warm protocol pools and outbound vector capacity before measuring.
+	if err := harness.feed(frame); err != nil {
+		b.Fatal(err)
+	}
+	resetHelloBenchmarkHarness(harness)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if err := harness.feed(frame); err != nil {
+			b.Fatal(err)
+		}
+		resetHelloBenchmarkHarness(harness)
+	}
+}
+
+func resetHelloBenchmarkHarness(harness *testHarness) {
+	harness.out.Lock()
+	for _, buffer := range harness.out.v {
+		pool.Put(buffer)
+	}
+	harness.out.v = harness.out.v[:0]
+	harness.out.pb = 0
+	harness.out.Unlock()
+	*harness.h.ps = parseState{state: OP_EXPECT_HELLO}
 }

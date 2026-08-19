@@ -16,8 +16,17 @@ import (
 	"github.com/fujin-io/fujin/public/proto/fujin/v1/session"
 )
 
+const OP_EXPECT_HELLO = -1
+
 const (
 	OP_START int = iota
+	OP_HELLO_FORMAT
+	OP_HELLO_VERSION_COUNT
+	OP_HELLO_VERSION
+	OP_HELLO_CLIENT_NAME_LEN
+	OP_HELLO_CLIENT_NAME
+	OP_HELLO_CLIENT_BUILD_LEN
+	OP_HELLO_CLIENT_BUILD
 
 	OP_BIND
 	OP_BIND_CONNECTOR_NAME_LEN
@@ -116,10 +125,11 @@ type parseState struct {
 
 	ca correlationIDArg
 
-	ba  bindArgs
-	pa  produceArgs
-	pma produceMsgArgs
-	ta  txArgs
+	ba    bindArgs
+	hello helloArgs
+	pa    produceArgs
+	pma   produceMsgArgs
+	ta    txArgs
 
 	sa subscribeArgs
 	aa ackArgs
@@ -129,6 +139,19 @@ type parseState struct {
 	ha headerArgs
 }
 
+const (
+	maxHelloVersions    = 16
+	maxHelloStringBytes = 256
+)
+
+type helloArgs struct {
+	versions     [maxHelloVersions]v1.WireVersion
+	versionCount byte
+	versionRead  byte
+	valueLen     uint32
+	clientName   []byte
+	clientBuild  []byte
+}
 type correlationIDArg struct {
 	cID []byte
 }
@@ -193,10 +216,11 @@ type headerArgs struct {
 }
 
 type Handler struct {
-	ctx  context.Context
-	out  *Outbound
-	str  session.Stream
-	core *core.Core
+	ctx         context.Context
+	out         *Outbound
+	str         session.Stream
+	core        *core.Core
+	serverBuild string
 
 	ps                *parseState
 	fetchBufsMu       sync.Mutex
@@ -209,6 +233,7 @@ type Handler struct {
 	pingInterval time.Duration
 	pingTimeout  time.Duration
 	pingStream   bool
+	pingOnce     sync.Once
 
 	disconnect     func()
 	disconnectOnce sync.Once
@@ -222,27 +247,26 @@ type Handler struct {
 func NewHandler(
 	ctx context.Context,
 	pingInterval time.Duration, pingTimeout time.Duration, pingStream bool,
-	baseGeneration *connector.Generation,
+	serverBuild string, baseGeneration *connector.Generation,
 	generationProvider core.GenerationProvider,
 	out *Outbound, str session.Stream, l *slog.Logger,
 ) *Handler {
+	if serverBuild == "" {
+		serverBuild = "dev"
+	}
 	h := &Handler{
 		ctx:          ctx,
 		core:         core.New(ctx, baseGeneration, generationProvider, l),
+		serverBuild:  serverBuild,
 		pingInterval: pingInterval,
 		pingTimeout:  pingTimeout,
 		pingStream:   pingStream,
-		l:            l,
+		ps:           &parseState{state: OP_EXPECT_HELLO},
 		out:          out,
 		str:          str,
-		ps:           &parseState{},
+		l:            l,
 		disconnect:   func() {},
 		closed:       make(chan struct{}),
-	}
-
-	if pingStream {
-		_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
-		go h.writePing()
 	}
 
 	return h
@@ -257,6 +281,11 @@ func (h *Handler) handle(buf []byte) error {
 	for i = 0; i < len(buf); i++ {
 		b = buf[i]
 		switch h.ps.state {
+		case OP_EXPECT_HELLO:
+			if b != byte(v1.OP_CODE_HELLO) {
+				return ErrParseProto
+			}
+			h.ps.state = OP_HELLO_FORMAT
 		case OP_START:
 			switch h.core.State() {
 			case core.StateUnbound:
@@ -353,6 +382,65 @@ func (h *Handler) handle(buf []byte) error {
 				}
 			case core.StateClosed:
 				return ErrParseProto
+			}
+		case OP_HELLO_FORMAT:
+			if b != v1.HelloFormat {
+				h.enqueueHelloError(newHelloError(v1.STATUS_UNIMPLEMENTED, "HELLO_FORMAT_UNSUPPORTED", "unsupported HELLO format"))
+				return ErrClose
+			}
+			h.ps.state = OP_HELLO_VERSION_COUNT
+		case OP_HELLO_VERSION_COUNT:
+			h.ps.hello.versionCount = b
+			if h.ps.hello.versionCount == 0 || h.ps.hello.versionCount > maxHelloVersions {
+				h.enqueueHelloError(newHelloError(v1.STATUS_INVALID_ARGUMENT, "INVALID_HELLO", "invalid supported version count"))
+				return ErrClose
+			}
+			h.ps.state = OP_HELLO_VERSION
+		case OP_HELLO_VERSION:
+			if b == 0 {
+				h.enqueueHelloError(newHelloError(v1.STATUS_INVALID_ARGUMENT, "INVALID_HELLO", "protocol version must be nonzero"))
+				return ErrClose
+			}
+			h.ps.hello.versions[h.ps.hello.versionRead] = v1.WireVersion(b)
+			h.ps.hello.versionRead++
+			if h.ps.hello.versionRead == h.ps.hello.versionCount {
+				h.ps.argBuf = pool.Get(v1.Uint32Len)
+				h.ps.state = OP_HELLO_CLIENT_NAME_LEN
+			}
+		case OP_HELLO_CLIENT_NAME_LEN, OP_HELLO_CLIENT_BUILD_LEN:
+			h.ps.argBuf = append(h.ps.argBuf, b)
+			if len(h.ps.argBuf) == v1.Uint32Len {
+				h.ps.hello.valueLen = binary.BigEndian.Uint32(h.ps.argBuf)
+				pool.Put(h.ps.argBuf)
+				h.ps.argBuf = nil
+				if h.ps.hello.valueLen == 0 || h.ps.hello.valueLen > maxHelloStringBytes {
+					h.enqueueHelloError(newHelloError(v1.STATUS_INVALID_ARGUMENT, "INVALID_HELLO", "invalid client identity length"))
+					return ErrClose
+				}
+				h.ps.argBuf = pool.Get(int(h.ps.hello.valueLen))
+				if h.ps.state == OP_HELLO_CLIENT_NAME_LEN {
+					h.ps.state = OP_HELLO_CLIENT_NAME
+				} else {
+					h.ps.state = OP_HELLO_CLIENT_BUILD
+				}
+			}
+		case OP_HELLO_CLIENT_NAME:
+			h.ps.argBuf = append(h.ps.argBuf, b)
+			if len(h.ps.argBuf) == int(h.ps.hello.valueLen) {
+				h.ps.hello.clientName = h.ps.argBuf
+				h.ps.argBuf = pool.Get(v1.Uint32Len)
+				h.ps.state = OP_HELLO_CLIENT_BUILD_LEN
+			}
+		case OP_HELLO_CLIENT_BUILD:
+			h.ps.argBuf = append(h.ps.argBuf, b)
+			if len(h.ps.argBuf) == int(h.ps.hello.valueLen) {
+				h.ps.hello.clientBuild = h.ps.argBuf
+				h.ps.argBuf = nil
+				if err := h.completeHello(); err != nil {
+					h.enqueueHelloError(err)
+					return ErrClose
+				}
+				h.ps.state = OP_START
 			}
 		case OP_TX_PRODUCE, OP_TX_PRODUCE_H:
 			h.ps.ca.cID = pool.Get(v1.Uint32Len)
@@ -1593,6 +1681,83 @@ func (h *Handler) ack(nack bool, subscriptionID byte, messageIDs [][]byte, cID [
 		response.onResult(err)
 	}
 }
+func (h *Handler) completeHello() error {
+	defer h.releaseHelloArgs()
+	for _, version := range h.ps.hello.versions[:h.ps.hello.versionCount] {
+		if version != v1.Version {
+			continue
+		}
+		h.enqueueHelloSuccess()
+		if h.l.Enabled(h.ctx, slog.LevelDebug) {
+			h.l.Debug("native protocol negotiated",
+				"protocol_version", byte(v1.Version),
+				"client", string(h.ps.hello.clientName),
+				"client_build", string(h.ps.hello.clientBuild),
+				"server_build", h.serverBuild,
+			)
+		}
+		h.startPing()
+		return nil
+	}
+	return newHelloError(v1.STATUS_UNIMPLEMENTED, "PROTOCOL_VERSION_UNSUPPORTED", "no mutually supported protocol version")
+}
+
+func (h *Handler) releaseHelloArgs() {
+	if h.ps.hello.clientName != nil {
+		pool.Put(h.ps.hello.clientName)
+	}
+	if h.ps.hello.clientBuild != nil {
+		pool.Put(h.ps.hello.clientBuild)
+	}
+	h.ps.hello = helloArgs{}
+}
+
+func (h *Handler) startPing() {
+	if !h.pingStream {
+		return
+	}
+	h.pingOnce.Do(func() {
+		_ = h.str.SetDeadline(time.Now().Add(h.pingTimeout))
+		go h.writePing()
+	})
+}
+
+func (h *Handler) enqueueHelloSuccess() {
+	response := pool.Get(4 + v1.Uint32Len + len(h.serverBuild))
+	response = append(response, byte(v1.RESP_CODE_HELLO), byte(v1.STATUS_OK), v1.HelloFormat, byte(v1.Version))
+	response = appendProtocolString(response, h.serverBuild)
+	h.out.EnqueueProto(response)
+	pool.Put(response)
+}
+
+func (h *Handler) enqueueHelloError(err error) {
+	errBuf := operationErrorBuf(err)
+	h.out.EnqueueProtoMulti([]byte{byte(v1.RESP_CODE_HELLO)}, errBuf)
+	pool.Put(errBuf)
+}
+
+type helloError struct {
+	status  v1.StatusCode
+	reason  string
+	message string
+}
+
+func newHelloError(status v1.StatusCode, reason, message string) *helloError {
+	return &helloError{status: status, reason: reason, message: message}
+}
+
+func (e *helloError) Error() string { return e.message }
+
+func (e *helloError) OperationError() core.OperationError {
+	return core.OperationError{
+		Code:    core.StatusCode(e.status),
+		Outcome: core.OutcomeNotApplied,
+		Reason:  e.reason,
+		Message: e.message,
+		Details: map[string]string{"server_protocol_version": v1.Version.String()},
+	}
+}
+
 func (h *Handler) writePing() {
 	t := time.NewTicker(h.pingInterval)
 	defer t.Stop()
@@ -1876,6 +2041,9 @@ func (h *Handler) flushBufs() {
 	if h.ps.ca.cID != nil {
 		pool.Put(h.ps.ca.cID)
 		h.ps.ca.cID = nil
+	}
+	if h.ps.hello.clientName != nil || h.ps.hello.clientBuild != nil {
+		h.releaseHelloArgs()
 	}
 	if h.ps.argBuf != nil {
 		pool.Put(h.ps.argBuf)

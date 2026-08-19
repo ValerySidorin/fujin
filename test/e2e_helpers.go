@@ -118,6 +118,39 @@ type nativeRouteCapabilities struct {
 	NackEffect       v1.NackEffect
 }
 
+func (p *protoReader) readHelloResp() error {
+	code, err := p.readByte()
+	if err != nil {
+		return err
+	}
+	if code != byte(v1.RESP_CODE_HELLO) {
+		return fmt.Errorf("expected HELLO resp code %d, got %d", v1.RESP_CODE_HELLO, code)
+	}
+	operationErr, err := p.readStatus()
+	if err != nil {
+		return fmt.Errorf("hello status: %w", err)
+	}
+	if operationErr != nil {
+		return fmt.Errorf("hello failed: %w", operationErr)
+	}
+	format, err := p.readByte()
+	if err != nil {
+		return err
+	}
+	if format != v1.HelloFormat {
+		return fmt.Errorf("unsupported HELLO response format %d", format)
+	}
+	version, err := p.readByte()
+	if err != nil {
+		return err
+	}
+	if v1.WireVersion(version) != v1.Version {
+		return fmt.Errorf("server selected unsupported protocol version %d", version)
+	}
+	_, err = p.readString()
+	return err
+}
+
 // readBindResp reads and discards the capability snapshot from a BIND response.
 func (p *protoReader) readBindResp() error {
 	_, err := p.readBindCapabilities()
@@ -127,6 +160,9 @@ func (p *protoReader) readBindResp() error {
 // readBindCapabilities reads: [16, 0, routeCount(u32), route entries].
 // Each route entry is [route string, capability flags, produce guarantee, ACK granularity, NACK effect].
 func (p *protoReader) readBindCapabilities() (map[string]nativeRouteCapabilities, error) {
+	if err := p.readHelloResp(); err != nil {
+		return nil, err
+	}
 	code, err := p.readByte()
 	if err != nil {
 		return nil, err

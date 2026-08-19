@@ -19,8 +19,9 @@ import (
 )
 
 type Server struct {
-	conf    serverconfig.TCPServerConfig
-	catalog *connector.Catalog
+	conf         serverconfig.TCPServerConfig
+	catalog      *connector.Catalog
+	buildVersion string
 
 	ln net.Listener // stored for ListenerFDs
 
@@ -30,13 +31,14 @@ type Server struct {
 	l *slog.Logger
 }
 
-func NewServer(conf serverconfig.TCPServerConfig, catalog *connector.Catalog, l *slog.Logger) *Server {
+func NewServer(conf serverconfig.TCPServerConfig, catalog *connector.Catalog, l *slog.Logger, buildVersion ...string) *Server {
 	return &Server{
-		conf:    conf,
-		catalog: catalog,
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		l:       l.With("server", "fujin_tcp"),
+		conf:         conf,
+		catalog:      catalog,
+		buildVersion: resolvedBuildVersion(buildVersion),
+		ready:        make(chan struct{}),
+		done:         make(chan struct{}),
+		l:            l.With("server", "fujin_tcp"),
 	}
 }
 
@@ -154,6 +156,7 @@ func (s *Server) acceptLoop(ctx context.Context, ln net.Listener) error {
 			}()
 
 			handler.HandleStream(ctx, conn, session.StreamOptions{
+				BuildVersion:          s.buildVersion,
 				BaseGeneration:        s.catalog.Current(),
 				GenerationProvider:    s.catalog.Current,
 				PingInterval:          s.conf.Fujin.PingInterval,
@@ -179,4 +182,11 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 
 func (s *Server) Done() <-chan struct{} {
 	return s.done
+}
+
+func resolvedBuildVersion(values []string) string {
+	if len(values) > 0 && values[0] != "" {
+		return values[0]
+	}
+	return "dev"
 }

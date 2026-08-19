@@ -85,10 +85,10 @@ func parseConfig(entry transport.Config) (any, error) {
 	}, nil
 }
 
-func factory(config any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
+func factory(config any, catalog *connector.Catalog, runtime transport.Runtime, l *slog.Logger) (transport.TransportServer, error) {
 	parsed := config.(serverconfig.WebSocketServerConfig)
 	if !parsed.Enabled {
 		return nil, nil
 	}
-	return NewServer(parsed, catalog, l), nil
+	return NewServer(parsed, catalog, l, runtime.BuildVersion), nil
 }

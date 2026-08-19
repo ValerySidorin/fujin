@@ -14,7 +14,7 @@ import (
 // Server is a stub on non-Unix platforms.
 type Server struct{}
 
-func NewServer(_ serverconfig.UnixServerConfig, _ *connector.Catalog, _ *slog.Logger) *Server {
+func NewServer(_ serverconfig.UnixServerConfig, _ *connector.Catalog, _ *slog.Logger, _ ...string) *Server {
 	return nil
 }
 

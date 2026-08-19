@@ -54,10 +54,20 @@ type OperationError struct {
 	Details map[string]string
 }
 
+// OperationErrorProvider allows protocol adapters to provide an explicit
+// client-visible classification for failures owned outside Session Core.
+type OperationErrorProvider interface {
+	OperationError() OperationError
+}
+
 // ClassifyError converts domain and connector failures to the shared wire contract.
 func ClassifyError(err error) OperationError {
 	if err == nil {
 		return OperationError{Code: StatusOK}
+	}
+	var provided OperationErrorProvider
+	if errors.As(err, &provided) {
+		return provided.OperationError()
 	}
 
 	classified := OperationError{

@@ -25,9 +25,10 @@ import (
 const connectionDrainTimeout = 30 * time.Second
 
 type Server struct {
-	config  serverconfig.WebSocketServerConfig
-	catalog *connector.Catalog
-	logger  *slog.Logger
+	config       serverconfig.WebSocketServerConfig
+	catalog      *connector.Catalog
+	buildVersion string
+	logger       *slog.Logger
 
 	listener    net.Listener
 	rawListener *net.TCPListener
@@ -41,7 +42,7 @@ type Server struct {
 	connectionsWG sync.WaitGroup
 }
 
-func NewServer(config serverconfig.WebSocketServerConfig, catalog *connector.Catalog, logger *slog.Logger) *Server {
+func NewServer(config serverconfig.WebSocketServerConfig, catalog *connector.Catalog, logger *slog.Logger, buildVersion ...string) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -53,12 +54,13 @@ func NewServer(config serverconfig.WebSocketServerConfig, catalog *connector.Cat
 	}
 	config.Fujin.SetDefaults()
 	return &Server{
-		config:      config,
-		catalog:     catalog,
-		logger:      logger.With("server", "fujin_websocket"),
-		ready:       make(chan struct{}),
-		done:        make(chan struct{}),
-		connections: make(map[*stream]struct{}),
+		config:       config,
+		catalog:      catalog,
+		buildVersion: resolvedBuildVersion(buildVersion),
+		logger:       logger.With("server", "fujin_websocket"),
+		ready:        make(chan struct{}),
+		done:         make(chan struct{}),
+		connections:  make(map[*stream]struct{}),
 	}
 }
 
@@ -152,6 +154,7 @@ func (s *Server) handleConnection(
 	}()
 
 	handler.HandleStream(ctx, stream, session.StreamOptions{
+		BuildVersion:          s.buildVersion,
 		BaseGeneration:        s.catalog.Current(),
 		GenerationProvider:    s.catalog.Current,
 		PingInterval:          s.config.Fujin.PingInterval,
@@ -219,6 +222,13 @@ func originChecker(allowed []string) func(*http.Request) bool {
 		_, ok := set[strings.TrimSuffix(origin, "/")]
 		return ok
 	}
+}
+
+func resolvedBuildVersion(values []string) string {
+	if len(values) > 0 && values[0] != "" {
+		return values[0]
+	}
+	return "dev"
 }
 
 func (s *Server) ReadyForConnections(timeout time.Duration) bool {

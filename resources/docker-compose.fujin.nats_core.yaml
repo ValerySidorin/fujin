@@ -1,11 +1,11 @@
 services:
   fujin:
-    image: fujin:nats_core-${BUILD_TAG:-v0.4.1}
+    image: fujin:nats_core-${BUILD_TAG:-v0.5.0}
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        VERSION: ${BUILD_TAG:-v0.4.1}
+        VERSION: ${BUILD_TAG:-v0.5.0}
         FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/nats/core
         FUJIN_GO_TAGS: fujin,grpc,unix
     container_name: fujin
