@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fujin-io/fujin/internal/proto/pool"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,25 +14,32 @@ func TestInbound_ErrorConstants(t *testing.T) {
 	assert.Equal(t, "handler is nil", ErrNilHandler.Error())
 }
 
-func TestInbound_ReadBufferSizeConstant(t *testing.T) {
-	assert.Equal(t, 512, readBufferSize)
+func TestInboundReadBufferGrowth(t *testing.T) {
+	buf := pool.Get(initialReadBufferSize)
+	t.Cleanup(func() { pool.Put(buf) })
+
+	for _, want := range []int{pool.SIZE_MEDIUM, pool.SIZE_LARGE} {
+		var shortReads int
+		buf, shortReads = resizeReadBuffer(buf, cap(buf), shortReads)
+		assert.Equal(t, want, cap(buf))
+		assert.Zero(t, shortReads)
+	}
+	buf, _ = resizeReadBuffer(buf, cap(buf), 0)
+	assert.Equal(t, maximumReadBufferSize, cap(buf))
 }
 
-// Unit tests for inbound structure and behavior
-func TestInbound_Constants(t *testing.T) {
-	tests := []struct {
-		name     string
-		constant int
-		expected int
-	}{
-		{"readBufferSize", readBufferSize, 512},
-	}
+func TestInboundReadBufferShrinksAfterQuietPeriod(t *testing.T) {
+	buf := pool.Get(pool.SIZE_LARGE)
+	t.Cleanup(func() { pool.Put(buf) })
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.constant)
-		})
+	shortReads := 0
+	for range readBufferShrinkAfter - 1 {
+		buf, shortReads = resizeReadBuffer(buf, 1, shortReads)
+		assert.Equal(t, pool.SIZE_LARGE, cap(buf))
 	}
+	buf, shortReads = resizeReadBuffer(buf, 1, shortReads)
+	assert.Equal(t, initialReadBufferSize, cap(buf))
+	assert.Zero(t, shortReads)
 }
 
 func TestInbound_TimeoutValues(t *testing.T) {

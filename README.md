@@ -4,14 +4,12 @@ High-performance message broker gateway. Sits between your applications and mess
 
 Think of it as Envoy, but for message brokers instead of HTTP.
 
-Current release: **v0.4.0**.
+Current release: **v0.4.1**.
 
-### v0.4.0 highlights
+### v0.4.1 highlights
 
-- Unified native and gRPC operations on the generation-pinned Session Core, with explicit route capability and settlement contracts.
-- Added WebSocket transport for the native binary protocol and an opt-in `zeromq_pebbe` connector with PUB/SUB, PUSH/PULL, `fujin_v1` framing, and CURVE security.
-- Added generation-scoped connector middleware compilation, eager runtime preflight, shared runtime ownership, and deterministic drain behavior for exclusive bind endpoints.
-- Certified the Session Core performance change against the pre-cutover baseline across representative 128 B and 1 MiB workloads; sustained native TCP, QUIC, and Unix workloads completed without stalls.
+- Reduced native large-message request/response overhead with adaptive inbound reads and bounded payload-buffer reuse through 1 MiB.
+- Added WebSocket to the canonical native Session Core benchmark matrix and clarified comparable TCP versus gRPC pipeline reporting.
 
 ## Why
 

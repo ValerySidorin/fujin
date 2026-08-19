@@ -4,54 +4,30 @@ import (
 	"sync"
 )
 
-const SIZE_BYTE = 1   // for single byte op protocol allocs
-const SIZE_4_BYTE = 4 // for uint32 protocol allocs
-const SIZE_TINY = 256
-const SIZE_SMALL = 512
-const SIZE_MEDIUM = 4 * 1024
-const SIZE_LARGE = 64 * 1024
+const SIZE_BYTE = 1 // for single byte op protocol allocs
+const (
+	SIZE_4_BYTE = 4 // for uint32 protocol allocs
+	SIZE_TINY   = 256
+	SIZE_SMALL  = 512
+	SIZE_MEDIUM = 4 * 1024
+	SIZE_LARGE  = 64 * 1024
 
-var poolByte = &sync.Pool{
-	New: func() any {
-		b := [SIZE_BYTE]byte{}
-		return &b
-	},
-}
+	payloadSize128K = 128 * 1024
+	payloadSize256K = 256 * 1024
+	payloadSize512K = 512 * 1024
+	payloadSize1M   = 1024 * 1024
+)
 
-var pool4Byte = &sync.Pool{
-	New: func() any {
-		b := [SIZE_4_BYTE]byte{}
-		return &b
-	},
-}
-
-var poolTiny = &sync.Pool{
-	New: func() any {
-		b := [SIZE_TINY]byte{}
-		return &b
-	},
-}
-
-var poolSmall = &sync.Pool{
-	New: func() any {
-		b := [SIZE_SMALL]byte{}
-		return &b
-	},
-}
-
-var poolMedium = &sync.Pool{
-	New: func() any {
-		b := [SIZE_MEDIUM]byte{}
-		return &b
-	},
-}
-
-var poolLarge = &sync.Pool{
-	New: func() any {
-		b := [SIZE_LARGE]byte{}
-		return &b
-	},
-}
+var poolByte = &sync.Pool{New: func() any { b := [SIZE_BYTE]byte{}; return &b }}
+var pool4Byte = &sync.Pool{New: func() any { b := [SIZE_4_BYTE]byte{}; return &b }}
+var poolTiny = &sync.Pool{New: func() any { b := [SIZE_TINY]byte{}; return &b }}
+var poolSmall = &sync.Pool{New: func() any { b := [SIZE_SMALL]byte{}; return &b }}
+var poolMedium = &sync.Pool{New: func() any { b := [SIZE_MEDIUM]byte{}; return &b }}
+var poolLarge = &sync.Pool{New: func() any { b := [SIZE_LARGE]byte{}; return &b }}
+var poolPayload128K = &sync.Pool{New: func() any { b := [payloadSize128K]byte{}; return &b }}
+var poolPayload256K = &sync.Pool{New: func() any { b := [payloadSize256K]byte{}; return &b }}
+var poolPayload512K = &sync.Pool{New: func() any { b := [payloadSize512K]byte{}; return &b }}
+var poolPayload1M = &sync.Pool{New: func() any { b := [payloadSize1M]byte{}; return &b }}
 
 func Get(sz int) []byte {
 	switch {
@@ -72,26 +48,54 @@ func Get(sz int) []byte {
 	}
 }
 
+// GetPayload returns a buffer suitable for retaining an inbound produce payload.
+// Buffers larger than 1 MiB are intentionally not pooled.
+func GetPayload(sz int) []byte {
+	switch {
+	case sz <= SIZE_LARGE:
+		return Get(sz)
+	case sz <= payloadSize128K:
+		return poolPayload128K.Get().(*[payloadSize128K]byte)[:0]
+	case sz <= payloadSize256K:
+		return poolPayload256K.Get().(*[payloadSize256K]byte)[:0]
+	case sz <= payloadSize512K:
+		return poolPayload512K.Get().(*[payloadSize512K]byte)[:0]
+	case sz <= payloadSize1M:
+		return poolPayload1M.Get().(*[payloadSize1M]byte)[:0]
+	default:
+		return make([]byte, 0, sz)
+	}
+}
+
 func Put(b []byte) {
 	switch cap(b) {
 	case SIZE_BYTE:
-		b := (*[SIZE_BYTE]byte)(b[0:SIZE_BYTE])
-		poolByte.Put(b)
+		poolByte.Put((*[SIZE_BYTE]byte)(b[:SIZE_BYTE]))
 	case SIZE_4_BYTE:
-		b := (*[SIZE_4_BYTE]byte)(b[0:SIZE_4_BYTE])
-		pool4Byte.Put(b)
+		pool4Byte.Put((*[SIZE_4_BYTE]byte)(b[:SIZE_4_BYTE]))
 	case SIZE_TINY:
-		b := (*[SIZE_TINY]byte)(b[0:SIZE_TINY])
-		poolTiny.Put(b)
+		poolTiny.Put((*[SIZE_TINY]byte)(b[:SIZE_TINY]))
 	case SIZE_SMALL:
-		b := (*[SIZE_SMALL]byte)(b[0:SIZE_SMALL])
-		poolSmall.Put(b)
+		poolSmall.Put((*[SIZE_SMALL]byte)(b[:SIZE_SMALL]))
 	case SIZE_MEDIUM:
-		b := (*[SIZE_MEDIUM]byte)(b[0:SIZE_MEDIUM])
-		poolMedium.Put(b)
+		poolMedium.Put((*[SIZE_MEDIUM]byte)(b[:SIZE_MEDIUM]))
 	case SIZE_LARGE:
-		b := (*[SIZE_LARGE]byte)(b[0:SIZE_LARGE])
-		poolLarge.Put(b)
+		poolLarge.Put((*[SIZE_LARGE]byte)(b[:SIZE_LARGE]))
+	}
+}
+
+// PutPayload returns a buffer acquired with GetPayload after its owner releases it.
+func PutPayload(b []byte) {
+	switch cap(b) {
+	case payloadSize128K:
+		poolPayload128K.Put((*[payloadSize128K]byte)(b[:payloadSize128K]))
+	case payloadSize256K:
+		poolPayload256K.Put((*[payloadSize256K]byte)(b[:payloadSize256K]))
+	case payloadSize512K:
+		poolPayload512K.Put((*[payloadSize512K]byte)(b[:payloadSize512K]))
+	case payloadSize1M:
+		poolPayload1M.Put((*[payloadSize1M]byte)(b[:payloadSize1M]))
 	default:
+		Put(b)
 	}
 }

@@ -65,7 +65,7 @@ if ! grep -q '^Benchmark_Produce_1BPayload_Nop_TCP-' "$raw" || ! grep -q '^Bench
 	exit 1
 fi
 
-for transport in tcp quic unix; do
+for transport in tcp quic unix websocket; do
 	if ! grep -q "^Benchmark_Session_Produce_Native/connector=nop/transport=$transport/" "$raw"; then
 		printf 'benchmark produced no Nop %s result; preserved existing report at %s\n' "$transport" "$output" >&2
 		exit 1
@@ -83,7 +83,7 @@ fi
 	printf '**Environment:** `%s` on `%s`\n\n' "$(go version)" "$(uname -srm)"
 	printf '%s\n' '## Scope' ''
 	printf '%s\n' "The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Fujin's Session Core and wire adapters using the built-in **\`nop\` connector**. The connector accepts every message immediately and performs no broker I/O; these figures isolate Fujin’s protocol, session, scheduling, and callback overhead on localhost. The pipeline table measures TCP and gRPC under identical 1 B, one-session, fixed-message-count, full-duplex conditions." ''
-	printf '%s\n' '- **Transports:** native TCP, QUIC, Unix socket, and gRPC' "- **Synchronous matrix payloads:** $payloads" "- **Synchronous concurrent sessions:** $concurrency" '- **Synchronous batch:** 1 message per operation' "- **Synchronous sample duration:** $benchtime per subtest" "- **Pipeline peak:** 1 B payload, one session, $peak_iterations messages for TCP and gRPC" ''
+	printf '%s\n' '- **Transports:** native TCP, QUIC, Unix socket, WebSocket, and gRPC' "- **Synchronous matrix payloads:** $payloads" "- **Synchronous concurrent sessions:** $concurrency" '- **Synchronous batch:** 1 message per operation' "- **Synchronous sample duration:** $benchtime per subtest" "- **Pipeline peak:** 1 B payload, one session, $peak_iterations messages for TCP and gRPC" ''
 	printf '%s\n' '> These are single-host performance snapshots, not a cross-machine comparison or a broker durability benchmark. Run broker-backed tests separately when evaluating connector throughput and acknowledgement latency.' ''
 	printf '%s\n' '## Synchronous request/response results' ''
 	printf '%s\n' '| Transport | Payload | Concurrent sessions | Messages/s | Mmsg/s | Throughput | p99 operation latency | Allocations/op | Bytes/op |' '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'

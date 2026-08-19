@@ -520,7 +520,7 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
 			} else {
-				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
+				h.ps.payloadBuf = pool.GetPayload(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produce(h.ps.payloadBuf, nil)
@@ -711,7 +711,7 @@ func (h *Handler) handle(buf []byte) error {
 					h.ps.ca.cID, h.ps.payloadBuf, h.ps.pa, h.ps.state = nil, nil, produceArgs{}, OP_START
 				}
 			} else {
-				h.ps.payloadBuf = pool.Get(int(h.ps.pma.size))
+				h.ps.payloadBuf = pool.GetPayload(int(h.ps.pma.size))
 				h.ps.payloadBuf = append(h.ps.payloadBuf, b)
 				if len(h.ps.payloadBuf) >= int(h.ps.pma.size) {
 					h.produce(h.ps.payloadBuf, h.ps.ha.headersKV)
@@ -1635,7 +1635,7 @@ func (h *Handler) putProduceResponse(response *produceResponse) {
 }
 
 func (r *produceResponse) respond(err error) {
-	pool.Put(r.message)
+	pool.PutPayload(r.message)
 	if err != nil {
 		header := r.response[:5]
 		errBuf := operationErrorBuf(err)
@@ -1882,7 +1882,7 @@ func (h *Handler) flushBufs() {
 		h.ps.argBuf = nil
 	}
 	if h.ps.payloadBuf != nil {
-		pool.Put(h.ps.payloadBuf)
+		pool.PutPayload(h.ps.payloadBuf)
 		h.ps.payloadBuf = nil
 	}
 	if h.ps.payloadsBuf != nil {

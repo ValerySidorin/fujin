@@ -1,14 +1,14 @@
 # Fujin Nop Connector Performance Report
 
-**Generated:** 2026-08-18T22:52:51Z
-**Source:** `e9e768c-dirty` (dirty)
+**Generated:** 2026-08-19T07:01:53Z
+**Source:** `71054db-dirty` (dirty)
 **Environment:** `go version go1.26.1 darwin/arm64` on `Darwin 24.6.0 arm64`
 
 ## Scope
 
 The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Fujin's Session Core and wire adapters using the built-in **`nop` connector**. The connector accepts every message immediately and performs no broker I/O; these figures isolate Fujin’s protocol, session, scheduling, and callback overhead on localhost. The pipeline table measures TCP and gRPC under identical 1 B, one-session, fixed-message-count, full-duplex conditions.
 
-- **Transports:** native TCP, QUIC, Unix socket, and gRPC
+- **Transports:** native TCP, QUIC, Unix socket, WebSocket, and gRPC
 - **Synchronous matrix payloads:** 1B,128B,1MiB
 - **Synchronous concurrent sessions:** 1,16,128
 - **Synchronous batch:** 1 message per operation
@@ -21,42 +21,51 @@ The synchronous matrix measures end-to-end **PRODUCE** request/response operatio
 
 | Transport | Payload | Concurrent sessions | Messages/s | Mmsg/s | Throughput | p99 operation latency | Allocations/op | Bytes/op |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| tcp | 1B | 1 | 45438 | 0.045 | 0.05 MB/s | 34.38 µs | 3 | 32 |
-| tcp | 1B | 16 | 107770 | 0.108 | 0.11 MB/s | 302.46 µs | 3 | 31 |
-| tcp | 1B | 128 | 105865 | 0.106 | 0.11 MB/s | 1877.42 µs | 3 | 31 |
-| tcp | 128B | 1 | 44926 | 0.045 | 5.75 MB/s | 35.54 µs | 3 | 32 |
-| tcp | 128B | 16 | 107793 | 0.108 | 13.80 MB/s | 302.33 µs | 3 | 31 |
-| tcp | 128B | 128 | 105585 | 0.106 | 13.51 MB/s | 1800.96 µs | 3 | 31 |
-| tcp | 1MiB | 1 | 906 | 0.001 | 950.21 MB/s | 1285.75 µs | 7 | 1049479 |
-| tcp | 1MiB | 16 | 810 | 0.001 | 848.98 MB/s | 49608.50 µs | 5 | 1048814 |
-| tcp | 1MiB | 128 | 812 | 0.001 | 851.25 MB/s | 487797.38 µs | 4 | 1048658 |
-| quic | 1B | 1 | 20609 | 0.021 | 0.02 MB/s | 64.46 µs | 33 | 1176 |
-| quic | 1B | 16 | 88944 | 0.089 | 0.09 MB/s | 323.00 µs | 29 | 1092 |
-| quic | 1B | 128 | 348797 | 0.349 | 0.35 MB/s | 647.54 µs | 16 | 689 |
-| quic | 128B | 1 | 20950 | 0.021 | 2.68 MB/s | 63.92 µs | 31 | 1102 |
-| quic | 128B | 16 | 89694 | 0.090 | 11.48 MB/s | 321.75 µs | 27 | 1016 |
-| quic | 128B | 128 | 332005 | 0.332 | 42.50 MB/s | 672.04 µs | 15 | 641 |
-| quic | 1MiB | 1 | 271 | 0.000 | 284.35 MB/s | 5035.71 µs | 9290 | 1408017 |
-| quic | 1MiB | 16 | 277 | 0.000 | 290.12 MB/s | 60090.50 µs | 9198 | 1376528 |
-| quic | 1MiB | 128 | 273 | 0.000 | 285.98 MB/s | 512758.50 µs | 9216 | 1376586 |
-| unix | 1B | 1 | 116077 | 0.116 | 0.12 MB/s | 16.04 µs | 3 | 32 |
-| unix | 1B | 16 | 232396 | 0.232 | 0.23 MB/s | 138.33 µs | 3 | 31 |
-| unix | 1B | 128 | 281611 | 0.282 | 0.28 MB/s | 876.00 µs | 3 | 31 |
-| unix | 128B | 1 | 116577 | 0.117 | 14.92 MB/s | 16.21 µs | 3 | 32 |
-| unix | 128B | 16 | 232288 | 0.232 | 29.73 MB/s | 138.88 µs | 3 | 31 |
-| unix | 128B | 128 | 279018 | 0.279 | 35.72 MB/s | 875.62 µs | 3 | 31 |
-| unix | 1MiB | 1 | 922 | 0.001 | 966.41 MB/s | 1377.67 µs | 7 | 1049489 |
-| unix | 1MiB | 16 | 637 | 0.001 | 668.37 MB/s | 29348.54 µs | 5 | 1048768 |
-| unix | 1MiB | 128 | 664 | 0.001 | 696.40 MB/s | 218111.42 µs | 4 | 1048629 |
-| gRPC | 1B | 1 | 27146 | 0.027 | 0.03 MB/s | 55.46 µs | 44 | 1217 |
-| gRPC | 1B | 16 | 238663 | 0.239 | 0.24 MB/s | 132.67 µs | 32 | 1034 |
-| gRPC | 1B | 128 | 519211 | 0.519 | 0.52 MB/s | 513.00 µs | 32 | 1026 |
-| gRPC | 128B | 1 | 26702 | 0.027 | 3.42 MB/s | 56.71 µs | 44 | 1594 |
-| gRPC | 128B | 16 | 238039 | 0.238 | 30.47 MB/s | 135.67 µs | 32 | 1412 |
-| gRPC | 128B | 128 | 502260 | 0.502 | 64.29 MB/s | 689.42 µs | 32 | 1404 |
-| gRPC | 1MiB | 1 | 2648 | 0.003 | 2776.52 MB/s | 642.12 µs | 97 | 1566934 |
-| gRPC | 1MiB | 16 | 3596 | 0.004 | 3770.58 MB/s | 5739.38 µs | 59 | 1094979 |
-| gRPC | 1MiB | 128 | 3289 | 0.003 | 3448.52 MB/s | 52740.29 µs | 54 | 1057539 |
+| tcp | 1B | 1 | 45356 | 0.045 | 0.05 MB/s | 34.96 µs | 3 | 32 |
+| tcp | 1B | 16 | 107875 | 0.108 | 0.11 MB/s | 302.42 µs | 3 | 31 |
+| tcp | 1B | 128 | 104888 | 0.105 | 0.10 MB/s | 1875.12 µs | 3 | 31 |
+| tcp | 128B | 1 | 45073 | 0.045 | 5.77 MB/s | 34.79 µs | 3 | 32 |
+| tcp | 128B | 16 | 107689 | 0.108 | 13.78 MB/s | 306.00 µs | 3 | 31 |
+| tcp | 128B | 128 | 104417 | 0.104 | 13.37 MB/s | 1834.92 µs | 3 | 31 |
+| tcp | 1MiB | 1 | 6545 | 0.007 | 6862.43 MB/s | 183.83 µs | 3 | 108 |
+| tcp | 1MiB | 16 | 10199 | 0.010 | 10694.65 MB/s | 3931.04 µs | 3 | 67 |
+| tcp | 1MiB | 128 | 5718 | 0.006 | 5996.17 MB/s | 26813.46 µs | 3 | 39 |
+| quic | 1B | 1 | 21460 | 0.021 | 0.02 MB/s | 63.42 µs | 33 | 1176 |
+| quic | 1B | 16 | 96006 | 0.096 | 0.10 MB/s | 308.79 µs | 29 | 1078 |
+| quic | 1B | 128 | 362582 | 0.363 | 0.36 MB/s | 626.08 µs | 16 | 689 |
+| quic | 128B | 1 | 21531 | 0.022 | 2.76 MB/s | 62.75 µs | 31 | 1103 |
+| quic | 128B | 16 | 96805 | 0.097 | 12.39 MB/s | 303.08 µs | 27 | 1006 |
+| quic | 128B | 128 | 346260 | 0.346 | 44.32 MB/s | 636.42 µs | 14 | 638 |
+| quic | 1MiB | 1 | 272 | 0.000 | 285.09 MB/s | 4532.71 µs | 9373 | 579518 |
+| quic | 1MiB | 16 | 273 | 0.000 | 286.47 MB/s | 93950.17 µs | 9271 | 356141 |
+| quic | 1MiB | 128 | 273 | 0.000 | 286.04 MB/s | 473582.21 µs | 9267 | 332374 |
+| unix | 1B | 1 | 115260 | 0.115 | 0.12 MB/s | 16.12 µs | 3 | 32 |
+| unix | 1B | 16 | 233754 | 0.234 | 0.23 MB/s | 138.25 µs | 3 | 31 |
+| unix | 1B | 128 | 279096 | 0.279 | 0.28 MB/s | 889.08 µs | 3 | 31 |
+| unix | 128B | 1 | 115088 | 0.115 | 14.73 MB/s | 16.42 µs | 3 | 32 |
+| unix | 128B | 16 | 233318 | 0.233 | 29.86 MB/s | 137.17 µs | 3 | 31 |
+| unix | 128B | 128 | 276625 | 0.277 | 35.41 MB/s | 895.79 µs | 3 | 31 |
+| unix | 1MiB | 1 | 2731 | 0.003 | 2863.35 MB/s | 421.54 µs | 3 | 140 |
+| unix | 1MiB | 16 | 2381 | 0.002 | 2496.15 MB/s | 7741.71 µs | 3 | 942 |
+| unix | 1MiB | 128 | 3014 | 0.003 | 3160.93 MB/s | 48523.00 µs | 3 | 802 |
+| websocket | 1B | 1 | 45029 | 0.045 | 0.05 MB/s | 35.46 µs | 7 | 144 |
+| websocket | 1B | 16 | 169952 | 0.170 | 0.17 MB/s | 224.46 µs | 7 | 143 |
+| websocket | 1B | 128 | 208333 | 0.208 | 0.21 MB/s | 1745.88 µs | 7 | 143 |
+| websocket | 128B | 1 | 44899 | 0.045 | 5.75 MB/s | 35.92 µs | 7 | 144 |
+| websocket | 128B | 16 | 169463 | 0.169 | 21.69 MB/s | 229.71 µs | 7 | 143 |
+| websocket | 128B | 128 | 207641 | 0.208 | 26.58 MB/s | 1787.88 µs | 7 | 143 |
+| websocket | 1MiB | 1 | 1175 | 0.001 | 1231.65 MB/s | 990.08 µs | 7 | 372 |
+| websocket | 1MiB | 16 | 2554 | 0.003 | 2678.31 MB/s | 15088.83 µs | 7 | 483 |
+| websocket | 1MiB | 128 | 2408 | 0.002 | 2524.61 MB/s | 121532.67 µs | 7 | 144 |
+| gRPC | 1B | 1 | 27189 | 0.027 | 0.03 MB/s | 55.75 µs | 44 | 1217 |
+| gRPC | 1B | 16 | 241196 | 0.241 | 0.24 MB/s | 131.46 µs | 32 | 1034 |
+| gRPC | 1B | 128 | 520833 | 0.521 | 0.52 MB/s | 499.42 µs | 32 | 1025 |
+| gRPC | 128B | 1 | 26921 | 0.027 | 3.45 MB/s | 55.67 µs | 44 | 1594 |
+| gRPC | 128B | 16 | 236742 | 0.237 | 30.30 MB/s | 137.38 µs | 32 | 1413 |
+| gRPC | 128B | 128 | 501756 | 0.502 | 64.24 MB/s | 681.92 µs | 32 | 1404 |
+| gRPC | 1MiB | 1 | 2643 | 0.003 | 2771.13 MB/s | 650.54 µs | 98 | 1547301 |
+| gRPC | 1MiB | 16 | 3530 | 0.004 | 3701.18 MB/s | 5865.25 µs | 60 | 1094707 |
+| gRPC | 1MiB | 128 | 3323 | 0.003 | 3484.83 MB/s | 42891.38 µs | 52 | 1056878 |
 
 ### Reading the two result modes
 
@@ -68,8 +77,8 @@ Both rows use one client session, exactly 1000000 PRODUCE messages, concurrent r
 
 | Transport | Payload | Session mode | Messages | Messages/s | Mmsg/s | Wire throughput | Allocations/op | Bytes/op |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| TCP | 1 B | One pipelined session | 1000000 | 5279831 | 5.280 | 89.77 MB/s | 1 | 6 |
-| gRPC | 1 B | One bounded full-duplex session | 1000000 | 517866 | 0.518 | 0.52 MB/s | 32 | 1188 |
+| TCP | 1 B | One pipelined session | 1000000 | 8354219 | 8.354 | 142.03 MB/s | 1 | 5 |
+| gRPC | 1 B | One bounded full-duplex session | 1000000 | 563380 | 0.563 | 0.56 MB/s | 32 | 1187 |
 
 ## Reproduce
 

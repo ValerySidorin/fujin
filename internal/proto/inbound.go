@@ -17,7 +17,9 @@ var (
 )
 
 const (
-	readBufferSize = 512
+	initialReadBufferSize = pool.SIZE_SMALL
+	maximumReadBufferSize = pool.SIZE_LARGE
+	readBufferShrinkAfter = 8
 )
 
 type inbound struct {
@@ -45,7 +47,7 @@ func NewInbound(str session.Stream, ftt time.Duration, h *Handler, l *slog.Logge
 
 func (i *inbound) ReadLoop(ctx context.Context) {
 	stopCh := make(chan struct{})
-	buf := pool.Get(readBufferSize)
+	buf := pool.Get(initialReadBufferSize)
 
 	defer func() {
 		pool.Put(buf)
@@ -56,8 +58,9 @@ func (i *inbound) ReadLoop(ctx context.Context) {
 	}()
 
 	var (
-		n   int
-		err error
+		n          int
+		err        error
+		shortReads int
 	)
 
 	go func() {
@@ -69,7 +72,7 @@ func (i *inbound) ReadLoop(ctx context.Context) {
 	}()
 
 	for {
-		n, err = i.str.Read(buf[:readBufferSize])
+		n, err = i.str.Read(buf[:cap(buf)])
 		if n == 0 && err != nil {
 			if errors.Is(err, io.EOF) {
 				break
@@ -87,12 +90,41 @@ func (i *inbound) ReadLoop(ctx context.Context) {
 			}
 			break
 		}
-		buf = buf[:0]
+		buf, shortReads = resizeReadBuffer(buf, n, shortReads)
 
 		if i.h.stopRead {
 			i.closeRead()
 			break
 		}
+	}
+}
+
+func resizeReadBuffer(buf []byte, bytesRead, shortReads int) ([]byte, int) {
+	if bytesRead == cap(buf) {
+		if cap(buf) < maximumReadBufferSize {
+			next := pool.Get(nextReadBufferSize(cap(buf)))
+			pool.Put(buf)
+			return next, 0
+		}
+		return buf, 0
+	}
+	if cap(buf) == initialReadBufferSize {
+		return buf, 0
+	}
+	shortReads++
+	if shortReads < readBufferShrinkAfter {
+		return buf, shortReads
+	}
+	pool.Put(buf)
+	return pool.Get(initialReadBufferSize), 0
+}
+
+func nextReadBufferSize(size int) int {
+	switch size {
+	case pool.SIZE_SMALL:
+		return pool.SIZE_MEDIUM
+	default:
+		return pool.SIZE_LARGE
 	}
 }
 

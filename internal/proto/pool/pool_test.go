@@ -131,6 +131,31 @@ func TestPut_NonMatchingCapacity(t *testing.T) {
 	Put(b)
 }
 
+func TestGetPayload_SizeBoundaries(t *testing.T) {
+	tests := []struct {
+		name        string
+		size        int
+		expectedCap int
+	}{
+		{"generic large", SIZE_LARGE, SIZE_LARGE},
+		{"128K", payloadSize128K, payloadSize128K},
+		{"128K plus one", payloadSize128K + 1, payloadSize256K},
+		{"256K plus one", payloadSize256K + 1, payloadSize512K},
+		{"512K plus one", payloadSize512K + 1, payloadSize1M},
+		{"1MiB", payloadSize1M, payloadSize1M},
+		{"over 1MiB", payloadSize1M + 1, payloadSize1M + 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := GetPayload(tt.size)
+			if cap(buf) != tt.expectedCap {
+				t.Fatalf("GetPayload(%d): cap %d, want %d", tt.size, cap(buf), tt.expectedCap)
+			}
+			PutPayload(buf)
+		})
+	}
+}
+
 func TestGetPut_RoundTrip(t *testing.T) {
 	sizes := []int{SIZE_BYTE, SIZE_4_BYTE, SIZE_TINY, SIZE_SMALL, SIZE_MEDIUM, SIZE_LARGE}
 

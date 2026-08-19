@@ -1,11 +1,11 @@
 services:
   fujin:
-    image: fujin:zeromq-pebbe-${BUILD_TAG:-v0.4.0}
+    image: fujin:zeromq-pebbe-${BUILD_TAG:-v0.4.1}
     build:
       context: ..
       dockerfile: Dockerfile.zeromq-pebbe
       args:
-        VERSION: ${BUILD_TAG:-v0.4.0}
+        VERSION: ${BUILD_TAG:-v0.4.1}
     environment:
       FUJIN_CONFIGURATOR: yaml
       FUJIN_CONFIGURATOR_YAML_PATHS: /assets/config/config-zeromq-pebbe.yaml

@@ -82,14 +82,6 @@ func Benchmark_Session_Transaction_Native(b *testing.B) {
 	benchmarkNativeSessionMatrix(b, benchmarkTransaction, false)
 }
 
-func Benchmark_Session_Produce_TCP_WebSocket(b *testing.B) {
-	benchmarkNativeSessionTransports(b, benchmarkProduce, false, []string{"tcp", "websocket"})
-}
-
-func Benchmark_Session_Fetch_TCP_WebSocket(b *testing.B) {
-	benchmarkNativeSessionTransports(b, benchmarkFetch, true, []string{"tcp", "websocket"})
-}
-
 func Benchmark_Session_Produce_GRPC(b *testing.B) {
 	benchmarkGRPCSessionMatrix(b, benchmarkProduce, false)
 }
@@ -127,7 +119,7 @@ func Benchmark_Session_Transaction_GRPC(b *testing.B) {
 }
 
 func benchmarkNativeSessionMatrix(b *testing.B, operation sessionBenchmarkOperation, batched bool) {
-	benchmarkNativeSessionTransports(b, operation, batched, []string{"tcp", "quic", "unix"})
+	benchmarkNativeSessionTransports(b, operation, batched, []string{"tcp", "quic", "unix", "websocket"})
 }
 
 func benchmarkNativeSessionTransports(

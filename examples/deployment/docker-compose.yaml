@@ -1,11 +1,11 @@
 services:
   fujin:
     build:
-      # context: https://github.com/fujin-io/fujin.git#v0.4.0
+      # context: https://github.com/fujin-io/fujin.git#v0.4.1
       context: ../..
       dockerfile: Dockerfile
       args:
-        VERSION: ${BUILD_TAG:-v0.4.0}
+        VERSION: ${BUILD_TAG:-v0.4.1}
         FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/kafka/franz
         FUJIN_GO_TAGS: fujin,grpc
     container_name: fujin
