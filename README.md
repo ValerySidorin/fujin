@@ -4,12 +4,13 @@ High-performance message broker gateway. Sits between your applications and mess
 
 Think of it as Envoy, but for message brokers instead of HTTP.
 
-Current release: **v0.4.1**.
+Current release: **v0.5.0**.
 
-### v0.4.1 highlights
+### v0.5.0 highlights
 
-- Reduced native large-message request/response overhead with adaptive inbound reads and bounded payload-buffer reuse through 1 MiB.
-- Added WebSocket to the canonical native Session Core benchmark matrix and clarified comparable TCP versus gRPC pipeline reporting.
+- Added mandatory transport-neutral HELLO negotiation before every native BIND, with byte-sized wire versions and diagnostic client/server build metadata.
+- Changed QUIC ALPN from versioned `fujin/1` to the version-independent `fujin`; native clients must upgrade to `fujin-go v0.3.0` or implement HELLO.
+- Kept the warmed server HELLO path and coordinated SDK HELLO encode/decode paths at zero allocations.
 
 ## Why
 
@@ -39,7 +40,7 @@ Fujin decouples applications from brokers. Your app talks to Fujin over TCP, QUI
 
 ## Client Interfaces
 
-**Fujin Protocol** — Custom binary protocol over TCP, QUIC, WebSocket, or Unix sockets. Zero-allocation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
+**Fujin Protocol** — Custom binary protocol over TCP, QUIC, WebSocket, or Unix sockets. Every session starts with HELLO to negotiate an exact wire version and exchange diagnostic client/server build versions; QUIC ALPN uses the version-independent `fujin` identifier. Zero-allocation operation parsing, transactions, headers, push and pull delivery. A successful BIND returns the pinned route capability and guarantee profile. Best for high-throughput scenarios. Go client: [`fujin-go`](https://github.com/fujin-io/fujin-go).
 
 **gRPC** — Standard gRPC interface. Works with any language that has a gRPC library. `BindResponse.routes` exposes the same pinned capability profile as the native protocol.
 

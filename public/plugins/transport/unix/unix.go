@@ -66,10 +66,10 @@ func decodeSettings(raw any, out any) error {
 	return yaml.Unmarshal(data, out)
 }
 
-func factory(cfg any, catalog *connector.Catalog, l *slog.Logger) (transport.TransportServer, error) {
+func factory(cfg any, catalog *connector.Catalog, runtime transport.Runtime, l *slog.Logger) (transport.TransportServer, error) {
 	if _, ok := cfg.(unixDisabledConfig); ok {
 		return nil, nil
 	}
 	conf := cfg.(serverconfig.UnixServerConfig)
-	return NewServer(conf, catalog, l), nil
+	return NewServer(conf, catalog, l, runtime.BuildVersion), nil
 }

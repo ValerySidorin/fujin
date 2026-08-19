@@ -93,16 +93,46 @@ Both native v1 and gRPC return the pinned profile on a successful `BIND`, so cli
 
 The command and response frames below are identical on every native transport:
 
-- **QUIC:** one bidirectional QUIC stream carries one Fujin session. A connection-level health probe uses a dedicated server-opened stream. If `ping_stream` is enabled, the server additionally emits in-band PING frames on each messaging stream.
-- **TCP:** one connection carries one Fujin session. Fujin-level PING emission is not currently enabled; the transport enables TCP keepalive.
-- **WebSocket:** one WebSocket connection carries one Fujin session. Binary WebSocket message payloads are concatenated into the protocol byte stream; text messages are rejected.
-- **Unix:** one Unix domain socket connection carries one Fujin session. Fujin-level PING emission is not currently enabled.
+- **QUIC:** ALPN value `fujin` identifies the application protocol. One bidirectional QUIC stream carries one Fujin session. Every session stream starts with HELLO. A connection-level health probe uses a dedicated server-opened stream and does not perform HELLO. If `ping_stream` is enabled, the server additionally emits in-band PING frames after HELLO on each messaging stream.
+- **TCP:** one connection carries one Fujin session and starts with HELLO. Fujin-level PING emission is not currently enabled; the transport enables TCP keepalive.
+- **WebSocket:** one WebSocket connection carries one Fujin session and starts with HELLO. Binary WebSocket message payloads are concatenated into the protocol byte stream; text messages are rejected.
+- **Unix:** one Unix domain socket connection carries one Fujin session and starts with HELLO. Fujin-level PING emission is not currently enabled.
 
 ## Versioning
 
-QUIC negotiates native protocol v1 through ALPN value `fujin/1`. The server rejects a missing or unsupported ALPN value. TCP, WebSocket, and Unix connections implicitly use v1 and perform no protocol negotiation.
+`fujin` is the version-independent native application protocol identifier. QUIC carries it through ALPN; wire compatibility is negotiated by the mandatory HELLO exchange on every native session stream.
 
-The opcodes, field encodings, and semantics in this document are the current `fujin/1` contract. Until Fujin declares the native protocol stable, coordinated server and SDK releases may evolve this contract while retaining the `fujin/1` identifier; clients and servers must therefore use compatible release lines. After that stability declaration, an incompatible wire or semantic change requires a new negotiated protocol version.
+The current wire version is byte `1`, displayed as `fujin/1`. Once published, a wire version's opcodes, field encodings, and semantics are immutable. An incompatible wire or semantic change requires a new byte value advertised through HELLO. The server build version and client SDK build version are diagnostic metadata and never determine wire compatibility.
+
+There is no legacy BIND-first mode. A native stream that does not begin with HELLO is malformed and is closed.
+
+## HELLO
+
+### Direction
+
+Client -> Server
+
+### Description
+
+HELLO is the mandatory first frame on every native session stream. It selects one exact wire version before authentication, connector selection, or Session Core state exists. The client includes its SDK identity and build version for diagnostics. The server returns its executable build version for diagnostics.
+
+The current HELLO format is `1`. Clients may advertise 1 to 16 nonzero protocol-version bytes in preference order. Client name and client build are non-empty strings limited to 256 bytes. The server selects the first advertised version it supports. Fujin currently supports wire version `1` (`fujin/1`).
+
+### Request
+
+`[0, <hello format: byte>, <version count: byte>, <versions: [count]byte>, <client name: string>, <client build: string>]`
+
+### Response
+
+- success: `[19, 0, <hello format: byte>, <selected version: byte>, <server build: string>]`
+- failure: `[19, <status>, <error envelope after status>]`
+
+An unsupported HELLO format or wire version returns `UNIMPLEMENTED`. A malformed HELLO returns `INVALID_ARGUMENT`. After either failure the server closes the stream. A successful HELLO must be followed by BIND.
+
+### Example
+
+- Client `fujin-go` built as `v0.4.1` advertising wire version `1`: `[0, 1, 1, 1, 0, 0, 0, 8, 102, 117, 106, 105, 110, 45, 103, 111, 0, 0, 0, 6, 118, 48, 46, 52, 46, 49]`.
+- Server built as `v0.4.1`: `[19, 0, 1, 1, 0, 0, 0, 6, 118, 48, 46, 52, 46, 49]`.
 
 ## PING / PONG
 
@@ -136,7 +166,7 @@ Client -> Server
 
 `BIND` selects one connector configuration and pins an immutable, locally validated configuration generation to the session. It runs bind middleware and may apply whitelisted configuration overrides. Success proves that the plugin is compiled in and that its settings, routes, capabilities, and guarantees are locally valid. It performs no broker I/O and does not prove broker availability or remote authentication.
 
-Clients must successfully bind before issuing session operations. PONG may be sent before BIND when the transport has emitted a PING.
+Clients must successfully complete HELLO and BIND before issuing session operations. PONG may be sent after HELLO and before BIND when the transport has emitted an in-band PING.
 
 ### Request
 

@@ -74,8 +74,9 @@ func (c *Config) parse() (serverconfig.Config, error) {
 	healthEnabled := c.Health.Enabled != nil && *c.Health.Enabled
 
 	return serverconfig.Config{
-		Transports: c.Fujin.Transports,
-		GRPC:       grpcConf,
+		BuildVersion: Version,
+		Transports:   c.Fujin.Transports,
+		GRPC:         grpcConf,
 		Health: serverconfig.HealthConfig{
 			Enabled: healthEnabled,
 			Addr:    c.Health.Addr,

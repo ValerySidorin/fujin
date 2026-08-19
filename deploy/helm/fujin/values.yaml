@@ -3,7 +3,7 @@ mode: standalone
 
 image:
   repository: ghcr.io/fujin-io/fujin
-  tag: "v0.4.1"
+  tag: "v0.5.0"
   pullPolicy: IfNotPresent
 
 replicaCount: 2

@@ -112,6 +112,7 @@ const (
 	RESP_CODE_BIND        RespCode = 16
 	RESP_CODE_TX_PRODUCE  RespCode = 17
 	RESP_CODE_TX_HPRODUCE RespCode = 18
+	RESP_CODE_HELLO       RespCode = 19
 
 	// Client response opcodes
 	RESP_CODE_PONG RespCode = 99

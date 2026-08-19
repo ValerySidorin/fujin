@@ -21,13 +21,12 @@ import (
 	quicgo "github.com/quic-go/quic-go"
 )
 
-var (
-	NextProtos = []string{v1.Version}
-)
+var NextProtos = []string{v1.Protocol}
 
 type FujinServer struct {
-	conf    serverconfig.QUICServerConfig
-	catalog *connector.Catalog
+	conf         serverconfig.QUICServerConfig
+	catalog      *connector.Catalog
+	buildVersion string
 
 	udpConn *net.UDPConn // stored for ListenerFDs
 
@@ -37,13 +36,14 @@ type FujinServer struct {
 	l *slog.Logger
 }
 
-func NewServer(conf serverconfig.QUICServerConfig, catalog *connector.Catalog, l *slog.Logger) *FujinServer {
+func NewServer(conf serverconfig.QUICServerConfig, catalog *connector.Catalog, l *slog.Logger, buildVersion ...string) *FujinServer {
 	return &FujinServer{
-		conf:    conf,
-		catalog: catalog,
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		l:       l.With("server", "fujin_quic"),
+		conf:         conf,
+		catalog:      catalog,
+		buildVersion: resolvedBuildVersion(buildVersion),
+		ready:        make(chan struct{}),
+		done:         make(chan struct{}),
+		l:            l.With("server", "fujin_quic"),
 	}
 }
 
@@ -170,10 +170,7 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 				_ = conn.CloseWithError(v1.ConnErr, "unsupported protocol: none")
 				continue
 			}
-			switch negotiated {
-			case v1.Version:
-				// ok – current version
-			default:
+			if negotiated != v1.Protocol {
 				s.l.Warn("rejecting connection: unsupported ALPN", "alpn", negotiated)
 				_ = conn.CloseWithError(v1.ConnErr, "unsupported protocol: "+negotiated)
 				continue
@@ -229,6 +226,7 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 					connWg.Add(1)
 					go func() {
 						handler.HandleStream(connCtx, str, session.StreamOptions{
+							BuildVersion:          s.buildVersion,
 							BaseGeneration:        s.catalog.Current(),
 							GenerationProvider:    s.catalog.Current,
 							PingInterval:          s.conf.Fujin.PingInterval,
@@ -247,6 +245,13 @@ func (s *FujinServer) serve(ctx context.Context, conn *net.UDPConn) error {
 			}()
 		}
 	}
+}
+
+func resolvedBuildVersion(values []string) string {
+	if len(values) > 0 && values[0] != "" {
+		return values[0]
+	}
+	return "dev"
 }
 
 func pingQUICConnection(ctx context.Context, conn *quicgo.Conn, timeout time.Duration) error {

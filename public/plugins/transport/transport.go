@@ -32,11 +32,16 @@ type Config struct {
 	Settings any    `yaml:"settings"`
 }
 
+// Runtime contains process metadata shared by every native transport instance.
+type Runtime struct {
+	BuildVersion string
+}
+
 // ParseConfigFunc converts a transport Entry into typed server config.
 type ParseConfigFunc func(e Config) (any, error)
 
-// Factory creates a TransportServer from parsed config and the shared connector catalog.
-type Factory func(config any, catalog *connector.Catalog, l *slog.Logger) (TransportServer, error)
+// Factory creates a TransportServer from parsed config and the shared runtime state.
+type Factory func(config any, catalog *connector.Catalog, runtime Runtime, l *slog.Logger) (TransportServer, error)
 
 type plugin struct {
 	parse   ParseConfigFunc
@@ -107,7 +112,7 @@ type FDKeyProvider interface {
 }
 
 // NewServer creates a TransportServer for the given entry.
-func NewServer(e Config, catalog *connector.Catalog, l *slog.Logger) (TransportServer, error) {
+func NewServer(e Config, catalog *connector.Catalog, runtime Runtime, l *slog.Logger) (TransportServer, error) {
 	parse, factory, ok := Get(e.Type)
 	if !ok {
 		return nil, fmt.Errorf("transport %q not registered (available: %v)", e.Type, List())
@@ -116,5 +121,5 @@ func NewServer(e Config, catalog *connector.Catalog, l *slog.Logger) (TransportS
 	if err != nil {
 		return nil, fmt.Errorf("parse %s config: %w", e.Type, err)
 	}
-	return factory(cfg, catalog, l)
+	return factory(cfg, catalog, runtime, l)
 }

@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	Transports []transport.Config
-	GRPC       GRPCServerConfig
-	Health     HealthConfig
-	Connectors config.ConnectorsConfig
+	BuildVersion string
+	Transports   []transport.Config
+	GRPC         GRPCServerConfig
+	Health       HealthConfig
+	Connectors   config.ConnectorsConfig
 }
 
 type QUICServerConfig struct {
