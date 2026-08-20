@@ -87,7 +87,16 @@ pub(crate) fn fetch(
     correlation_id: u32,
     result: &CoreResult<FetchResult>,
 ) -> Result<Bytes, NativeError> {
-    let mut output = BytesMut::new();
+    let capacity = match result {
+        Ok(fetched) => fetched
+            .messages
+            .iter()
+            .try_fold(11_usize, |size, message| {
+                checked_add(size, delivery_body_wire_len(message)?)
+            })?,
+        Err(_) => 6,
+    };
+    let mut output = BytesMut::with_capacity(capacity);
     output.put_u8(code as u8);
     output.put_u32(correlation_id);
     match result {
@@ -109,7 +118,13 @@ pub(crate) fn settlement(
     correlation_id: u32,
     result: &CoreResult<Vec<SettlementResult>>,
 ) -> Result<Bytes, NativeError> {
-    let mut output = BytesMut::new();
+    let capacity = match result {
+        Ok(results) => results.iter().try_fold(10_usize, |size, message| {
+            checked_add(size, checked_add(bytes_wire_len(&message.message_id)?, 1)?)
+        })?,
+        Err(_) => 6,
+    };
+    let mut output = BytesMut::with_capacity(capacity);
     output.put_u8(code as u8);
     output.put_u32(correlation_id);
     match result {
@@ -132,7 +147,7 @@ pub(crate) fn delivery(delivery: &Delivery) -> Result<Bytes, NativeError> {
     } else {
         ResponseCode::Message
     };
-    let mut output = BytesMut::new();
+    let mut output = BytesMut::with_capacity(checked_add(2, delivery_body_wire_len(delivery)?)?);
     output.put_u8(code as u8);
     output.put_u8(delivery.subscription_id);
     put_delivery_body(&mut output, delivery)?;
@@ -141,6 +156,35 @@ pub(crate) fn delivery(delivery: &Delivery) -> Result<Bytes, NativeError> {
 
 pub(crate) fn disconnect() -> Bytes {
     Bytes::from_static(&[ResponseCode::Disconnect as u8])
+}
+
+fn delivery_body_wire_len(delivery: &Delivery) -> Result<usize, NativeError> {
+    let mut size = bytes_wire_len(&delivery.payload)?;
+    if let Some(message_id) = &delivery.message_id {
+        size = checked_add(size, bytes_wire_len(message_id)?)?;
+    }
+    if let Some(headers) = &delivery.headers {
+        let strings = headers
+            .len()
+            .checked_mul(2)
+            .ok_or(NativeError::FrameTooLarge)?;
+        checked_u16(strings)?;
+        size = checked_add(size, 2)?;
+        for header in headers {
+            size = checked_add(size, bytes_wire_len(&header.key)?)?;
+            size = checked_add(size, bytes_wire_len(&header.value)?)?;
+        }
+    }
+    Ok(size)
+}
+
+fn bytes_wire_len(value: &[u8]) -> Result<usize, NativeError> {
+    checked_u32(value.len())?;
+    checked_add(4, value.len())
+}
+
+fn checked_add(left: usize, right: usize) -> Result<usize, NativeError> {
+    left.checked_add(right).ok_or(NativeError::FrameTooLarge)
 }
 
 fn put_delivery_body(output: &mut BytesMut, delivery: &Delivery) -> Result<(), NativeError> {
