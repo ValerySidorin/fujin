@@ -17,7 +17,7 @@ unix = []
 websocket = ["dep:tokio-tungstenite"]
 quic = ["dep:quinn", "dep:rustls", "dep:rustls-pemfile"]
 grpc = ["dep:fujin-proto", "dep:tonic", "dep:tonic-prost", "dep:tokio-stream"]
-bench = ["grpc"]
+bench = ["full", "dep:rcgen"]
 bench-alloc = ["bench", "dep:stats_alloc"]
 
 [dependencies]
@@ -33,6 +33,7 @@ fujin-runtime = { path = "../fujin-runtime" }
 futures-util.workspace = true
 quinn = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
+rcgen = { workspace = true, optional = true }
 rustls-pemfile = { workspace = true, optional = true }
 stats_alloc = { workspace = true, optional = true }
 tokio.workspace = true
@@ -51,4 +52,14 @@ required-features = ["bench"]
 [[bin]]
 name = "grpc-session-bench"
 path = "src/bin/grpc-session-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "session-matrix-bench"
+path = "src/bin/session-matrix-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "grpc-session-matrix-bench"
+path = "src/bin/grpc-session-matrix-bench.rs"
 required-features = ["bench"]

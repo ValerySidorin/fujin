@@ -278,6 +278,22 @@ async fn serve_websocket(
 }
 
 #[cfg(feature = "websocket")]
+#[derive(Debug)]
+enum WebSocketCompletion {
+    Native(Result<()>),
+    Inbound(Result<()>),
+    Outbound(Result<()>),
+    Shutdown,
+}
+
+#[cfg(feature = "websocket")]
+type WebSocketNativeTask =
+    tokio::task::JoinHandle<std::result::Result<(), fujin_native::NativeError>>;
+
+#[cfg(feature = "websocket")]
+type WebSocketBridgeTask = tokio::task::JoinHandle<Result<()>>;
+
+#[cfg(feature = "websocket")]
 async fn websocket_session(
     stream: tokio::net::TcpStream,
     catalog: Arc<Catalog>,
@@ -355,30 +371,64 @@ async fn websocket_session(
         }
     });
 
-    let first = tokio::select! {
-        result = &mut native => result.context("join native WebSocket session")?.map_err(anyhow::Error::from),
-        result = &mut inbound => result.context("join WebSocket input")?,
-        result = &mut outbound => result.context("join WebSocket output")?,
-        () = shutdown.cancelled() => Ok(()),
+    let completed = tokio::select! {
+        result = &mut native => WebSocketCompletion::Native(
+            result.context("join native WebSocket session")?.map_err(anyhow::Error::from),
+        ),
+        result = &mut inbound => WebSocketCompletion::Inbound(
+            result.context("join WebSocket input")?,
+        ),
+        result = &mut outbound => WebSocketCompletion::Outbound(
+            result.context("join WebSocket output")?,
+        ),
+        () = shutdown.cancelled() => WebSocketCompletion::Shutdown,
     };
+    finish_websocket_session(completed, session_shutdown, native, inbound, outbound).await
+}
+
+#[cfg(feature = "websocket")]
+async fn finish_websocket_session(
+    completed: WebSocketCompletion,
+    session_shutdown: CancellationToken,
+    native: WebSocketNativeTask,
+    inbound: WebSocketBridgeTask,
+    outbound: WebSocketBridgeTask,
+) -> Result<()> {
     session_shutdown.cancel();
-    let native_result = if native.is_finished() {
-        None
-    } else {
-        Some(
-            native
+    match completed {
+        WebSocketCompletion::Native(native_result) => {
+            inbound.abort();
+            let outbound_result = outbound.await.context("join WebSocket output cleanup")?;
+            native_result?;
+            outbound_result
+        }
+        WebSocketCompletion::Inbound(inbound_result) => {
+            outbound.abort();
+            let native_result = native
                 .await
                 .context("join native WebSocket cleanup")?
-                .map_err(anyhow::Error::from),
-        )
-    };
-    inbound.abort();
-    outbound.abort();
-    first?;
-    if let Some(result) = native_result {
-        result?;
+                .map_err(anyhow::Error::from);
+            inbound_result?;
+            native_result
+        }
+        WebSocketCompletion::Outbound(outbound_result) => {
+            inbound.abort();
+            let native_result = native
+                .await
+                .context("join native WebSocket cleanup")?
+                .map_err(anyhow::Error::from);
+            outbound_result?;
+            native_result
+        }
+        WebSocketCompletion::Shutdown => {
+            inbound.abort();
+            outbound.abort();
+            native
+                .await
+                .context("join native WebSocket shutdown")?
+                .map_err(anyhow::Error::from)
+        }
     }
-    Ok(())
 }
 
 #[cfg(feature = "quic")]
@@ -390,7 +440,12 @@ async fn serve_quic(
     shutdown: CancellationToken,
 ) -> Result<()> {
     let address = config.listen.parse().context("parse QUIC listen address")?;
-    let server_config = quic_server_config(&config.certificate, &config.private_key).await?;
+    let server_config = quic_server_config(
+        &config.certificate,
+        &config.private_key,
+        config.max_incoming_streams,
+    )
+    .await?;
     let endpoint = quinn::Endpoint::server(server_config, address).context("bind QUIC endpoint")?;
     let mut connections = JoinSet::new();
     loop {
@@ -446,7 +501,11 @@ async fn serve_quic(
 }
 
 #[cfg(feature = "quic")]
-async fn quic_server_config(certificate: &str, private_key: &str) -> Result<quinn::ServerConfig> {
+async fn quic_server_config(
+    certificate: &str,
+    private_key: &str,
+    max_incoming_streams: u32,
+) -> Result<quinn::ServerConfig> {
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
     let certificate_bytes = tokio::fs::read(certificate)
@@ -466,7 +525,12 @@ async fn quic_server_config(certificate: &str, private_key: &str) -> Result<quin
         rustls_pemfile::private_key(&mut private_key_bytes.as_slice())
             .context("parse QUIC private key")?
             .context("QUIC private key file contains no key")?;
-    quinn::ServerConfig::with_single_cert(certificates, key).context("build QUIC server config")
+    let mut server = quinn::ServerConfig::with_single_cert(certificates, key)
+        .context("build QUIC server config")?;
+    let mut transport = quinn::TransportConfig::default();
+    transport.max_concurrent_bidi_streams(quinn::VarInt::from_u32(max_incoming_streams));
+    server.transport_config(Arc::new(transport));
+    Ok(server)
 }
 
 #[cfg(feature = "quic")]
@@ -568,5 +632,139 @@ mod tests {
         .await
         .expect("serve and drain TCP listener");
         catalog.close().await.expect("close catalog");
+    }
+}
+
+#[cfg(all(test, feature = "bench"))]
+mod websocket_tests {
+    use super::*;
+    use crate::bench_support::nop_catalog;
+    use fujin_native::{RequestCode, ResponseCode};
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::{
+        sync::Barrier,
+        task::JoinSet,
+        time::{Duration, timeout},
+    };
+    use tokio_tungstenite::{client_async, tungstenite::Message};
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn concurrent_disconnects_deliver_final_response() {
+        const CLIENTS: usize = 32;
+
+        let catalog = nop_catalog().await.expect("compile nop catalog");
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let address = listener.local_addr().expect("test listener address");
+        let start = Arc::new(Barrier::new(CLIENTS + 1));
+        let shutdown = CancellationToken::new();
+        let mut sessions = JoinSet::new();
+        let mut clients = JoinSet::new();
+
+        for _ in 0..CLIENTS {
+            let connection = tokio::net::TcpStream::connect(address);
+            let accepted = listener.accept();
+            let (client_stream, server_stream) = tokio::join!(connection, accepted);
+            let client_stream = client_stream.expect("connect WebSocket client");
+            let (server_stream, _) = server_stream.expect("accept WebSocket client");
+            let server_catalog = Arc::clone(&catalog);
+            let server_shutdown = shutdown.clone();
+            sessions.spawn(async move {
+                websocket_session(
+                    server_stream,
+                    server_catalog,
+                    Arc::new(fujin_core::NoBindMiddleware),
+                    "test".into(),
+                    server_shutdown,
+                )
+                .await
+            });
+            let barrier = Arc::clone(&start);
+            clients.spawn(async move {
+                let (mut websocket, _) = client_async("ws://localhost/", client_stream)
+                    .await
+                    .expect("upgrade WebSocket client");
+                websocket
+                    .send(Message::Binary(hello_frame()))
+                    .await
+                    .expect("send HELLO");
+                let hello = receive_binary_bytes(&mut websocket, 12).await;
+                assert_eq!(hello.first(), Some(&(ResponseCode::Hello as u8)));
+                websocket
+                    .send(Message::Binary(bind_frame()))
+                    .await
+                    .expect("send BIND");
+                let bind = receive_binary_bytes(&mut websocket, 17).await;
+                assert_eq!(bind.first(), Some(&(ResponseCode::Bind as u8)));
+                assert_eq!(bind.get(1), Some(&0));
+
+                barrier.wait().await;
+                websocket
+                    .send(Message::Binary(bytes::Bytes::from_static(&[
+                        RequestCode::Disconnect as u8,
+                    ])))
+                    .await
+                    .expect("send DISCONNECT");
+                let disconnect = receive_binary_bytes(&mut websocket, 1).await;
+                assert_eq!(disconnect.first(), Some(&(ResponseCode::Disconnect as u8)));
+            });
+        }
+
+        start.wait().await;
+        while let Some(result) = clients.join_next().await {
+            result.expect("client task");
+        }
+        shutdown.cancel();
+        while let Some(result) = sessions.join_next().await {
+            result.expect("server task").expect("WebSocket session");
+        }
+        catalog.close().await.expect("close catalog");
+    }
+
+    fn hello_frame() -> bytes::Bytes {
+        let mut frame = vec![RequestCode::Hello as u8, 1, 1, 1];
+        append_bytes(&mut frame, b"test");
+        append_bytes(&mut frame, b"dev");
+        frame.into()
+    }
+
+    fn bind_frame() -> bytes::Bytes {
+        let mut frame = vec![RequestCode::Bind as u8];
+        append_bytes(&mut frame, b"connector");
+        frame.extend_from_slice(&0_u16.to_be_bytes());
+        frame.extend_from_slice(&0_u16.to_be_bytes());
+        frame.into()
+    }
+
+    async fn receive_binary_bytes<S>(
+        websocket: &mut tokio_tungstenite::WebSocketStream<S>,
+        minimum: usize,
+    ) -> Vec<u8>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
+        let mut received = Vec::with_capacity(minimum);
+        while received.len() < minimum {
+            let message = timeout(Duration::from_secs(1), websocket.next())
+                .await
+                .expect("WebSocket response timeout")
+                .expect("WebSocket response stream ended")
+                .expect("read WebSocket response");
+            match message {
+                Message::Binary(bytes) => received.extend_from_slice(&bytes),
+                message => panic!("unexpected WebSocket response {message:?}"),
+            }
+        }
+        received
+    }
+
+    fn append_bytes(frame: &mut Vec<u8>, value: &[u8]) {
+        frame.extend_from_slice(
+            &u32::try_from(value.len())
+                .expect("test value length")
+                .to_be_bytes(),
+        );
+        frame.extend_from_slice(value);
     }
 }

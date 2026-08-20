@@ -49,6 +49,12 @@ pub mod fujin_server_config {
         pub listen: String,
         pub certificate: String,
         pub private_key: String,
+        #[serde(default = "default_max_incoming_streams")]
+        pub max_incoming_streams: u32,
+    }
+
+    fn default_max_incoming_streams() -> u32 {
+        1024
     }
 
     fn default_build() -> String {
@@ -132,6 +138,10 @@ server:
   build: test
   tcp:
     listen: 127.0.0.1:4848
+  quic:
+    listen: 127.0.0.1:4849
+    certificate: cert.pem
+    private_key: key.pem
 ",
         )
         .expect("parse runtime config");
@@ -144,6 +154,14 @@ server:
                 .as_ref()
                 .map(|value| value.listen.as_str()),
             Some("127.0.0.1:4848")
+        );
+        assert_eq!(
+            config
+                .server
+                .quic
+                .as_ref()
+                .map(|value| value.max_incoming_streams),
+            Some(1024)
         );
     }
 }

@@ -39,6 +39,8 @@ const (
 	benchmarkTransaction sessionBenchmarkOperation = "transaction"
 )
 
+const sessionBenchmarkGRPCSessionsPerConnection = 64
+
 type sessionBenchmarkWorker struct {
 	run     func() error
 	abort   func()
@@ -208,13 +210,11 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 					}
 					ctx, cleanupServer := startGRPCSessionBenchmarkServer(b, sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, false, subscribeStart))
 					defer cleanupServer()
-					conn, err := grpc.NewClient(perfGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-					if err != nil {
-						b.Fatal(err)
-					}
-					defer conn.Close()
+					connections, closeConnections := newGRPCSessionBenchmarkConnections(b, workerCount)
+					defer closeConnections()
 					workers := make([]sessionBenchmarkWorker, workerCount)
 					for i := range workers {
+						conn := connections[i%len(connections)]
 						workers[i] = newGRPCSessionBenchmarkWorker(b, ctx, conn, operation, payload.size, batchSize)
 					}
 					runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, sessionBenchmarkNeedsWarmup(operation), func() {
@@ -224,6 +224,48 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 					})
 				})
 			}
+		}
+	}
+}
+
+func newGRPCSessionBenchmarkConnections(b *testing.B, sessions int) ([]*grpc.ClientConn, func()) {
+	b.Helper()
+	connections := make([]*grpc.ClientConn, sessionBenchmarkGRPCConnectionCount(sessions))
+	for i := range connections {
+		conn, err := grpc.NewClient(perfGRPCAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			for _, opened := range connections[:i] {
+				_ = opened.Close()
+			}
+			b.Fatal(err)
+		}
+		connections[i] = conn
+	}
+	return connections, func() {
+		for _, conn := range connections {
+			if err := conn.Close(); err != nil {
+				b.Error(err)
+			}
+		}
+	}
+}
+
+func sessionBenchmarkGRPCConnectionCount(sessions int) int {
+	return (sessions + sessionBenchmarkGRPCSessionsPerConnection - 1) / sessionBenchmarkGRPCSessionsPerConnection
+}
+
+func TestSessionBenchmarkGRPCConnectionCount(t *testing.T) {
+	for _, test := range []struct {
+		sessions int
+		want     int
+	}{
+		{sessions: 1, want: 1},
+		{sessions: 64, want: 1},
+		{sessions: 65, want: 2},
+		{sessions: 128, want: 2},
+	} {
+		if got := sessionBenchmarkGRPCConnectionCount(test.sessions); got != test.want {
+			t.Fatalf("sessions=%d: got %d connections, want %d", test.sessions, got, test.want)
 		}
 	}
 }

@@ -27,6 +27,7 @@ parking_lot = "0.12.5"
 prost = "0.14.3"
 quinn = { version = "0.11.11", default-features = false, features = ["runtime-tokio", "rustls-ring", "log"] }
 rdkafka = { version = "0.39.0", default-features = false, features = ["tokio", "cmake-build", "static-linking", "libz-static", "ssl-vendored"] }
+rcgen = "0.14"
 rustls = { version = "0.23.36", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pemfile = "2.2.0"
 serde = { version = "1.0.229", features = ["derive"] }
