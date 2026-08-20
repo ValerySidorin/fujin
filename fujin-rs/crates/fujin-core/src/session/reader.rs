@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use parking_lot::Mutex;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::HashSet,
     fmt,
     sync::{
         Arc,
@@ -89,15 +89,81 @@ struct FetchWait {
 struct SettlementWait {
     token: crate::OperationToken,
     originals: Vec<Bytes>,
-    matches: HashMap<Bytes, VecDeque<usize>>,
-    sequences: Vec<u64>,
+    states: Vec<u8>,
     sender: oneshot::Sender<Result<Vec<SettlementResult>>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SettlementRange {
+    first: u64,
+    last: u64,
 }
 
 #[derive(Default)]
 struct SettlementTracker {
-    active: HashSet<u64>,
-    settled: HashSet<u64>,
+    settled_through: u64,
+    settled_ranges: Vec<SettlementRange>,
+}
+
+impl SettlementTracker {
+    fn contains(&self, sequence: u64) -> bool {
+        sequence <= self.settled_through
+            || self
+                .settled_ranges
+                .iter()
+                .any(|range| sequence >= range.first && sequence <= range.last)
+    }
+
+    fn mark_settled(&mut self, sequence: u64) {
+        if sequence <= self.settled_through {
+            return;
+        }
+        if sequence == self.settled_through + 1 {
+            self.settled_through = sequence;
+            while self
+                .settled_ranges
+                .first()
+                .is_some_and(|range| range.first == self.settled_through + 1)
+            {
+                self.settled_through = self.settled_ranges.remove(0).last;
+            }
+            return;
+        }
+        for index in 0..self.settled_ranges.len() {
+            let range = self.settled_ranges[index];
+            if sequence >= range.first && sequence <= range.last {
+                return;
+            }
+            if sequence + 1 == range.first {
+                self.settled_ranges[index].first = sequence;
+                return;
+            }
+            if sequence == range.last + 1 {
+                self.settled_ranges[index].last = sequence;
+                if index + 1 < self.settled_ranges.len()
+                    && sequence + 1 == self.settled_ranges[index + 1].first
+                {
+                    let next = self.settled_ranges.remove(index + 1);
+                    self.settled_ranges[index].last = next.last;
+                }
+                return;
+            }
+            if sequence < range.first {
+                self.settled_ranges.insert(
+                    index,
+                    SettlementRange {
+                        first: sequence,
+                        last: sequence,
+                    },
+                );
+                return;
+            }
+        }
+        self.settled_ranges.push(SettlementRange {
+            first: sequence,
+            last: sequence,
+        });
+    }
 }
 
 pub(super) struct ReaderRouter {
@@ -168,7 +234,6 @@ impl ReaderRouter {
             let _ = wait.sender.send(Err(CoreError::Closed));
         }
         if let Some(wait) = self.settlement.lock().take() {
-            self.release_active(&wait.sequences, &[]);
             let _ = wait.sender.send(Err(CoreError::Closed));
         }
     }
@@ -205,47 +270,47 @@ impl ReaderRouter {
     pub(super) fn prepare_settlement(
         &self,
         token: crate::OperationToken,
-        message_ids: &[Bytes],
+        message_ids: Vec<Bytes>,
     ) -> Result<(Vec<Bytes>, SettlementReceiver)> {
-        let mut originals = Vec::with_capacity(message_ids.len());
-        let mut adapters = Vec::with_capacity(message_ids.len());
-        let mut matches = HashMap::<Bytes, VecDeque<usize>>::with_capacity(message_ids.len());
-        let mut sequences = Vec::with_capacity(message_ids.len());
-        let mut request = HashSet::with_capacity(message_ids.len());
-        let mut tracker = self.tracker.lock();
-        for message_id in message_ids {
-            let (sequence, adapter) = self.decode_message_id(message_id)?;
-            if !request.insert(sequence) {
-                return Err(CoreError::InvalidMessageId(
-                    "duplicate message ID in request".into(),
-                ));
-            }
-            if tracker.active.contains(&sequence) || tracker.settled.contains(&sequence) {
-                return Err(CoreError::InvalidMessageId(
-                    "message ID already settled or in progress".into(),
-                ));
-            }
-            let index = originals.len();
-            originals.push(message_id.clone());
-            matches.entry(adapter.clone()).or_default().push_back(index);
-            adapters.push(adapter);
-            sequences.push(sequence);
-        }
-        tracker.active.extend(sequences.iter().copied());
-        drop(tracker);
-        let (sender, receiver) = oneshot::channel();
         let mut settlement = self.settlement.lock();
         if settlement.is_some() {
-            self.release_active(&sequences, &[]);
             return Err(CoreError::Internal(
                 "settlement already in progress for reader".into(),
             ));
         }
+        let mut adapters = Vec::with_capacity(message_ids.len());
+        let mut sequences = Vec::with_capacity(message_ids.len());
+        let tracker = self.tracker.lock();
+        let mut strictly_increasing = true;
+        let mut previous = None;
+        for message_id in &message_ids {
+            let (sequence, adapter) = self.decode_message_id(message_id)?;
+            if tracker.contains(sequence) {
+                return Err(CoreError::InvalidMessageId(
+                    "message ID already settled or in progress".into(),
+                ));
+            }
+            if previous.is_some_and(|value| sequence <= value) {
+                strictly_increasing = false;
+            }
+            previous = Some(sequence);
+            sequences.push(sequence);
+            adapters.push(adapter);
+        }
+        drop(tracker);
+        if !strictly_increasing {
+            let mut request = HashSet::with_capacity(sequences.len());
+            if sequences.iter().any(|sequence| !request.insert(*sequence)) {
+                return Err(CoreError::InvalidMessageId(
+                    "duplicate message ID in request".into(),
+                ));
+            }
+        }
+        let (sender, receiver) = oneshot::channel();
         *settlement = Some(SettlementWait {
             token,
-            originals,
-            matches,
-            sequences,
+            states: vec![0; message_ids.len()],
+            originals: message_ids,
             sender,
         });
         Ok((adapters, receiver))
@@ -253,11 +318,8 @@ impl ReaderRouter {
 
     pub(super) fn cancel_settlement(&self, token: crate::OperationToken) {
         let mut settlement = self.settlement.lock();
-        if settlement.as_ref().is_some_and(|wait| wait.token == token)
-            && let Some(wait) = settlement.take()
-        {
-            drop(settlement);
-            self.release_active(&wait.sequences, &[]);
+        if settlement.as_ref().is_some_and(|wait| wait.token == token) {
+            settlement.take();
         }
     }
 
@@ -360,6 +422,9 @@ impl ReaderRouter {
         result: Result<()>,
         messages: Vec<(Bytes, Result<()>)>,
     ) {
+        const MATCHED: u8 = 1;
+        const SUCCESSFUL: u8 = 2;
+
         let mut settlement = self.settlement.lock();
         let Some(mut wait) = settlement.take() else {
             return;
@@ -370,52 +435,62 @@ impl ReaderRouter {
         }
         drop(settlement);
         if let Err(error) = result {
-            self.release_active(&wait.sequences, &[]);
             let _ = wait.sender.send(Err(error));
             return;
         }
-        let mut successful = Vec::with_capacity(messages.len());
         let mut results = Vec::with_capacity(messages.len());
-        for (adapter, result) in messages {
-            let Some(indices) = wait.matches.get_mut(&adapter) else {
-                self.release_active(&wait.sequences, &[]);
+        for (position, (adapter, result)) in messages.into_iter().enumerate() {
+            let index = if position < wait.originals.len()
+                && wait.states[position] & MATCHED == 0
+                && &wait.originals[position][MESSAGE_ID_ENVELOPE_LEN..] == adapter.as_ref()
+            {
+                Some(position)
+            } else {
+                wait.originals
+                    .iter()
+                    .enumerate()
+                    .position(|(index, original)| {
+                        wait.states[index] & MATCHED == 0
+                            && &original[MESSAGE_ID_ENVELOPE_LEN..] == adapter.as_ref()
+                    })
+            };
+            let Some(index) = index else {
                 let _ = wait.sender.send(Err(CoreError::Internal(
                     "settlement result did not match a requested message ID".into(),
                 )));
                 return;
             };
-            let Some(index) = indices.pop_front() else {
-                self.release_active(&wait.sequences, &[]);
-                let _ = wait.sender.send(Err(CoreError::Internal(
-                    "settlement result repeated a requested message ID".into(),
-                )));
-                return;
-            };
+            wait.states[index] |= MATCHED;
             if result.is_ok() {
-                successful.push(wait.sequences[index]);
+                wait.states[index] |= SUCCESSFUL;
             }
             results.push(SettlementResult {
                 message_id: wait.originals[index].clone(),
                 result,
             });
         }
-        if wait.matches.values().any(|indices| !indices.is_empty()) {
-            self.release_active(&wait.sequences, &[]);
+        if wait.states.iter().any(|state| state & MATCHED == 0) {
             let _ = wait.sender.send(Err(CoreError::Internal(
                 "settlement response omitted requested message IDs".into(),
             )));
             return;
         }
-        self.release_active(&wait.sequences, &successful);
+        let mut tracker = self.tracker.lock();
+        for (message_id, state) in wait.originals.iter().zip(&wait.states) {
+            if state & SUCCESSFUL != 0 {
+                tracker.mark_settled(Self::message_id_sequence(message_id));
+            }
+        }
+        drop(tracker);
         let _ = wait.sender.send(Ok(results));
     }
 
-    fn release_active(&self, sequences: &[u64], successful: &[u64]) {
-        let mut tracker = self.tracker.lock();
-        for sequence in sequences {
-            tracker.active.remove(sequence);
-        }
-        tracker.settled.extend(successful.iter().copied());
+    fn message_id_sequence(message_id: &Bytes) -> u64 {
+        u64::from_be_bytes(
+            message_id[1..MESSAGE_ID_ENVELOPE_LEN]
+                .try_into()
+                .expect("validated message ID token length"),
+        ) & u64::from(u32::MAX)
     }
 }
 
@@ -640,7 +715,7 @@ impl SessionCore {
         let reader = Arc::clone(&slot.reader);
         let router = Arc::clone(&slot.router);
         let token = router.next_operation();
-        let (adapter_ids, receiver) = router.prepare_settlement(token, &message_ids)?;
+        let (adapter_ids, receiver) = router.prepare_settlement(token, message_ids)?;
         let mut pending = PendingSettlement {
             router,
             token,
