@@ -1,0 +1,54 @@
+[package]
+name = "fujin-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+full = ["tcp", "unix", "websocket", "quic", "grpc"]
+tcp = []
+unix = []
+websocket = ["dep:tokio-tungstenite"]
+quic = ["dep:quinn", "dep:rustls", "dep:rustls-pemfile"]
+grpc = ["dep:fujin-proto", "dep:tonic", "dep:tonic-prost", "dep:tokio-stream"]
+bench = ["grpc"]
+bench-alloc = ["bench", "dep:stats_alloc"]
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+fujin-core = { path = "../fujin-core" }
+fujin-native = { path = "../fujin-native" }
+serde_json.workspace = true
+fujin-proto = { path = "../fujin-proto", optional = true }
+prost.workspace = true
+parking_lot.workspace = true
+fujin-runtime = { path = "../fujin-runtime" }
+futures-util.workspace = true
+quinn = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+rustls-pemfile = { workspace = true, optional = true }
+stats_alloc = { workspace = true, optional = true }
+tokio.workspace = true
+tokio-stream = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
+tokio-util.workspace = true
+tonic = { workspace = true, optional = true }
+tonic-prost = { workspace = true, optional = true }
+tracing.workspace = true
+
+[[bin]]
+name = "session-bench"
+path = "src/bin/session-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "grpc-session-bench"
+path = "src/bin/grpc-session-bench.rs"
+required-features = ["bench"]
