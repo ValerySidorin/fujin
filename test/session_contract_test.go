@@ -466,7 +466,7 @@ func TestSessionBenchmarkSettlementFrameAdvancesMessageIDs(t *testing.T) {
 }
 
 func TestSessionBenchConfigDistributesSubscribeLimitsAcrossConnectors(t *testing.T) {
-	config := makeSessionBenchConfig(1, []int{7, 6}, false, nil)
+	config := makeSessionBenchConfig(1, []int{7, 6}, nil, false, nil)
 	settings := config["connector"].Settings
 
 	firstConnector := newSessionBenchConnector(settings)

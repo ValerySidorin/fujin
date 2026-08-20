@@ -13,15 +13,16 @@ use bytes::Bytes;
 use fujin_core::{AcceptanceGuarantee, NoBindMiddleware};
 use fujin_native::{RequestCode, ResponseCode};
 use fujin_server::bench_support::{
-    BenchmarkOperation, SubscribeGate, session_bench_catalog, validate_benchmark_shape,
+    BenchmarkOperation, SubscribeGate, benchmark_subscription_plan, session_bench_catalog,
+    validate_benchmark_shape,
 };
 use futures_util::{SinkExt, StreamExt};
 use quinn::{Connection, Endpoint};
 use rcgen::{CertifiedKey, generate_simple_self_signed};
 use rustls::RootCertStore;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    sync::{Barrier, mpsc},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    sync::{Barrier, Semaphore, mpsc},
     task::{JoinHandle, JoinSet},
     time::{sleep, timeout},
 };
@@ -226,14 +227,13 @@ async fn run_benchmark(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
     let worker_operations: Vec<_> = (0..config.concurrency)
         .map(|worker| operation_count(worker, config.concurrency, config.operations))
         .collect();
+    let (subscribe_limits, subscribe_permits) =
+        benchmark_subscription_plan(config.operation, &worker_operations);
     let subscribe_gate = Arc::new(SubscribeGate::default());
     let catalog = session_bench_catalog(
         config.payload,
-        if config.operation.is_subscription() {
-            worker_operations.clone()
-        } else {
-            Vec::new()
-        },
+        subscribe_limits,
+        subscribe_permits.clone(),
         Arc::clone(&subscribe_gate),
     )
     .await?;
@@ -243,7 +243,13 @@ async fn run_benchmark(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
     } else {
         None
     };
-    let prepared = prepare_native_workers(config, quic.as_deref(), worker_operations).await?;
+    let prepared = prepare_native_workers(
+        config,
+        quic.as_deref(),
+        worker_operations,
+        &subscribe_permits,
+    )
+    .await?;
     let start = Arc::new(Barrier::new(config.concurrency + 1));
     let finish = Arc::new(Barrier::new(config.concurrency + 1));
     let (ready_sender, mut ready_receiver) = mpsc::channel(config.concurrency);
@@ -326,11 +332,13 @@ async fn prepare_native_workers(
     config: &BenchmarkConfig,
     quic: Option<&QuicClient>,
     worker_operations: Vec<usize>,
+    subscribe_permits: &[Arc<Semaphore>],
 ) -> Result<Vec<(PreparedOperation, usize)>> {
     let mut prepared = Vec::with_capacity(config.concurrency);
-    for operations in worker_operations {
+    for (worker, operations) in worker_operations.into_iter().enumerate() {
         let session = NativeSession::connect(config.transport, quic).await?;
-        let mut operation = PreparedOperation::new(session, config).await?;
+        let mut operation =
+            PreparedOperation::new(session, config, subscribe_permits.get(worker).cloned()).await?;
         if operation.needs_warmup() {
             operation.run().await?;
         }
@@ -404,9 +412,10 @@ async fn run_worker(mut plan: WorkerPlan) -> Result<Vec<u64>> {
 trait BenchStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T> BenchStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
 type BoxStream = Box<dyn BenchStream>;
+type BufferedStream = BufReader<BoxStream>;
 
 struct NativeSession {
-    stream: BoxStream,
+    stream: BufferedStream,
     background: Vec<JoinHandle<()>>,
 }
 
@@ -423,16 +432,18 @@ impl NativeSession {
     async fn connect(transport: Transport, quic: Option<&QuicClient>) -> Result<Self> {
         let mut session = match transport {
             Transport::Tcp => Self {
-                stream: Box::new(connect_tcp(TCP_ADDRESS).await?),
+                stream: BufReader::new(Box::new(connect_tcp(TCP_ADDRESS).await?)),
                 background: Vec::new(),
             },
             Transport::Unix => Self {
-                stream: Box::new(connect_unix().await?),
+                stream: BufReader::new(Box::new(connect_unix().await?)),
                 background: Vec::new(),
             },
             Transport::WebSocket => connect_websocket().await?,
             Transport::Quic => Self {
-                stream: Box::new(quic.context("QUIC client missing")?.open_stream().await?),
+                stream: BufReader::new(Box::new(
+                    quic.context("QUIC client missing")?.open_stream().await?,
+                )),
                 background: Vec::new(),
             },
         };
@@ -517,6 +528,7 @@ enum PreparedOperation {
         subscription_id: u8,
         payload: usize,
         with_headers: bool,
+        permit: Arc<Semaphore>,
     },
     Settlement {
         session: NativeSession,
@@ -534,7 +546,11 @@ enum PreparedOperation {
 }
 
 impl PreparedOperation {
-    async fn new(mut session: NativeSession, config: &BenchmarkConfig) -> Result<Self> {
+    async fn new(
+        mut session: NativeSession,
+        config: &BenchmarkConfig,
+        subscribe_permit: Option<Arc<Semaphore>>,
+    ) -> Result<Self> {
         match config.operation {
             BenchmarkOperation::Produce => Ok(Self::Produce {
                 session,
@@ -584,6 +600,7 @@ impl PreparedOperation {
                     subscription_id,
                     payload: config.payload,
                     with_headers,
+                    permit: subscribe_permit.context("subscription permit missing")?,
                 })
             }
             BenchmarkOperation::Ack | BenchmarkOperation::Nack => {
@@ -669,6 +686,7 @@ impl PreparedOperation {
                 subscription_id,
                 payload,
                 with_headers,
+                permit,
             } => {
                 read_subscription_message(
                     &mut session.stream,
@@ -676,7 +694,9 @@ impl PreparedOperation {
                     *payload,
                     *with_headers,
                 )
-                .await
+                .await?;
+                permit.add_permits(1);
+                Ok(())
             }
             Self::Settlement {
                 session,
@@ -724,7 +744,7 @@ impl PreparedOperation {
 }
 
 async fn read_fetch_response(
-    stream: &mut BoxStream,
+    stream: &mut BufferedStream,
     response: ResponseCode,
     payload_size: usize,
     batch: usize,
@@ -758,7 +778,7 @@ async fn read_fetch_response(
 }
 
 async fn read_subscription_message(
-    stream: &mut BoxStream,
+    stream: &mut BufferedStream,
     subscription_id: u8,
     payload_size: usize,
     with_headers: bool,
@@ -783,7 +803,7 @@ async fn read_subscription_message(
 }
 
 async fn read_settlement_response(
-    stream: &mut BoxStream,
+    stream: &mut BufferedStream,
     response: ResponseCode,
     batch: usize,
 ) -> Result<()> {
@@ -806,7 +826,7 @@ async fn read_settlement_response(
     Ok(())
 }
 
-async fn read_headers(stream: &mut BoxStream) -> Result<()> {
+async fn read_headers(stream: &mut BufferedStream) -> Result<()> {
     let strings = usize::from(stream.read_u16().await?);
     if strings != 2 {
         bail!("invalid header string count {strings}");
@@ -1033,7 +1053,7 @@ async fn connect_websocket() -> Result<NativeSession> {
         }
     });
     Ok(NativeSession {
-        stream: Box::new(client),
+        stream: BufReader::new(Box::new(client)),
         background: vec![inbound, outbound],
     })
 }

@@ -10,12 +10,13 @@ use fujin_proto::fujin::v1 as pb;
 use fujin_server::{
     GrpcService,
     bench_support::{
-        BenchmarkOperation, SubscribeGate, session_bench_catalog, validate_benchmark_shape,
+        BenchmarkOperation, SubscribeGate, benchmark_subscription_plan, session_bench_catalog,
+        validate_benchmark_shape,
     },
 };
 use tokio::{
     net::TcpListener,
-    sync::{Barrier, mpsc, oneshot},
+    sync::{Barrier, Semaphore, mpsc, oneshot},
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
@@ -30,8 +31,6 @@ use std::alloc::System;
 #[cfg(feature = "bench-alloc")]
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
-
-const GRPC_SESSIONS_PER_CHANNEL: usize = 64;
 
 #[derive(Clone, Debug)]
 struct BenchmarkConfig {
@@ -181,14 +180,13 @@ async fn run_benchmark(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
     let worker_operations: Vec<_> = (0..config.concurrency)
         .map(|worker| operation_count(worker, config.concurrency, config.operations))
         .collect();
+    let (subscribe_limits, subscribe_permits) =
+        benchmark_subscription_plan(config.operation, &worker_operations);
     let subscribe_gate = Arc::new(SubscribeGate::default());
     let catalog = session_bench_catalog(
         config.payload,
-        if config.operation.is_subscription() {
-            worker_operations.clone()
-        } else {
-            Vec::new()
-        },
+        subscribe_limits,
+        subscribe_permits.clone(),
         Arc::clone(&subscribe_gate),
     )
     .await?;
@@ -196,7 +194,8 @@ async fn run_benchmark(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
     let address = listener.local_addr()?;
     let (server, shutdown) = spawn_server(listener, Arc::clone(&catalog));
     let channels = open_channels(address, config.concurrency).await?;
-    let prepared = prepare_grpc_workers(&channels, config, worker_operations).await?;
+    let prepared =
+        prepare_grpc_workers(&channels, config, worker_operations, &subscribe_permits).await?;
     let start = Arc::new(Barrier::new(config.concurrency + 1));
     let finish = Arc::new(Barrier::new(config.concurrency + 1));
     let (ready_sender, mut ready_receiver) = mpsc::channel(config.concurrency);
@@ -275,7 +274,7 @@ async fn run_benchmark(config: &BenchmarkConfig) -> Result<BenchmarkResult> {
 }
 
 async fn open_channels(address: std::net::SocketAddr, concurrency: usize) -> Result<Vec<Channel>> {
-    let count = concurrency.div_ceil(GRPC_SESSIONS_PER_CHANNEL);
+    let count = concurrency;
     let mut channels = Vec::with_capacity(count);
     for _ in 0..count {
         channels.push(
@@ -292,12 +291,19 @@ async fn prepare_grpc_workers(
     channels: &[Channel],
     config: &BenchmarkConfig,
     worker_operations: Vec<usize>,
+    subscribe_permits: &[Arc<Semaphore>],
 ) -> Result<Vec<(PreparedOperation, usize)>> {
     let mut prepared = Vec::with_capacity(config.concurrency);
     for (worker, operations) in worker_operations.into_iter().enumerate() {
-        let channel = channels[worker % channels.len()].clone();
+        let channel = channels[worker].clone();
         let (sender, responses) = open_stream(channel).await?;
-        let mut operation = PreparedOperation::new(sender, responses, config).await?;
+        let mut operation = PreparedOperation::new(
+            sender,
+            responses,
+            config,
+            subscribe_permits.get(worker).cloned(),
+        )
+        .await?;
         if operation.needs_warmup() {
             operation.run().await?;
         }
@@ -421,6 +427,7 @@ enum PreparedOperation {
         subscription_id: u32,
         payload: usize,
         with_headers: bool,
+        permit: Arc<Semaphore>,
     },
     Settlement {
         sender: GrpcSender,
@@ -441,6 +448,7 @@ impl PreparedOperation {
         sender: GrpcSender,
         responses: GrpcResponses,
         config: &BenchmarkConfig,
+        subscribe_permit: Option<Arc<Semaphore>>,
     ) -> Result<Self> {
         let payload = vec![0; config.payload];
         match config.operation {
@@ -459,6 +467,7 @@ impl PreparedOperation {
                     responses,
                     config.payload,
                     config.operation == BenchmarkOperation::HSubscribe,
+                    subscribe_permit.context("subscription permit missing")?,
                 )
                 .await
             }
@@ -507,8 +516,13 @@ impl PreparedOperation {
                 subscription_id,
                 payload,
                 with_headers,
+                permit,
                 ..
-            } => run_subscribe(responses, *subscription_id, *payload, *with_headers).await,
+            } => {
+                run_subscribe(responses, *subscription_id, *payload, *with_headers).await?;
+                permit.add_permits(1);
+                Ok(())
+            }
             Self::Settlement {
                 sender,
                 responses,
@@ -616,6 +630,7 @@ async fn prepare_subscribe(
     mut responses: GrpcResponses,
     payload: usize,
     with_headers: bool,
+    permit: Arc<Semaphore>,
 ) -> Result<PreparedOperation> {
     let request = if with_headers {
         pb::fujin_request::Request::Hsubscribe(pb::HSubscribeRequest {
@@ -650,6 +665,7 @@ async fn prepare_subscribe(
         subscription_id,
         payload,
         with_headers,
+        permit,
     })
 }
 

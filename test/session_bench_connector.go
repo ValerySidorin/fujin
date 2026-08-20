@@ -16,11 +16,12 @@ func init() {
 }
 
 type sessionBenchConnector struct {
-	msgSize         int
-	subscribeLimit  uint64
-	subscribeLimits <-chan uint64
-	subscribeStart  <-chan struct{}
-	ackDoneFirst    bool
+	msgSize          int
+	subscribeLimit   uint64
+	subscribeLimits  <-chan uint64
+	subscribePermits <-chan chan struct{}
+	subscribeStart   <-chan struct{}
+	ackDoneFirst     bool
 }
 
 func newSessionBenchConnector(config any) *sessionBenchConnector {
@@ -48,6 +49,12 @@ func newSessionBenchConnector(config any) *sessionBenchConnector {
 		result.subscribeLimits = value
 	case <-chan uint64:
 		result.subscribeLimits = value
+	}
+	switch value := settings["subscribe_permits"].(type) {
+	case chan chan struct{}:
+		result.subscribePermits = value
+	case <-chan chan struct{}:
+		result.subscribePermits = value
 	}
 	switch value := settings["subscribe_start"].(type) {
 	case chan struct{}:
@@ -103,14 +110,23 @@ func (c *sessionBenchConnector) NewReader(autoSettle bool, _ *slog.Logger) (conn
 			return nil, fmt.Errorf("session benchmark subscription limit exhausted")
 		}
 	}
+	var subscribePermit <-chan struct{}
+	if c.subscribePermits != nil {
+		permit, ok := <-c.subscribePermits
+		if !ok {
+			return nil, fmt.Errorf("session benchmark subscription permit exhausted")
+		}
+		subscribePermit = permit
+	}
 	return &genReader{
-		msg:            sizedBytes(c.msgSize),
-		headers:        [][]byte{[]byte("content-type"), []byte("application/octet-stream")},
-		autoCommit:     autoSettle,
-		fetchDoneFirst: true,
-		subscribeLimit: subscribeLimit,
-		subscribeStart: c.subscribeStart,
-		ackDoneFirst:   c.ackDoneFirst,
+		msg:             sizedBytes(c.msgSize),
+		headers:         [][]byte{[]byte("content-type"), []byte("application/octet-stream")},
+		autoCommit:      autoSettle,
+		fetchDoneFirst:  true,
+		subscribeLimit:  subscribeLimit,
+		subscribePermit: subscribePermit,
+		subscribeStart:  c.subscribeStart,
+		ackDoneFirst:    c.ackDoneFirst,
 	}, nil
 }
 
@@ -143,10 +159,10 @@ func MakeSessionBenchConfig(msgSize int) connectorconfig.ConnectorsConfig {
 }
 
 func MakeSessionBenchConfigWithSubscribeLimit(msgSize, limit int) connectorconfig.ConnectorsConfig {
-	return makeSessionBenchConfig(msgSize, []int{limit}, false, nil)
+	return makeSessionBenchConfig(msgSize, []int{limit}, nil, false, nil)
 }
 
-func makeSessionBenchConfig(msgSize int, limits []int, ackDoneFirst bool, subscribeStart <-chan struct{}) connectorconfig.ConnectorsConfig {
+func makeSessionBenchConfig(msgSize int, limits []int, permits []chan struct{}, ackDoneFirst bool, subscribeStart <-chan struct{}) connectorconfig.ConnectorsConfig {
 	config := MakeSessionBenchConfig(msgSize)
 	settings := config["connector"].Settings.(map[string]any)
 	if len(limits) > 0 {
@@ -155,6 +171,13 @@ func makeSessionBenchConfig(msgSize int, limits []int, ackDoneFirst bool, subscr
 			subscribeLimits <- uint64(limit)
 		}
 		settings["subscribe_limits"] = subscribeLimits
+	}
+	if len(permits) > 0 {
+		subscribePermits := make(chan chan struct{}, len(permits))
+		for _, permit := range permits {
+			subscribePermits <- permit
+		}
+		settings["subscribe_permits"] = subscribePermits
 	}
 	settings["ack_done_first"] = ackDoneFirst
 	if subscribeStart != nil {

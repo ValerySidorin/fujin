@@ -86,14 +86,15 @@ func (g *genConnector) NewReader(autoSettle bool, _ *slog.Logger) (connector.Rea
 
 // genReader generates messages in a tight loop until context is cancelled.
 type genReader struct {
-	msg            []byte
-	headers        [][]byte
-	autoCommit     bool
-	fetchDoneFirst bool
-	subscribeLimit uint64
-	subscribeStart <-chan struct{}
-	ackDoneFirst   bool
-	nextID         atomic.Uint32
+	msg             []byte
+	headers         [][]byte
+	autoCommit      bool
+	fetchDoneFirst  bool
+	subscribeLimit  uint64
+	subscribePermit <-chan struct{}
+	subscribeStart  <-chan struct{}
+	ackDoneFirst    bool
+	nextID          atomic.Uint32
 }
 
 func (r *genReader) waitForSubscribeStart(ctx context.Context) bool {
@@ -107,6 +108,18 @@ func (r *genReader) waitForSubscribeStart(ctx context.Context) bool {
 		return true
 	}
 }
+func (r *genReader) waitForSubscribePermit(ctx context.Context) bool {
+	if r.subscribePermit == nil {
+		return true
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case <-r.subscribePermit:
+		return true
+	}
+}
+
 func (r *genReader) Subscribe(ctx context.Context, ready func() error, h func([]byte, string, ...any)) error {
 	if err := ready(); err != nil {
 		return err
@@ -117,6 +130,9 @@ func (r *genReader) Subscribe(ctx context.Context, ready func() error, h func([]
 	for emitted := uint64(0); ; emitted++ {
 		if r.subscribeLimit > 0 && emitted >= r.subscribeLimit {
 			<-ctx.Done()
+			return nil
+		}
+		if !r.waitForSubscribePermit(ctx) {
 			return nil
 		}
 		select {
@@ -143,6 +159,9 @@ func (r *genReader) SubscribeWithHeaders(ctx context.Context, ready func() error
 	for emitted := uint64(0); ; emitted++ {
 		if r.subscribeLimit > 0 && emitted >= r.subscribeLimit {
 			<-ctx.Done()
+			return nil
+		}
+		if !r.waitForSubscribePermit(ctx) {
 			return nil
 		}
 		select {

@@ -39,8 +39,6 @@ const (
 	benchmarkTransaction sessionBenchmarkOperation = "transaction"
 )
 
-const sessionBenchmarkGRPCSessionsPerConnection = 64
-
 type sessionBenchmarkWorker struct {
 	run     func() error
 	abort   func()
@@ -151,13 +149,9 @@ func benchmarkNativeSessionTransports(
 					b.Run(name, func(b *testing.B) {
 						isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
 						workerCount := sessionBenchmarkWorkerCount(concurrency, b.N)
-						var subscribeLimits []int
-						var subscribeStart chan struct{}
-						if isSubscription {
-							subscribeLimits = sessionBenchmarkOperationCounts(workerCount, b.N)
-							subscribeStart = make(chan struct{})
-						}
-						config := sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, true, subscribeStart)
+						subscribeLimits, subscribePermits, subscribeStart :=
+							sessionBenchmarkSubscriptionPlan(isSubscription, workerCount, b.N)
+						config := sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, subscribePermits, true, subscribeStart)
 						ctx, cleanupServer := startNativeSessionBenchmarkServer(b, transport, config)
 						defer cleanupServer()
 						var sharedQUIC *quicgo.Conn
@@ -167,7 +161,7 @@ func benchmarkNativeSessionTransports(
 						}
 						workers := make([]sessionBenchmarkWorker, workerCount)
 						for i := range workers {
-							workers[i] = newNativeSessionBenchmarkWorker(b, ctx, transport, operation, payload.size, batchSize, sharedQUIC)
+							workers[i] = newNativeSessionBenchmarkWorker(b, ctx, transport, operation, payload.size, batchSize, sharedQUIC, sessionBenchmarkPermit(subscribePermits, i))
 						}
 						runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, sessionBenchmarkNeedsWarmup(operation), func() {
 							if subscribeStart != nil {
@@ -202,20 +196,16 @@ func benchmarkGRPCSessionMatrix(b *testing.B, operation sessionBenchmarkOperatio
 				b.Run(name, func(b *testing.B) {
 					isSubscription := operation == benchmarkSubscribe || operation == benchmarkHSubscribe
 					workerCount := sessionBenchmarkWorkerCount(concurrency, b.N)
-					var subscribeLimits []int
-					var subscribeStart chan struct{}
-					if isSubscription {
-						subscribeLimits = sessionBenchmarkOperationCounts(workerCount, b.N)
-						subscribeStart = make(chan struct{})
-					}
-					ctx, cleanupServer := startGRPCSessionBenchmarkServer(b, sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, false, subscribeStart))
+					subscribeLimits, subscribePermits, subscribeStart :=
+						sessionBenchmarkSubscriptionPlan(isSubscription, workerCount, b.N)
+					ctx, cleanupServer := startGRPCSessionBenchmarkServer(b, sessionBenchmarkConnectors(operation, payload.size, subscribeLimits, subscribePermits, false, subscribeStart))
 					defer cleanupServer()
 					connections, closeConnections := newGRPCSessionBenchmarkConnections(b, workerCount)
 					defer closeConnections()
 					workers := make([]sessionBenchmarkWorker, workerCount)
 					for i := range workers {
 						conn := connections[i%len(connections)]
-						workers[i] = newGRPCSessionBenchmarkWorker(b, ctx, conn, operation, payload.size, batchSize)
+						workers[i] = newGRPCSessionBenchmarkWorker(b, ctx, conn, operation, payload.size, batchSize, sessionBenchmarkPermit(subscribePermits, i))
 					}
 					runSessionBenchmarkWorkers(b, workers, payload.size*batchSize, sessionBenchmarkNeedsWarmup(operation), func() {
 						if subscribeStart != nil {
@@ -251,7 +241,7 @@ func newGRPCSessionBenchmarkConnections(b *testing.B, sessions int) ([]*grpc.Cli
 }
 
 func sessionBenchmarkGRPCConnectionCount(sessions int) int {
-	return (sessions + sessionBenchmarkGRPCSessionsPerConnection - 1) / sessionBenchmarkGRPCSessionsPerConnection
+	return sessions
 }
 
 func TestSessionBenchmarkGRPCConnectionCount(t *testing.T) {
@@ -260,13 +250,38 @@ func TestSessionBenchmarkGRPCConnectionCount(t *testing.T) {
 		want     int
 	}{
 		{sessions: 1, want: 1},
-		{sessions: 64, want: 1},
-		{sessions: 65, want: 2},
-		{sessions: 128, want: 2},
+		{sessions: 64, want: 64},
+		{sessions: 65, want: 65},
+		{sessions: 128, want: 128},
 	} {
 		if got := sessionBenchmarkGRPCConnectionCount(test.sessions); got != test.want {
 			t.Fatalf("sessions=%d: got %d connections, want %d", test.sessions, got, test.want)
 		}
+	}
+}
+
+func sessionBenchmarkSubscriptionPlan(enabled bool, workers, operations int) ([]int, []chan struct{}, chan struct{}) {
+	if !enabled {
+		return nil, nil, nil
+	}
+	permits := make([]chan struct{}, workers)
+	for i := range permits {
+		permits[i] = make(chan struct{}, 1)
+		permits[i] <- struct{}{}
+	}
+	return sessionBenchmarkOperationCounts(workers, operations), permits, make(chan struct{})
+}
+
+func sessionBenchmarkPermit(permits []chan struct{}, worker int) chan struct{} {
+	if worker >= len(permits) {
+		return nil
+	}
+	return permits[worker]
+}
+
+func releaseSessionBenchmarkPermit(permit chan<- struct{}) {
+	if permit != nil {
+		permit <- struct{}{}
 	}
 }
 
@@ -285,11 +300,11 @@ func sessionBenchmarkConnectorName(operation sessionBenchmarkOperation) string {
 	return "session_bench"
 }
 
-func sessionBenchmarkConnectors(operation sessionBenchmarkOperation, msgSize int, limits []int, ackDoneFirst bool, subscribeStart <-chan struct{}) connectorconfig.ConnectorsConfig {
+func sessionBenchmarkConnectors(operation sessionBenchmarkOperation, msgSize int, limits []int, permits []chan struct{}, ackDoneFirst bool, subscribeStart <-chan struct{}) connectorconfig.ConnectorsConfig {
 	if operation == benchmarkProduce {
 		return connectorconfig.ConnectorsConfig{"connector": {Type: "nop"}}
 	}
-	return makeSessionBenchConfig(msgSize, limits, ackDoneFirst, subscribeStart)
+	return makeSessionBenchConfig(msgSize, limits, permits, ackDoneFirst, subscribeStart)
 }
 
 func sessionBenchmarkConcurrencyEnabled(concurrency int) bool {
@@ -551,7 +566,7 @@ func startGRPCSessionBenchmarkServer(b *testing.B, connectors connectorconfig.Co
 	}
 }
 
-func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transport string, operation sessionBenchmarkOperation, payloadSize, batchSize int, sharedQUIC *quicgo.Conn) sessionBenchmarkWorker {
+func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transport string, operation sessionBenchmarkOperation, payloadSize, batchSize int, sharedQUIC *quicgo.Conn, subscribePermit chan struct{}) sessionBenchmarkWorker {
 	b.Helper()
 	session := openNativeBenchmarkSession(b, ctx, transport, sharedQUIC)
 	payload := sizedString(payloadSize)
@@ -626,6 +641,7 @@ func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transpor
 				if id != subscriptionID || len(payload) != payloadSize || len(headers) != 2 {
 					return fmt.Errorf("invalid hsubscribe message")
 				}
+				releaseSessionBenchmarkPermit(subscribePermit)
 				return nil
 			}
 			id, payload, err := session.reader.readMsg()
@@ -635,6 +651,7 @@ func newNativeSessionBenchmarkWorker(b *testing.B, ctx context.Context, transpor
 			if id != subscriptionID || len(payload) != payloadSize {
 				return fmt.Errorf("invalid subscribe message")
 			}
+			releaseSessionBenchmarkPermit(subscribePermit)
 			return nil
 		}
 	case benchmarkAck, benchmarkNack:
@@ -763,7 +780,7 @@ func newProtoReaderFromReadWriter(reader io.Reader) *protoReader {
 	return newProtoReader(reader)
 }
 
-func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc.ClientConn, operation sessionBenchmarkOperation, payloadSize, batchSize int) sessionBenchmarkWorker {
+func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc.ClientConn, operation sessionBenchmarkOperation, payloadSize, batchSize int, subscribePermit chan struct{}) sessionBenchmarkWorker {
 	b.Helper()
 	streamCtx, cancel := context.WithCancel(ctx)
 	stream, err := pb.NewFujinServiceClient(conn).Stream(streamCtx)
@@ -850,6 +867,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 				if message == nil || message.SubscriptionId != subscriptionID || len(message.Payload) != payloadSize || len(message.Headers) != 1 {
 					return fmt.Errorf("invalid hsubscribe response")
 				}
+				releaseSessionBenchmarkPermit(subscribePermit)
 				return nil
 			}
 		} else {
@@ -870,6 +888,7 @@ func newGRPCSessionBenchmarkWorker(b *testing.B, ctx context.Context, conn *grpc
 				if message == nil || message.SubscriptionId != subscriptionID || len(message.Payload) != payloadSize {
 					return fmt.Errorf("invalid subscribe response")
 				}
+				releaseSessionBenchmarkPermit(subscribePermit)
 				return nil
 			}
 		}

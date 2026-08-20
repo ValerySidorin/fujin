@@ -17,7 +17,7 @@ use fujin_core::{
     SettlementProfile, Writer,
 };
 use parking_lot::Mutex;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Semaphore};
 use tokio_util::sync::CancellationToken;
 
 /// Builds the one-route, locally-acknowledged connector used by protocol benchmarks.
@@ -131,6 +131,22 @@ pub fn validate_benchmark_shape(
     Ok(())
 }
 
+pub fn benchmark_subscription_plan(
+    operation: BenchmarkOperation,
+    operation_counts: &[usize],
+) -> (Vec<usize>, Vec<Arc<Semaphore>>) {
+    if !operation.is_subscription() {
+        return (Vec::new(), Vec::new());
+    }
+    (
+        operation_counts.to_vec(),
+        operation_counts
+            .iter()
+            .map(|_| Arc::new(Semaphore::new(1)))
+            .collect(),
+    )
+}
+
 /// Start barrier shared by synthetic subscription readers and the benchmark harness.
 #[derive(Debug, Default)]
 pub struct SubscribeGate {
@@ -156,6 +172,7 @@ impl SubscribeGate {
 struct SessionBenchPlan {
     payload: Bytes,
     subscribe_limits: Mutex<VecDeque<usize>>,
+    subscribe_permits: Mutex<VecDeque<Arc<Semaphore>>>,
     subscribe_gate: Arc<SubscribeGate>,
 }
 
@@ -168,6 +185,7 @@ struct SessionBenchPlan {
 pub async fn session_bench_catalog(
     payload_size: usize,
     subscribe_limits: Vec<usize>,
+    subscribe_permits: Vec<Arc<Semaphore>>,
     subscribe_gate: Arc<SubscribeGate>,
 ) -> fujin_core::Result<Arc<Catalog>> {
     let registry = Arc::new(DescriptorRegistry::default());
@@ -177,6 +195,7 @@ pub async fn session_bench_catalog(
             plan: Arc::new(SessionBenchPlan {
                 payload: Bytes::from(vec![0; payload_size]),
                 subscribe_limits: Mutex::new(subscribe_limits.into()),
+                subscribe_permits: Mutex::new(subscribe_permits.into()),
                 subscribe_gate,
             }),
         }),
@@ -278,6 +297,7 @@ impl ConnectorRuntime for SessionBenchRuntime {
         Ok(Arc::new(SessionBenchReader {
             payload: self.plan.payload.clone(),
             subscribe_limit: self.plan.subscribe_limits.lock().pop_front().unwrap_or(0),
+            subscribe_permit: self.plan.subscribe_permits.lock().pop_front(),
             subscribe_gate: Arc::clone(&self.plan.subscribe_gate),
             auto_settle,
             events,
@@ -304,6 +324,7 @@ impl ConnectorRuntime for SessionBenchRuntime {
 struct SessionBenchReader {
     payload: Bytes,
     subscribe_limit: usize,
+    subscribe_permit: Option<Arc<Semaphore>>,
     subscribe_gate: Arc<SubscribeGate>,
     auto_settle: bool,
     events: Arc<dyn ReaderEventSink>,
@@ -336,11 +357,19 @@ impl Reader for SessionBenchReader {
         let subscribe_gate = Arc::clone(&self.subscribe_gate);
         let closed = self.closed.clone();
         let limit = self.subscribe_limit;
-        let burst = (1024 * 1024 / payload.len().max(1)).clamp(1, 256);
+        let subscribe_permit = self.subscribe_permit.clone();
         tokio::spawn(async move {
             subscribe_gate.wait().await;
-            for emitted in 0..limit {
-                if closed.is_cancelled() {
+            for _ in 0..limit {
+                if let Some(permit) = &subscribe_permit {
+                    tokio::select! {
+                        () = closed.cancelled() => return,
+                        acquired = permit.acquire() => match acquired {
+                            Ok(acquired) => acquired.forget(),
+                            Err(_) => return,
+                        },
+                    }
+                } else if closed.is_cancelled() {
                     return;
                 }
                 events.emit(ReaderEvent::Message(ReaderMessage {
@@ -356,9 +385,6 @@ impl Reader for SessionBenchReader {
                     },
                     adapter_message_id: Bytes::from_static(b"sub"),
                 }));
-                if emitted % burst == burst - 1 {
-                    tokio::task::yield_now().await;
-                }
             }
         });
         Ok(())
@@ -535,5 +561,17 @@ mod tests {
         );
         assert!(validate_benchmark_shape(BenchmarkOperation::Produce, 128, 32, 1, 1000).is_err());
         assert!(validate_benchmark_shape(BenchmarkOperation::Produce, 128, 1, 128, 100).is_err());
+    }
+
+    #[test]
+    fn subscription_plan_assigns_one_demand_per_worker() {
+        let (limits, permits) = benchmark_subscription_plan(BenchmarkOperation::Subscribe, &[7, 6]);
+        assert_eq!(limits, [7, 6]);
+        assert_eq!(permits.len(), 2);
+        assert!(permits.iter().all(|permit| permit.available_permits() == 1));
+
+        let (limits, permits) = benchmark_subscription_plan(BenchmarkOperation::Produce, &[7, 6]);
+        assert!(limits.is_empty());
+        assert!(permits.is_empty());
     }
 }
