@@ -456,19 +456,18 @@ impl Reader for TestReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        adapter_message_ids: Vec<Bytes>,
+        mut settlements: Vec<fujin_core::SettlementResult>,
     ) -> Result<()> {
         self.settlement_count.fetch_add(1, Ordering::Relaxed);
         let plan = self.plan.lock().settlements.pop_front().unwrap_or_default();
-        let messages = adapter_message_ids
-            .into_iter()
-            .zip(plan.results)
-            .map(|(message_id, error)| (message_id, error.map_or(Ok(()), Err)))
-            .collect();
+        settlements.truncate(plan.results.len());
+        for (settlement, error) in settlements.iter_mut().zip(plan.results) {
+            settlement.result = error.map_or(Ok(()), Err);
+        }
         self.events.emit(ReaderEvent::SettlementComplete {
             token,
             result: plan.top_error.map_or(Ok(()), Err),
-            messages,
+            messages: settlements,
         });
         Ok(())
     }

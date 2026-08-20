@@ -14,7 +14,7 @@ pub use connector::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, CompiledConnector, Completion,
     CompletionSink, ConnectorDescriptor, ConnectorRuntime, Header, Headers, Message, NackEffect,
     OperationToken, Reader, ReaderEvent, ReaderEventSink, ReaderMessage, ReadyCallback,
-    RouteProfile, SettlementKind, SettlementProfile, Writer,
+    RouteProfile, SettlementKind, SettlementProfile, SettlementResult, Writer,
 };
 pub use error::{CoreError, OperationError, OperationOutcome, Result, StatusCode};
 pub use generation::{Binding, Catalog, DescriptorRegistry, Generation, GenerationCompiler};
@@ -24,6 +24,5 @@ pub use middleware::{
 };
 pub use overrides::{apply_overrides, validate_override_path};
 pub use session::{
-    BindResult, Delivery, FetchResult, NoSessionEvents, SessionCore, SessionEventSink,
-    SessionState, SettlementResult,
+    BindResult, Delivery, FetchResult, NoSessionEvents, SessionCore, SessionEventSink, SessionState,
 };

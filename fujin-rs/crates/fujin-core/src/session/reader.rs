@@ -12,7 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::{
     AckGranularity, Capabilities, CoreError, Header, NackEffect, Reader, ReaderEvent,
-    ReaderEventSink, ReaderMessage, Result, RouteProfile, SettlementKind,
+    ReaderEventSink, ReaderMessage, Result, RouteProfile, SettlementKind, SettlementResult,
     connector::validate_headers,
 };
 
@@ -33,12 +33,6 @@ pub struct Delivery {
 pub struct FetchResult {
     pub subscription_id: u8,
     pub messages: Vec<Delivery>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SettlementResult {
-    pub message_id: Bytes,
-    pub result: Result<()>,
 }
 
 type SettlementReceiver = oneshot::Receiver<Result<Vec<SettlementResult>>>;
@@ -271,7 +265,7 @@ impl ReaderRouter {
         &self,
         token: crate::OperationToken,
         message_ids: Vec<Bytes>,
-    ) -> Result<(Vec<Bytes>, SettlementReceiver)> {
+    ) -> Result<(Vec<SettlementResult>, SettlementReceiver)> {
         let mut settlement = self.settlement.lock();
         if settlement.is_some() {
             return Err(CoreError::Internal(
@@ -295,7 +289,10 @@ impl ReaderRouter {
             }
             previous = Some(sequence);
             sequences.push(sequence);
-            adapters.push(adapter);
+            adapters.push(SettlementResult {
+                message_id: adapter,
+                result: Ok(()),
+            });
         }
         drop(tracker);
         if !strictly_increasing {
@@ -420,7 +417,7 @@ impl ReaderRouter {
         &self,
         token: crate::OperationToken,
         result: Result<()>,
-        messages: Vec<(Bytes, Result<()>)>,
+        mut messages: Vec<SettlementResult>,
     ) {
         const MATCHED: u8 = 1;
         const SUCCESSFUL: u8 = 2;
@@ -438,8 +435,8 @@ impl ReaderRouter {
             let _ = wait.sender.send(Err(error));
             return;
         }
-        let mut results = Vec::with_capacity(messages.len());
-        for (position, (adapter, result)) in messages.into_iter().enumerate() {
+        for position in 0..messages.len() {
+            let adapter = &messages[position].message_id;
             let index = if position < wait.originals.len()
                 && wait.states[position] & MATCHED == 0
                 && &wait.originals[position][MESSAGE_ID_ENVELOPE_LEN..] == adapter.as_ref()
@@ -461,13 +458,10 @@ impl ReaderRouter {
                 return;
             };
             wait.states[index] |= MATCHED;
-            if result.is_ok() {
+            if messages[position].result.is_ok() {
                 wait.states[index] |= SUCCESSFUL;
             }
-            results.push(SettlementResult {
-                message_id: wait.originals[index].clone(),
-                result,
-            });
+            messages[position].message_id = wait.originals[index].clone();
         }
         if wait.states.iter().any(|state| state & MATCHED == 0) {
             let _ = wait.sender.send(Err(CoreError::Internal(
@@ -482,7 +476,7 @@ impl ReaderRouter {
             }
         }
         drop(tracker);
-        let _ = wait.sender.send(Ok(results));
+        let _ = wait.sender.send(Ok(messages));
     }
 
     fn message_id_sequence(message_id: &Bytes) -> u64 {

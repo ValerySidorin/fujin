@@ -290,6 +290,12 @@ pub struct ReaderMessage {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SettlementResult {
+    pub message_id: Bytes,
+    pub result: Result<()>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReaderEvent {
     /// Push-subscription delivery after readiness.
     Message(ReaderMessage),
@@ -303,7 +309,7 @@ pub enum ReaderEvent {
     SettlementComplete {
         token: OperationToken,
         result: Result<()>,
-        messages: Vec<(Bytes, Result<()>)>,
+        messages: Vec<SettlementResult>,
     },
     Terminal(Result<()>),
 }
@@ -326,7 +332,8 @@ pub trait Reader: Send + Sync + 'static {
     ///
     /// Returns an error when the operation cannot be accepted.
     fn fetch(&self, token: OperationToken, maximum: u32, with_headers: bool) -> Result<()>;
-    /// Accepts one ACK or NACK operation.
+    /// Accepts one ACK or NACK operation. `settlements` owns the adapter message IDs and is
+    /// returned through [`ReaderEvent::SettlementComplete`] after each result is populated.
     ///
     /// # Errors
     ///
@@ -335,7 +342,7 @@ pub trait Reader: Send + Sync + 'static {
         &self,
         token: OperationToken,
         kind: SettlementKind,
-        adapter_message_ids: Vec<Bytes>,
+        settlements: Vec<SettlementResult>,
     ) -> Result<()>;
     fn adapter_message_id_prefix_len(&self) -> usize;
     fn auto_settle(&self) -> bool;

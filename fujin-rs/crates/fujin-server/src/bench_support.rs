@@ -411,15 +411,12 @@ impl Reader for SessionBenchReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        adapter_message_ids: Vec<Bytes>,
+        settlements: Vec<fujin_core::SettlementResult>,
     ) -> fujin_core::Result<()> {
         self.events.emit(ReaderEvent::SettlementComplete {
             token,
             result: Ok(()),
-            messages: adapter_message_ids
-                .into_iter()
-                .map(|message_id| (message_id, Ok(())))
-                .collect(),
+            messages: settlements,
         });
         Ok(())
     }

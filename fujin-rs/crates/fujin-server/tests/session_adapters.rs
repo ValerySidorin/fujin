@@ -218,15 +218,12 @@ impl Reader for TestReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        adapter_message_ids: Vec<Bytes>,
+        settlements: Vec<fujin_core::SettlementResult>,
     ) -> Result<()> {
         self.events.emit(ReaderEvent::SettlementComplete {
             token,
             result: Ok(()),
-            messages: adapter_message_ids
-                .into_iter()
-                .map(|message_id| (message_id, Ok(())))
-                .collect(),
+            messages: settlements,
         });
         Ok(())
     }

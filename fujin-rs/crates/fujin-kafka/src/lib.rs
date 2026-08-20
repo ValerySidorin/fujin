@@ -16,7 +16,8 @@ mod implementation {
         AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, CompiledConnector,
         Completion, CompletionSink, ConnectorDescriptor, ConnectorRuntime, CoreError, Header,
         Message, NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink, ReaderMessage,
-        ReadyCallback, Result, RouteProfile, SettlementKind, SettlementProfile, Writer,
+        ReadyCallback, Result, RouteProfile, SettlementKind, SettlementProfile, SettlementResult,
+        Writer,
     };
     use parking_lot::Mutex;
     use rdkafka::{
@@ -438,7 +439,7 @@ mod implementation {
         Settle {
             token: OperationToken,
             kind: SettlementKind,
-            message_ids: Vec<Bytes>,
+            settlements: Vec<SettlementResult>,
         },
     }
 
@@ -505,7 +506,7 @@ mod implementation {
             &self,
             token: OperationToken,
             kind: SettlementKind,
-            adapter_message_ids: Vec<Bytes>,
+            settlements: Vec<SettlementResult>,
         ) -> Result<()> {
             if kind == SettlementKind::Nack {
                 return Err(CoreError::OperationUnsupported);
@@ -514,7 +515,7 @@ mod implementation {
                 .send(ReaderCommand::Settle {
                     token,
                     kind,
-                    message_ids: adapter_message_ids,
+                    settlements,
                 })
                 .map_err(|_| CoreError::Closed)
         }
@@ -585,17 +586,15 @@ mod implementation {
                                 result,
                             });
                         }
-                        ReaderCommand::Settle { token, kind, message_ids } => {
+                        ReaderCommand::Settle { token, kind, mut settlements } => {
                             debug_assert_eq!(kind, SettlementKind::Ack);
-                            let mut results = Vec::with_capacity(message_ids.len());
-                            for message_id in message_ids {
-                                let result = commit_message_id(&consumer, &message_id);
-                                results.push((message_id, result));
+                            for settlement in &mut settlements {
+                                settlement.result = commit_message_id(&consumer, &settlement.message_id);
                             }
                             events.emit(ReaderEvent::SettlementComplete {
                                 token,
                                 result: Ok(()),
-                                messages: results,
+                                messages: settlements,
                             });
                         }
                     }

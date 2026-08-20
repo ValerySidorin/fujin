@@ -1,6 +1,6 @@
 mod reader;
 
-pub use reader::{Delivery, FetchResult, NoSessionEvents, SessionEventSink, SettlementResult};
+pub use reader::{Delivery, FetchResult, NoSessionEvents, SessionEventSink};
 
 use reader::{FetchKey, ReaderSlot};
 
