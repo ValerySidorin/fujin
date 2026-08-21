@@ -23,7 +23,7 @@ use quinn::{Connection, Endpoint};
 use rcgen::{CertifiedKey, generate_simple_self_signed};
 use rustls::RootCertStore;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     sync::{Barrier, Semaphore, mpsc},
     task::{JoinHandle, JoinSet},
     time::{sleep, timeout},
@@ -761,9 +761,7 @@ async fn read_fetch_response(
         if !auto_settle {
             message_ids.push(Bytes::from(read_bytes(stream).await?));
         }
-        if read_bytes(stream).await?.len() != payload_size {
-            bail!("invalid FETCH payload");
-        }
+        read_bytes_length(stream, payload_size).await?;
     }
     Ok((subscription_id, message_ids))
 }
@@ -787,9 +785,7 @@ async fn read_subscription_message(
     if with_headers {
         read_headers(stream).await?;
     }
-    if read_bytes(stream).await?.len() != payload_size {
-        bail!("invalid subscription payload");
-    }
+    read_bytes_length(stream, payload_size).await?;
     Ok(())
 }
 
@@ -809,7 +805,7 @@ async fn read_settlement_response(
         );
     }
     for _ in 0..count {
-        let _message_id = read_bytes(stream).await?;
+        skip_bytes(stream).await?;
         if stream.read_u8().await? != 0 {
             bail!("settlement result failed");
         }
@@ -822,10 +818,54 @@ async fn read_headers(stream: &mut BufferedStream) -> Result<()> {
     if strings != 2 {
         bail!("invalid header string count {strings}");
     }
-    let key = read_bytes(stream).await?;
-    let value = read_bytes(stream).await?;
-    if key != b"content-type" || value != b"application/octet-stream" {
-        bail!("invalid headers");
+    read_expected_bytes(stream, b"content-type").await?;
+    read_expected_bytes(stream, b"application/octet-stream").await?;
+    Ok(())
+}
+
+async fn read_bytes_length(stream: &mut BufferedStream, expected: usize) -> Result<()> {
+    let length = usize::try_from(stream.read_u32().await?)?;
+    if length != expected {
+        bail!("byte field length: got {length}, want {expected}");
+    }
+    skip_exact(stream, length).await
+}
+
+async fn read_expected_bytes(stream: &mut BufferedStream, expected: &[u8]) -> Result<()> {
+    let length = usize::try_from(stream.read_u32().await?)?;
+    if length != expected.len() {
+        bail!("byte field length: got {length}, want {}", expected.len());
+    }
+    let mut offset = 0;
+    while offset < expected.len() {
+        let available = stream.fill_buf().await?;
+        if available.is_empty() {
+            bail!("unexpected EOF while reading byte field");
+        }
+        let read = available.len().min(expected.len() - offset);
+        if available[..read] != expected[offset..offset + read] {
+            bail!("invalid byte field");
+        }
+        stream.consume(read);
+        offset += read;
+    }
+    Ok(())
+}
+
+async fn skip_bytes(stream: &mut BufferedStream) -> Result<()> {
+    let length = usize::try_from(stream.read_u32().await?)?;
+    skip_exact(stream, length).await
+}
+
+async fn skip_exact(stream: &mut BufferedStream, mut remaining: usize) -> Result<()> {
+    while remaining > 0 {
+        let available = stream.fill_buf().await?;
+        if available.is_empty() {
+            bail!("unexpected EOF while skipping byte field");
+        }
+        let read = available.len().min(remaining);
+        stream.consume(read);
+        remaining -= read;
     }
     Ok(())
 }
