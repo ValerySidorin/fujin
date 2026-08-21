@@ -1122,7 +1122,9 @@ impl Decoder {
                         correlation_id,
                         subscription_id,
                         remaining,
-                        message_ids: Vec::new(),
+                        message_ids: Vec::with_capacity(
+                            usize::try_from(remaining).map_err(|_| NativeError::FrameTooLarge)?,
+                        ),
                     };
                 }
                 State::SettlementMessageLength {
