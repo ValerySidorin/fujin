@@ -6,12 +6,13 @@ FROM rust:${RUST_VERSION}-alpine AS builder
 
 ARG VERSION=dev
 
-RUN apk add --no-cache build-base cmake perl pkgconf
+RUN apk add --no-cache build-base cmake curl-dev perl pkgconf protobuf-dev
 WORKDIR /app
 
 COPY fujin-rs/Cargo.toml fujin-rs/Cargo.lock ./fujin-rs/
 COPY fujin-rs/crates ./fujin-rs/crates
 COPY fujin-rs/plugins ./fujin-rs/plugins
+COPY public/proto ./public/proto
 
 RUN FUJIN_VERSION="${VERSION}" cargo build \
     --manifest-path fujin-rs/Cargo.toml \

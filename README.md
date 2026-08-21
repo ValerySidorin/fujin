@@ -210,6 +210,7 @@ the release container, Compose, and Helm all select the Rust runtime.
 - [gRPC Proto Definition](public/proto/grpc/v1/fujin.proto)
 - [Development Configuration](config.dev.yaml)
 - [Deployment Configuration](examples/assets/config/config.deployment.example.yaml)
+- [Rust Migration Evidence](fujin-rs/migration_report.md)
 
 ## License
 
