@@ -15,8 +15,8 @@ full = ["tcp", "unix", "websocket", "quic", "grpc"]
 tcp = []
 unix = []
 websocket = ["dep:tokio-tungstenite"]
-quic = ["dep:quinn", "dep:rustls", "dep:rustls-pemfile"]
-grpc = ["dep:fujin-proto", "dep:tonic", "dep:tonic-prost", "dep:tokio-stream"]
+quic = ["dep:quinn", "dep:rustls"]
+grpc = ["dep:fujin-proto", "dep:tonic", "dep:tonic-health", "dep:tonic-prost", "dep:tokio-stream"]
 bench = ["full", "dep:rcgen"]
 bench-alloc = ["bench", "dep:stats_alloc"]
 
@@ -34,12 +34,14 @@ futures-util.workspace = true
 quinn = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 rcgen = { workspace = true, optional = true }
-rustls-pemfile = { workspace = true, optional = true }
+rustls-pemfile.workspace = true
 stats_alloc = { workspace = true, optional = true }
 tokio.workspace = true
 tokio-stream = { workspace = true, optional = true }
+tokio-rustls.workspace = true
 tokio-tungstenite = { workspace = true, optional = true }
 tokio-util.workspace = true
+tonic-health = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 tonic-prost = { workspace = true, optional = true }
 tracing.workspace = true

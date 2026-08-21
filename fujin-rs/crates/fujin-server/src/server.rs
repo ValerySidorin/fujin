@@ -14,7 +14,7 @@ use anyhow::{Context, Result, bail};
 #[cfg(feature = "websocket")]
 use bytes::{Buf, Bytes, BytesMut};
 use fujin_core::{BindMiddlewareRunner, Catalog};
-use fujin_runtime::fujin_server_config::ServerConfig;
+use fujin_runtime::fujin_server_config::{ServerConfig, TlsConfig};
 #[cfg(feature = "websocket")]
 use futures_util::{Sink, Stream};
 #[cfg(feature = "websocket")]
@@ -24,6 +24,7 @@ use tokio::{
     sync::mpsc,
     task::JoinSet,
 };
+use tokio_rustls::{TlsAcceptor, rustls};
 #[cfg(feature = "websocket")]
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
@@ -51,7 +52,7 @@ pub async fn serve(
         let _ = listener;
         #[cfg(feature = "tcp")]
         listeners.spawn(serve_tcp(
-            listener.listen,
+            listener,
             Arc::clone(&catalog),
             Arc::clone(&bind_middlewares),
             config.build.clone(),
@@ -81,7 +82,7 @@ pub async fn serve(
         let _ = listener;
         #[cfg(feature = "websocket")]
         listeners.spawn(serve_websocket(
-            listener.listen,
+            listener,
             Arc::clone(&catalog),
             Arc::clone(&bind_middlewares),
             config.build.clone(),
@@ -111,7 +112,7 @@ pub async fn serve(
         let _ = listener;
         #[cfg(feature = "grpc")]
         listeners.spawn(serve_grpc(
-            listener.listen,
+            listener,
             Arc::clone(&catalog),
             Arc::clone(&bind_middlewares),
             shutdown.clone(),
@@ -208,16 +209,20 @@ fn listener_stopped(
 
 #[cfg(feature = "tcp")]
 async fn serve_tcp(
-    address: String,
+    config: fujin_runtime::fujin_server_config::TcpListenerConfig,
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
     ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind(&address)
+    let tls = match config.tls.as_ref() {
+        Some(config) => Some(load_tls_acceptor(config).await?),
+        None => None,
+    };
+    let listener = tokio::net::TcpListener::bind(&config.listen)
         .await
-        .with_context(|| format!("bind TCP listener {address:?}"))?;
+        .with_context(|| format!("bind TCP listener {:?}", config.listen))?;
     let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
@@ -230,16 +235,30 @@ async fn serve_tcp(
                 let bind_middlewares = Arc::clone(&bind_middlewares);
                 let build = build.clone();
                 let session_shutdown = shutdown.clone();
+                let tls = tls.clone();
                 sessions.spawn(async move {
-                    fujin_native::run_with_shutdown(
-                        stream,
-                        catalog,
-                        bind_middlewares,
-                        build,
-                        session_shutdown.cancelled_owned(),
-                    )
-                    .await
-                    .with_context(|| format!("TCP session {peer}"))
+                    if let Some(tls) = tls {
+                        let stream = tls.accept(stream).await.context("accept TCP TLS")?;
+                        fujin_native::run_with_shutdown(
+                            stream,
+                            catalog,
+                            bind_middlewares,
+                            build,
+                            session_shutdown.cancelled_owned(),
+                        )
+                        .await
+                        .with_context(|| format!("TCP TLS session {peer}"))
+                    } else {
+                        fujin_native::run_with_shutdown(
+                            stream,
+                            catalog,
+                            bind_middlewares,
+                            build,
+                            session_shutdown.cancelled_owned(),
+                        )
+                        .await
+                        .with_context(|| format!("TCP session {peer}"))
+                    }
                 });
             }
         }
@@ -304,17 +323,34 @@ async fn drain_sessions(sessions: &mut JoinSet<Result<()>>) -> Result<()> {
 }
 
 #[cfg(feature = "websocket")]
+#[derive(Clone)]
+struct WebSocketPolicy {
+    path: Arc<str>,
+    allowed_origins: Arc<[String]>,
+    max_message_bytes: usize,
+}
+
+#[cfg(feature = "websocket")]
 async fn serve_websocket(
-    address: String,
+    config: fujin_runtime::fujin_server_config::WebSocketListenerConfig,
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
     ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind(&address)
+    let tls = match config.tls.as_ref() {
+        Some(config) => Some(load_tls_acceptor(config).await?),
+        None => None,
+    };
+    let listener = tokio::net::TcpListener::bind(&config.listen)
         .await
-        .with_context(|| format!("bind WebSocket listener {address:?}"))?;
+        .with_context(|| format!("bind WebSocket listener {:?}", config.listen))?;
+    let policy = WebSocketPolicy {
+        path: config.path.into(),
+        allowed_origins: config.allowed_origins.into(),
+        max_message_bytes: config.max_message_bytes,
+    };
     let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
@@ -326,15 +362,15 @@ async fn serve_websocket(
                 let bind_middlewares = Arc::clone(&bind_middlewares);
                 let build = build.clone();
                 let session_shutdown = shutdown.clone();
+                let tls = tls.clone();
+                let policy = policy.clone();
                 sessions.spawn(async move {
-                    websocket_session(
-                        stream,
-                        catalog,
-                        bind_middlewares,
-                        build,
-                        session_shutdown,
-                    )
-                    .await
+                    if let Some(tls) = tls {
+                        let stream = tls.accept(stream).await.context("accept WebSocket TLS")?;
+                        websocket_session(stream, catalog, bind_middlewares, build, session_shutdown, policy).await
+                    } else {
+                        websocket_session(stream, catalog, bind_middlewares, build, session_shutdown, policy).await
+                    }
                     .with_context(|| format!("WebSocket session {peer}"))
                 });
             }
@@ -499,22 +535,46 @@ where
 }
 
 #[cfg(feature = "websocket")]
-async fn websocket_session(
-    stream: tokio::net::TcpStream,
+#[allow(clippy::result_large_err)]
+async fn websocket_session<S>(
+    stream: S,
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
-) -> Result<()> {
-    use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+    policy: WebSocketPolicy,
+) -> Result<()>
+where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    use tokio_tungstenite::tungstenite::{
+        handshake::server::{Request, Response},
+        http::StatusCode,
+        protocol::WebSocketConfig,
+    };
 
     let config = WebSocketConfig::default()
         .read_buffer_size(8 * 1024)
         .write_buffer_size(8 * 1024)
-        .max_write_buffer_size(4 * 1024 * 1024)
-        .max_message_size(Some(4 * 1024 * 1024))
-        .max_frame_size(Some(4 * 1024 * 1024));
-    let websocket = tokio_tungstenite::accept_async_with_config(stream, Some(config))
+        .max_write_buffer_size(policy.max_message_bytes)
+        .max_message_size(Some(policy.max_message_bytes))
+        .max_frame_size(Some(policy.max_message_bytes));
+    let callback = move |request: &Request, response: Response| {
+        if request.uri().path() != policy.path.as_ref() {
+            return Err(websocket_rejection(
+                StatusCode::NOT_FOUND,
+                "WebSocket path not found",
+            ));
+        }
+        if !websocket_origin_allowed(request, &policy.allowed_origins) {
+            return Err(websocket_rejection(
+                StatusCode::FORBIDDEN,
+                "WebSocket origin denied",
+            ));
+        }
+        Ok(response)
+    };
+    let websocket = tokio_tungstenite::accept_hdr_async_with_config(stream, callback, Some(config))
         .await
         .context("upgrade WebSocket")?;
     fujin_native::run_with_shutdown(
@@ -528,6 +588,48 @@ async fn websocket_session(
     .map_err(anyhow::Error::from)
 }
 
+#[cfg(feature = "websocket")]
+fn websocket_rejection(
+    status: tokio_tungstenite::tungstenite::http::StatusCode,
+    message: &str,
+) -> tokio_tungstenite::tungstenite::handshake::server::ErrorResponse {
+    let mut response = tokio_tungstenite::tungstenite::handshake::server::ErrorResponse::new(Some(
+        message.to_owned(),
+    ));
+    *response.status_mut() = status;
+    response
+}
+
+#[cfg(feature = "websocket")]
+fn websocket_origin_allowed(
+    request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+    allowed: &[String],
+) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    let Some(origin) = request
+        .headers()
+        .get("origin")
+        .and_then(|value| value.to_str().ok())
+    else {
+        return true;
+    };
+    if allowed.iter().any(|value| value == "*") {
+        return true;
+    }
+    let Ok(parsed) = origin.parse::<tokio_tungstenite::tungstenite::http::Uri>() else {
+        return false;
+    };
+    if parsed.scheme().is_none() || parsed.authority().is_none() {
+        return false;
+    }
+    let origin = origin.trim_end_matches('/');
+    allowed
+        .iter()
+        .any(|value| value.trim_end_matches('/') == origin)
+}
+
 #[cfg(feature = "quic")]
 async fn serve_quic(
     config: fujin_runtime::fujin_server_config::QuicListenerConfig,
@@ -539,9 +641,11 @@ async fn serve_quic(
 ) -> Result<()> {
     let address = config.listen.parse().context("parse QUIC listen address")?;
     let server_config = quic_server_config(
-        &config.certificate,
-        &config.private_key,
+        &config.tls.certificate,
+        &config.tls.private_key,
         config.max_incoming_streams,
+        config.max_idle_timeout,
+        config.keepalive_period,
     )
     .await?;
     let endpoint = quinn::Endpoint::server(server_config, address).context("bind QUIC endpoint")?;
@@ -604,8 +708,11 @@ async fn quic_server_config(
     certificate: &str,
     private_key: &str,
     max_incoming_streams: u32,
+    max_idle_timeout: Option<std::time::Duration>,
+    keepalive_period: Option<std::time::Duration>,
 ) -> Result<quinn::ServerConfig> {
     use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+    install_rustls_provider();
 
     let certificate_bytes = tokio::fs::read(certificate)
         .await
@@ -628,6 +735,10 @@ async fn quic_server_config(
         .context("build QUIC server config")?;
     let mut transport = quinn::TransportConfig::default();
     transport.max_concurrent_bidi_streams(quinn::VarInt::from_u32(max_incoming_streams));
+    if let Some(timeout) = max_idle_timeout {
+        transport.max_idle_timeout(Some(timeout.try_into().context("QUIC max idle timeout")?));
+    }
+    transport.keep_alive_interval(keepalive_period);
     server.transport_config(Arc::new(transport));
     Ok(server)
 }
@@ -674,9 +785,83 @@ impl tokio::io::AsyncWrite for QuicStream {
     }
 }
 
+fn install_rustls_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+async fn load_tls_acceptor(config: &TlsConfig) -> Result<TlsAcceptor> {
+    install_rustls_provider();
+    let certificate = tokio::fs::read(&config.certificate)
+        .await
+        .with_context(|| format!("read TLS certificate {:?}", config.certificate))?;
+    let private_key = tokio::fs::read(&config.private_key)
+        .await
+        .with_context(|| format!("read TLS private key {:?}", config.private_key))?;
+    let certificates = rustls_pemfile::certs(&mut certificate.as_slice())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .context("parse TLS certificate")?;
+    if certificates.is_empty() {
+        bail!("TLS certificate contains no certificates");
+    }
+    let private_key = rustls_pemfile::private_key(&mut private_key.as_slice())
+        .context("parse TLS private key")?
+        .context("TLS private key file contains no key")?;
+    let builder = rustls::ServerConfig::builder();
+    let server = if config.require_client_certificate {
+        let directory = config
+            .client_certificates
+            .as_ref()
+            .context("client certificate directory missing")?;
+        let roots_pem = load_pem_directory(directory).await?;
+        let mut roots = rustls::RootCertStore::empty();
+        for certificate in rustls_pemfile::certs(&mut roots_pem.as_slice()) {
+            roots
+                .add(certificate.context("parse client CA certificate")?)
+                .context("add client CA certificate")?;
+        }
+        if roots.is_empty() {
+            bail!("client certificate directory contains no certificates");
+        }
+        let verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(roots))
+            .build()
+            .context("build client certificate verifier")?;
+        builder
+            .with_client_cert_verifier(verifier)
+            .with_single_cert(certificates, private_key)
+            .context("configure TLS identity")?
+    } else {
+        builder
+            .with_no_client_auth()
+            .with_single_cert(certificates, private_key)
+            .context("configure TLS identity")?
+    };
+    Ok(TlsAcceptor::from(Arc::new(server)))
+}
+
+async fn load_pem_directory(directory: &str) -> Result<Vec<u8>> {
+    let mut entries = tokio::fs::read_dir(directory)
+        .await
+        .with_context(|| format!("read certificate directory {directory:?}"))?;
+    let mut paths = Vec::new();
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_type().await?.is_file() {
+            paths.push(entry.path());
+        }
+    }
+    paths.sort();
+    let mut output = Vec::new();
+    for path in paths {
+        let bytes = tokio::fs::read(&path)
+            .await
+            .with_context(|| format!("read certificate {}", path.display()))?;
+        output.extend_from_slice(&bytes);
+        output.push(b'\n');
+    }
+    Ok(output)
+}
+
 #[cfg(feature = "grpc")]
 async fn serve_grpc(
-    address: String,
+    config: fujin_runtime::fujin_server_config::GrpcListenerConfig,
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
@@ -684,16 +869,71 @@ async fn serve_grpc(
 ) -> Result<()> {
     use fujin_proto::fujin::v1 as pb;
     use tokio_stream::wrappers::TcpListenerStream;
-    use tonic::transport::Server;
+    use tonic::transport::{Identity, Server, ServerTlsConfig};
 
-    let listener = tokio::net::TcpListener::bind(&address)
+    let listener = tokio::net::TcpListener::bind(&config.listen)
         .await
-        .with_context(|| format!("bind gRPC listener {address:?}"))?;
+        .with_context(|| format!("bind gRPC listener {:?}", config.listen))?;
+    let mut builder = Server::builder()
+        .max_concurrent_streams(config.max_concurrent_streams)
+        .initial_stream_window_size(config.initial_window_size)
+        .initial_connection_window_size(config.initial_connection_window_size)
+        .http2_keepalive_interval(config.server_keepalive.time)
+        .http2_keepalive_timeout(config.server_keepalive.timeout);
+    if let Some(age) = config.server_keepalive.max_connection_age {
+        builder = builder.max_connection_age(age);
+    }
+    if let Some(grace) = config.server_keepalive.max_connection_age_grace {
+        builder = builder.max_connection_age_grace(grace);
+    }
+    if let Some(tls) = config.tls.as_ref() {
+        let certificate = tokio::fs::read(&tls.certificate)
+            .await
+            .with_context(|| format!("read gRPC certificate {:?}", tls.certificate))?;
+        let private_key = tokio::fs::read(&tls.private_key)
+            .await
+            .with_context(|| format!("read gRPC private key {:?}", tls.private_key))?;
+        let mut tls_config =
+            ServerTlsConfig::new().identity(Identity::from_pem(certificate, private_key));
+        if let Some(directory) = tls.client_certificates.as_ref() {
+            tls_config = tls_config.client_ca_root(tonic::transport::Certificate::from_pem(
+                load_pem_directory(directory).await?,
+            ));
+        }
+        builder = builder
+            .tls_config(tls_config)
+            .context("configure gRPC TLS")?;
+    }
+    let mut service = pb::fujin_service_server::FujinServiceServer::new(crate::GrpcService::new(
+        catalog,
+        bind_middlewares,
+    ));
+    if let Some(limit) = config.max_recv_message_size {
+        service = service.max_decoding_message_size(limit);
+    }
+    if let Some(limit) = config.max_send_message_size {
+        service = service.max_encoding_message_size(limit);
+    }
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<pb::fujin_service_server::FujinServiceServer<crate::GrpcService>>()
+        .await;
     let _ = ready.send(());
-    let service = crate::GrpcService::new(catalog, bind_middlewares);
-    Server::builder()
-        .add_service(pb::fujin_service_server::FujinServiceServer::new(service))
-        .serve_with_incoming_shutdown(TcpListenerStream::new(listener), shutdown.cancelled_owned())
+    let shutdown_health = health_reporter.clone();
+    builder
+        .add_service(health_service)
+        .add_service(service)
+        .serve_with_incoming_shutdown(TcpListenerStream::new(listener), async move {
+            shutdown.cancelled().await;
+            shutdown_health
+                .set_not_serving::<
+                    pb::fujin_service_server::FujinServiceServer<crate::GrpcService>,
+                >()
+                .await;
+            shutdown_health
+                .set_service_status("", tonic_health::ServingStatus::NotServing)
+                .await;
+        })
         .await
         .context("serve gRPC")
 }
@@ -813,8 +1053,9 @@ mod tests {
         serve(
             ServerConfig {
                 build: "test".into(),
-                tcp: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
+                tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
                     listen: "127.0.0.1:0".into(),
+                    tls: None,
                 }),
                 ..ServerConfig::default()
             },
@@ -847,8 +1088,9 @@ mod tests {
             serve(
                 ServerConfig {
                     build: "test".into(),
-                    tcp: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
+                    tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
                         listen: tcp_address.to_string(),
+                        tls: None,
                     }),
                     health: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
                         listen: health_address.to_string(),
@@ -891,6 +1133,155 @@ mod tests {
         catalog.close().await.expect("close catalog");
     }
 }
+#[cfg(all(test, feature = "bench"))]
+mod tls_tests {
+    use std::sync::Arc;
+
+    use rcgen::{CertifiedKey, generate_simple_self_signed};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn configured_tls_acceptor_completes_a_real_handshake() {
+        let CertifiedKey { cert, signing_key } =
+            generate_simple_self_signed(vec!["localhost".into()]).expect("generate certificate");
+        let prefix =
+            std::env::temp_dir().join(format!("fujin-rust-tls-test-{}", std::process::id()));
+        let certificate_path = prefix.with_extension("cert.pem");
+        let private_key_path = prefix.with_extension("key.pem");
+        tokio::fs::write(&certificate_path, cert.pem())
+            .await
+            .expect("write certificate");
+        tokio::fs::write(&private_key_path, signing_key.serialize_pem())
+            .await
+            .expect("write private key");
+        let acceptor = load_tls_acceptor(&TlsConfig {
+            certificate: certificate_path.display().to_string(),
+            private_key: private_key_path.display().to_string(),
+            client_certificates: None,
+            require_client_certificate: false,
+        })
+        .await
+        .expect("load TLS acceptor");
+        let mut roots = rustls::RootCertStore::empty();
+        roots
+            .add(cert.der().clone())
+            .expect("trust test certificate");
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(
+            rustls::ClientConfig::builder()
+                .with_root_certificates(roots)
+                .with_no_client_auth(),
+        ));
+        let server_name = rustls::pki_types::ServerName::try_from("localhost")
+            .expect("server name")
+            .to_owned();
+        let (client_io, server_io) = tokio::io::duplex(1024);
+        let (client, server) = tokio::join!(
+            connector.connect(server_name, client_io),
+            acceptor.accept(server_io)
+        );
+        let mut client = client.expect("client TLS handshake");
+        let mut server = server.expect("server TLS handshake");
+        client.write_all(b"fujin").await.expect("write TLS bytes");
+        client.flush().await.expect("flush TLS bytes");
+        let mut received = [0_u8; 5];
+        server
+            .read_exact(&mut received)
+            .await
+            .expect("read TLS bytes");
+        assert_eq!(&received, b"fujin");
+        tokio::fs::remove_file(certificate_path)
+            .await
+            .expect("remove certificate");
+        tokio::fs::remove_file(private_key_path)
+            .await
+            .expect("remove private key");
+    }
+}
+
+#[cfg(all(test, feature = "grpc"))]
+mod grpc_health_tests {
+    use std::{collections::BTreeMap, sync::Arc};
+
+    use fujin_core::{Catalog, DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    use tokio::time::{Duration, timeout};
+    use tokio_util::sync::CancellationToken;
+    use tonic_health::pb::{
+        HealthCheckRequest, health_check_response::ServingStatus, health_client::HealthClient,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn grpc_health_reports_fujin_service_serving() {
+        let probe = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("reserve gRPC address");
+        let address = probe.local_addr().expect("gRPC address");
+        drop(probe);
+        let registry = Arc::new(DescriptorRegistry::default());
+        let compiler = Arc::new(GenerationCompiler::new(
+            registry,
+            Arc::new(NoConnectorMiddleware),
+        ));
+        let catalog = Arc::new(
+            Catalog::compile(&BTreeMap::new(), compiler)
+                .await
+                .expect("compile empty catalog"),
+        );
+        let shutdown = CancellationToken::new();
+        let (ready_tx, mut ready_rx) = mpsc::unbounded_channel();
+        let server_catalog = Arc::clone(&catalog);
+        let server_shutdown = shutdown.clone();
+        let server = tokio::spawn(async move {
+            serve_grpc(
+                fujin_runtime::fujin_server_config::GrpcListenerConfig {
+                    listen: address.to_string(),
+                    max_concurrent_streams: None,
+                    max_recv_message_size: None,
+                    max_send_message_size: None,
+                    initial_window_size: None,
+                    initial_connection_window_size: None,
+                    server_keepalive:
+                        fujin_runtime::fujin_server_config::ServerKeepAliveConfig::default(),
+                    tls: None,
+                },
+                server_catalog,
+                Arc::new(fujin_core::NoBindMiddleware),
+                server_shutdown,
+                ready_tx,
+            )
+            .await
+        });
+        timeout(Duration::from_secs(5), ready_rx.recv())
+            .await
+            .expect("gRPC listener readiness timeout")
+            .expect("gRPC listener readiness");
+        let channel = tonic::transport::Endpoint::from_shared(format!("http://{address}"))
+            .expect("health endpoint")
+            .connect()
+            .await
+            .expect("connect health channel");
+        let mut client = HealthClient::new(channel);
+        let response = client
+            .check(HealthCheckRequest {
+                service: "fujin.v1.FujinService".into(),
+            })
+            .await
+            .expect("check Fujin gRPC health")
+            .into_inner();
+        assert_eq!(response.status, ServingStatus::Serving as i32);
+        drop(client);
+        shutdown.cancel();
+        timeout(Duration::from_secs(5), server)
+            .await
+            .expect("gRPC shutdown timeout")
+            .expect("gRPC server task")
+            .expect("gRPC server");
+        catalog.close().await.expect("close catalog");
+    }
+}
 
 #[cfg(all(test, feature = "bench"))]
 mod websocket_tests {
@@ -905,6 +1296,37 @@ mod websocket_tests {
     };
     use tokio_tungstenite::{client_async, tungstenite::Message};
 
+    #[test]
+    fn websocket_origin_policy_allows_configured_origin_and_rejects_others() {
+        let allowed = ["https://console.example".to_owned()];
+        let allowed_request = tokio_tungstenite::tungstenite::handshake::server::Request::builder()
+            .uri("/fujin")
+            .header("origin", "https://console.example/")
+            .body(())
+            .expect("allowed request");
+        let denied_request = tokio_tungstenite::tungstenite::handshake::server::Request::builder()
+            .uri("/fujin")
+            .header("origin", "https://attacker.example")
+            .body(())
+            .expect("denied request");
+
+        assert!(websocket_origin_allowed(&allowed_request, &allowed));
+        assert!(!websocket_origin_allowed(&denied_request, &allowed));
+    }
+
+    #[test]
+    fn websocket_origin_policy_allows_non_browser_clients_without_origin() {
+        let request = tokio_tungstenite::tungstenite::handshake::server::Request::builder()
+            .uri("/fujin")
+            .body(())
+            .expect("request without origin");
+
+        assert!(websocket_origin_allowed(
+            &request,
+            &["https://console.example".to_owned()]
+        ));
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn concurrent_disconnects_deliver_final_response() {
         const CLIENTS: usize = 32;
@@ -912,7 +1334,7 @@ mod websocket_tests {
         let catalog = nop_catalog().await.expect("compile nop catalog");
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
-            .expect("bind test listener");
+            .expect("bind test WebSocket listener");
         let address = listener.local_addr().expect("test listener address");
         let start = Arc::new(Barrier::new(CLIENTS + 1));
         let shutdown = CancellationToken::new();
@@ -934,6 +1356,11 @@ mod websocket_tests {
                     Arc::new(fujin_core::NoBindMiddleware),
                     "test".into(),
                     server_shutdown,
+                    WebSocketPolicy {
+                        path: Arc::<str>::from("/"),
+                        allowed_origins: Arc::<[String]>::from([]),
+                        max_message_bytes: 4 * 1024 * 1024,
+                    },
                 )
                 .await
             });

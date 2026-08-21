@@ -1146,8 +1146,9 @@ impl ServerHandle {
         let mut temporary_files = Vec::new();
         match transport {
             Transport::Tcp => {
-                config.tcp = Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
+                config.tcp = Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
                     listen: TCP_ADDRESS.into(),
+                    tls: None,
                 });
             }
             Transport::Unix => {
@@ -1156,9 +1157,15 @@ impl ServerHandle {
                 });
             }
             Transport::WebSocket => {
-                config.websocket = Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
-                    listen: WEBSOCKET_ADDRESS.into(),
-                });
+                config.websocket = Some(
+                    fujin_runtime::fujin_server_config::WebSocketListenerConfig {
+                        listen: WEBSOCKET_ADDRESS.into(),
+                        path: "/".into(),
+                        allowed_origins: Vec::new(),
+                        max_message_bytes: 4 * 1024 * 1024,
+                        tls: None,
+                    },
+                );
             }
             Transport::Quic => {
                 let CertifiedKey { cert, signing_key } =
@@ -1174,9 +1181,15 @@ impl ServerHandle {
                 temporary_files.push(private_key_path.clone());
                 config.quic = Some(fujin_runtime::fujin_server_config::QuicListenerConfig {
                     listen: QUIC_ADDRESS.into(),
-                    certificate: certificate_path.display().to_string(),
-                    private_key: private_key_path.display().to_string(),
+                    tls: fujin_runtime::fujin_server_config::TlsConfig {
+                        certificate: certificate_path.display().to_string(),
+                        private_key: private_key_path.display().to_string(),
+                        client_certificates: None,
+                        require_client_certificate: false,
+                    },
                     max_incoming_streams: 1024,
+                    max_idle_timeout: None,
+                    keepalive_period: None,
                 });
             }
         }
