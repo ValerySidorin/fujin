@@ -435,8 +435,8 @@ impl ReaderRouter {
             let _ = wait.sender.send(Err(error));
             return;
         }
-        for position in 0..messages.len() {
-            let adapter = &messages[position].message_id;
+        for (position, message) in messages.iter_mut().enumerate() {
+            let adapter = &message.message_id;
             let index = if position < wait.originals.len()
                 && wait.states[position] & MATCHED == 0
                 && &wait.originals[position][MESSAGE_ID_ENVELOPE_LEN..] == adapter.as_ref()
@@ -458,10 +458,10 @@ impl ReaderRouter {
                 return;
             };
             wait.states[index] |= MATCHED;
-            if messages[position].result.is_ok() {
+            if message.result.is_ok() {
                 wait.states[index] |= SUCCESSFUL;
             }
-            messages[position].message_id = wait.originals[index].clone();
+            message.message_id = wait.originals[index].clone();
         }
         if wait.states.iter().any(|state| state & MATCHED == 0) {
             let _ = wait.sender.send(Err(CoreError::Internal(
