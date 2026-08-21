@@ -9,7 +9,6 @@ use std::{
     },
 };
 
-use bytes::Bytes;
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
     Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime,
