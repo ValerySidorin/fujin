@@ -25,6 +25,9 @@ async fn main() -> Result<()> {
     registry
         .register("kafka_franz", fujin_kafka::descriptor())
         .context("register Kafka connector")?;
+    let plugin_paths = fujin_plugin_api::plugin_paths_from_env("FUJIN_CONNECTOR_PLUGINS");
+    let _connector_plugins = fujin_plugin_api::load_connector_plugins(plugin_paths, &registry)
+        .context("load connector plugins")?;
     let catalog = fujin_runtime::compile_catalog(&config, registry)
         .await
         .context("compile connector catalog")?;

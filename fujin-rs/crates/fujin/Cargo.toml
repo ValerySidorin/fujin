@@ -22,6 +22,7 @@ grpc = ["fujin-server/grpc"]
 [dependencies]
 anyhow.workspace = true
 fujin-core = { path = "../fujin-core" }
+fujin-plugin-api = { path = "../fujin-plugin-api" }
 fujin-kafka = { path = "../fujin-kafka", optional = true }
 fujin-runtime = { path = "../fujin-runtime" }
 fujin-server = { path = "../fujin-server", default-features = false }

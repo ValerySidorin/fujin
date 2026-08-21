@@ -1,0 +1,18 @@
+[package]
+name = "fujin-plugin-nop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+fujin-core = { path = "../../crates/fujin-core" }
+fujin-plugin-api = { path = "../../crates/fujin-plugin-api" }
+serde_json.workspace = true
