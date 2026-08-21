@@ -14,30 +14,30 @@ config:
     transports:
       - type: tcp
         settings:
-          addr: ":4850"
+          addr: 0.0.0.0:4850
   grpc:
     enabled: true
-    addr: ":4849"
+    addr: 0.0.0.0:4849
   health:
     enabled: true
-    addr: ":8080"
+    addr: 0.0.0.0:8080
   connectors: {}
   #  kafka_connector:
   #    type: kafka_franz
   #    settings:
   #      common:
   #        brokers: ["kafka:9092"]
-  #      clients:
+  #        properties: {}
+  #      routes:
   #        pub:
   #          produce_topic: my_topic
   #        sub:
   #          consume_topics: [my_topic]
   #          group: myapp
 
-# Log settings
+# Rust tracing filter.
 log:
-  level: INFO
-  type: json
+  level: info
 
 # Ports exposed by the container / Service
 ports:

@@ -72,6 +72,6 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           docker pull --platform linux/amd64 "$IMAGE"
-          output=$(docker run --rm --platform linux/amd64 "$IMAGE" 2>&1 || true)
+          output=$(docker run --rm --platform linux/amd64 "$IMAGE" --version)
           echo "$output"
           echo "$output" | grep -F "version: $VERSION"

@@ -3,6 +3,7 @@ use std::{env, sync::Arc};
 use anyhow::{Context, Result};
 use fujin_core::{DescriptorRegistry, NoBindMiddleware};
 use tokio_util::sync::CancellationToken;
+const BUILD_VERSION: &str = env!("FUJIN_BUILD_VERSION");
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -10,15 +11,19 @@ async fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let config_path = env::args()
-        .nth(1)
+    let argument = env::args().nth(1);
+    if argument.as_deref() == Some("--version") {
+        println!("version: {BUILD_VERSION}");
+        return Ok(());
+    }
+    let config_path = argument
         .or_else(|| env::var("FUJIN_CONFIG").ok())
         .unwrap_or_else(|| "config.yaml".to_owned());
     let config = fujin_runtime::load(&config_path)
         .await
         .with_context(|| format!("load Fujin configuration {config_path:?}"))?;
     let server_config = config
-        .server_config(env!("CARGO_PKG_VERSION"))
+        .server_config(BUILD_VERSION)
         .context("validate Fujin server configuration")?;
     let registry = Arc::new(DescriptorRegistry::default());
     #[cfg(feature = "kafka")]

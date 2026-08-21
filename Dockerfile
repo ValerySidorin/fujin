@@ -1,47 +1,37 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.25.1
+ARG RUST_VERSION=1.97.1
 
-FROM golang:${GO_VERSION}-alpine AS builder
+FROM rust:${RUST_VERSION}-alpine AS builder
 
-ARG FUJIN_CONFIGURATORS
-ARG FUJIN_CONNECTORS
-ARG FUJIN_TRANSPORTS
-ARG FUJIN_BIND_MIDDLEWARES
-ARG FUJIN_CONNECTOR_MIDDLEWARES
-ARG FUJIN_GO_TAGS=fujin,grpc
 ARG VERSION=dev
 
+RUN apk add --no-cache build-base cmake perl pkgconf
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
+COPY fujin-rs/Cargo.toml fujin-rs/Cargo.lock ./fujin-rs/
+COPY fujin-rs/crates ./fujin-rs/crates
+COPY fujin-rs/plugins ./fujin-rs/plugins
 
-COPY . .
+RUN FUJIN_VERSION="${VERSION}" cargo build \
+    --manifest-path fujin-rs/Cargo.toml \
+    --release \
+    -p fujin \
+    --features full \
+ && ./fujin-rs/target/release/fujin --version
 
-RUN apk add --no-cache bash dos2unix
+FROM alpine:3.22 AS runtime
 
-RUN chmod +x build.sh
+RUN apk add --no-cache ca-certificates libgcc libstdc++ \
+ && addgroup -S fujin \
+ && adduser -S -G fujin -h /nonexistent -s /sbin/nologin fujin
 
-# For Windows compatibility
-RUN dos2unix build.sh
+COPY --from=builder /app/fujin-rs/target/release/fujin /fujin
 
-RUN FUJIN_CONFIGURATORS="${FUJIN_CONFIGURATORS:-github.com/fujin-io/fujin/public/plugins/configurator/all}" \
-    FUJIN_CONNECTORS="${FUJIN_CONNECTORS:-github.com/fujin-io/fujin/public/plugins/connector/kafka/franz}" \
-    FUJIN_TRANSPORTS="${FUJIN_TRANSPORTS:-github.com/fujin-io/fujin/public/plugins/transport/all}" \
-    FUJIN_BIND_MIDDLEWARES="${FUJIN_BIND_MIDDLEWARES:-}" \
-    FUJIN_CONNECTOR_MIDDLEWARES="${FUJIN_CONNECTOR_MIDDLEWARES:-}" \
-    FUJIN_GO_TAGS="${FUJIN_GO_TAGS}" \
-    FUJIN_VERSION="${VERSION}" \
-    ./build.sh
-
-FROM scratch AS runtime
-
-WORKDIR /
-
-COPY --from=builder /app/bin/fujin /fujin
-
+USER fujin
+ENV FUJIN_CONFIG=/config/config.yaml \
+    RUST_LOG=info
 STOPSIGNAL SIGTERM
-EXPOSE 4850/tcp 4848/udp 4849/tcp 8080/tcp
+EXPOSE 4850/tcp 4848/udp 4849/tcp 4851/tcp 8080/tcp
 
 ENTRYPOINT ["/fujin"]

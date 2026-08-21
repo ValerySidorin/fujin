@@ -1,19 +1,39 @@
 fujin:
   transports:
     - type: tcp
+      settings:
+        addr: 0.0.0.0:4850
+    - type: quic
+      settings:
+        addr: 0.0.0.0:4848
+        max_incoming_streams: 1000
+        max_idle_timeout: 30s
+        keepalive_period: 10s
+        tls:
+          enabled: true
+          server_cert_pem_path: /certs/fujin.io.pem
+          server_key_pem_path: /certs/fujin.io-key.pem
+grpc:
+  enabled: true
+  addr: 0.0.0.0:4849
+health:
+  enabled: true
+  addr: 0.0.0.0:8080
 connectors:
   connector:
     type: kafka_franz
     settings:
       common:
-        brokers: [localhost:9092, localhost:9093, localhost:9094]
-        tls:
-          enabled: false
-          server_cert_pem_path: ./examples/assets/certs/fujin.io.pem
-          server_key_pem_path: ./examples/assets/certs/fujin.io-key.pem
+        brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
+        properties: {}
       routes:
         pub:
           produce_topic: my_pub_topic
+          properties:
+            allow.auto.create.topics: "true"
         sub:
           consume_topics: [my_pub_topic]
           group: fujin2
+          properties:
+            auto.offset.reset: earliest
+            allow.auto.create.topics: "true"

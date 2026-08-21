@@ -14,7 +14,9 @@ use anyhow::{Context, Result, bail};
 #[cfg(feature = "websocket")]
 use bytes::{Buf, Bytes, BytesMut};
 use fujin_core::{BindMiddlewareRunner, Catalog};
-use fujin_runtime::fujin_server_config::{ServerConfig, TlsConfig};
+use fujin_runtime::fujin_server_config::ServerConfig;
+#[cfg(any(feature = "tcp", feature = "websocket"))]
+use fujin_runtime::fujin_server_config::TlsConfig;
 #[cfg(feature = "websocket")]
 use futures_util::{Sink, Stream};
 #[cfg(feature = "websocket")]
@@ -24,7 +26,10 @@ use tokio::{
     sync::mpsc,
     task::JoinSet,
 };
-use tokio_rustls::{TlsAcceptor, rustls};
+#[cfg(any(feature = "tcp", feature = "websocket"))]
+use tokio_rustls::TlsAcceptor;
+#[cfg(any(feature = "tcp", feature = "websocket", feature = "quic"))]
+use tokio_rustls::rustls;
 #[cfg(feature = "websocket")]
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
@@ -785,9 +790,11 @@ impl tokio::io::AsyncWrite for QuicStream {
     }
 }
 
+#[cfg(any(feature = "tcp", feature = "websocket", feature = "quic"))]
 fn install_rustls_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
+#[cfg(any(feature = "tcp", feature = "websocket"))]
 async fn load_tls_acceptor(config: &TlsConfig) -> Result<TlsAcceptor> {
     install_rustls_provider();
     let certificate = tokio::fs::read(&config.certificate)
@@ -837,6 +844,7 @@ async fn load_tls_acceptor(config: &TlsConfig) -> Result<TlsAcceptor> {
     Ok(TlsAcceptor::from(Arc::new(server)))
 }
 
+#[cfg(any(feature = "tcp", feature = "websocket", feature = "grpc"))]
 async fn load_pem_directory(directory: &str) -> Result<Vec<u8>> {
     let mut entries = tokio::fs::read_dir(directory)
         .await

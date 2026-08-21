@@ -2,20 +2,11 @@
 
 APP_NAME := fujin
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+RUST_ROOT := fujin-rs
+RUST_FEATURES ?= full
+RUST_PROFILE ?= release
 
-FUJIN_PKG := github.com/fujin-io/fujin
-
-ALL_TAGS = fujin,grpc
-
-GO_BUILD_TAGS ?= ${ALL_TAGS}
-
-# Full plugin set for default build.
-CONFIGURATORS ?= github.com/fujin-io/fujin/public/plugins/configurator/all
-CONNECTORS ?= github.com/fujin-io/fujin/public/plugins/connector/all
-TRANSPORTS ?= github.com/fujin-io/fujin/public/plugins/transport/all
-BIND_MIDDLEWARES ?= github.com/fujin-io/fujin/public/plugins/middleware/bind/all
-CONNECTOR_MIDDLEWARES ?= github.com/fujin-io/fujin/public/plugins/middleware/connector/all
-
+GO_BUILD_TAGS ?= fujin,grpc
 BENCH_TIME ?= 1000000x
 BENCH_FUNC ?= Benchmark_Produce_32KBPayload_Nop_TCP
 
@@ -26,45 +17,39 @@ ifeq ($(OS),Windows_NT)
     RM := del /Q /F
     RMDIR := rmdir /S /Q
     MKDIR := mkdir
+    COPY := copy /Y
     PATHSEP := \\
-	BOOTCONF := set "FUJIN_CONFIGURATOR=yaml" && set "FUJIN_CONFIGURATOR_YAML_PATHS=./config.dev.yaml"
+    RUNCONF := set "FUJIN_CONFIG=./config.dev.yaml"
+    RUST_BUILD_ENV :=
 else
     DETECTED_OS := $(shell uname -s)
     BINARY_EXT :=
     RM := rm -f
     RMDIR := rm -rf
     MKDIR := mkdir -p
+    COPY := cp
     PATHSEP := /
-	BOOTCONF := export FUJIN_CONFIGURATOR=yaml && export FUJIN_CONFIGURATOR_YAML_PATHS=./config.dev.yaml
+    RUNCONF := FUJIN_CONFIG=./config.dev.yaml
+    ifeq ($(DETECTED_OS),Darwin)
+        RUST_BUILD_ENV := CPLUS_INCLUDE_PATH=$(shell xcrun --show-sdk-path)/usr/include/c++/v1
+    else
+        RUST_BUILD_ENV :=
+    endif
 endif
 
 BIN_DIR := bin
 BINARY := $(BIN_DIR)$(PATHSEP)$(APP_NAME)$(BINARY_EXT)
+RUST_BINARY := $(RUST_ROOT)$(PATHSEP)target$(PATHSEP)$(RUST_PROFILE)$(PATHSEP)$(APP_NAME)$(BINARY_EXT)
 
 .PHONY: all
 all: clean build run
 
-comma := ,
-# Build args (comma-separated)
-BUILDER_TR_ARGS := $(foreach c,$(subst $(comma), ,$(TRANSPORTS)),-transport $(c))
-BUILDER_CONF_ARGS := $(foreach c,$(subst $(comma), ,$(CONFIGURATORS)),-configurator $(c))
-BUILDER_CONN_ARGS := $(foreach c,$(subst $(comma), ,$(CONNECTORS)),-connector $(c))
-BUILDER_BIND_M_ARGS := $(foreach c,$(subst $(comma), ,$(BIND_MIDDLEWARES)),-bind-middleware $(c))
-BUILDER_CONN_M_ARGS := $(foreach c,$(subst $(comma), ,$(CONNECTOR_MIDDLEWARES)),-connector-middleware $(c))
-
 .PHONY: build
 build:
-	@echo "==> Building ${APP_NAME} for ${DETECTED_OS} (Version: ${VERSION}, Tags: [${GO_BUILD_TAGS}], Connectors: [${CONNECTORS}])"
-	@go run ./cmd/builder \
-		-local \
-		$(BUILDER_TR_ARGS) \
-		$(BUILDER_CONF_ARGS) \
-		$(BUILDER_CONN_ARGS) \
-		$(BUILDER_BIND_M_ARGS) \
-		$(BUILDER_CONN_M_ARGS) \
-		-tags "$(GO_BUILD_TAGS)" \
-		-ldflags "-X main.Version=$(VERSION)" \
-		-output ./$(BINARY)
+	@echo "==> Building ${APP_NAME} with Rust for ${DETECTED_OS} (Version: ${VERSION}, Features: [${RUST_FEATURES}])"
+	@$(RUST_BUILD_ENV) FUJIN_VERSION="$(VERSION)" cargo build --manifest-path $(RUST_ROOT)/Cargo.toml --profile $(RUST_PROFILE) -p fujin --features "$(RUST_FEATURES)"
+	@$(MKDIR) $(BIN_DIR)
+	@$(COPY) $(RUST_BINARY) $(BINARY)
 	@echo "==> Binary created: $(BINARY)"
 
 .PHONY: clean
@@ -79,50 +64,45 @@ endif
 .PHONY: run
 run:
 	@echo "==> Running"
-	@$(BOOTCONF) && $(BINARY)
+	@$(RUNCONF) $(BINARY)
 
 .PHONY: generate
 generate:
-	@echo "==> Generating gRPC code"
-	@cd public/proto && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative grpc/v1/fujin.proto
+	@echo "==> Regenerating Rust gRPC bindings"
+	@cargo build --manifest-path $(RUST_ROOT)/Cargo.toml -p fujin-proto
 
 .PHONY: test
 test:
-	@echo "==> Running tests"
-	@go test -v -tags=${GO_BUILD_TAGS} ./...
+	@echo "==> Running Rust tests"
+	@$(RUST_BUILD_ENV) cargo test --manifest-path $(RUST_ROOT)/Cargo.toml --workspace --all-features --all-targets
 
 .PHONY: cross-build
 cross-build:
-	@echo "==> Cross-compiling for Windows"
-	@GOOS=windows GOARCH=amd64 go build -tags=${GO_BUILD_TAGS} ./...
-	@echo "==> Cross-compiling for Linux"
-	@GOOS=linux GOARCH=amd64 go build -tags=${GO_BUILD_TAGS} ./...
-	@echo "==> Cross-compiling for Darwin (arm64)"
-	@GOOS=darwin GOARCH=arm64 go build -tags=${GO_BUILD_TAGS} ./...
-	@echo "==> All platforms OK"
+	@echo "==> Checking all Rust production features"
+	@$(RUST_BUILD_ENV) cargo check --manifest-path $(RUST_ROOT)/Cargo.toml --workspace --all-features --all-targets
+
+.PHONY: go-test-legacy
+go-test-legacy:
+	@go test -tags=${GO_BUILD_TAGS} ./...
 
 .PHONY: help
 help:
 	@echo "Fujin Makefile ($(DETECTED_OS))"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build [GO_BUILD_TAGS=\"tag1,tag2\"]  Build binary. Default GO_BUILD_TAGS=\"$(ALL_TAGS)\"."
-	@echo "  make run                                  Run binary."
-	@echo "  make clean                                Remove build artifacts."
-	@echo "  make test                                 Run all tests."
-	@echo "  make cross-build                          Verify cross-compilation (Windows, Linux, Darwin)."
-	@echo "  make bench                                Run benchmarks."
-	@echo "  make sdk-compat                           Build the server and verify fujin-go over native QUIC and gRPC."
+	@echo "  make build [RUST_FEATURES=full]       Build the production Rust binary."
+	@echo "  make run                              Run with ./config.dev.yaml."
+	@echo "  make clean                            Remove packaged binaries."
+	@echo "  make test                             Run the complete Rust workspace suite."
+	@echo "  make cross-build                      Check all Rust targets and features."
+	@echo "  make go-test-legacy                    Run the retained Go comparison suite."
+	@echo "  make rust-bench-report                 Generate the Rust benchmark report."
+	@echo "  make sdk-compat                        Verify the coordinated Go SDK."
 	@echo ""
 	@echo "Variables:"
-	@echo "  VERSION (default: git describe || dev) Version tag for builds."
-	@echo "  GO_BUILD_TAGS (default: $(ALL_TAGS))   Comma-separated Go build tags."
-	@echo "  CONFIGURATORS (default: all)           Comma-separated configurator names for builder."
-	@echo "  CONNECTORS (default: all)              Comma-separated connector names for builder."
-	@echo "  BIND_MIDDLEWARES (default: all)        Comma-separated bind middleware names for builder."
-	@echo "  CONNECTOR_MIDDLEWARES (default: all)   Comma-separated connector middleware names for builder."
-	@echo "  BOOTCONF (optional)                    Bootstrap config."
-	@echo "  FUJIN_GO_ROOT (default: ../fujin-go)    Path to the coordinated Go SDK checkout."
+	@echo "  VERSION (default: git describe || dev) Build version."
+	@echo "  RUST_FEATURES (default: full)           Cargo feature set."
+	@echo "  RUST_PROFILE (default: release)         Cargo profile."
 	@echo ""
 	@echo "Platform: $(DETECTED_OS)"
 	@echo "Binary: $(BINARY)"
@@ -243,6 +223,10 @@ bench:
 .PHONY: bench-report
 bench-report:
 	@test/generate_bench_report.sh
+
+.PHONY: rust-bench-report
+rust-bench-report:
+	@fujin-rs/scripts/generate_bench_report.sh
 
 # Broker-backed E2E tests. Targets set FUJIN_E2E=1 and require Docker.
 E2E_TIMEOUT ?= 120s

@@ -6,12 +6,10 @@ services:
       dockerfile: Dockerfile
       args:
         VERSION: ${BUILD_TAG:-v0.5.0}
-        FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/kafka/franz
-        FUJIN_GO_TAGS: fujin,grpc
     container_name: fujin
     environment:
-      FUJIN_CONFIGURATOR: yaml
-      FUJIN_CONFIGURATOR_YAML_PATHS: /config/config.yaml
+      FUJIN_CONFIG: /config/config.yaml
+      RUST_LOG: info
     ports:
       - "4850:4850"
       - "4848:4848/udp"

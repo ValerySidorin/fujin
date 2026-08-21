@@ -17,14 +17,10 @@
   image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
   imagePullPolicy: {{ .Values.image.pullPolicy }}
   env:
-    - name: FUJIN_CONFIGURATOR
-      value: "yaml"
-    - name: FUJIN_CONFIGURATOR_YAML_PATHS
+    - name: FUJIN_CONFIG
       value: "/config/config.yaml"
-    - name: FUJIN_LOG_LEVEL
-      value: {{ .Values.log.level | quote }}
-    - name: FUJIN_LOG_TYPE
-      value: {{ .Values.log.type | quote }}
+    - name: RUST_LOG
+      value: {{ .Values.log.level | lower | quote }}
   ports:
     - name: tcp
       containerPort: {{ .Values.ports.tcp }}
