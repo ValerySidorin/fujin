@@ -12,11 +12,13 @@ use anyhow::{Context, Result, bail};
 use bytes::Bytes;
 use fujin_core::{AcceptanceGuarantee, NoBindMiddleware};
 use fujin_native::{RequestCode, ResponseCode};
-use fujin_server::bench_support::{
-    BenchmarkOperation, SubscribeGate, benchmark_subscription_plan, session_bench_catalog,
-    validate_benchmark_shape,
+use fujin_server::{
+    NativeWebSocketStream,
+    bench_support::{
+        BenchmarkOperation, SubscribeGate, benchmark_subscription_plan, session_bench_catalog,
+        validate_benchmark_shape,
+    },
 };
-use futures_util::{SinkExt, StreamExt};
 use quinn::{Connection, Endpoint};
 use rcgen::{CertifiedKey, generate_simple_self_signed};
 use rustls::RootCertStore;
@@ -26,7 +28,6 @@ use tokio::{
     task::{JoinHandle, JoinSet},
     time::{sleep, timeout},
 };
-use tokio_tungstenite::tungstenite::Message as WebSocketMessage;
 use tokio_util::sync::CancellationToken;
 
 #[cfg(feature = "bench-alloc")]
@@ -413,17 +414,13 @@ trait BenchStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T> BenchStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
 type BoxStream = Box<dyn BenchStream>;
 type BufferedStream = BufReader<BoxStream>;
-
 struct NativeSession {
     stream: BufferedStream,
-    background: Vec<JoinHandle<()>>,
 }
-
 impl std::fmt::Debug for NativeSession {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("NativeSession")
-            .field("background_tasks", &self.background.len())
             .finish_non_exhaustive()
     }
 }
@@ -433,18 +430,15 @@ impl NativeSession {
         let mut session = match transport {
             Transport::Tcp => Self {
                 stream: BufReader::new(Box::new(connect_tcp(TCP_ADDRESS).await?)),
-                background: Vec::new(),
             },
             Transport::Unix => Self {
                 stream: BufReader::new(Box::new(connect_unix().await?)),
-                background: Vec::new(),
             },
             Transport::WebSocket => connect_websocket().await?,
             Transport::Quic => Self {
                 stream: BufReader::new(Box::new(
                     quic.context("QUIC client missing")?.open_stream().await?,
                 )),
-                background: Vec::new(),
             },
         };
         session.negotiate_and_bind().await?;
@@ -500,9 +494,6 @@ impl NativeSession {
         let response = self.stream.read_u8().await?;
         if response != ResponseCode::Disconnect as u8 {
             bail!("invalid DISCONNECT response {response}");
-        }
-        for task in &self.background {
-            task.abort();
         }
         Ok(())
     }
@@ -1012,49 +1003,8 @@ async fn connect_websocket() -> Result<NativeSession> {
     let (websocket, _) = tokio_tungstenite::client_async("ws://localhost/", stream)
         .await
         .context("connect WebSocket")?;
-    let (mut sink, mut source) = websocket.split();
-    let (client, bridge) = tokio::io::duplex(64 * 1024);
-    let (mut bridge_read, mut bridge_write) = tokio::io::split(bridge);
-    let inbound = tokio::spawn(async move {
-        while let Some(message) = source.next().await {
-            match message {
-                Ok(WebSocketMessage::Binary(bytes)) => {
-                    if bridge_write.write_all(&bytes).await.is_err() {
-                        return;
-                    }
-                }
-                Ok(WebSocketMessage::Close(_)) | Err(_) => return,
-                Ok(
-                    WebSocketMessage::Ping(_)
-                    | WebSocketMessage::Pong(_)
-                    | WebSocketMessage::Text(_)
-                    | WebSocketMessage::Frame(_),
-                ) => {}
-            }
-        }
-    });
-    let outbound = tokio::spawn(async move {
-        let mut buffer = vec![0_u8; 64 * 1024];
-        loop {
-            match bridge_read.read(&mut buffer).await {
-                Ok(0) | Err(_) => return,
-                Ok(read) => {
-                    if sink
-                        .send(WebSocketMessage::Binary(Bytes::copy_from_slice(
-                            &buffer[..read],
-                        )))
-                        .await
-                        .is_err()
-                    {
-                        return;
-                    }
-                }
-            }
-        }
-    });
     Ok(NativeSession {
-        stream: BufReader::new(Box::new(client)),
-        background: vec![inbound, outbound],
+        stream: BufReader::new(Box::new(NativeWebSocketStream::new(websocket))),
     })
 }
 

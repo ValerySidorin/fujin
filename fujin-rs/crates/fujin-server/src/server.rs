@@ -1,11 +1,24 @@
-#[cfg(any(all(feature = "unix", unix), feature = "quic"))]
+#[cfg(any(all(feature = "unix", unix), feature = "quic", feature = "websocket"))]
 use std::io;
 use std::sync::Arc;
+#[cfg(feature = "websocket")]
+use std::{
+    pin::Pin,
+    task::{Context as TaskContext, Poll, ready},
+};
 
 use anyhow::{Context, Result, bail};
+#[cfg(feature = "websocket")]
+use bytes::{Buf, Bytes, BytesMut};
 use fujin_core::{BindMiddlewareRunner, Catalog};
 use fujin_runtime::fujin_server_config::ServerConfig;
+#[cfg(feature = "websocket")]
+use futures_util::{Sink, Stream};
+#[cfg(feature = "websocket")]
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::task::JoinSet;
+#[cfg(feature = "websocket")]
+use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
 
 /// Runs every configured listener until shutdown or a terminal listener failure.
@@ -279,19 +292,158 @@ async fn serve_websocket(
 
 #[cfg(feature = "websocket")]
 #[derive(Debug)]
-enum WebSocketCompletion {
-    Native(Result<()>),
-    Inbound(Result<()>),
-    Outbound(Result<()>),
-    Shutdown,
+pub struct NativeWebSocketStream<S> {
+    websocket: WebSocketStream<S>,
+    pending: Bytes,
+    input_closed: bool,
+    pending_write: bool,
 }
 
 #[cfg(feature = "websocket")]
-type WebSocketNativeTask =
-    tokio::task::JoinHandle<std::result::Result<(), fujin_native::NativeError>>;
+impl<S> NativeWebSocketStream<S> {
+    pub fn new(websocket: WebSocketStream<S>) -> Self {
+        Self {
+            websocket,
+            pending: Bytes::new(),
+            input_closed: false,
+            pending_write: false,
+        }
+    }
+
+    fn websocket_error(error: tokio_tungstenite::tungstenite::Error) -> io::Error {
+        io::Error::other(error)
+    }
+}
 
 #[cfg(feature = "websocket")]
-type WebSocketBridgeTask = tokio::task::JoinHandle<Result<()>>;
+impl<S> AsyncRead for NativeWebSocketStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if self.pending_write {
+            match Pin::new(&mut self.websocket).poll_flush(context) {
+                Poll::Ready(Ok(())) => self.pending_write = false,
+                Poll::Ready(Err(error)) => {
+                    return Poll::Ready(Err(Self::websocket_error(error)));
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+        loop {
+            if !self.pending.is_empty() {
+                let read = self.pending.len().min(buffer.remaining());
+                buffer.put_slice(&self.pending[..read]);
+                self.pending.advance(read);
+                return Poll::Ready(Ok(()));
+            }
+            if self.input_closed {
+                return Poll::Ready(Ok(()));
+            }
+            match ready!(Pin::new(&mut self.websocket).poll_next(context)) {
+                Some(Ok(Message::Binary(bytes))) => self.pending = bytes,
+                Some(Ok(Message::Close(_))) | None => {
+                    self.input_closed = true;
+                }
+                Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
+                Some(Ok(Message::Text(_) | Message::Frame(_))) => {
+                    self.input_closed = true;
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "only binary WebSocket messages are valid",
+                    )));
+                }
+                Some(Err(error)) => return Poll::Ready(Err(Self::websocket_error(error))),
+            }
+        }
+    }
+}
+
+#[cfg(feature = "websocket")]
+impl<S> AsyncWrite for NativeWebSocketStream<S>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        if buffer.is_empty() {
+            return Poll::Ready(Ok(0));
+        }
+        if self.pending_write {
+            ready!(Pin::new(&mut self.websocket).poll_flush(context))
+                .map_err(Self::websocket_error)?;
+            self.pending_write = false;
+        }
+        ready!(Pin::new(&mut self.websocket).poll_ready(context)).map_err(Self::websocket_error)?;
+        Pin::new(&mut self.websocket)
+            .start_send(Message::Binary(Bytes::copy_from_slice(buffer)))
+            .map_err(Self::websocket_error)?;
+        self.pending_write = true;
+        Poll::Ready(Ok(buffer.len()))
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffers: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let length = buffers.iter().try_fold(0_usize, |length, buffer| {
+            length.checked_add(buffer.len()).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "WebSocket write overflow")
+            })
+        })?;
+        if length == 0 {
+            return Poll::Ready(Ok(0));
+        }
+        if self.pending_write {
+            ready!(Pin::new(&mut self.websocket).poll_flush(context))
+                .map_err(Self::websocket_error)?;
+            self.pending_write = false;
+        }
+        ready!(Pin::new(&mut self.websocket).poll_ready(context)).map_err(Self::websocket_error)?;
+        let mut message = BytesMut::with_capacity(length);
+        for buffer in buffers {
+            message.extend_from_slice(buffer);
+        }
+        Pin::new(&mut self.websocket)
+            .start_send(Message::Binary(message.freeze()))
+            .map_err(Self::websocket_error)?;
+        self.pending_write = true;
+        Poll::Ready(Ok(length))
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        true
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, context: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+        match Pin::new(&mut self.websocket).poll_flush(context) {
+            Poll::Ready(Ok(())) => {
+                self.pending_write = false;
+                Poll::Ready(Ok(()))
+            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(Self::websocket_error(error))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+    ) -> Poll<io::Result<()>> {
+        ready!(self.as_mut().poll_flush(context))?;
+        Pin::new(&mut self.websocket)
+            .poll_close(context)
+            .map_err(Self::websocket_error)
+    }
+}
 
 #[cfg(feature = "websocket")]
 async fn websocket_session(
@@ -301,9 +453,7 @@ async fn websocket_session(
     build: String,
     shutdown: CancellationToken,
 ) -> Result<()> {
-    use futures_util::{SinkExt, StreamExt};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio_tungstenite::tungstenite::{Message, protocol::WebSocketConfig};
+    use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
     let config = WebSocketConfig::default()
         .read_buffer_size(8 * 1024)
@@ -314,121 +464,15 @@ async fn websocket_session(
     let websocket = tokio_tungstenite::accept_async_with_config(stream, Some(config))
         .await
         .context("upgrade WebSocket")?;
-    let (mut websocket_sink, mut websocket_source) = websocket.split();
-    let (native_stream, bridge) = tokio::io::duplex(64 * 1024);
-    let (mut bridge_read, mut bridge_write) = tokio::io::split(bridge);
-    let session_shutdown = shutdown.child_token();
-    let native_shutdown = session_shutdown.clone();
-    let mut native = tokio::spawn(async move {
-        fujin_native::run_with_shutdown(
-            native_stream,
-            catalog,
-            bind_middlewares,
-            build,
-            native_shutdown.cancelled_owned(),
-        )
-        .await
-    });
-    let mut inbound = tokio::spawn(async move {
-        while let Some(message) = websocket_source.next().await {
-            match message.context("read WebSocket message")? {
-                Message::Binary(bytes) => bridge_write
-                    .write_all(&bytes)
-                    .await
-                    .context("forward WebSocket input")?,
-                Message::Close(_) => break,
-                Message::Ping(_) | Message::Pong(_) => {}
-                Message::Text(_) | Message::Frame(_) => {
-                    bail!("only binary WebSocket messages are valid")
-                }
-            }
-        }
-        bridge_write
-            .shutdown()
-            .await
-            .context("close WebSocket input")
-    });
-    let mut outbound = tokio::spawn(async move {
-        let mut buffer = vec![0_u8; 64 * 1024];
-        loop {
-            let read = bridge_read
-                .read(&mut buffer)
-                .await
-                .context("read native WebSocket output")?;
-            if read == 0 {
-                websocket_sink
-                    .close()
-                    .await
-                    .context("close WebSocket output")?;
-                return Ok::<(), anyhow::Error>(());
-            }
-            websocket_sink
-                .send(Message::Binary(bytes::Bytes::copy_from_slice(
-                    &buffer[..read],
-                )))
-                .await
-                .context("send WebSocket output")?;
-        }
-    });
-
-    let completed = tokio::select! {
-        result = &mut native => WebSocketCompletion::Native(
-            result.context("join native WebSocket session")?.map_err(anyhow::Error::from),
-        ),
-        result = &mut inbound => WebSocketCompletion::Inbound(
-            result.context("join WebSocket input")?,
-        ),
-        result = &mut outbound => WebSocketCompletion::Outbound(
-            result.context("join WebSocket output")?,
-        ),
-        () = shutdown.cancelled() => WebSocketCompletion::Shutdown,
-    };
-    finish_websocket_session(completed, session_shutdown, native, inbound, outbound).await
-}
-
-#[cfg(feature = "websocket")]
-async fn finish_websocket_session(
-    completed: WebSocketCompletion,
-    session_shutdown: CancellationToken,
-    native: WebSocketNativeTask,
-    inbound: WebSocketBridgeTask,
-    outbound: WebSocketBridgeTask,
-) -> Result<()> {
-    session_shutdown.cancel();
-    match completed {
-        WebSocketCompletion::Native(native_result) => {
-            inbound.abort();
-            let outbound_result = outbound.await.context("join WebSocket output cleanup")?;
-            native_result?;
-            outbound_result
-        }
-        WebSocketCompletion::Inbound(inbound_result) => {
-            outbound.abort();
-            let native_result = native
-                .await
-                .context("join native WebSocket cleanup")?
-                .map_err(anyhow::Error::from);
-            inbound_result?;
-            native_result
-        }
-        WebSocketCompletion::Outbound(outbound_result) => {
-            inbound.abort();
-            let native_result = native
-                .await
-                .context("join native WebSocket cleanup")?
-                .map_err(anyhow::Error::from);
-            outbound_result?;
-            native_result
-        }
-        WebSocketCompletion::Shutdown => {
-            inbound.abort();
-            outbound.abort();
-            native
-                .await
-                .context("join native WebSocket shutdown")?
-                .map_err(anyhow::Error::from)
-        }
-    }
+    fujin_native::run_with_shutdown(
+        NativeWebSocketStream::new(websocket),
+        catalog,
+        bind_middlewares,
+        build,
+        shutdown.cancelled_owned(),
+    )
+    .await
+    .map_err(anyhow::Error::from)
 }
 
 #[cfg(feature = "quic")]

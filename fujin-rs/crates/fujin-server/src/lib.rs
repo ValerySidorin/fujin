@@ -11,3 +11,7 @@ mod server;
 pub use grpc::{GrpcOutput, GrpcService, GrpcSession};
 
 pub use server::serve;
+
+#[cfg(feature = "websocket")]
+#[doc(hidden)]
+pub use server::NativeWebSocketStream;
