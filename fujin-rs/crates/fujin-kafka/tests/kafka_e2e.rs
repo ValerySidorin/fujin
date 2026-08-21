@@ -21,7 +21,7 @@ impl CompletionSink for CompletionChannel {
 
 #[derive(Debug)]
 enum SessionEvent {
-    Delivery(fujin_core::Delivery),
+    Delivery(u8, fujin_core::Delivery),
     Terminal(fujin_core::CoreError),
 }
 
@@ -29,8 +29,10 @@ enum SessionEvent {
 struct EventChannel(mpsc::UnboundedSender<SessionEvent>);
 
 impl SessionEventSink for EventChannel {
-    fn delivery(&self, delivery: fujin_core::Delivery) {
-        let _ = self.0.send(SessionEvent::Delivery(delivery));
+    fn delivery(&self, subscription_id: u8, delivery: fujin_core::Delivery) {
+        let _ = self
+            .0
+            .send(SessionEvent::Delivery(subscription_id, delivery));
     }
 
     fn subscription_terminal(&self, _subscription_id: u8, error: fujin_core::CoreError) {
@@ -144,11 +146,11 @@ async fn kafka_produce_subscribe_settle_and_transaction() {
         .await
         .expect("Kafka delivery deadline")
         .expect("Kafka session event");
-    let delivery = match event {
-        SessionEvent::Delivery(delivery) => delivery,
+    let (delivered_subscription_id, delivery) = match event {
+        SessionEvent::Delivery(subscription_id, delivery) => (subscription_id, delivery),
         SessionEvent::Terminal(error) => panic!("Kafka subscription terminated: {error}"),
     };
-    assert_eq!(delivery.subscription_id, subscription_id);
+    assert_eq!(delivered_subscription_id, subscription_id);
     assert_eq!(
         delivery.payload,
         Bytes::from_static(b"broker-backed-payload")

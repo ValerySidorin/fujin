@@ -282,10 +282,10 @@ pub enum SettlementKind {
 pub type ReadyCallback = Box<dyn FnOnce() -> Result<()> + Send + 'static>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReaderMessage {
+pub struct Delivery {
+    pub message_id: Option<Bytes>,
+    pub headers: Option<Headers>,
     pub payload: Bytes,
-    pub headers: Headers,
-    pub adapter_message_id: Bytes,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -297,12 +297,12 @@ pub struct SettlementResult {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReaderEvent {
     /// Push-subscription delivery after readiness.
-    Message(ReaderMessage),
+    Message(Delivery),
     /// One complete bounded fetch result. `reported_count` must equal `messages.len()`.
     FetchComplete {
         token: OperationToken,
         reported_count: u32,
-        messages: Vec<ReaderMessage>,
+        messages: Vec<Delivery>,
         result: Result<()>,
     },
     SettlementComplete {

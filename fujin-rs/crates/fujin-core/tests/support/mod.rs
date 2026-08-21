@@ -14,7 +14,7 @@ use fujin_core::{
     Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime,
     ConnectorsConfig, CoreError, Delivery, DescriptorRegistry, GenerationCompiler, Message,
     NackEffect, NoConnectorMiddleware, OperationToken, Reader, ReaderEvent, ReaderEventSink,
-    ReaderMessage, ReadyCallback, Result, RouteProfile, SessionEventSink, SettlementKind, Writer,
+    ReadyCallback, Result, RouteProfile, SessionEventSink, SettlementKind, Writer,
 };
 use parking_lot::Mutex;
 use serde_json::Value;
@@ -33,12 +33,12 @@ pub struct WriterPlan {
 #[derive(Clone, Debug)]
 pub struct FetchPlan {
     pub reported_count: u32,
-    pub messages: Vec<ReaderMessage>,
+    pub messages: Vec<Delivery>,
     pub error: Option<CoreError>,
 }
 
 impl FetchPlan {
-    pub fn success(messages: Vec<ReaderMessage>) -> Self {
+    pub fn success(messages: Vec<Delivery>) -> Self {
         Self {
             reported_count: u32::try_from(messages.len()).expect("test fetch count"),
             messages,
@@ -56,7 +56,7 @@ pub struct SettlementPlan {
 #[derive(Clone, Debug, Default)]
 pub struct ReaderPlan {
     pub ready_error: Option<CoreError>,
-    pub subscription_messages: Vec<ReaderMessage>,
+    pub subscription_messages: Vec<Delivery>,
     pub terminal: Option<CoreError>,
     pub fetches: VecDeque<FetchPlan>,
     pub settlements: VecDeque<SettlementPlan>,
@@ -489,12 +489,12 @@ impl Reader for TestReader {
 
 #[derive(Debug, Default)]
 pub struct SessionRecorder {
-    deliveries: Mutex<Vec<Delivery>>,
+    deliveries: Mutex<Vec<(u8, Delivery)>>,
     terminals: Mutex<Vec<(u8, CoreError)>>,
 }
 
 impl SessionRecorder {
-    pub fn deliveries(&self) -> Vec<Delivery> {
+    pub fn deliveries(&self) -> Vec<(u8, Delivery)> {
         self.deliveries.lock().clone()
     }
 
@@ -504,8 +504,8 @@ impl SessionRecorder {
 }
 
 impl SessionEventSink for SessionRecorder {
-    fn delivery(&self, delivery: Delivery) {
-        self.deliveries.lock().push(delivery);
+    fn delivery(&self, subscription_id: u8, delivery: Delivery) {
+        self.deliveries.lock().push((subscription_id, delivery));
     }
 
     fn subscription_terminal(&self, subscription_id: u8, error: CoreError) {

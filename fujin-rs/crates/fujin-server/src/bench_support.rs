@@ -11,10 +11,10 @@ use std::{
 use bytes::Bytes;
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
-    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime,
+    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime, Delivery,
     DescriptorRegistry, GenerationCompiler, Header, Message, NackEffect, OperationToken, Reader,
-    ReaderEvent, ReaderEventSink, ReaderMessage, ReadyCallback, RouteProfile, SettlementKind,
-    SettlementProfile, Writer,
+    ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile, SettlementKind, SettlementProfile,
+    Writer,
 };
 use parking_lot::Mutex;
 use tokio::sync::{Notify, Semaphore};
@@ -332,18 +332,16 @@ struct SessionBenchReader {
 }
 
 impl SessionBenchReader {
-    fn message(&self, with_headers: bool) -> ReaderMessage {
-        ReaderMessage {
+    fn message(&self, with_headers: bool) -> Delivery {
+        Delivery {
             payload: self.payload.clone(),
-            headers: if with_headers {
+            headers: with_headers.then(|| {
                 vec![Header {
                     key: Bytes::from_static(b"content-type"),
                     value: Bytes::from_static(b"application/octet-stream"),
                 }]
-            } else {
-                Vec::new()
-            },
-            adapter_message_id: Bytes::from_static(b"sub"),
+            }),
+            message_id: (!self.auto_settle).then(|| Bytes::from_static(b"sub")),
         }
     }
 }
@@ -371,17 +369,15 @@ impl Reader for SessionBenchReader {
                 } else if closed.is_cancelled() {
                     return;
                 }
-                events.emit(ReaderEvent::Message(ReaderMessage {
+                events.emit(ReaderEvent::Message(Delivery {
                     payload: payload.clone(),
-                    headers: if with_headers {
+                    headers: with_headers.then(|| {
                         vec![Header {
                             key: Bytes::from_static(b"content-type"),
                             value: Bytes::from_static(b"application/octet-stream"),
                         }]
-                    } else {
-                        Vec::new()
-                    },
-                    adapter_message_id: Bytes::from_static(b"sub"),
+                    }),
+                    message_id: Some(Bytes::from_static(b"sub")),
                 }));
             }
         });

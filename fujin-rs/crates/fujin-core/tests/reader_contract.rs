@@ -10,25 +10,23 @@ use std::{
 
 use bytes::Bytes;
 use fujin_core::{
-    CoreError, Header, Message, NoBindMiddleware, OperationToken, ReaderMessage, SessionCore,
+    CoreError, Delivery, Header, Message, NoBindMiddleware, OperationToken, SessionCore,
     SessionEventSink,
 };
 use support::{
     CompletionRecorder, FetchPlan, ReaderPlan, SessionRecorder, SettlementPlan, catalog_and_state,
 };
 
-fn reader_message(payload: &'static [u8], adapter_id: u8, with_headers: bool) -> ReaderMessage {
-    ReaderMessage {
+fn reader_message(payload: &'static [u8], adapter_id: u8, with_headers: bool) -> Delivery {
+    Delivery {
         payload: Bytes::from_static(payload),
-        headers: if with_headers {
+        headers: with_headers.then(|| {
             vec![Header {
                 key: Bytes::from_static(b"key"),
                 value: Bytes::from_static(b"value"),
             }]
-        } else {
-            Vec::new()
-        },
-        adapter_message_id: Bytes::from(vec![adapter_id]),
+        }),
+        message_id: Some(Bytes::from(vec![adapter_id])),
     }
 }
 
@@ -75,10 +73,10 @@ async fn subscribe_emits_success_before_delivery_and_reuses_id_after_failed_setu
 
     let deliveries = events.deliveries();
     assert_eq!(deliveries.len(), 1);
-    assert_eq!(deliveries[0].subscription_id, 0);
-    assert_eq!(deliveries[0].payload, Bytes::from_static(b"payload"));
-    assert!(deliveries[0].message_id.is_some());
-    assert_eq!(deliveries[0].headers.as_ref().map(Vec::len), Some(1));
+    assert_eq!(deliveries[0].0, 0);
+    assert_eq!(deliveries[0].1.payload, Bytes::from_static(b"payload"));
+    assert!(deliveries[0].1.message_id.is_some());
+    assert_eq!(deliveries[0].1.headers.as_ref().map(Vec::len), Some(1));
     assert!(matches!(
         events.terminals().as_slice(),
         [(0, CoreError::Unavailable(_))]

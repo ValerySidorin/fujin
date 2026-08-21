@@ -134,8 +134,8 @@ impl CompletionSink for GrpcSink {
 }
 
 impl SessionEventSink for GrpcSink {
-    fn delivery(&self, delivery: Delivery) {
-        self.send_response(delivery_response(delivery));
+    fn delivery(&self, subscription_id: u8, delivery: Delivery) {
+        self.send_response(delivery_response(subscription_id, delivery));
     }
 
     fn subscription_terminal(&self, _subscription_id: u8, error: CoreError) {
@@ -694,10 +694,10 @@ fn subscribe_response(
     }
 }
 
-fn delivery_response(delivery: Delivery) -> pb::fujin_response::Response {
+fn delivery_response(subscription_id: u8, delivery: Delivery) -> pb::fujin_response::Response {
     match delivery.headers {
         Some(headers) => pb::fujin_response::Response::Hmessage(pb::HMessage {
-            subscription_id: u32::from(delivery.subscription_id),
+            subscription_id: u32::from(subscription_id),
             message_id: delivery
                 .message_id
                 .map_or_else(Vec::new, |value| value.to_vec()),
@@ -705,7 +705,7 @@ fn delivery_response(delivery: Delivery) -> pb::fujin_response::Response {
             payload: delivery.payload.to_vec(),
         }),
         None => pb::fujin_response::Response::Message(pb::Message {
-            subscription_id: u32::from(delivery.subscription_id),
+            subscription_id: u32::from(subscription_id),
             message_id: delivery
                 .message_id
                 .map_or_else(Vec::new, |value| value.to_vec()),

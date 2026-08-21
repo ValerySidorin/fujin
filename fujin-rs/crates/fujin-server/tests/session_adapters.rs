@@ -12,10 +12,10 @@ use std::{
 use bytes::Bytes;
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
-    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime,
+    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime, Delivery,
     DescriptorRegistry, GenerationCompiler, Header, NackEffect, NoBindMiddleware, OperationToken,
-    Reader, ReaderEvent, ReaderEventSink, ReaderMessage, ReadyCallback, Result, RouteProfile,
-    SettlementKind, SettlementProfile, Writer,
+    Reader, ReaderEvent, ReaderEventSink, ReadyCallback, Result, RouteProfile, SettlementKind,
+    SettlementProfile, Writer,
 };
 use fujin_native::{RequestCode, ResponseCode};
 use fujin_proto::fujin::v1 as pb;
@@ -244,18 +244,16 @@ impl Reader for TestReader {
     }
 }
 
-fn reader_message(payload: &'static [u8], with_headers: bool) -> ReaderMessage {
-    ReaderMessage {
+fn reader_message(payload: &'static [u8], with_headers: bool) -> Delivery {
+    Delivery {
         payload: Bytes::from_static(payload),
-        headers: if with_headers {
+        headers: with_headers.then(|| {
             vec![Header {
                 key: Bytes::from_static(b"key"),
                 value: Bytes::from_static(b"value"),
             }]
-        } else {
-            Vec::new()
-        },
-        adapter_message_id: Bytes::from_static(b"a"),
+        }),
+        message_id: Some(Bytes::from_static(b"a")),
     }
 }
 

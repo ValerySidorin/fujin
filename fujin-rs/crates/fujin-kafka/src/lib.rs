@@ -14,8 +14,8 @@ mod implementation {
     use bytes::{BufMut, Bytes, BytesMut};
     use fujin_core::{
         AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, CompiledConnector,
-        Completion, CompletionSink, ConnectorDescriptor, ConnectorRuntime, CoreError, Header,
-        Message, NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink, ReaderMessage,
+        Completion, CompletionSink, ConnectorDescriptor, ConnectorRuntime, CoreError, Delivery,
+        Header, Message, NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink,
         ReadyCallback, Result, RouteProfile, SettlementKind, SettlementProfile, SettlementResult,
         Writer,
     };
@@ -626,7 +626,7 @@ mod implementation {
         message: &rdkafka::message::BorrowedMessage<'_>,
         with_headers: bool,
         auto_settle: bool,
-    ) -> Result<ReaderMessage> {
+    ) -> Result<Delivery> {
         let headers = if with_headers {
             message.headers().map_or_else(Vec::new, |headers| {
                 (0..headers.count())
@@ -642,13 +642,17 @@ mod implementation {
         } else {
             Vec::new()
         };
-        Ok(ReaderMessage {
+        Ok(Delivery {
             payload: Bytes::copy_from_slice(message.payload().unwrap_or_default()),
-            headers,
-            adapter_message_id: if auto_settle {
-                Bytes::new()
+            headers: with_headers.then_some(headers),
+            message_id: if auto_settle {
+                None
             } else {
-                encode_message_id(message.topic(), message.partition(), message.offset())?
+                Some(encode_message_id(
+                    message.topic(),
+                    message.partition(),
+                    message.offset(),
+                )?)
             },
         })
     }

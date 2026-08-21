@@ -191,8 +191,8 @@ impl CompletionSink for AdapterSink {
 }
 
 impl SessionEventSink for AdapterSink {
-    fn delivery(&self, delivery: fujin_core::Delivery) {
-        self.send_frame(encode::delivery(&delivery));
+    fn delivery(&self, subscription_id: u8, delivery: fujin_core::Delivery) {
+        self.send_frame(encode::delivery(subscription_id, &delivery));
     }
 
     fn subscription_terminal(&self, _subscription_id: u8, error: CoreError) {

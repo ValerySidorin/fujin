@@ -141,7 +141,7 @@ pub(crate) fn settlement(
     Ok(output.freeze())
 }
 
-pub(crate) fn delivery(delivery: &Delivery) -> Result<Bytes, NativeError> {
+pub(crate) fn delivery(subscription_id: u8, delivery: &Delivery) -> Result<Bytes, NativeError> {
     let code = if delivery.headers.is_some() {
         ResponseCode::HMessage
     } else {
@@ -149,7 +149,7 @@ pub(crate) fn delivery(delivery: &Delivery) -> Result<Bytes, NativeError> {
     };
     let mut output = BytesMut::with_capacity(checked_add(2, delivery_body_wire_len(delivery)?)?);
     output.put_u8(code as u8);
-    output.put_u8(delivery.subscription_id);
+    output.put_u8(subscription_id);
     put_delivery_body(&mut output, delivery)?;
     Ok(output.freeze())
 }

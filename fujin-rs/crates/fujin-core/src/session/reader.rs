@@ -11,8 +11,8 @@ use std::{
 use tokio::sync::oneshot;
 
 use crate::{
-    AckGranularity, Capabilities, CoreError, Header, NackEffect, Reader, ReaderEvent,
-    ReaderEventSink, ReaderMessage, Result, RouteProfile, SettlementKind, SettlementResult,
+    AckGranularity, Capabilities, CoreError, Delivery, NackEffect, Reader, ReaderEvent,
+    ReaderEventSink, Result, RouteProfile, SettlementKind, SettlementResult,
     connector::validate_headers,
 };
 
@@ -20,14 +20,6 @@ use super::SessionCore;
 
 const MESSAGE_ID_VERSION: u8 = 1;
 const MESSAGE_ID_ENVELOPE_LEN: usize = 9;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Delivery {
-    pub subscription_id: u8,
-    pub message_id: Option<Bytes>,
-    pub headers: Option<Vec<Header>>,
-    pub payload: Bytes,
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FetchResult {
@@ -38,7 +30,7 @@ pub struct FetchResult {
 type SettlementReceiver = oneshot::Receiver<Result<Vec<SettlementResult>>>;
 
 pub trait SessionEventSink: Send + Sync + 'static {
-    fn delivery(&self, delivery: Delivery);
+    fn delivery(&self, subscription_id: u8, delivery: Delivery);
     fn subscription_terminal(&self, subscription_id: u8, error: CoreError);
 }
 
@@ -46,7 +38,7 @@ pub trait SessionEventSink: Send + Sync + 'static {
 pub struct NoSessionEvents;
 
 impl SessionEventSink for NoSessionEvents {
-    fn delivery(&self, _delivery: Delivery) {}
+    fn delivery(&self, _subscription_id: u8, _delivery: Delivery) {}
     fn subscription_terminal(&self, _subscription_id: u8, _error: CoreError) {}
 }
 
@@ -320,37 +312,32 @@ impl ReaderRouter {
         }
     }
 
-    fn delivery(&self, message: ReaderMessage) -> Result<Delivery> {
-        let headers = if self.with_headers {
-            validate_headers(&message.headers)?;
-            Some(message.headers)
-        } else if message.headers.is_empty() {
-            None
-        } else {
-            return Err(CoreError::Internal(
-                "connector delivered headers to a non-header reader".into(),
-            ));
-        };
-        let message_id = if self.auto_settle {
-            None
+    fn scope_delivery(&self, delivery: &mut Delivery) -> Result<()> {
+        match (&delivery.headers, self.with_headers) {
+            (Some(headers), true) => validate_headers(headers)?,
+            (None, false) => {}
+            _ => {
+                return Err(CoreError::Internal(
+                    "connector delivery header variant does not match reader".into(),
+                ));
+            }
+        }
+        if self.auto_settle {
+            delivery.message_id = None;
         } else {
             let sequence = self.next_sequence.fetch_add(1, Ordering::Relaxed);
             if sequence == 0 {
                 return Err(CoreError::SubscriptionIdsExhausted);
             }
+            let adapter_message_id = delivery.message_id.take().unwrap_or_default();
             let mut encoded =
-                BytesMut::with_capacity(MESSAGE_ID_ENVELOPE_LEN + message.adapter_message_id.len());
+                BytesMut::with_capacity(MESSAGE_ID_ENVELOPE_LEN + adapter_message_id.len());
             encoded.put_u8(MESSAGE_ID_VERSION);
             encoded.put_u64((u64::from(self.incarnation) << 32) | u64::from(sequence));
-            encoded.extend_from_slice(&message.adapter_message_id);
-            Some(encoded.freeze())
-        };
-        Ok(Delivery {
-            subscription_id: self.subscription_id,
-            message_id,
-            headers,
-            payload: message.payload,
-        })
+            encoded.extend_from_slice(&adapter_message_id);
+            delivery.message_id = Some(encoded.freeze());
+        }
+        Ok(())
     }
 
     fn decode_message_id(&self, message_id: &Bytes) -> Result<(u64, Bytes)> {
@@ -383,7 +370,7 @@ impl ReaderRouter {
         &self,
         token: crate::OperationToken,
         reported_count: u32,
-        messages: Vec<ReaderMessage>,
+        mut messages: Vec<Delivery>,
         result: Result<()>,
     ) {
         let mut fetch = self.fetch.lock();
@@ -405,10 +392,10 @@ impl ReaderRouter {
                     wait.maximum
                 )));
             }
-            messages
-                .into_iter()
-                .map(|message| self.delivery(message))
-                .collect()
+            for message in &mut messages {
+                self.scope_delivery(message)?;
+            }
+            Ok(messages)
         });
         let _ = wait.sender.send(outcome);
     }
@@ -490,12 +477,9 @@ impl ReaderRouter {
 
 impl ReaderEventSink for ReaderRouter {
     fn emit(&self, event: ReaderEvent) {
-        if !self.active.load(Ordering::Acquire) {
-            return;
-        }
         match event {
-            ReaderEvent::Message(message) => match self.delivery(message) {
-                Ok(delivery) => self.events.delivery(delivery),
+            ReaderEvent::Message(mut message) => match self.scope_delivery(&mut message) {
+                Ok(()) => self.events.delivery(self.subscription_id, message),
                 Err(error) => self
                     .events
                     .subscription_terminal(self.subscription_id, error),
