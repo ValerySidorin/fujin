@@ -29,19 +29,7 @@ async fn main() -> Result<()> {
         .await
         .context("compile connector catalog")?;
     let shutdown = CancellationToken::new();
-    let signal_shutdown = shutdown.clone();
-    let signal_done = shutdown.clone();
-    let signal_task = tokio::spawn(async move {
-        tokio::select! {
-            result = tokio::signal::ctrl_c() => {
-                if let Err(error) = result {
-                    tracing::error!(%error, "install Ctrl-C handler");
-                }
-                signal_shutdown.cancel();
-            }
-            () = signal_done.cancelled() => {}
-        }
-    });
+    let signal_task = spawn_shutdown_loop(shutdown.clone())?;
     #[cfg(unix)]
     let reload_task =
         spawn_reload_loop(config_path.clone(), Arc::clone(&catalog), shutdown.clone())?;
@@ -61,6 +49,44 @@ async fn main() -> Result<()> {
     server_result.context("serve Fujin")?;
     catalog_result.context("close connector catalog")?;
     Ok(())
+}
+
+fn spawn_shutdown_loop(shutdown: CancellationToken) -> Result<tokio::task::JoinHandle<()>> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        let mut terminate = signal(SignalKind::terminate()).context("install SIGTERM handler")?;
+        let task_shutdown = shutdown.clone();
+        Ok(tokio::spawn(async move {
+            tokio::select! {
+                result = tokio::signal::ctrl_c() => {
+                    if let Err(error) = result {
+                        tracing::error!(%error, "receive interrupt signal");
+                    }
+                    task_shutdown.cancel();
+                }
+                signal = terminate.recv() => {
+                    if signal.is_some() {
+                        task_shutdown.cancel();
+                    }
+                }
+                () = shutdown.cancelled() => {}
+            }
+        }))
+    }
+    #[cfg(not(unix))]
+    Ok(tokio::spawn(async move {
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => {
+                if let Err(error) = result {
+                    tracing::error!(%error, "receive interrupt signal");
+                }
+                shutdown.cancel();
+            }
+            () = shutdown.cancelled() => {}
+        }
+    }))
 }
 
 #[cfg(unix)]

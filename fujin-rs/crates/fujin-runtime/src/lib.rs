@@ -82,6 +82,8 @@ pub mod fujin_server_config {
         pub quic: Option<QuicListenerConfig>,
         #[serde(default)]
         pub grpc: Option<SocketListenerConfig>,
+        #[serde(default)]
+        pub health: Option<SocketListenerConfig>,
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -231,6 +233,12 @@ impl RuntimeConfig {
             require_non_empty(&self.grpc.addr, "gRPC addr")?;
             output.grpc = Some(fujin_server_config::SocketListenerConfig {
                 listen: self.grpc.addr.clone(),
+            });
+        }
+        if self.health.enabled {
+            require_non_empty(&self.health.addr, "health addr")?;
+            output.health = Some(fujin_server_config::SocketListenerConfig {
+                listen: self.health.addr.clone(),
             });
         }
         Ok(output)

@@ -1,6 +1,9 @@
 #[cfg(any(all(feature = "unix", unix), feature = "quic", feature = "websocket"))]
 use std::io;
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 #[cfg(feature = "websocket")]
 use std::{
     pin::Pin,
@@ -16,7 +19,11 @@ use fujin_runtime::fujin_server_config::ServerConfig;
 use futures_util::{Sink, Stream};
 #[cfg(feature = "websocket")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-use tokio::task::JoinSet;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::mpsc,
+    task::JoinSet,
+};
 #[cfg(feature = "websocket")]
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
@@ -34,16 +41,9 @@ pub async fn serve(
     shutdown: CancellationToken,
 ) -> Result<()> {
     let mut listeners = JoinSet::new();
-    let configured = [
-        config.tcp.is_some(),
-        config.unix.is_some(),
-        config.websocket.is_some(),
-        config.quic.is_some(),
-        config.grpc.is_some(),
-    ]
-    .into_iter()
-    .filter(|configured| *configured)
-    .count();
+    let configured = configured_listener_count(&config);
+    let (ready_sender, mut ready_receiver) = mpsc::unbounded_channel();
+    let health_ready = Arc::new(AtomicBool::new(false));
     let _ = (&catalog, &bind_middlewares);
 
     if let Some(listener) = config.tcp {
@@ -56,6 +56,7 @@ pub async fn serve(
             Arc::clone(&bind_middlewares),
             config.build.clone(),
             shutdown.clone(),
+            ready_sender.clone(),
         ));
         #[cfg(not(feature = "tcp"))]
         bail!("TCP listener configured but fujin-server/tcp is disabled");
@@ -70,6 +71,7 @@ pub async fn serve(
             Arc::clone(&bind_middlewares),
             config.build.clone(),
             shutdown.clone(),
+            ready_sender.clone(),
         ));
         #[cfg(not(all(feature = "unix", unix)))]
         bail!("Unix listener configured but unavailable in this build");
@@ -84,6 +86,7 @@ pub async fn serve(
             Arc::clone(&bind_middlewares),
             config.build.clone(),
             shutdown.clone(),
+            ready_sender.clone(),
         ));
         #[cfg(not(feature = "websocket"))]
         bail!("WebSocket listener configured but fujin-server/websocket is disabled");
@@ -98,6 +101,7 @@ pub async fn serve(
             Arc::clone(&bind_middlewares),
             config.build.clone(),
             shutdown.clone(),
+            ready_sender.clone(),
         ));
         #[cfg(not(feature = "quic"))]
         bail!("QUIC listener configured but fujin-server/quic is disabled");
@@ -111,15 +115,63 @@ pub async fn serve(
             Arc::clone(&catalog),
             Arc::clone(&bind_middlewares),
             shutdown.clone(),
+            ready_sender.clone(),
         ));
         #[cfg(not(feature = "grpc"))]
         bail!("gRPC listener configured but fujin-server/grpc is disabled");
     }
+    if let Some(listener) = config.health {
+        listeners.spawn(serve_health(
+            listener.listen,
+            Arc::clone(&health_ready),
+            shutdown.clone(),
+            ready_sender.clone(),
+        ));
+    }
     if configured == 0 {
         bail!("no listeners configured");
     }
+    drop(ready_sender);
 
-    wait_for_listeners(&mut listeners, &shutdown).await
+    wait_for_readiness(&mut listeners, &mut ready_receiver, configured, &shutdown).await?;
+    health_ready.store(true, Ordering::Release);
+    let result = wait_for_listeners(&mut listeners, &shutdown).await;
+    health_ready.store(false, Ordering::Release);
+    result
+}
+
+fn configured_listener_count(config: &ServerConfig) -> usize {
+    [
+        config.tcp.is_some(),
+        config.unix.is_some(),
+        config.websocket.is_some(),
+        config.quic.is_some(),
+        config.grpc.is_some(),
+        config.health.is_some(),
+    ]
+    .into_iter()
+    .filter(|configured| *configured)
+    .count()
+}
+
+async fn wait_for_readiness(
+    listeners: &mut JoinSet<Result<()>>,
+    ready: &mut mpsc::UnboundedReceiver<()>,
+    expected: usize,
+    shutdown: &CancellationToken,
+) -> Result<()> {
+    let mut started = 0;
+    while started < expected {
+        tokio::select! {
+            () = shutdown.cancelled() => return Ok(()),
+            signal = ready.recv() => match signal {
+                Some(()) => started += 1,
+                None => bail!("listener readiness channel closed after {started}/{expected}"),
+            },
+            result = listeners.join_next() => return listener_stopped(result, shutdown, true),
+        }
+    }
+    Ok(())
 }
 
 async fn wait_for_listeners(
@@ -128,22 +180,7 @@ async fn wait_for_listeners(
 ) -> Result<()> {
     tokio::select! {
         () = shutdown.cancelled() => {}
-        result = listeners.join_next() => match result {
-            Some(Ok(Ok(()))) if shutdown.is_cancelled() => {}
-            Some(Ok(Ok(()))) => {
-                shutdown.cancel();
-                bail!("listener stopped unexpectedly");
-            }
-            Some(Ok(Err(error))) => {
-                shutdown.cancel();
-                return Err(error);
-            }
-            Some(Err(error)) => {
-                shutdown.cancel();
-                return Err(error).context("listener task failed");
-            }
-            None => bail!("all listeners stopped"),
-        },
+        result = listeners.join_next() => listener_stopped(result, shutdown, false)?,
     }
 
     shutdown.cancel();
@@ -153,6 +190,22 @@ async fn wait_for_listeners(
     Ok(())
 }
 
+fn listener_stopped(
+    result: Option<std::result::Result<Result<()>, tokio::task::JoinError>>,
+    shutdown: &CancellationToken,
+    starting: bool,
+) -> Result<()> {
+    let shutting_down = shutdown.is_cancelled();
+    shutdown.cancel();
+    match result {
+        Some(Ok(Ok(()))) if shutting_down && !starting => Ok(()),
+        Some(Ok(Ok(()))) => bail!("listener stopped unexpectedly"),
+        Some(Ok(Err(error))) => Err(error),
+        Some(Err(error)) => Err(error).context("listener task failed"),
+        None => bail!("all listeners stopped"),
+    }
+}
+
 #[cfg(feature = "tcp")]
 async fn serve_tcp(
     address: String,
@@ -160,10 +213,12 @@ async fn serve_tcp(
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
     let listener = tokio::net::TcpListener::bind(&address)
         .await
         .with_context(|| format!("bind TCP listener {address:?}"))?;
+    let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -199,9 +254,11 @@ async fn serve_unix(
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
     let listener = tokio::net::UnixListener::bind(&path)
         .with_context(|| format!("bind Unix listener {path:?}"))?;
+    let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -235,12 +292,6 @@ async fn serve_unix(
     }
 }
 
-#[cfg(any(
-    feature = "tcp",
-    all(feature = "unix", unix),
-    feature = "websocket",
-    feature = "quic"
-))]
 async fn drain_sessions(sessions: &mut JoinSet<Result<()>>) -> Result<()> {
     while let Some(result) = sessions.join_next().await {
         match result {
@@ -259,10 +310,12 @@ async fn serve_websocket(
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
     let listener = tokio::net::TcpListener::bind(&address)
         .await
         .with_context(|| format!("bind WebSocket listener {address:?}"))?;
+    let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -482,6 +535,7 @@ async fn serve_quic(
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     build: String,
     shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
     let address = config.listen.parse().context("parse QUIC listen address")?;
     let server_config = quic_server_config(
@@ -491,6 +545,7 @@ async fn serve_quic(
     )
     .await?;
     let endpoint = quinn::Endpoint::server(server_config, address).context("bind QUIC endpoint")?;
+    let _ = ready.send(());
     let mut connections = JoinSet::new();
     loop {
         tokio::select! {
@@ -625,6 +680,7 @@ async fn serve_grpc(
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
 ) -> Result<()> {
     use fujin_proto::fujin::v1 as pb;
     use tokio_stream::wrappers::TcpListenerStream;
@@ -633,6 +689,7 @@ async fn serve_grpc(
     let listener = tokio::net::TcpListener::bind(&address)
         .await
         .with_context(|| format!("bind gRPC listener {address:?}"))?;
+    let _ = ready.send(());
     let service = crate::GrpcService::new(catalog, bind_middlewares);
     Server::builder()
         .add_service(pb::fujin_service_server::FujinServiceServer::new(service))
@@ -641,23 +698,115 @@ async fn serve_grpc(
         .context("serve gRPC")
 }
 
+async fn serve_health(
+    address: String,
+    readiness: Arc<AtomicBool>,
+    shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
+) -> Result<()> {
+    let listener = tokio::net::TcpListener::bind(&address)
+        .await
+        .with_context(|| format!("bind health listener {address:?}"))?;
+    let _ = ready.send(());
+    let mut connections = JoinSet::new();
+    loop {
+        tokio::select! {
+            () = shutdown.cancelled() => break,
+            accepted = listener.accept() => {
+                let (stream, _) = accepted.context("accept health connection")?;
+                let readiness = Arc::clone(&readiness);
+                let connection_shutdown = shutdown.clone();
+                connections.spawn(async move {
+                    serve_health_connection(stream, readiness, connection_shutdown).await
+                });
+            }
+        }
+    }
+    drain_sessions(&mut connections).await
+}
+
+async fn serve_health_connection(
+    mut stream: tokio::net::TcpStream,
+    readiness: Arc<AtomicBool>,
+    shutdown: CancellationToken,
+) -> Result<()> {
+    const MAX_REQUEST_BYTES: usize = 8 * 1024;
+    let mut request = Vec::with_capacity(1024);
+    loop {
+        if request.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+        if request.len() == MAX_REQUEST_BYTES {
+            stream.write_all(HTTP_TOO_LARGE).await?;
+            return Ok(());
+        }
+        let mut buffer = [0_u8; 1024];
+        let maximum = buffer.len().min(MAX_REQUEST_BYTES - request.len());
+        let read = tokio::select! {
+            () = shutdown.cancelled() => return Ok(()),
+            read = stream.read(&mut buffer[..maximum]) => read?,
+        };
+        if read == 0 {
+            return Ok(());
+        }
+        request.extend_from_slice(&buffer[..read]);
+    }
+    let path = request
+        .split(|byte| *byte == b' ')
+        .nth(1)
+        .unwrap_or_default();
+    let response = health_response(path, readiness.load(Ordering::Acquire));
+    stream.write_all(response).await?;
+    stream.shutdown().await?;
+    Ok(())
+}
+
+const HTTP_HEALTHY: &[u8] =
+    b"HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nok\n";
+const HTTP_NOT_READY: &[u8] = b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 10\r\nConnection: close\r\n\r\nnot ready\n";
+const HTTP_NOT_FOUND: &[u8] =
+    b"HTTP/1.1 404 Not Found\r\nContent-Length: 10\r\nConnection: close\r\n\r\nnot found\n";
+const HTTP_TOO_LARGE: &[u8] = b"HTTP/1.1 431 Request Header Fields Too Large\r\nContent-Length: 18\r\nConnection: close\r\n\r\nrequest too large\n";
+
+fn health_response(path: &[u8], ready: bool) -> &'static [u8] {
+    match path {
+        b"/healthz" => HTTP_HEALTHY,
+        b"/readyz" if ready => HTTP_HEALTHY,
+        b"/readyz" => HTTP_NOT_READY,
+        _ => HTTP_NOT_FOUND,
+    }
+}
+
 #[cfg(all(test, feature = "tcp"))]
 mod tests {
     use super::*;
     use fujin_core::{DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    use tokio::time::{Duration, timeout};
 
-    #[tokio::test]
-    async fn cancelled_server_binds_and_drains_tcp_listener() {
+    async fn empty_catalog() -> Arc<Catalog> {
         let registry = Arc::new(DescriptorRegistry::default());
         let compiler = Arc::new(GenerationCompiler::new(
             registry,
             Arc::new(NoConnectorMiddleware),
         ));
-        let catalog = Arc::new(
+        Arc::new(
             Catalog::compile(&std::collections::BTreeMap::default(), compiler)
                 .await
                 .expect("compile empty catalog"),
-        );
+        )
+    }
+
+    #[test]
+    fn health_response_tracks_readiness() {
+        assert!(health_response(b"/healthz", false).starts_with(b"HTTP/1.1 200"));
+        assert!(health_response(b"/readyz", false).starts_with(b"HTTP/1.1 503"));
+        assert!(health_response(b"/readyz", true).starts_with(b"HTTP/1.1 200"));
+        assert!(health_response(b"/missing", true).starts_with(b"HTTP/1.1 404"));
+    }
+
+    #[tokio::test]
+    async fn cancelled_server_binds_and_drains_tcp_listener() {
+        let catalog = empty_catalog().await;
         let shutdown = CancellationToken::new();
         shutdown.cancel();
 
@@ -675,6 +824,70 @@ mod tests {
         )
         .await
         .expect("serve and drain TCP listener");
+        catalog.close().await.expect("close catalog");
+    }
+
+    #[tokio::test]
+    async fn readyz_becomes_healthy_after_all_listeners_bind() {
+        let tcp_probe = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("reserve TCP address");
+        let tcp_address = tcp_probe.local_addr().expect("TCP address");
+        drop(tcp_probe);
+        let health_probe = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("reserve health address");
+        let health_address = health_probe.local_addr().expect("health address");
+        drop(health_probe);
+        let catalog = empty_catalog().await;
+        let shutdown = CancellationToken::new();
+        let server_shutdown = shutdown.clone();
+        let server_catalog = Arc::clone(&catalog);
+        let server = tokio::spawn(async move {
+            serve(
+                ServerConfig {
+                    build: "test".into(),
+                    tcp: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
+                        listen: tcp_address.to_string(),
+                    }),
+                    health: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
+                        listen: health_address.to_string(),
+                    }),
+                    ..ServerConfig::default()
+                },
+                server_catalog,
+                Arc::new(fujin_core::NoBindMiddleware),
+                server_shutdown,
+            )
+            .await
+        });
+
+        let response = timeout(Duration::from_secs(2), async {
+            loop {
+                if let Ok(mut stream) = tokio::net::TcpStream::connect(health_address).await {
+                    stream
+                        .write_all(b"GET /readyz HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                        .await
+                        .expect("write health request");
+                    let mut response = Vec::new();
+                    stream
+                        .read_to_end(&mut response)
+                        .await
+                        .expect("read health response");
+                    break response;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("health listener readiness");
+        assert!(response.starts_with(b"HTTP/1.1 200"));
+
+        shutdown.cancel();
+        server
+            .await
+            .expect("server task")
+            .expect("serve and drain listeners");
         catalog.close().await.expect("close catalog");
     }
 }
