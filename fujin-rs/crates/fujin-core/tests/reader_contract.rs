@@ -20,7 +20,6 @@ use support::{
 fn reader_message(payload: &'static [u8], adapter_id: u8, with_headers: bool) -> ReaderMessage {
     ReaderMessage {
         payload: Bytes::from_static(payload),
-        source: "topic".into(),
         headers: if with_headers {
             vec![Header {
                 key: Bytes::from_static(b"key"),

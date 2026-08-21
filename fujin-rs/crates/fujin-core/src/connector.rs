@@ -284,7 +284,6 @@ pub type ReadyCallback = Box<dyn FnOnce() -> Result<()> + Send + 'static>;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReaderMessage {
     pub payload: Bytes,
-    pub source: String,
     pub headers: Headers,
     pub adapter_message_id: Bytes,
 }

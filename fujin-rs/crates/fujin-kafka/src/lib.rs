@@ -644,7 +644,6 @@ mod implementation {
         };
         Ok(ReaderMessage {
             payload: Bytes::copy_from_slice(message.payload().unwrap_or_default()),
-            source: message.topic().to_owned(),
             headers,
             adapter_message_id: if auto_settle {
                 Bytes::new()

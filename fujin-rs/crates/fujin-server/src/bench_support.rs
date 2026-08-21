@@ -335,7 +335,6 @@ impl SessionBenchReader {
     fn message(&self, with_headers: bool) -> ReaderMessage {
         ReaderMessage {
             payload: self.payload.clone(),
-            source: "sub".into(),
             headers: if with_headers {
                 vec![Header {
                     key: Bytes::from_static(b"content-type"),
@@ -374,7 +373,6 @@ impl Reader for SessionBenchReader {
                 }
                 events.emit(ReaderEvent::Message(ReaderMessage {
                     payload: payload.clone(),
-                    source: "sub".into(),
                     headers: if with_headers {
                         vec![Header {
                             key: Bytes::from_static(b"content-type"),

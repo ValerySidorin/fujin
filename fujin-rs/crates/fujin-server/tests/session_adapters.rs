@@ -247,7 +247,6 @@ impl Reader for TestReader {
 fn reader_message(payload: &'static [u8], with_headers: bool) -> ReaderMessage {
     ReaderMessage {
         payload: Bytes::from_static(payload),
-        source: "source".into(),
         headers: if with_headers {
             vec![Header {
                 key: Bytes::from_static(b"key"),
