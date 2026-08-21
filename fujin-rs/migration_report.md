@@ -104,6 +104,12 @@ Negative delta means Rust completed an operation faster.
 
 Across the 18 common cells, Rust's geometric-mean operation-time delta was **-33.0%** and its geometric-mean p99 delta was **-48.6%**. Rust was faster in 16 of 18 median operation-time cells and had lower p99 in all 18. The two operation-time regressions were 1 MiB gRPC at concurrency 1 (+1.3%) and 128 (+1.1%); these small deltas were not treated as statistically significant claims because this comparison reports five-sample medians rather than confidence intervals.
 
+## gRPC pipelined throughput correction
+
+The initial one-session gRPC pipeline result was limited by the server response relay's one-message capacity. Tonic's streaming encoder therefore became pending after every response and emitted one small HTTP/2 DATA frame per message. Raising only the client in-flight window to 1024 was invalid: h2 terminated the connection with `ENHANCE_YOUR_CALM` / `too_many_data_frames` after 1417 responses.
+
+The production fix raises the bounded response relay and benchmark in-flight window to 4096 messages. This permits Tonic to coalesce ready responses toward its 32 KiB yield threshold while the existing 4 MiB session-output byte limit remains authoritative. Ten consecutive 1,000,000-message runs completed successfully at a median **409 ns/message** (**2.445 million messages/s**), versus **2495 ns/message** (**0.401 million messages/s**) before the fix: a **6.1× throughput increase**. The synchronous request/response median remained effectively unchanged at **27,690 ns/message** versus **27,387 ns/message** before the fix.
+
 ## Cleanup evidence
 
 - Every Fujin smoke process and Kafka container stack was stopped.

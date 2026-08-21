@@ -20,6 +20,9 @@ use tonic::{Request, Response, Status};
 pub type GrpcOutput = Result<pb::FujinResponse, Status>;
 
 const MAXIMUM_PENDING_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
+// Keep enough completed messages ready for Tonic's streaming encoder to coalesce them into its
+// 32 KiB yield threshold. A capacity of one forces one tiny HTTP/2 DATA frame per response.
+const MAXIMUM_RESPONSE_CHANNEL_MESSAGES: usize = 4096;
 
 #[derive(Debug, Default)]
 struct GrpcQueueState {
@@ -496,7 +499,7 @@ impl pb::fujin_service_server::FujinService for GrpcService {
             Arc::clone(&self.catalog),
             Arc::clone(&self.bind_middlewares),
         );
-        let (sender, receiver) = mpsc::channel(1);
+        let (sender, receiver) = mpsc::channel(MAXIMUM_RESPONSE_CHANNEL_MESSAGES);
         tokio::spawn(async move {
             loop {
                 tokio::select! {

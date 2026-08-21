@@ -231,7 +231,7 @@ lines += [
     "",
     "## 1 B pipelined throughput",
     "",
-    f"Both rows use one client session, exactly {peak_operations} PRODUCE messages, concurrent response draining, and the nop connector. Native TCP uses 512 KiB buffered writes and reads while validating every pre-encoded request and six-byte response. gRPC keeps at most 64 operations in flight to respect HTTP/2 flow control and small-frame load protection.",
+    f"Both rows use one client session, exactly {peak_operations} PRODUCE messages, concurrent response draining, and the nop connector. Native TCP uses 512 KiB buffered writes and reads while validating every pre-encoded request and six-byte response. gRPC keeps at most 4096 operations in flight, matching the server response relay capacity so Tonic can coalesce ready messages up to its 32 KiB encoder yield threshold.",
     "",
     "| Transport | Payload | Session mode | Messages | Messages/s | Mmsg/s | Wire throughput | Allocations/op | Bytes/op |",
     "| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",

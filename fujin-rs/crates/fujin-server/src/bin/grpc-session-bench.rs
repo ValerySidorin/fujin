@@ -26,7 +26,8 @@ use std::alloc::System;
 #[global_allocator]
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
-const MAX_PIPELINE_IN_FLIGHT: usize = 64;
+// Matches the server response relay capacity so both streaming encoders can form full batches.
+const MAX_PIPELINE_IN_FLIGHT: usize = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Mode {
