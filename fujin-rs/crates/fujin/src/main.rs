@@ -17,32 +17,75 @@ async fn main() -> Result<()> {
     let config = fujin_runtime::load(&config_path)
         .await
         .with_context(|| format!("load Fujin configuration {config_path:?}"))?;
+    let server_config = config
+        .server_config(env!("CARGO_PKG_VERSION"))
+        .context("validate Fujin server configuration")?;
     let registry = Arc::new(DescriptorRegistry::default());
     #[cfg(feature = "kafka")]
     registry
-        .register("kafka", fujin_kafka::descriptor())
+        .register("kafka_franz", fujin_kafka::descriptor())
         .context("register Kafka connector")?;
     let catalog = fujin_runtime::compile_catalog(&config, registry)
         .await
         .context("compile connector catalog")?;
     let shutdown = CancellationToken::new();
-    let signal = shutdown.clone();
-    tokio::spawn(async move {
-        if let Err(error) = tokio::signal::ctrl_c().await {
-            tracing::error!(%error, "install Ctrl-C handler");
+    let signal_shutdown = shutdown.clone();
+    let signal_done = shutdown.clone();
+    let signal_task = tokio::spawn(async move {
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => {
+                if let Err(error) = result {
+                    tracing::error!(%error, "install Ctrl-C handler");
+                }
+                signal_shutdown.cancel();
+            }
+            () = signal_done.cancelled() => {}
         }
-        signal.cancel();
     });
+    #[cfg(unix)]
+    let reload_task =
+        spawn_reload_loop(config_path.clone(), Arc::clone(&catalog), shutdown.clone())?;
 
     let server_result = fujin_server::serve(
-        config.server,
+        server_config,
         Arc::clone(&catalog),
         Arc::new(NoBindMiddleware),
-        shutdown,
+        shutdown.clone(),
     )
     .await;
+    shutdown.cancel();
+    signal_task.await.context("join shutdown signal task")?;
+    #[cfg(unix)]
+    reload_task.await.context("join SIGHUP reload task")?;
     let catalog_result = catalog.close().await;
     server_result.context("serve Fujin")?;
     catalog_result.context("close connector catalog")?;
     Ok(())
+}
+
+#[cfg(unix)]
+fn spawn_reload_loop(
+    config_path: String,
+    catalog: Arc<fujin_core::Catalog>,
+    shutdown: CancellationToken,
+) -> Result<tokio::task::JoinHandle<()>> {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    let mut hangup = signal(SignalKind::hangup()).context("install SIGHUP handler")?;
+    Ok(tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                signal = hangup.recv() => {
+                    if signal.is_none() {
+                        return;
+                    }
+                    match fujin_runtime::reload_connectors(&config_path, &catalog).await {
+                        Ok(()) => tracing::info!(path = %config_path, "reloaded connector snapshot"),
+                        Err(error) => tracing::error!(path = %config_path, %error, "reload connector snapshot"),
+                    }
+                }
+                () = shutdown.cancelled() => return,
+            }
+        }
+    }))
 }
