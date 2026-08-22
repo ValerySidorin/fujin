@@ -11,8 +11,8 @@ use std::{
 
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
-    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime,
-    ConnectorsConfig, CoreError, Delivery, DescriptorRegistry, GenerationCompiler, Message,
+    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
+    ConnectorRuntime, ConnectorsConfig, CoreError, Delivery, GenerationCompiler, Message,
     NackEffect, NoConnectorMiddleware, OperationToken, Reader, ReaderEvent, ReaderEventSink,
     ReadyCallback, Result, RouteProfile, SessionEventSink, SettlementKind, Writer,
 };
@@ -515,7 +515,7 @@ impl SessionEventSink for SessionRecorder {
 
 pub async fn catalog_and_state() -> (Arc<Catalog>, Arc<TestState>, ConnectorsConfig) {
     let state = Arc::new(TestState::default());
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     registry
         .register("test", Arc::new(TestDescriptor::new(Arc::clone(&state))))
         .expect("register test descriptor");

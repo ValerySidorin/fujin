@@ -1335,7 +1335,7 @@ fn health_response(path: &[u8], ready: bool) -> &'static [u8] {
 #[cfg(all(test, feature = "tcp"))]
 mod tests {
     use super::*;
-    use fujin_core::{DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    use fujin_core::{ConnectorRegistry, GenerationCompiler, NoConnectorMiddleware};
     #[cfg(unix)]
     use fujin_native::{RequestCode, ResponseCode};
     #[cfg(unix)]
@@ -1343,7 +1343,7 @@ mod tests {
     use tokio::time::{Duration, timeout};
 
     async fn empty_catalog() -> Arc<Catalog> {
-        let registry = Arc::new(DescriptorRegistry::default());
+        let registry = Arc::new(ConnectorRegistry::default());
         let compiler = Arc::new(GenerationCompiler::new(
             registry,
             Arc::new(NoConnectorMiddleware),
@@ -1706,7 +1706,7 @@ mod tls_tests {
 mod grpc_health_tests {
     use std::{collections::BTreeMap, sync::Arc};
 
-    use fujin_core::{Catalog, DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    use fujin_core::{Catalog, ConnectorRegistry, GenerationCompiler, NoConnectorMiddleware};
     use tokio::time::{Duration, timeout};
     use tokio_util::sync::CancellationToken;
     use tonic_health::pb::{
@@ -1722,7 +1722,7 @@ mod grpc_health_tests {
             .expect("reserve gRPC address");
         let address = probe.local_addr().expect("gRPC address");
         drop(probe);
-        let registry = Arc::new(DescriptorRegistry::default());
+        let registry = Arc::new(ConnectorRegistry::default());
         let compiler = Arc::new(GenerationCompiler::new(
             registry,
             Arc::new(NoConnectorMiddleware),

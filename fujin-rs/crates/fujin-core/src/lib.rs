@@ -18,12 +18,14 @@ pub use connector::{
 };
 pub use error::{CoreError, OperationError, OperationOutcome, Result, StatusCode};
 pub use generation::{
-    Binding, Catalog, CatalogStatus, DescriptorRegistry, Generation, GenerationCompiler,
-    GenerationState, GenerationStatus, GenerationTransition,
+    Binding, Catalog, CatalogStatus, ConnectorPlugin, ConnectorRegistry, Generation,
+    GenerationCompiler, GenerationState, GenerationStatus, GenerationTransition,
 };
 pub use middleware::{
-    BindContext, BindMiddleware, BindMiddlewareRunner, CompiledConnectorMiddleware,
-    ConnectorMiddlewareCompiler, NoBindMiddleware, NoConnectorMiddleware,
+    BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistry,
+    BindMiddlewareRunner, CompiledConnectorMiddleware, ConnectorMiddlewareCompiler,
+    ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistry, NoBindMiddleware,
+    NoConnectorMiddleware,
 };
 pub use overrides::{apply_overrides, validate_override_path};
 pub use session::{

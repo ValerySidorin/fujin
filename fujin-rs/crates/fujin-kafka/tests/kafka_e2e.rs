@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use fujin_core::{
-    Catalog, Completion, CompletionSink, ConnectorConfig, DescriptorRegistry, GenerationCompiler,
+    Catalog, Completion, CompletionSink, ConnectorConfig, ConnectorRegistry, GenerationCompiler,
     Header, Message, NoBindMiddleware, NoConnectorMiddleware, OperationToken, SessionCore,
     SessionEventSink,
 };
@@ -58,7 +58,7 @@ async fn kafka_produce_subscribe_settle_and_transaction() {
     let topic = format!("fujin-rs-{unique}");
     let group = format!("fujin-rs-group-{unique}");
     let transactional_id = format!("fujin-rs-tx-{unique}");
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     registry
         .register("kafka", fujin_kafka::descriptor())
         .expect("register Kafka connector");

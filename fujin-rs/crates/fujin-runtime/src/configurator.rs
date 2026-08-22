@@ -21,8 +21,56 @@ const DEFAULT_YAML_PATHS: [&str; 3] = ["./config.yaml", "conf/config.yaml", "con
 type ConfiguratorFactory =
     Arc<dyn Fn() -> Result<Arc<dyn Configurator>, RuntimeError> + Send + Sync + 'static>;
 
+/// One explicitly registered, statically linked configurator plugin.
+#[derive(Clone)]
+pub struct ConfiguratorPlugin {
+    name: String,
+    factory: ConfiguratorFactory,
+}
+
+impl ConfiguratorPlugin {
+    #[must_use]
+    pub fn new<C, F>(name: impl Into<String>, factory: F) -> Self
+    where
+        C: Configurator,
+        F: Fn() -> Result<C, RuntimeError> + Send + Sync + 'static,
+    {
+        Self {
+            name: name.into(),
+            factory: Arc::new(move || {
+                factory().map(|configurator| Arc::new(configurator) as Arc<dyn Configurator>)
+            }),
+        }
+    }
+
+    #[must_use]
+    pub fn from_factory(
+        name: impl Into<String>,
+        factory: impl Fn() -> Result<Arc<dyn Configurator>, RuntimeError> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            factory: Arc::new(factory),
+        }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl fmt::Debug for ConfiguratorPlugin {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConfiguratorPlugin")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
+}
+
 #[async_trait]
-pub trait Configurator: fmt::Debug + Send + Sync {
+pub trait Configurator: fmt::Debug + Send + Sync + 'static {
     async fn load(&self) -> Result<RuntimeConfig, RuntimeError>;
 
     fn initial_connector_snapshot(&self) -> Option<ConnectorSnapshot> {
@@ -82,6 +130,16 @@ impl ConfiguratorRegistry {
         }
         self.factories.insert(name, Arc::new(factory));
         Ok(())
+    }
+
+    /// Registers one configurator plugin exactly once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimeError::InvalidConfig`] for an empty or duplicate name.
+    pub fn register_plugin(&mut self, plugin: ConfiguratorPlugin) -> Result<(), RuntimeError> {
+        let ConfiguratorPlugin { name, factory } = plugin;
+        self.register(name, move || factory())
     }
 
     /// Constructs one registered configurator.
@@ -146,6 +204,7 @@ impl YamlConfigurator {
                     .collect()
             },
         );
+
         Self { paths }
     }
 
@@ -153,6 +212,10 @@ impl YamlConfigurator {
     pub fn new(paths: Vec<PathBuf>) -> Self {
         Self { paths }
     }
+}
+#[must_use]
+pub fn yaml_plugin() -> ConfiguratorPlugin {
+    ConfiguratorPlugin::new("yaml", || Ok(YamlConfigurator::from_environment()))
 }
 
 #[async_trait]
@@ -201,12 +264,17 @@ impl Configurator for EnvConfigurator {
                 "env configurator: {ENV_CONFIG_ENV} is not set or empty"
             )));
         }
+
         tracing::info!(
             variable = ENV_CONFIG_ENV,
             "loading configuration with env configurator"
         );
         decode_config(value.as_bytes(), ENV_CONFIG_ENV)
     }
+}
+#[must_use]
+pub fn env_plugin() -> ConfiguratorPlugin {
+    ConfiguratorPlugin::new("env", || Ok(EnvConfigurator))
 }
 
 /// Decodes one complete JSON or YAML bootstrap document.
@@ -641,16 +709,15 @@ mod tests {
     fn registry_rejects_duplicate_names_and_lists_available_configurators() {
         let mut registry = ConfiguratorRegistry::default();
         registry
-            .register("test", || {
-                Ok(Arc::new(StaticConfigurator(RuntimeConfig::default())) as Arc<dyn Configurator>)
-            })
+            .register_plugin(ConfiguratorPlugin::new("test", || {
+                Ok(StaticConfigurator(RuntimeConfig::default()))
+            }))
             .expect("register configurator");
         assert!(
             registry
-                .register("test", || {
-                    Ok(Arc::new(StaticConfigurator(RuntimeConfig::default()))
-                        as Arc<dyn Configurator>)
-                })
+                .register_plugin(ConfiguratorPlugin::new("test", || {
+                    Ok(StaticConfigurator(RuntimeConfig::default()))
+                }))
                 .is_err()
         );
         assert_eq!(registry.list(), ["test"]);

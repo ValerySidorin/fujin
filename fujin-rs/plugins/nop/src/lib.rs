@@ -1,15 +1,13 @@
-#![allow(unsafe_code)]
-
 use std::{collections::BTreeMap, sync::Arc};
 
-use fujin_core::{
+use fujin_plugin_api::connector::{
     AcceptanceGuarantee, BoxFuture, Capabilities, CompiledConnector, Completion, CompletionSink,
-    ConnectorDescriptor, ConnectorRuntime, CoreError, Message, OperationToken, Reader,
-    ReaderEventSink, Result, RouteProfile, Writer,
+    ConnectorDescriptor, ConnectorPlugin, ConnectorRuntime, CoreError, Message, OperationToken,
+    Reader, ReaderEventSink, Result, RouteProfile, Writer,
 };
 
 #[derive(Debug)]
-struct NopDescriptor;
+pub struct NopDescriptor;
 
 impl ConnectorDescriptor for NopDescriptor {
     fn compile(&self, settings: &serde_json::Value) -> Result<Arc<dyn CompiledConnector>> {
@@ -128,4 +126,7 @@ impl NopWriter {
     }
 }
 
-fujin_plugin_api::export_connector_plugin!("nop", NopDescriptor);
+#[must_use]
+pub fn plugin() -> ConnectorPlugin {
+    ConnectorPlugin::new("nop", NopDescriptor)
+}

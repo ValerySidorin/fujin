@@ -26,22 +26,61 @@ const DEFAULT_CATALOG_CLEANUP_TIMEOUT: Duration = Duration::from_secs(30);
 const GENERATION_TRANSITION_LIMIT: usize = 64;
 static NEXT_GENERATION_ID: AtomicU64 = AtomicU64::new(1);
 
+/// One explicitly registered, statically linked connector plugin.
+#[derive(Clone)]
+pub struct ConnectorPlugin {
+    name: String,
+    descriptor: Arc<dyn ConnectorDescriptor>,
+}
+
+impl ConnectorPlugin {
+    #[must_use]
+    pub fn new(name: impl Into<String>, descriptor: impl ConnectorDescriptor) -> Self {
+        Self {
+            name: name.into(),
+            descriptor: Arc::new(descriptor),
+        }
+    }
+
+    #[must_use]
+    pub fn from_arc(name: impl Into<String>, descriptor: Arc<dyn ConnectorDescriptor>) -> Self {
+        Self {
+            name: name.into(),
+            descriptor,
+        }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl fmt::Debug for ConnectorPlugin {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConnectorPlugin")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Explicit registry of statically linked connector compilers.
 #[derive(Default)]
-pub struct DescriptorRegistry {
+pub struct ConnectorRegistry {
     descriptors: RwLock<BTreeMap<String, Arc<dyn ConnectorDescriptor>>>,
 }
 
-impl fmt::Debug for DescriptorRegistry {
+impl fmt::Debug for ConnectorRegistry {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("DescriptorRegistry")
+            .debug_struct("ConnectorRegistry")
             .field("descriptors", &self.descriptors.read().keys())
             .finish()
     }
 }
 
-impl DescriptorRegistry {
+impl ConnectorRegistry {
     /// Registers one connector type exactly once.
     ///
     /// # Errors
@@ -68,6 +107,15 @@ impl DescriptorRegistry {
         Ok(())
     }
 
+    /// Registers one connector plugin exactly once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::InvalidConfig`] for an empty or duplicate name.
+    pub fn register_plugin(&self, plugin: ConnectorPlugin) -> Result<()> {
+        self.register(plugin.name, plugin.descriptor)
+    }
+
     #[must_use]
     pub fn list(&self) -> Vec<String> {
         self.descriptors.read().keys().cloned().collect()
@@ -80,7 +128,7 @@ impl DescriptorRegistry {
 
 /// Side-effect-free compiler for complete immutable connector snapshots.
 pub struct GenerationCompiler {
-    registry: Arc<DescriptorRegistry>,
+    registry: Arc<ConnectorRegistry>,
     middleware: Arc<dyn ConnectorMiddlewareCompiler>,
 }
 
@@ -95,7 +143,7 @@ impl fmt::Debug for GenerationCompiler {
 
 impl GenerationCompiler {
     pub fn new(
-        registry: Arc<DescriptorRegistry>,
+        registry: Arc<ConnectorRegistry>,
         middleware: Arc<dyn ConnectorMiddlewareCompiler>,
     ) -> Self {
         Self {
@@ -104,7 +152,7 @@ impl GenerationCompiler {
         }
     }
 
-    pub fn without_middlewares(registry: Arc<DescriptorRegistry>) -> Self {
+    pub fn without_middlewares(registry: Arc<ConnectorRegistry>) -> Self {
         Self::new(registry, Arc::new(NoConnectorMiddleware))
     }
 
@@ -181,7 +229,7 @@ impl GenerationCompiler {
 
 impl Default for GenerationCompiler {
     fn default() -> Self {
-        Self::without_middlewares(Arc::new(DescriptorRegistry::default()))
+        Self::without_middlewares(Arc::new(ConnectorRegistry::default()))
     }
 }
 
@@ -988,7 +1036,7 @@ mod tests {
     }
 
     fn compiler(opens: Arc<AtomicUsize>, closes: Arc<AtomicUsize>) -> Arc<GenerationCompiler> {
-        let registry = Arc::new(DescriptorRegistry::default());
+        let registry = Arc::new(ConnectorRegistry::default());
         registry
             .register("test", Arc::new(TestDescriptor { opens, closes }))
             .expect("register test connector");

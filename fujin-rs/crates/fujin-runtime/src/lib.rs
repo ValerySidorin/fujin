@@ -5,7 +5,7 @@ pub mod configurator;
 use std::{path::Path, sync::Arc};
 
 use fujin_core::{
-    Catalog, ConnectorsConfig, DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware,
+    Catalog, ConnectorRegistry, ConnectorsConfig, GenerationCompiler, NoConnectorMiddleware,
 };
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -626,7 +626,7 @@ pub async fn reload_connectors(
 /// generation preflight fails.
 pub async fn compile_catalog(
     config: &RuntimeConfig,
-    registry: Arc<DescriptorRegistry>,
+    registry: Arc<ConnectorRegistry>,
 ) -> Result<Arc<Catalog>, RuntimeError> {
     let compiler = Arc::new(GenerationCompiler::new(
         registry,
@@ -865,7 +865,7 @@ grpc: { enabled: false }
             }
         }
 
-        let registry = Arc::new(DescriptorRegistry::default());
+        let registry = Arc::new(ConnectorRegistry::default());
         registry
             .register("test", Arc::new(Descriptor))
             .expect("register test descriptor");

@@ -10,6 +10,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-anyhow.workspace = true
 fujin-core = { path = "../fujin-core" }
-libloading.workspace = true
+fujin-runtime = { path = "../fujin-runtime" }
+fujin-server = { path = "../fujin-server", default-features = false }
+fujin-upgrade = { path = "../fujin-upgrade" }

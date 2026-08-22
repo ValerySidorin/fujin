@@ -12,10 +12,10 @@ use std::{
 use bytes::Bytes;
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
-    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime, Delivery,
-    DescriptorRegistry, GenerationCompiler, Header, NackEffect, NoBindMiddleware, OperationToken,
-    Reader, ReaderEvent, ReaderEventSink, ReadyCallback, Result, RouteProfile, SettlementKind,
-    SettlementProfile, Writer,
+    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
+    ConnectorRuntime, Delivery, GenerationCompiler, Header, NackEffect, NoBindMiddleware,
+    OperationToken, Reader, ReaderEvent, ReaderEventSink, ReadyCallback, Result, RouteProfile,
+    SettlementKind, SettlementProfile, Writer,
 };
 use fujin_native::{RequestCode, ResponseCode};
 use fujin_proto::fujin::v1 as pb;
@@ -259,7 +259,7 @@ fn reader_message(payload: &'static [u8], with_headers: bool) -> Delivery {
 
 async fn catalog() -> (Arc<Catalog>, Arc<TestState>) {
     let state = Arc::new(TestState::default());
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     registry
         .register("test", Arc::new(TestDescriptor::new(Arc::clone(&state))))
         .expect("register descriptor");

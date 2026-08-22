@@ -4,7 +4,7 @@ compile_error!("the fujin binary requires at least one configurator feature");
 use std::{env, sync::Arc};
 
 use anyhow::{Context, Result, bail};
-use fujin_core::{DescriptorRegistry, NoBindMiddleware};
+use fujin_core::{ConnectorRegistry, NoBindMiddleware};
 #[cfg(feature = "configurator-env")]
 use fujin_runtime::configurator::EnvConfigurator;
 #[cfg(feature = "configurator-yaml")]
@@ -254,7 +254,7 @@ async fn bootstrap() -> Result<Bootstrap> {
         .server_config(BUILD_VERSION)
         .context("validate Fujin server configuration")?;
 
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     #[cfg(feature = "kafka")]
     registry
         .register("kafka_franz", fujin_kafka::descriptor())

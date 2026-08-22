@@ -11,10 +11,10 @@ use std::{
 use bytes::Bytes;
 use fujin_core::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
-    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRuntime, Delivery,
-    DescriptorRegistry, GenerationCompiler, Header, Message, NackEffect, OperationToken, Reader,
-    ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile, SettlementKind, SettlementProfile,
-    Writer,
+    Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
+    ConnectorRuntime, Delivery, GenerationCompiler, Header, Message, NackEffect, OperationToken,
+    Reader, ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile, SettlementKind,
+    SettlementProfile, Writer,
 };
 use parking_lot::Mutex;
 use tokio::sync::{Notify, Semaphore};
@@ -26,7 +26,7 @@ use tokio_util::sync::CancellationToken;
 ///
 /// Returns an error if the in-process Nop connector cannot be registered or compiled.
 pub async fn nop_catalog() -> fujin_core::Result<Arc<Catalog>> {
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     registry.register("nop", Arc::new(NopDescriptor))?;
     let compiler = Arc::new(GenerationCompiler::without_middlewares(registry));
     let configs = BTreeMap::from([(
@@ -188,7 +188,7 @@ pub async fn session_bench_catalog(
     subscribe_permits: Vec<Arc<Semaphore>>,
     subscribe_gate: Arc<SubscribeGate>,
 ) -> fujin_core::Result<Arc<Catalog>> {
-    let registry = Arc::new(DescriptorRegistry::default());
+    let registry = Arc::new(ConnectorRegistry::default());
     registry.register(
         "session_bench",
         Arc::new(SessionBenchDescriptor {
