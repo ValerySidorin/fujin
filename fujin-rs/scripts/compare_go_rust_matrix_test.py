@@ -49,6 +49,13 @@ class MatrixDriverTest(unittest.TestCase):
             "^transport=unix$/^payload=1B$/^batch=256$/^concurrency=128$",
         )
 
+        produce = matrix.Cell("produce", "grpc", "128B", 1, 16)
+        self.assertEqual(
+            matrix.go_benchmark_pattern(produce),
+            "^Benchmark_Session_Produce_GRPC$/^connector=nop$/"
+            "^payload=128B$/^batch=1$/^concurrency=16$",
+        )
+
     def test_result_parser_requires_exactly_one_valid_row(self) -> None:
         row = (
             "rust/native/fetch transport=unix payload=1B batch=256 concurrency=128 "

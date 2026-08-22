@@ -220,7 +220,7 @@ def go_benchmark_pattern(cell: Cell) -> str:
     suffix = "GRPC" if cell.transport == "grpc" else "Native"
     segments = [
         f"^Benchmark_Session_{OPERATION_NAMES[cell.operation]}_{suffix}$",
-        "^connector=session_bench$",
+        f"^connector={'nop' if cell.operation == 'produce' else 'session_bench'}$",
     ]
     if cell.transport != "grpc":
         segments.append(f"^transport={cell.transport}$")
