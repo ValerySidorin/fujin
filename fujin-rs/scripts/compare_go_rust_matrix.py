@@ -222,13 +222,14 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
     return environment
 
 
-def go_group_key(cell: Cell) -> tuple[str, str, str, int, int]:
+def go_group_key(cell: Cell) -> tuple[str, str, str]:
     interface = "grpc" if cell.transport == "grpc" else "native"
-    return (cell.operation, interface, cell.payload, cell.batch, cell.concurrency)
+    size_class = "large" if cell.payload == "1MiB" else "small"
+    return (cell.operation, interface, size_class)
 
 
 def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
-    groups: dict[tuple[str, str, str, int, int], list[Cell]] = {}
+    groups: dict[tuple[str, str, str], list[Cell]] = {}
     for cell in cells:
         groups.setdefault(go_group_key(cell), []).append(cell)
     return list(groups.values())
@@ -237,6 +238,24 @@ def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
 def go_benchmark_pattern(cell: Cell) -> str:
     suffix = "GRPC" if cell.transport == "grpc" else "Native"
     return f"^Benchmark_Session_{OPERATION_NAMES[cell.operation]}_{suffix}$"
+
+def go_group_environment(cells: list[Cell], operations: int, deadline: str) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "FUJIN_BENCH_PAYLOAD": ",".join(dict.fromkeys(cell.payload for cell in cells)),
+            "FUJIN_BENCH_BATCH": ",".join(
+                map(str, dict.fromkeys(cell.batch for cell in cells))
+            ),
+            "FUJIN_BENCH_CONCURRENCY": ",".join(
+                map(str, dict.fromkeys(cell.concurrency for cell in cells))
+            ),
+            "FUJIN_BENCH_OPERATIONS": str(operations),
+            "FUJIN_BENCH_DEADLINE": deadline,
+            "FUJIN_BENCH_QUIET": "1",
+        }
+    )
+    return environment
 
 
 def parse_go_results(output: str, operation: str) -> dict[Cell, dict[str, float]]:
@@ -294,7 +313,7 @@ def run_go_group(
             "./test",
         ],
         root,
-        benchmark_environment(first, operations, deadline),
+        go_group_environment(cells, operations, deadline),
         int(deadline[:-1]) + 120,
     )
     parsed = parse_go_results(output, first.operation)
@@ -685,7 +704,7 @@ def main() -> int:
             if timing_missing["go"] or timing_missing["rust"]:
                 print(
                     f"timing {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{group[0].payload}/{group[0].batch}/{group[0].concurrency} "
+                    f"{go_group_key(group[0])[2]} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
@@ -730,7 +749,7 @@ def main() -> int:
             if allocation_missing["go_alloc"] or allocation_missing["rust_alloc"]:
                 print(
                     f"alloc  {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{group[0].payload}/{group[0].batch}/{group[0].concurrency} "
+                    f"{go_group_key(group[0])[2]} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
