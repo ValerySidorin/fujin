@@ -22,10 +22,10 @@ pub use generation::{
     GenerationCompiler, GenerationState, GenerationStatus, GenerationTransition,
 };
 pub use middleware::{
-    BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistry,
-    BindMiddlewareRunner, CompiledConnectorMiddleware, ConnectorMiddlewareCompiler,
-    ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistry, NoBindMiddleware,
-    NoConnectorMiddleware,
+    BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistration,
+    BindMiddlewareRegistry, BindMiddlewareRunner, CompiledConnectorMiddleware,
+    ConnectorMiddlewareCompiler, ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistration,
+    ConnectorMiddlewareRegistry, NoBindMiddleware, NoConnectorMiddleware,
 };
 pub use overrides::{apply_overrides, validate_override_path};
 pub use session::{

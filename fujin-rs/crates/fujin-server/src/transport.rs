@@ -13,6 +13,77 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
+#[cfg(any(
+    feature = "tcp",
+    all(feature = "unix", unix),
+    feature = "websocket",
+    feature = "quic"
+))]
+mod builtin;
+
+#[cfg(feature = "quic")]
+pub use builtin::quic_plugin;
+#[cfg(feature = "tcp")]
+pub use builtin::tcp_plugin;
+#[cfg(all(feature = "unix", unix))]
+pub use builtin::unix_plugin;
+#[cfg(feature = "websocket")]
+pub use builtin::websocket_plugin;
+
+/// One listener after it has bound its actual address.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Endpoint {
+    pub interface: String,
+    pub transport: Option<String>,
+    pub network: String,
+    pub address: String,
+    pub path: Option<String>,
+    pub tls: bool,
+}
+
+impl Endpoint {
+    #[must_use]
+    pub fn native(
+        transport: impl Into<String>,
+        network: impl Into<String>,
+        address: impl Into<String>,
+        path: Option<String>,
+        tls: bool,
+    ) -> Self {
+        Self {
+            interface: "native".into(),
+            transport: Some(transport.into()),
+            network: network.into(),
+            address: address.into(),
+            path,
+            tls,
+        }
+    }
+
+    #[must_use]
+    pub fn grpc(address: impl Into<String>, tls: bool) -> Self {
+        Self {
+            interface: "grpc".into(),
+            transport: None,
+            network: "tcp".into(),
+            address: address.into(),
+            path: None,
+            tls,
+        }
+    }
+
+    #[must_use]
+    pub fn health(address: impl Into<String>) -> Self {
+        Self {
+            interface: "health".into(),
+            transport: None,
+            network: "tcp".into(),
+            address: address.into(),
+            path: None,
+            tls: false,
+        }
+    }
+}
 
 /// One configured native transport listener.
 pub trait CompiledTransport: Send + Sync + 'static {
@@ -178,13 +249,13 @@ impl fmt::Debug for ConfiguredTransport {
 /// Host services supplied to one compiled transport listener.
 #[derive(Clone)]
 pub struct TransportContext {
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    build: Arc<str>,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
-    listener_registry: ListenerRegistry,
-    inherited_listeners: InheritedListeners,
+    pub(crate) catalog: Arc<Catalog>,
+    pub(crate) bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    pub(crate) build: String,
+    pub(crate) shutdown: CancellationToken,
+    pub(crate) ready: mpsc::UnboundedSender<Endpoint>,
+    pub(crate) registry: ListenerRegistry,
+    pub(crate) inherited: InheritedListeners,
 }
 
 impl fmt::Debug for TransportContext {
@@ -193,8 +264,8 @@ impl fmt::Debug for TransportContext {
             .debug_struct("TransportContext")
             .field("build", &self.build)
             .field("shutdown", &self.shutdown.is_cancelled())
-            .field("listener_registry", &self.listener_registry)
-            .field("inherited_listeners", &self.inherited_listeners)
+            .field("listener_registry", &self.registry)
+            .field("inherited_listeners", &self.inherited)
             .finish_non_exhaustive()
     }
 }
@@ -204,9 +275,9 @@ impl TransportContext {
     pub fn new(
         catalog: Arc<Catalog>,
         bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-        build: Arc<str>,
+        build: String,
         shutdown: CancellationToken,
-        ready: mpsc::UnboundedSender<()>,
+        ready: mpsc::UnboundedSender<Endpoint>,
         listener_registry: ListenerRegistry,
         inherited_listeners: InheritedListeners,
     ) -> Self {
@@ -216,14 +287,14 @@ impl TransportContext {
             build,
             shutdown,
             ready,
-            listener_registry,
-            inherited_listeners,
+            registry: listener_registry,
+            inherited: inherited_listeners,
         }
     }
 
     /// Reports that one listener owned by this transport is accepting connections.
-    pub fn signal_ready(&self) {
-        let _ = self.ready.send(());
+    pub fn signal_ready(&self, endpoint: Endpoint) {
+        let _ = self.ready.send(endpoint);
     }
 
     #[must_use]
@@ -233,12 +304,12 @@ impl TransportContext {
 
     #[must_use]
     pub fn listener_registry(&self) -> &ListenerRegistry {
-        &self.listener_registry
+        &self.registry
     }
 
     #[must_use]
     pub fn inherited_listeners(&self) -> &InheritedListeners {
-        &self.inherited_listeners
+        &self.inherited
     }
 
     #[must_use]
@@ -259,7 +330,7 @@ impl TransportContext {
             stream,
             Arc::clone(&self.catalog),
             Arc::clone(&self.bind_middlewares),
-            self.build.to_string(),
+            self.build.clone(),
             self.shutdown.clone().cancelled_owned(),
         )
         .await

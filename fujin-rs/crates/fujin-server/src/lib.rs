@@ -12,10 +12,11 @@ pub mod transport;
 pub use grpc::{GrpcOutput, GrpcService, GrpcSession};
 
 pub use server::{
-    configured_listener_count, serve, serve_with_readiness, serve_with_readiness_and_upgrade,
+    ServerConfig, configured_listener_count, serve, serve_with_readiness,
+    serve_with_readiness_and_upgrade,
 };
 pub use transport::{
-    CompiledTransport, ConfiguredTransport, TransportContext, TransportPlugin,
+    CompiledTransport, ConfiguredTransport, Endpoint, TransportContext, TransportPlugin,
     TransportRegistration, TransportRegistry,
 };
 

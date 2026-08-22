@@ -1138,34 +1138,44 @@ impl ServerHandle {
                 Err(error) => return Err(error).context("remove stale benchmark socket"),
             }
         }
-        let mut config = fujin_runtime::fujin_server_config::ServerConfig {
-            build: "rust-bench".into(),
-            ..Default::default()
-        };
+        let registry = fujin_server::TransportRegistry::default();
         let mut quic_certificate = None;
         let mut temporary_files = Vec::new();
-        match transport {
+        let transport_config = match transport {
             Transport::Tcp => {
-                config.tcp = Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
-                    listen: TCP_ADDRESS.into(),
-                    tls: None,
-                });
+                registry.register(fujin_server::transport::tcp_plugin())?;
+                fujin_runtime::TransportConfig {
+                    transport_type: "tcp".into(),
+                    enabled: true,
+                    settings: serde_json::json!({"addr": TCP_ADDRESS}),
+                }
             }
             Transport::Unix => {
-                config.unix = Some(fujin_runtime::fujin_server_config::UnixListenerConfig {
-                    path: UNIX_PATH.into(),
-                });
+                #[cfg(unix)]
+                {
+                    registry.register(fujin_server::transport::unix_plugin())?;
+                    fujin_runtime::TransportConfig {
+                        transport_type: "unix".into(),
+                        enabled: true,
+                        settings: serde_json::json!({"path": UNIX_PATH}),
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    bail!("Unix benchmark transport is unavailable on this platform");
+                }
             }
             Transport::WebSocket => {
-                config.websocket = Some(
-                    fujin_runtime::fujin_server_config::WebSocketListenerConfig {
-                        listen: WEBSOCKET_ADDRESS.into(),
-                        path: "/".into(),
-                        allowed_origins: Vec::new(),
-                        max_message_bytes: 4 * 1024 * 1024,
-                        tls: None,
-                    },
-                );
+                registry.register(fujin_server::transport::websocket_plugin())?;
+                fujin_runtime::TransportConfig {
+                    transport_type: "websocket".into(),
+                    enabled: true,
+                    settings: serde_json::json!({
+                        "addr": WEBSOCKET_ADDRESS,
+                        "path": "/",
+                        "max_message_bytes": 4 * 1024 * 1024,
+                    }),
+                }
             }
             Transport::Quic => {
                 let CertifiedKey { cert, signing_key } =
@@ -1179,20 +1189,27 @@ impl ServerHandle {
                 quic_certificate = Some(cert.der().clone());
                 temporary_files.push(certificate_path.clone());
                 temporary_files.push(private_key_path.clone());
-                config.quic = Some(fujin_runtime::fujin_server_config::QuicListenerConfig {
-                    listen: QUIC_ADDRESS.into(),
-                    tls: fujin_runtime::fujin_server_config::TlsConfig {
-                        certificate: certificate_path.display().to_string(),
-                        private_key: private_key_path.display().to_string(),
-                        client_certificates: None,
-                        require_client_certificate: false,
-                    },
-                    max_incoming_streams: 1024,
-                    max_idle_timeout: None,
-                    keepalive_period: None,
-                });
+                registry.register(fujin_server::transport::quic_plugin())?;
+                fujin_runtime::TransportConfig {
+                    transport_type: "quic".into(),
+                    enabled: true,
+                    settings: serde_json::json!({
+                        "addr": QUIC_ADDRESS,
+                        "tls": {
+                            "enabled": true,
+                            "server_cert_pem_path": certificate_path,
+                            "server_key_pem_path": private_key_path,
+                        },
+                    }),
+                }
             }
-        }
+        };
+        let config = fujin_server::ServerConfig {
+            build: "rust-bench".into(),
+            transports: vec![registry.compile(&transport_config)?],
+            grpc: None,
+            health: None,
+        };
         let shutdown = CancellationToken::new();
         let server_shutdown = shutdown.clone();
         let task = tokio::spawn(async move {

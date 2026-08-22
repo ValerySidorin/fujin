@@ -32,8 +32,10 @@ grpc = ["fujin-server/grpc"]
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-kafka = { path = "../fujin-kafka", optional = true }
+fujin-plugin-api = { path = "../fujin-plugin-api" }
 fujin-runtime = { path = "../fujin-runtime" }
 fujin-server = { path = "../fujin-server", default-features = false }
 fujin-upgrade = { path = "../fujin-upgrade" }
@@ -41,3 +43,7 @@ tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+yaml_serde.workspace = true

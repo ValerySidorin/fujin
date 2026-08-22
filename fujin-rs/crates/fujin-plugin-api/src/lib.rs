@@ -36,8 +36,8 @@ pub mod transport {
 /// BIND and connector middleware contracts.
 pub mod middleware {
     pub use fujin_core::{
-        BindContext, BindMiddleware, BindMiddlewarePlugin, CompiledConnectorMiddleware,
-        ConnectorMiddlewarePlugin,
+        BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistration,
+        CompiledConnectorMiddleware, ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistration,
     };
 }
 

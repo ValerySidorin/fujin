@@ -12,13 +12,16 @@ use std::{
     task::{Context as TaskContext, Poll, ready},
 };
 
+use crate::transport::{ConfiguredTransport, Endpoint, TransportContext};
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "websocket")]
 use bytes::{Buf, Bytes, BytesMut};
 use fujin_core::{BindMiddlewareRunner, Catalog};
-use fujin_runtime::fujin_server_config::ServerConfig;
 #[cfg(any(feature = "tcp", feature = "websocket"))]
 use fujin_runtime::fujin_server_config::TlsConfig;
+use fujin_runtime::fujin_server_config::{
+    ControlPlaneConfig, GrpcListenerConfig, SocketListenerConfig,
+};
 use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 #[cfg(feature = "websocket")]
 use futures_util::{Sink, Stream};
@@ -36,6 +39,30 @@ use tokio_rustls::rustls;
 #[cfg(feature = "websocket")]
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
+
+/// Fully compiled server plan. Native transport settings have already been validated by plugins.
+#[derive(Clone, Debug, Default)]
+pub struct ServerConfig {
+    pub build: String,
+    pub transports: Vec<ConfiguredTransport>,
+    pub grpc: Option<GrpcListenerConfig>,
+    pub health: Option<SocketListenerConfig>,
+}
+
+impl ServerConfig {
+    #[must_use]
+    pub fn from_control_plane(
+        control_plane: ControlPlaneConfig,
+        transports: Vec<ConfiguredTransport>,
+    ) -> Self {
+        Self {
+            build: control_plane.build,
+            transports,
+            grpc: control_plane.grpc,
+            health: control_plane.health,
+        }
+    }
+}
 
 /// Runs every configured listener until shutdown or a terminal listener failure.
 ///
@@ -72,7 +99,7 @@ pub async fn serve_with_readiness(
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
-    ready: oneshot::Sender<()>,
+    ready: oneshot::Sender<Vec<Endpoint>>,
 ) -> Result<()> {
     let registry = ListenerRegistry::new(configured_listener_count(&config));
     serve_inner(
@@ -98,7 +125,7 @@ pub async fn serve_with_readiness_and_upgrade(
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
-    ready: oneshot::Sender<()>,
+    ready: oneshot::Sender<Vec<Endpoint>>,
     registry: ListenerRegistry,
     inherited: InheritedListeners,
 ) -> Result<()> {
@@ -114,100 +141,14 @@ pub async fn serve_with_readiness_and_upgrade(
     .await
 }
 
-#[derive(Clone)]
-struct ListenerContext {
-    #[cfg(any(
-        feature = "tcp",
-        all(feature = "unix", unix),
-        feature = "websocket",
-        feature = "quic",
-        feature = "grpc"
-    ))]
-    catalog: Arc<Catalog>,
-    #[cfg(any(
-        feature = "tcp",
-        all(feature = "unix", unix),
-        feature = "websocket",
-        feature = "quic",
-        feature = "grpc"
-    ))]
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    #[cfg(any(
-        feature = "tcp",
-        all(feature = "unix", unix),
-        feature = "websocket",
-        feature = "quic"
-    ))]
-    build: String,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
-    registry: ListenerRegistry,
-    inherited: InheritedListeners,
-}
-
-impl ListenerContext {
-    fn new(
-        catalog: Arc<Catalog>,
-        bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-        build: String,
-        shutdown: CancellationToken,
-        ready: mpsc::UnboundedSender<()>,
-        registry: ListenerRegistry,
-        inherited: InheritedListeners,
-    ) -> Self {
-        #[cfg(not(any(
-            feature = "tcp",
-            all(feature = "unix", unix),
-            feature = "websocket",
-            feature = "quic",
-            feature = "grpc"
-        )))]
-        drop((catalog, bind_middlewares));
-        #[cfg(not(any(
-            feature = "tcp",
-            all(feature = "unix", unix),
-            feature = "websocket",
-            feature = "quic"
-        )))]
-        drop(build);
-        Self {
-            #[cfg(any(
-                feature = "tcp",
-                all(feature = "unix", unix),
-                feature = "websocket",
-                feature = "quic",
-                feature = "grpc"
-            ))]
-            catalog,
-            #[cfg(any(
-                feature = "tcp",
-                all(feature = "unix", unix),
-                feature = "websocket",
-                feature = "quic",
-                feature = "grpc"
-            ))]
-            bind_middlewares,
-            #[cfg(any(
-                feature = "tcp",
-                all(feature = "unix", unix),
-                feature = "websocket",
-                feature = "quic"
-            ))]
-            build,
-            shutdown,
-            ready,
-            registry,
-            inherited,
-        }
-    }
-}
+type ListenerContext = TransportContext;
 
 async fn serve_inner(
     config: ServerConfig,
     catalog: Arc<Catalog>,
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
-    ready: Option<oneshot::Sender<()>>,
+    ready: Option<oneshot::Sender<Vec<Endpoint>>>,
     registry: ListenerRegistry,
     inherited: InheritedListeners,
 ) -> Result<()> {
@@ -231,37 +172,8 @@ async fn serve_inner(
         inherited,
     );
 
-    if let Some(listener) = config.tcp {
-        #[cfg(not(feature = "tcp"))]
-        let _ = listener;
-        #[cfg(feature = "tcp")]
-        listeners.spawn(serve_tcp(listener, context.clone()));
-        #[cfg(not(feature = "tcp"))]
-        bail!("TCP listener configured but fujin-server/tcp is disabled");
-    }
-    if let Some(listener) = config.unix {
-        #[cfg(not(all(feature = "unix", unix)))]
-        let _ = listener;
-        #[cfg(all(feature = "unix", unix))]
-        listeners.spawn(serve_unix(listener.path, context.clone()));
-        #[cfg(not(all(feature = "unix", unix)))]
-        bail!("Unix listener configured but unavailable in this build");
-    }
-    if let Some(listener) = config.websocket {
-        #[cfg(not(feature = "websocket"))]
-        let _ = listener;
-        #[cfg(feature = "websocket")]
-        listeners.spawn(serve_websocket(listener, context.clone()));
-        #[cfg(not(feature = "websocket"))]
-        bail!("WebSocket listener configured but fujin-server/websocket is disabled");
-    }
-    if let Some(listener) = config.quic {
-        #[cfg(not(feature = "quic"))]
-        let _ = listener;
-        #[cfg(feature = "quic")]
-        listeners.spawn(serve_quic(listener, context.clone()));
-        #[cfg(not(feature = "quic"))]
-        bail!("QUIC listener configured but fujin-server/quic is disabled");
+    for transport in config.transports {
+        listeners.spawn(transport.serve(context.clone()));
     }
     if let Some(listener) = config.grpc {
         #[cfg(not(feature = "grpc"))]
@@ -293,19 +205,20 @@ async fn serve_inner(
 
 async fn serve_ready_listeners(
     mut listeners: JoinSet<Result<()>>,
-    mut ready_receiver: mpsc::UnboundedReceiver<()>,
+    mut ready_receiver: mpsc::UnboundedReceiver<Endpoint>,
     configured: usize,
     shutdown: CancellationToken,
     health_ready: Arc<AtomicBool>,
-    ready: Option<oneshot::Sender<()>>,
+    ready: Option<oneshot::Sender<Vec<Endpoint>>>,
 ) -> Result<()> {
-    wait_for_readiness(&mut listeners, &mut ready_receiver, configured, &shutdown).await?;
+    let endpoints =
+        wait_for_readiness(&mut listeners, &mut ready_receiver, configured, &shutdown).await?;
     if shutdown.is_cancelled() {
         return Ok(());
     }
     health_ready.store(true, Ordering::Release);
     if let Some(ready) = ready {
-        let _ = ready.send(());
+        let _ = ready.send(endpoints);
     }
     let result = wait_for_listeners(&mut listeners, &shutdown).await;
     health_ready.store(false, Ordering::Release);
@@ -321,37 +234,37 @@ fn require_configured_listener_count(config: &ServerConfig) -> Result<usize> {
 }
 
 pub fn configured_listener_count(config: &ServerConfig) -> usize {
-    [
-        config.tcp.is_some(),
-        config.unix.is_some(),
-        config.websocket.is_some(),
-        config.quic.is_some(),
-        config.grpc.is_some(),
-        config.health.is_some(),
-    ]
-    .into_iter()
-    .filter(|configured| *configured)
-    .count()
+    config
+        .transports
+        .iter()
+        .map(ConfiguredTransport::listener_count)
+        .sum::<usize>()
+        + usize::from(config.grpc.is_some())
+        + usize::from(config.health.is_some())
 }
 
 async fn wait_for_readiness(
     listeners: &mut JoinSet<Result<()>>,
-    ready: &mut mpsc::UnboundedReceiver<()>,
+    ready: &mut mpsc::UnboundedReceiver<Endpoint>,
     expected: usize,
     shutdown: &CancellationToken,
-) -> Result<()> {
-    let mut started = 0;
-    while started < expected {
+) -> Result<Vec<Endpoint>> {
+    let mut endpoints = Vec::with_capacity(expected);
+    while endpoints.len() < expected {
         tokio::select! {
-            () = shutdown.cancelled() => return Ok(()),
+            () = shutdown.cancelled() => return Ok(endpoints),
             signal = ready.recv() => match signal {
-                Some(()) => started += 1,
-                None => bail!("listener readiness channel closed after {started}/{expected}"),
+                Some(endpoint) => endpoints.push(endpoint),
+                None => bail!(
+                    "listener readiness channel closed after {}/{}",
+                    endpoints.len(),
+                    expected
+                ),
             },
-            result = listeners.join_next() => return listener_stopped(result, shutdown, true),
+            result = listeners.join_next() => return listener_stopped(result, shutdown, true).map(|()| endpoints),
         }
     }
-    Ok(())
+    Ok(endpoints)
 }
 
 async fn wait_for_listeners(
@@ -482,7 +395,7 @@ fn bind_quic_socket(
 }
 
 #[cfg(feature = "tcp")]
-async fn serve_tcp(
+pub(crate) async fn serve_tcp(
     config: fujin_runtime::fujin_server_config::TcpListenerConfig,
     context: ListenerContext,
 ) -> Result<()> {
@@ -501,7 +414,16 @@ async fn serve_tcp(
     };
     let metadata = ListenerMetadata::tcp(config.listen.clone());
     let listener = bind_tcp_listener(&config.listen, metadata, &registry, &inherited).await?;
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::native(
+        "tcp",
+        "tcp",
+        listener
+            .local_addr()
+            .context("read TCP listener address")?
+            .to_string(),
+        None,
+        config.tls.is_some(),
+    ));
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -545,7 +467,7 @@ async fn serve_tcp(
 }
 
 #[cfg(all(feature = "unix", unix))]
-async fn serve_unix(path: String, context: ListenerContext) -> Result<()> {
+pub(crate) async fn serve_unix(path: String, context: ListenerContext) -> Result<()> {
     let ListenerContext {
         catalog,
         bind_middlewares,
@@ -557,7 +479,13 @@ async fn serve_unix(path: String, context: ListenerContext) -> Result<()> {
     } = context;
     let metadata = ListenerMetadata::unix(path.clone());
     let listener = bind_unix_listener(&path, metadata, &registry, &inherited)?;
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::native(
+        "unix",
+        "unix",
+        path.clone(),
+        Some(path.clone()),
+        false,
+    ));
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -614,7 +542,7 @@ struct WebSocketPolicy {
 }
 
 #[cfg(feature = "websocket")]
-async fn serve_websocket(
+pub(crate) async fn serve_websocket(
     config: fujin_runtime::fujin_server_config::WebSocketListenerConfig,
     context: ListenerContext,
 ) -> Result<()> {
@@ -638,7 +566,16 @@ async fn serve_websocket(
         allowed_origins: config.allowed_origins.into(),
         max_message_bytes: config.max_message_bytes,
     };
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::native(
+        "websocket",
+        "tcp",
+        listener
+            .local_addr()
+            .context("read WebSocket listener address")?
+            .to_string(),
+        Some(policy.path.to_string()),
+        config.tls.is_some(),
+    ));
     let mut sessions = JoinSet::new();
     loop {
         tokio::select! {
@@ -918,7 +855,7 @@ fn websocket_origin_allowed(
 }
 
 #[cfg(feature = "quic")]
-async fn serve_quic(
+pub(crate) async fn serve_quic(
     config: fujin_runtime::fujin_server_config::QuicListenerConfig,
     context: ListenerContext,
 ) -> Result<()> {
@@ -950,7 +887,16 @@ async fn serve_quic(
         Arc::new(quinn::TokioRuntime),
     )
     .context("start QUIC endpoint")?;
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::native(
+        "quic",
+        "udp",
+        endpoint
+            .local_addr()
+            .context("read QUIC listener address")?
+            .to_string(),
+        None,
+        true,
+    ));
     let mut connections = JoinSet::new();
     loop {
         tokio::select! {
@@ -1228,7 +1174,13 @@ async fn serve_grpc(
     health_reporter
         .set_serving::<pb::fujin_service_server::FujinServiceServer<crate::GrpcService>>()
         .await;
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::grpc(
+        listener
+            .local_addr()
+            .context("read gRPC listener address")?
+            .to_string(),
+        config.tls.is_some(),
+    ));
     let shutdown_health = health_reporter.clone();
     builder
         .add_service(health_service)
@@ -1262,7 +1214,12 @@ async fn serve_health(
     } = context;
     let metadata = ListenerMetadata::tcp(address.clone());
     let listener = bind_tcp_listener(&address, metadata, &registry, &inherited).await?;
-    let _ = ready.send(());
+    let _ = ready.send(Endpoint::health(
+        listener
+            .local_addr()
+            .context("read health listener address")?
+            .to_string(),
+    ));
     let mut connections = JoinSet::new();
     loop {
         tokio::select! {
@@ -1355,6 +1312,27 @@ mod tests {
         )
     }
 
+    fn tcp_server_config(address: impl Into<String>, health: Option<String>) -> ServerConfig {
+        let registry = crate::TransportRegistry::default();
+        registry
+            .register(crate::transport::tcp_plugin())
+            .expect("register TCP transport");
+        let transport = registry
+            .compile(&fujin_runtime::TransportConfig {
+                transport_type: "tcp".into(),
+                enabled: true,
+                settings: serde_json::json!({"addr": address.into()}),
+            })
+            .expect("compile TCP transport");
+        ServerConfig {
+            build: "test".into(),
+            transports: vec![transport],
+            grpc: None,
+            health: health
+                .map(|listen| fujin_runtime::fujin_server_config::SocketListenerConfig { listen }),
+        }
+    }
+
     #[cfg(unix)]
     async fn transfer_listener(
         metadata: ListenerMetadata,
@@ -1428,14 +1406,7 @@ mod tests {
         shutdown.cancel();
 
         serve(
-            ServerConfig {
-                build: "test".into(),
-                tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
-                    listen: "127.0.0.1:0".into(),
-                    tls: None,
-                }),
-                ..ServerConfig::default()
-            },
+            tcp_server_config("127.0.0.1:0", None),
             Arc::clone(&catalog),
             Arc::new(fujin_core::NoBindMiddleware),
             shutdown,
@@ -1468,14 +1439,7 @@ mod tests {
         let (ready_sender, ready_receiver) = oneshot::channel();
         let server = tokio::spawn(async move {
             serve_with_readiness_and_upgrade(
-                ServerConfig {
-                    build: "test".into(),
-                    tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
-                        listen: address.to_string(),
-                        tls: None,
-                    }),
-                    ..ServerConfig::default()
-                },
+                tcp_server_config(address.to_string(), None),
                 server_catalog,
                 Arc::new(fujin_core::NoBindMiddleware),
                 server_shutdown,
@@ -1510,7 +1474,6 @@ mod tests {
             .expect("HELLO response timeout")
             .expect("read HELLO response");
         assert_eq!(response, ResponseCode::Hello as u8);
-
         shutdown.cancel();
         server
             .await
@@ -1588,17 +1551,7 @@ mod tests {
         let server_catalog = Arc::clone(&catalog);
         let server = tokio::spawn(async move {
             serve(
-                ServerConfig {
-                    build: "test".into(),
-                    tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
-                        listen: tcp_address.to_string(),
-                        tls: None,
-                    }),
-                    health: Some(fujin_runtime::fujin_server_config::SocketListenerConfig {
-                        listen: health_address.to_string(),
-                    }),
-                    ..ServerConfig::default()
-                },
+                tcp_server_config(tcp_address.to_string(), Some(health_address.to_string())),
                 server_catalog,
                 Arc::new(fujin_core::NoBindMiddleware),
                 server_shutdown,
@@ -1624,7 +1577,7 @@ mod tests {
             }
         })
         .await
-        .expect("health listener readiness");
+        .expect("listener readiness");
         assert!(response.starts_with(b"HTTP/1.1 200"));
 
         shutdown.cancel();

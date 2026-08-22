@@ -13,7 +13,7 @@ use fujin_runtime::configurator::{
     Configurator, ConfiguratorRegistry, ConnectorReloader, ConnectorRuntime, ConnectorSnapshot,
     RuntimeController, RuntimeQueue, bootstrap_snapshot, selected_configurator,
 };
-use fujin_runtime::fujin_server_config::ServerConfig;
+use fujin_runtime::fujin_server_config::ControlPlaneConfig;
 use fujin_upgrade::{InheritedListeners, ListenerRegistry};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -42,7 +42,7 @@ struct UpgradeSetup {
 }
 
 async fn prepare_upgrade(
-    server_config: &ServerConfig,
+    server_config: &ControlPlaneConfig,
     upgrade_shutdown: &CancellationToken,
     shutdown_requested: &CancellationToken,
 ) -> Result<UpgradeSetup> {
@@ -99,12 +99,15 @@ async fn complete_upgrade(
 }
 
 fn spawn_server(
-    server_config: ServerConfig,
+    server_config: ControlPlaneConfig,
     catalog: Arc<fujin_core::Catalog>,
     shutdown: CancellationToken,
     registry: ListenerRegistry,
     inherited: InheritedListeners,
-) -> (JoinHandle<Result<()>>, tokio::sync::oneshot::Receiver<()>) {
+) -> (
+    JoinHandle<Result<()>>,
+    tokio::sync::oneshot::Receiver<Vec<fujin_server::Endpoint>>,
+) {
     let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
     let task = tokio::spawn(fujin_server::serve_with_readiness_and_upgrade(
         server_config,
@@ -229,7 +232,7 @@ struct Bootstrap {
     configurator: Arc<dyn Configurator>,
     catalog: Arc<fujin_core::Catalog>,
     controller: Arc<RuntimeController>,
-    server_config: ServerConfig,
+    server_config: ControlPlaneConfig,
 }
 
 async fn bootstrap() -> Result<Bootstrap> {

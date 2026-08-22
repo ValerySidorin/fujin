@@ -38,6 +38,45 @@ pub trait BindMiddlewarePlugin: Send + Sync + 'static {
     ) -> Result<()>;
 }
 
+/// One explicitly registered BIND middleware plugin.
+#[derive(Clone)]
+pub struct BindMiddlewareRegistration {
+    name: String,
+    plugin: Arc<dyn BindMiddlewarePlugin>,
+}
+
+impl BindMiddlewareRegistration {
+    #[must_use]
+    pub fn new(name: impl Into<String>, plugin: impl BindMiddlewarePlugin) -> Self {
+        Self {
+            name: name.into(),
+            plugin: Arc::new(plugin),
+        }
+    }
+
+    #[must_use]
+    pub fn from_arc(name: impl Into<String>, plugin: Arc<dyn BindMiddlewarePlugin>) -> Self {
+        Self {
+            name: name.into(),
+            plugin,
+        }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl fmt::Debug for BindMiddlewareRegistration {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("BindMiddlewareRegistration")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
+}
+
 pub trait BindMiddlewareRunner: Send + Sync + 'static {
     /// Runs the configured BIND middleware chain in declaration order.
     ///
@@ -115,6 +154,15 @@ impl BindMiddlewareRegistry {
         }
         plugins.insert(name, plugin);
         Ok(())
+    }
+
+    /// Registers one BIND middleware registration exactly once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::InvalidConfig`] for an empty or duplicate name.
+    pub fn register_plugin(&self, registration: BindMiddlewareRegistration) -> Result<()> {
+        self.register(registration.name, registration.plugin)
     }
 
     #[must_use]
@@ -198,6 +246,45 @@ pub trait ConnectorMiddlewarePlugin: Send + Sync + 'static {
     ) -> Result<Arc<dyn CompiledConnectorMiddleware>>;
 }
 
+/// One explicitly registered connector middleware plugin.
+#[derive(Clone)]
+pub struct ConnectorMiddlewareRegistration {
+    name: String,
+    plugin: Arc<dyn ConnectorMiddlewarePlugin>,
+}
+
+impl ConnectorMiddlewareRegistration {
+    #[must_use]
+    pub fn new(name: impl Into<String>, plugin: impl ConnectorMiddlewarePlugin) -> Self {
+        Self {
+            name: name.into(),
+            plugin: Arc::new(plugin),
+        }
+    }
+
+    #[must_use]
+    pub fn from_arc(name: impl Into<String>, plugin: Arc<dyn ConnectorMiddlewarePlugin>) -> Self {
+        Self {
+            name: name.into(),
+            plugin,
+        }
+    }
+
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl fmt::Debug for ConnectorMiddlewareRegistration {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ConnectorMiddlewareRegistration")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Explicit registry and compiler for statically linked connector middleware plugins.
 #[derive(Default)]
 pub struct ConnectorMiddlewareRegistry {
@@ -238,6 +325,15 @@ impl ConnectorMiddlewareRegistry {
         }
         plugins.insert(name, plugin);
         Ok(())
+    }
+
+    /// Registers one connector middleware registration exactly once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::InvalidConfig`] for an empty or duplicate name.
+    pub fn register_plugin(&self, registration: ConnectorMiddlewareRegistration) -> Result<()> {
+        self.register(registration.name, registration.plugin)
     }
 
     #[must_use]

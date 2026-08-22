@@ -344,15 +344,19 @@ name = "fujin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "fujin-core",
  "fujin-kafka",
+ "fujin-plugin-api",
  "fujin-runtime",
  "fujin-server",
  "fujin-upgrade",
+ "serde_json",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "yaml_serde",
 ]
 
 [[package]]
@@ -460,12 +464,14 @@ dependencies = [
  "fujin-runtime",
  "fujin-upgrade",
  "futures-util",
+ "humantime",
  "parking_lot",
  "prost",
  "quinn",
  "rcgen",
  "rustls",
  "rustls-pemfile",
+ "serde",
  "serde_json",
  "stats_alloc",
  "tokio",
