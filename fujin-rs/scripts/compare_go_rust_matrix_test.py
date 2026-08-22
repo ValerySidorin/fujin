@@ -41,19 +41,34 @@ class MatrixDriverTest(unittest.TestCase):
             )
         )
 
-    def test_go_selector_targets_one_native_cell(self) -> None:
-        cell = matrix.Cell("fetch", "unix", "1B", 256, 128)
+    def test_go_grouping_batches_native_transports(self) -> None:
+        tcp = matrix.Cell("fetch", "tcp", "1B", 256, 128)
+        quic = matrix.Cell("fetch", "quic", "1B", 256, 128)
+        grpc = matrix.Cell("fetch", "grpc", "1B", 256, 128)
+        self.assertEqual(matrix.grouped_cells([tcp, quic, grpc]), [[tcp, quic], [grpc]])
         self.assertEqual(
-            matrix.go_benchmark_pattern(cell),
-            "^Benchmark_Session_Fetch_Native$/^connector=session_bench$/"
-            "^transport=unix$/^payload=1B$/^batch=256$/^concurrency=128$",
+            matrix.go_benchmark_pattern(tcp), "^Benchmark_Session_Fetch_Native$"
+        )
+        self.assertEqual(
+            matrix.go_benchmark_pattern(grpc), "^Benchmark_Session_Fetch_GRPC$"
         )
 
-        produce = matrix.Cell("produce", "grpc", "128B", 1, 16)
+    def test_go_parser_returns_every_transport_cell(self) -> None:
+        output = "\n".join(
+            (
+                "Benchmark_Session_Fetch_Native/connector=session_bench/transport=tcp/"
+                "payload=1B/batch=256/concurrency=128-8 1000 5000 ns/op 51.20 MB/s "
+                "100000 p99-ns 20000 B/op 500 allocs/op",
+                "Benchmark_Session_Fetch_Native/connector=session_bench/transport=quic/"
+                "payload=1B/batch=256/concurrency=128-8 1000 7000 ns/op 36.57 MB/s "
+                "200000 p99-ns 21000 B/op 510 allocs/op",
+            )
+        )
+        parsed = matrix.parse_go_results(output, "fetch")
+        self.assertEqual(len(parsed), 2)
         self.assertEqual(
-            matrix.go_benchmark_pattern(produce),
-            "^Benchmark_Session_Produce_GRPC$/^connector=nop$/"
-            "^payload=128B$/^batch=1$/^concurrency=16$",
+            parsed[matrix.Cell("fetch", "tcp", "1B", 256, 128)]["ns_per_operation"],
+            5000,
         )
 
     def test_result_parser_requires_exactly_one_valid_row(self) -> None:

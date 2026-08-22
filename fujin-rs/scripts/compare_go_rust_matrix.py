@@ -48,7 +48,7 @@ OPERATION_NAMES = {
     "transaction": "Transaction",
 }
 GO_RESULT = re.compile(
-    r"^Benchmark_Session_\S+\s+\d+\s+"
+    r"^(?P<name>Benchmark_Session_\S+)\s+\d+\s+"
     r"(?P<ns>[0-9.]+)\s+ns/op\s+"
     r"(?P<mb>[0-9.]+)\s+MB/s\s+"
     r"(?P<p99>[0-9.]+)\s+p99-ns\s+"
@@ -177,22 +177,28 @@ def run_checked(
     return process.stdout
 
 
+def metrics_from_values(values: dict[str, str]) -> dict[str, float]:
+    result = {
+        "ns_per_operation": float(values["ns"]),
+        "megabytes_per_second": float(values["mb"]),
+        "p99_ns": float(values["p99"]),
+    }
+    for source, target in (
+        ("bytes", "bytes_per_operation"),
+        ("allocs", "allocations_per_operation"),
+    ):
+        if values[source] != "n/a":
+            result[target] = float(values[source])
+    return result
+
+
 def parse_metrics(pattern: re.Pattern[str], output: str, runtime: str) -> dict[str, float]:
     matches = list(pattern.finditer(output))
     if len(matches) != 1:
         raise RuntimeError(
             f"expected exactly one {runtime} benchmark result, got {len(matches)}\n{output}"
         )
-    values = matches[0].groupdict()
-    result = {
-        "ns_per_operation": float(values["ns"]),
-        "megabytes_per_second": float(values["mb"]),
-        "p99_ns": float(values["p99"]),
-    }
-    for source, target in (("bytes", "bytes_per_operation"), ("allocs", "allocations_per_operation")):
-        if values[source] != "n/a":
-            result[target] = float(values[source])
-    return result
+    return metrics_from_values(matches[0].groupdict())
 
 
 def operations_for(cell: Cell, args: argparse.Namespace) -> int:
@@ -216,25 +222,64 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
     return environment
 
 
+def go_group_key(cell: Cell) -> tuple[str, str, str, int, int]:
+    interface = "grpc" if cell.transport == "grpc" else "native"
+    return (cell.operation, interface, cell.payload, cell.batch, cell.concurrency)
+
+
+def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
+    groups: dict[tuple[str, str, str, int, int], list[Cell]] = {}
+    for cell in cells:
+        groups.setdefault(go_group_key(cell), []).append(cell)
+    return list(groups.values())
+
+
 def go_benchmark_pattern(cell: Cell) -> str:
     suffix = "GRPC" if cell.transport == "grpc" else "Native"
-    segments = [
-        f"^Benchmark_Session_{OPERATION_NAMES[cell.operation]}_{suffix}$",
-        f"^connector={'nop' if cell.operation == 'produce' else 'session_bench'}$",
-    ]
-    if cell.transport != "grpc":
-        segments.append(f"^transport={cell.transport}$")
-    segments.extend(
-        (
-            f"^payload={cell.payload}$",
-            f"^batch={cell.batch}$",
-            f"^concurrency={cell.concurrency}$",
-        )
-    )
-    return "/".join(segments)
+    return f"^Benchmark_Session_{OPERATION_NAMES[cell.operation]}_{suffix}$"
 
 
-def run_go(root: Path, cell: Cell, operations: int, deadline: str) -> dict[str, float]:
+def parse_go_results(output: str, operation: str) -> dict[Cell, dict[str, float]]:
+    expected_native = f"Benchmark_Session_{OPERATION_NAMES[operation]}_Native"
+    expected_grpc = f"Benchmark_Session_{OPERATION_NAMES[operation]}_GRPC"
+    expected_connector = "nop" if operation == "produce" else "session_bench"
+    results: dict[Cell, dict[str, float]] = {}
+    for match in GO_RESULT.finditer(output):
+        segments = match.group("name").split("/")
+        benchmark = segments[0]
+        if benchmark not in (expected_native, expected_grpc):
+            continue
+        attributes: dict[str, str] = {}
+        for segment in segments[1:]:
+            segment = re.sub(r"-[0-9]+$", "", segment)
+            if "=" in segment:
+                key, value = segment.split("=", 1)
+                attributes[key] = value
+        if attributes.get("connector") != expected_connector:
+            continue
+        transport = "grpc" if benchmark == expected_grpc else attributes.get("transport")
+        try:
+            cell = Cell(
+                operation,
+                str(transport),
+                attributes["payload"],
+                int(attributes["batch"]),
+                int(attributes["concurrency"]),
+            )
+        except (KeyError, ValueError) as error:
+            raise RuntimeError(f"malformed Go benchmark name {match.group('name')!r}") from error
+        if cell in results:
+            raise RuntimeError(f"duplicate Go benchmark result for {cell.key}")
+        results[cell] = metrics_from_values(match.groupdict())
+    return results
+
+
+def run_go_group(
+    root: Path, cells: list[Cell], operations: int, deadline: str
+) -> dict[Cell, dict[str, float]]:
+    if not cells or any(go_group_key(cell) != go_group_key(cells[0]) for cell in cells):
+        raise RuntimeError("Go benchmark group contains mismatched cells")
+    first = cells[0]
     output = run_checked(
         [
             "go",
@@ -242,17 +287,21 @@ def run_go(root: Path, cell: Cell, operations: int, deadline: str) -> dict[str, 
             "-tags=fujin,grpc",
             "-run",
             "^$",
-            f"-bench={go_benchmark_pattern(cell)}",
+            f"-bench={go_benchmark_pattern(first)}",
             f"-benchtime={operations}x",
             "-count=1",
             "-benchmem",
             "./test",
         ],
         root,
-        benchmark_environment(cell, operations, deadline),
+        benchmark_environment(first, operations, deadline),
         int(deadline[:-1]) + 120,
     )
-    return parse_metrics(GO_RESULT, output, "Go")
+    parsed = parse_go_results(output, first.operation)
+    missing = [cell.key for cell in cells if cell not in parsed]
+    if missing:
+        raise RuntimeError(f"Go benchmark group omitted expected cells: {missing}\n{output}")
+    return {cell: parsed[cell] for cell in cells}
 
 
 def rust_binary(root: Path, cell: Cell, allocation: bool) -> Path:
@@ -609,46 +658,82 @@ def main() -> int:
         if args.output_markdown:
             atomic_write(args.output_markdown, markdown_report(document))
 
-    for cell_index, cell in enumerate(cells):
-        entry = results[cell.key]
-        operations = operations_for(cell, args)
+    for group_index, group in enumerate(grouped_cells(cells)):
+        operations = operations_for(group[0], args)
         for sample in range(args.samples):
-            if len(entry["go"]) <= sample or len(entry["rust"]) <= sample:
-                order = ("go", "rust") if (cell_index + sample) % 2 == 0 else ("rust", "go")
-                pending: dict[str, dict[str, float]] = {}
-                for runtime in order:
-                    pending[runtime] = (
-                        run_go(root, cell, operations, args.deadline)
-                        if runtime == "go"
-                        else run_rust(root, cell, operations, args.deadline, False)
-                    )
-                for runtime in ("go", "rust"):
-                    if len(entry[runtime]) <= sample:
-                        entry[runtime].append(pending[runtime])
-                persist()
-                print(f"timing {cell.key} sample={sample + 1}/{args.samples}", flush=True)
-            if args.allocation_operations > 0 and (
-                len(entry["go_alloc"]) <= sample or len(entry["rust_alloc"]) <= sample
-            ):
-                order = (
-                    ("rust_alloc", "go_alloc")
-                    if (cell_index + sample) % 2 == 0
-                    else ("go_alloc", "rust_alloc")
-                )
-                pending = {}
-                for runtime in order:
-                    pending[runtime] = (
-                        run_go(root, cell, args.allocation_operations, args.deadline)
-                        if runtime == "go_alloc"
-                        else run_rust(
-                            root, cell, args.allocation_operations, args.deadline, True
+            timing_missing = {
+                "go": [cell for cell in group if len(results[cell.key]["go"]) <= sample],
+                "rust": [cell for cell in group if len(results[cell.key]["rust"]) <= sample],
+            }
+            timing_order = (
+                ("go", "rust") if (group_index + sample) % 2 == 0 else ("rust", "go")
+            )
+            for runtime in timing_order:
+                missing = timing_missing[runtime]
+                if not missing:
+                    continue
+                if runtime == "go":
+                    measured = run_go_group(root, group, operations, args.deadline)
+                    for cell in missing:
+                        results[cell.key]["go"].append(measured[cell])
+                else:
+                    for cell in missing:
+                        results[cell.key]["rust"].append(
+                            run_rust(root, cell, operations, args.deadline, False)
                         )
-                    )
-                for runtime in ("go_alloc", "rust_alloc"):
-                    if len(entry[runtime]) <= sample:
-                        entry[runtime].append(pending[runtime])
                 persist()
-                print(f"alloc  {cell.key} sample={sample + 1}/{args.samples}", flush=True)
+            if timing_missing["go"] or timing_missing["rust"]:
+                print(
+                    f"timing {group[0].operation}/{go_group_key(group[0])[1]}/"
+                    f"{group[0].payload}/{group[0].batch}/{group[0].concurrency} "
+                    f"cells={len(group)} sample={sample + 1}/{args.samples}",
+                    flush=True,
+                )
+
+            if args.allocation_operations == 0:
+                continue
+            allocation_missing = {
+                "go_alloc": [
+                    cell for cell in group if len(results[cell.key]["go_alloc"]) <= sample
+                ],
+                "rust_alloc": [
+                    cell for cell in group if len(results[cell.key]["rust_alloc"]) <= sample
+                ],
+            }
+            allocation_order = (
+                ("rust_alloc", "go_alloc")
+                if (group_index + sample) % 2 == 0
+                else ("go_alloc", "rust_alloc")
+            )
+            for runtime in allocation_order:
+                missing = allocation_missing[runtime]
+                if not missing:
+                    continue
+                if runtime == "go_alloc":
+                    measured = run_go_group(
+                        root, group, args.allocation_operations, args.deadline
+                    )
+                    for cell in missing:
+                        results[cell.key]["go_alloc"].append(measured[cell])
+                else:
+                    for cell in missing:
+                        results[cell.key]["rust_alloc"].append(
+                            run_rust(
+                                root,
+                                cell,
+                                args.allocation_operations,
+                                args.deadline,
+                                True,
+                            )
+                        )
+                persist()
+            if allocation_missing["go_alloc"] or allocation_missing["rust_alloc"]:
+                print(
+                    f"alloc  {group[0].operation}/{go_group_key(group[0])[1]}/"
+                    f"{group[0].payload}/{group[0].batch}/{group[0].concurrency} "
+                    f"cells={len(group)} sample={sample + 1}/{args.samples}",
+                    flush=True,
+                )
     persist()
     print(f"wrote {args.output_json}")
     if args.output_markdown:
