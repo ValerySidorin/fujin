@@ -684,6 +684,7 @@ mod tests {
         Message, OperationToken, Reader, ReaderEventSink, Result as CoreResult, RouteProfile,
         Writer,
     };
+    #[cfg(feature = "tcp")]
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[derive(Debug)]
@@ -823,6 +824,7 @@ connectors:
     }
 
     #[tokio::test]
+    #[cfg(feature = "tcp")]
     async fn embedded_application_starts_reports_actual_endpoint_and_shuts_down() {
         let application = Application::builder()
             .graceful_upgrade(false)
