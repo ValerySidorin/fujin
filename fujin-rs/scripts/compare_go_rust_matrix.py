@@ -392,6 +392,7 @@ def benchmark_configuration(args: argparse.Namespace) -> dict[str, Any]:
         "small_operations": args.small_operations,
         "large_operations": args.large_operations,
         "allocation_operations": args.allocation_operations,
+        "go_allocation_source": "timing_pass",
         "deadline": args.deadline,
         "interleaved": True,
         "max_batch_payload_bytes": MAX_BATCH_PAYLOAD_BYTES,
@@ -711,42 +712,25 @@ def main() -> int:
 
             if args.allocation_operations == 0:
                 continue
-            allocation_missing = {
-                "go_alloc": [
-                    cell for cell in group if len(results[cell.key]["go_alloc"]) <= sample
-                ],
-                "rust_alloc": [
-                    cell for cell in group if len(results[cell.key]["rust_alloc"]) <= sample
-                ],
-            }
-            allocation_order = (
-                ("rust_alloc", "go_alloc")
-                if (group_index + sample) % 2 == 0
-                else ("go_alloc", "rust_alloc")
-            )
-            for runtime in allocation_order:
-                missing = allocation_missing[runtime]
-                if not missing:
-                    continue
-                if runtime == "go_alloc":
-                    measured = run_go_group(
-                        root, group, args.allocation_operations, args.deadline
+            for cell in group:
+                entry = results[cell.key]
+                if len(entry["go_alloc"]) <= sample:
+                    entry["go_alloc"].append(entry["go"][sample])
+            rust_allocation_missing = [
+                cell for cell in group if len(results[cell.key]["rust_alloc"]) <= sample
+            ]
+            for cell in rust_allocation_missing:
+                results[cell.key]["rust_alloc"].append(
+                    run_rust(
+                        root,
+                        cell,
+                        args.allocation_operations,
+                        args.deadline,
+                        True,
                     )
-                    for cell in missing:
-                        results[cell.key]["go_alloc"].append(measured[cell])
-                else:
-                    for cell in missing:
-                        results[cell.key]["rust_alloc"].append(
-                            run_rust(
-                                root,
-                                cell,
-                                args.allocation_operations,
-                                args.deadline,
-                                True,
-                            )
-                        )
+                )
                 persist()
-            if allocation_missing["go_alloc"] or allocation_missing["rust_alloc"]:
+            if rust_allocation_missing:
                 print(
                     f"alloc  {group[0].operation}/{go_group_key(group[0])[1]}/"
                     f"{go_group_key(group[0])[2]} "
