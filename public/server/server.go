@@ -41,6 +41,7 @@ type GRPCServer interface {
 	Stop()
 	ReadyForConnections(timeout time.Duration) bool
 	Done() <-chan struct{}
+	Endpoint() transport.Endpoint
 }
 
 // NewServer creates a new server instance and validates the complete connector generation.
@@ -193,9 +194,34 @@ func (s *Server) ReadyForConnections(timeout time.Duration) bool {
 		}
 	}
 	if s.healthServer != nil {
+		remaining := time.Until(deadline)
+		if remaining <= 0 || !s.healthServer.ReadyForConnections(remaining) {
+			return false
+		}
 		s.healthServer.SetReady(true)
 	}
 	return true
+}
+
+// Endpoints returns a detached projection of actual listener addresses.
+// Call it after ReadyForConnections reports true.
+func (s *Server) Endpoints() []transport.Endpoint {
+	if s == nil {
+		return nil
+	}
+	endpoints := make([]transport.Endpoint, 0, len(s.transportServers)+2)
+	for _, ts := range s.transportServers {
+		if provider, ok := ts.(transport.EndpointProvider); ok {
+			endpoints = append(endpoints, provider.Endpoint())
+		}
+	}
+	if s.grpcServer != nil {
+		endpoints = append(endpoints, s.grpcServer.Endpoint())
+	}
+	if s.healthServer != nil {
+		endpoints = append(endpoints, transport.Endpoint{Interface: "health", Network: "tcp", Address: s.healthServer.Addr()})
+	}
+	return endpoints
 }
 
 func (s *Server) Done() <-chan struct{} {

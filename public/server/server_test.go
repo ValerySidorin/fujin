@@ -7,6 +7,7 @@ import (
 	"time"
 
 	connectorconfig "github.com/fujin-io/fujin/public/plugins/connector/config"
+	"github.com/fujin-io/fujin/public/plugins/transport"
 )
 
 func TestReloadConnectors(t *testing.T) {
@@ -147,3 +148,6 @@ func (s *lifecycleGRPCServer) ReadyForConnections(timeout time.Duration) bool {
 }
 
 func (s *lifecycleGRPCServer) Done() <-chan struct{} { return s.done }
+func (s *lifecycleGRPCServer) Endpoint() transport.Endpoint {
+	return transport.Endpoint{Interface: "grpc", Network: "tcp", Address: "127.0.0.1:0"}
+}

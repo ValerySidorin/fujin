@@ -20,6 +20,7 @@ import (
 	"github.com/fujin-io/fujin/public/plugins/transport"
 	"github.com/fujin-io/fujin/public/server"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -66,6 +67,12 @@ type ClientKeepAliveConfig struct {
 }
 
 func (c *Config) parse() (serverconfig.Config, error) {
+	return c.ServerConfig(Version)
+}
+
+// ServerConfig validates and converts bootstrap configuration without using
+// process-global environment, signals, logging, or exit behavior.
+func (c *Config) ServerConfig(buildVersion string) (serverconfig.Config, error) {
 	grpcConf, err := c.parseGRPCConfig()
 	if err != nil {
 		return serverconfig.Config{}, fmt.Errorf("parse grpc server config: %w", err)
@@ -74,7 +81,7 @@ func (c *Config) parse() (serverconfig.Config, error) {
 	healthEnabled := c.Health.Enabled != nil && *c.Health.Enabled
 
 	return serverconfig.Config{
-		BuildVersion: Version,
+		BuildVersion: buildVersion,
 		Transports:   c.Fujin.Transports,
 		GRPC:         grpcConf,
 		Health: serverconfig.HealthConfig{
@@ -83,6 +90,15 @@ func (c *Config) parse() (serverconfig.Config, error) {
 		},
 		Connectors: c.Connectors,
 	}, nil
+}
+
+// DecodeConfig decodes JSON or YAML bootstrap bytes and returns server config.
+func DecodeConfig(data []byte, buildVersion string) (serverconfig.Config, error) {
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return serverconfig.Config{}, fmt.Errorf("decode bootstrap config: %w", err)
+	}
+	return config.ServerConfig(buildVersion)
 }
 
 func (c *Config) parseGRPCConfig() (serverconfig.GRPCServerConfig, error) {

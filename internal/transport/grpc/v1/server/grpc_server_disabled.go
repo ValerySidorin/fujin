@@ -16,6 +16,7 @@ var ErrGRPCNotCompiledIn = fmt.Errorf("grpc is not compiled in")
 
 // GRPCServer stub implementation when gRPC is disabled
 type GRPCServer struct {
+	conf    serverconfig.GRPCServerConfig
 	enabled bool
 	ready   chan struct{}
 	done    chan struct{}
@@ -25,6 +26,7 @@ type GRPCServer struct {
 // NewGRPCServer creates a stub gRPC server instance.
 func NewGRPCServer(conf serverconfig.GRPCServerConfig, _ *connector.Catalog, l *slog.Logger) *GRPCServer {
 	return &GRPCServer{
+		conf:    conf,
 		enabled: conf.Enabled,
 		ready:   make(chan struct{}),
 		done:    make(chan struct{}),

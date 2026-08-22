@@ -12,10 +12,10 @@ The supported production entry points now select the Rust implementation:
 - `make build` builds `fujin-rs/crates/fujin` with the `full` feature set.
 - `Dockerfile` builds and packages the Rust binary as an unprivileged Alpine container.
 - `.github/workflows/release-image.yml` publishes and smoke-tests the Rust image.
-- Docker Compose and Helm use `FUJIN_CONFIG=/config/config.yaml` and `RUST_LOG`.
+- Docker Compose and Helm select the `yaml` configurator with `FUJIN_CONFIGURATOR=yaml`, provide `/config/config.yaml` through `FUJIN_CONFIGURATOR_YAML_PATHS`, and use the Go-compatible `FUJIN_LOG_LEVEL` logging control.
 - The Go default executable, Go production build script, and Go-only ZeroMQ production image/workflow were removed.
 
-The Go implementation remains in the repository only for compatibility tests, migration comparisons, and non-production library work. No active release or deployment definition invokes `go run ./cmd/builder`, `build.sh`, or the former Go configurator environment variables.
+The Go implementation remains in the repository only for compatibility tests, migration comparisons, and non-production library work. Active release and deployment definitions preserve the Go configurator contract rather than introducing a binary-owned configuration path.
 
 ## Delivered Rust runtime
 

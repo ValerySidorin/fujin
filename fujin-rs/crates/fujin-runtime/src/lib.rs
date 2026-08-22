@@ -1,5 +1,7 @@
 //! Fujin process lifecycle, connector catalog, and runtime configuration.
 
+pub mod configurator;
+
 use std::{path::Path, sync::Arc};
 
 use fujin_core::{

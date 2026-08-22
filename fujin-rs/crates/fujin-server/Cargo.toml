@@ -26,6 +26,7 @@ bytes.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-native = { path = "../fujin-native" }
 serde_json.workspace = true
+fujin-upgrade = { path = "../fujin-upgrade" }
 fujin-proto = { path = "../fujin-proto", optional = true }
 prost.workspace = true
 parking_lot.workspace = true

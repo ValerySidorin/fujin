@@ -8,8 +8,9 @@ services:
         VERSION: ${BUILD_TAG:-v0.5.0}
     container_name: fujin
     environment:
-      FUJIN_CONFIG: /config/config.yaml
-      RUST_LOG: info
+      FUJIN_CONFIGURATOR: yaml
+      FUJIN_CONFIGURATOR_YAML_PATHS: /config/config.yaml
+      FUJIN_LOG_LEVEL: INFO
     ports:
       - "4850:4850"
       - "4848:4848/udp"

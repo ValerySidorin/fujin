@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fujin-io/fujin/public/plugins/connector"
+	"github.com/fujin-io/fujin/public/plugins/transport"
 	serverconfig "github.com/fujin-io/fujin/public/server/config"
 )
 
@@ -40,4 +41,9 @@ func (w *GRPCServerWrapper) ReadyForConnections(timeout time.Duration) bool {
 // Done is closed after the disabled server exits.
 func (w *GRPCServerWrapper) Done() <-chan struct{} {
 	return w.server.Done()
+}
+
+// Endpoint returns the configured endpoint for the disabled build stub.
+func (w *GRPCServerWrapper) Endpoint() transport.Endpoint {
+	return transport.Endpoint{Interface: "grpc", Network: "tcp", Address: w.server.conf.Addr, TLS: w.server.conf.TLS != nil}
 }

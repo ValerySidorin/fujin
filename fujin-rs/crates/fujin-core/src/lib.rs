@@ -17,7 +17,10 @@ pub use connector::{
     SettlementKind, SettlementProfile, SettlementResult, Writer,
 };
 pub use error::{CoreError, OperationError, OperationOutcome, Result, StatusCode};
-pub use generation::{Binding, Catalog, DescriptorRegistry, Generation, GenerationCompiler};
+pub use generation::{
+    Binding, Catalog, CatalogStatus, DescriptorRegistry, Generation, GenerationCompiler,
+    GenerationState, GenerationStatus, GenerationTransition,
+};
 pub use middleware::{
     BindContext, BindMiddleware, BindMiddlewareRunner, CompiledConnectorMiddleware,
     ConnectorMiddlewareCompiler, NoBindMiddleware, NoConnectorMiddleware,

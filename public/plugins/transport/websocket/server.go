@@ -66,6 +66,15 @@ func NewServer(config serverconfig.WebSocketServerConfig, catalog *connector.Cat
 
 func (s *Server) FDKey() string { return "tcp:" + s.config.Addr }
 
+// Endpoint returns the actual WebSocket listener endpoint after readiness.
+func (s *Server) Endpoint() transport.Endpoint {
+	address := s.config.Addr
+	if s.listener != nil {
+		address = s.listener.Addr().String()
+	}
+	return transport.Endpoint{Interface: "native", Transport: "websocket", Network: "tcp", Address: address, Path: s.config.Path, TLS: s.config.TLS != nil}
+}
+
 func (s *Server) ListenerFDs() ([]transport.ListenerFD, error) {
 	if s.rawListener == nil {
 		return nil, errors.New("websocket listener not started")

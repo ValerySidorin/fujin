@@ -1,0 +1,22 @@
+{
+  "servers": {
+    "rust-analyzer": {
+      "rootMarkers": ["fujin-rs"],
+      "initOptions": {
+        "cargo": {
+          "features": "all"
+        },
+        "linkedProjects": ["fujin-rs/Cargo.toml"]
+      },
+      "settings": {
+        "rust-analyzer": {
+          "checkOnSave": false,
+          "cargo": {
+            "features": "all"
+          },
+          "linkedProjects": ["fujin-rs/Cargo.toml"]
+        }
+      }
+    }
+  }
+}

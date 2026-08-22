@@ -1,5 +1,7 @@
 #[cfg(any(all(feature = "unix", unix), feature = "quic", feature = "websocket"))]
 use std::io;
+#[cfg(unix)]
+use std::os::fd::AsFd;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -17,13 +19,14 @@ use fujin_core::{BindMiddlewareRunner, Catalog};
 use fujin_runtime::fujin_server_config::ServerConfig;
 #[cfg(any(feature = "tcp", feature = "websocket"))]
 use fujin_runtime::fujin_server_config::TlsConfig;
+use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 #[cfg(feature = "websocket")]
 use futures_util::{Sink, Stream};
 #[cfg(feature = "websocket")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    sync::mpsc,
+    sync::{mpsc, oneshot},
     task::JoinSet,
 };
 #[cfg(any(feature = "tcp", feature = "websocket"))]
@@ -46,24 +49,193 @@ pub async fn serve(
     bind_middlewares: Arc<dyn BindMiddlewareRunner>,
     shutdown: CancellationToken,
 ) -> Result<()> {
+    let registry = ListenerRegistry::new(configured_listener_count(&config));
+    serve_inner(
+        config,
+        catalog,
+        bind_middlewares,
+        shutdown,
+        None,
+        registry,
+        InheritedListeners::default(),
+    )
+    .await
+}
+
+/// Runs every configured listener and reports after all listeners are accepting connections.
+///
+/// # Errors
+///
+/// Returns the same startup and serving errors as [`serve`].
+pub async fn serve_with_readiness(
+    config: ServerConfig,
+    catalog: Arc<Catalog>,
+    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    shutdown: CancellationToken,
+    ready: oneshot::Sender<()>,
+) -> Result<()> {
+    let registry = ListenerRegistry::new(configured_listener_count(&config));
+    serve_inner(
+        config,
+        catalog,
+        bind_middlewares,
+        shutdown,
+        Some(ready),
+        registry,
+        InheritedListeners::default(),
+    )
+    .await
+}
+
+/// Runs every configured listener with upgrade descriptor registration and inheritance.
+///
+/// # Errors
+///
+/// Returns the same startup and serving errors as [`serve`], and rejects a registry whose
+/// expected listener count differs from the configured listener count.
+pub async fn serve_with_readiness_and_upgrade(
+    config: ServerConfig,
+    catalog: Arc<Catalog>,
+    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    shutdown: CancellationToken,
+    ready: oneshot::Sender<()>,
+    registry: ListenerRegistry,
+    inherited: InheritedListeners,
+) -> Result<()> {
+    serve_inner(
+        config,
+        catalog,
+        bind_middlewares,
+        shutdown,
+        Some(ready),
+        registry,
+        inherited,
+    )
+    .await
+}
+
+#[derive(Clone)]
+struct ListenerContext {
+    #[cfg(any(
+        feature = "tcp",
+        all(feature = "unix", unix),
+        feature = "websocket",
+        feature = "quic",
+        feature = "grpc"
+    ))]
+    catalog: Arc<Catalog>,
+    #[cfg(any(
+        feature = "tcp",
+        all(feature = "unix", unix),
+        feature = "websocket",
+        feature = "quic",
+        feature = "grpc"
+    ))]
+    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    #[cfg(any(
+        feature = "tcp",
+        all(feature = "unix", unix),
+        feature = "websocket",
+        feature = "quic"
+    ))]
+    build: String,
+    shutdown: CancellationToken,
+    ready: mpsc::UnboundedSender<()>,
+    registry: ListenerRegistry,
+    inherited: InheritedListeners,
+}
+
+impl ListenerContext {
+    fn new(
+        catalog: Arc<Catalog>,
+        bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+        build: String,
+        shutdown: CancellationToken,
+        ready: mpsc::UnboundedSender<()>,
+        registry: ListenerRegistry,
+        inherited: InheritedListeners,
+    ) -> Self {
+        #[cfg(not(any(
+            feature = "tcp",
+            all(feature = "unix", unix),
+            feature = "websocket",
+            feature = "quic",
+            feature = "grpc"
+        )))]
+        drop((catalog, bind_middlewares));
+        #[cfg(not(any(
+            feature = "tcp",
+            all(feature = "unix", unix),
+            feature = "websocket",
+            feature = "quic"
+        )))]
+        drop(build);
+        Self {
+            #[cfg(any(
+                feature = "tcp",
+                all(feature = "unix", unix),
+                feature = "websocket",
+                feature = "quic",
+                feature = "grpc"
+            ))]
+            catalog,
+            #[cfg(any(
+                feature = "tcp",
+                all(feature = "unix", unix),
+                feature = "websocket",
+                feature = "quic",
+                feature = "grpc"
+            ))]
+            bind_middlewares,
+            #[cfg(any(
+                feature = "tcp",
+                all(feature = "unix", unix),
+                feature = "websocket",
+                feature = "quic"
+            ))]
+            build,
+            shutdown,
+            ready,
+            registry,
+            inherited,
+        }
+    }
+}
+
+async fn serve_inner(
+    config: ServerConfig,
+    catalog: Arc<Catalog>,
+    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    shutdown: CancellationToken,
+    ready: Option<oneshot::Sender<()>>,
+    registry: ListenerRegistry,
+    inherited: InheritedListeners,
+) -> Result<()> {
     let mut listeners = JoinSet::new();
-    let configured = configured_listener_count(&config);
-    let (ready_sender, mut ready_receiver) = mpsc::unbounded_channel();
+    let configured = require_configured_listener_count(&config)?;
+    if registry.expected() != configured {
+        bail!(
+            "upgrade listener registry expects {}, but {configured} listeners are configured",
+            registry.expected()
+        );
+    }
+    let (ready_sender, ready_receiver) = mpsc::unbounded_channel();
     let health_ready = Arc::new(AtomicBool::new(false));
-    let _ = (&catalog, &bind_middlewares);
+    let context = ListenerContext::new(
+        catalog,
+        bind_middlewares,
+        config.build.clone(),
+        shutdown.clone(),
+        ready_sender,
+        registry,
+        inherited,
+    );
 
     if let Some(listener) = config.tcp {
         #[cfg(not(feature = "tcp"))]
         let _ = listener;
         #[cfg(feature = "tcp")]
-        listeners.spawn(serve_tcp(
-            listener,
-            Arc::clone(&catalog),
-            Arc::clone(&bind_middlewares),
-            config.build.clone(),
-            shutdown.clone(),
-            ready_sender.clone(),
-        ));
+        listeners.spawn(serve_tcp(listener, context.clone()));
         #[cfg(not(feature = "tcp"))]
         bail!("TCP listener configured but fujin-server/tcp is disabled");
     }
@@ -71,14 +243,7 @@ pub async fn serve(
         #[cfg(not(all(feature = "unix", unix)))]
         let _ = listener;
         #[cfg(all(feature = "unix", unix))]
-        listeners.spawn(serve_unix(
-            listener.path,
-            Arc::clone(&catalog),
-            Arc::clone(&bind_middlewares),
-            config.build.clone(),
-            shutdown.clone(),
-            ready_sender.clone(),
-        ));
+        listeners.spawn(serve_unix(listener.path, context.clone()));
         #[cfg(not(all(feature = "unix", unix)))]
         bail!("Unix listener configured but unavailable in this build");
     }
@@ -86,14 +251,7 @@ pub async fn serve(
         #[cfg(not(feature = "websocket"))]
         let _ = listener;
         #[cfg(feature = "websocket")]
-        listeners.spawn(serve_websocket(
-            listener,
-            Arc::clone(&catalog),
-            Arc::clone(&bind_middlewares),
-            config.build.clone(),
-            shutdown.clone(),
-            ready_sender.clone(),
-        ));
+        listeners.spawn(serve_websocket(listener, context.clone()));
         #[cfg(not(feature = "websocket"))]
         bail!("WebSocket listener configured but fujin-server/websocket is disabled");
     }
@@ -101,14 +259,7 @@ pub async fn serve(
         #[cfg(not(feature = "quic"))]
         let _ = listener;
         #[cfg(feature = "quic")]
-        listeners.spawn(serve_quic(
-            listener,
-            Arc::clone(&catalog),
-            Arc::clone(&bind_middlewares),
-            config.build.clone(),
-            shutdown.clone(),
-            ready_sender.clone(),
-        ));
+        listeners.spawn(serve_quic(listener, context.clone()));
         #[cfg(not(feature = "quic"))]
         bail!("QUIC listener configured but fujin-server/quic is disabled");
     }
@@ -116,13 +267,7 @@ pub async fn serve(
         #[cfg(not(feature = "grpc"))]
         let _ = listener;
         #[cfg(feature = "grpc")]
-        listeners.spawn(serve_grpc(
-            listener,
-            Arc::clone(&catalog),
-            Arc::clone(&bind_middlewares),
-            shutdown.clone(),
-            ready_sender.clone(),
-        ));
+        listeners.spawn(serve_grpc(listener, context.clone()));
         #[cfg(not(feature = "grpc"))]
         bail!("gRPC listener configured but fujin-server/grpc is disabled");
     }
@@ -130,23 +275,52 @@ pub async fn serve(
         listeners.spawn(serve_health(
             listener.listen,
             Arc::clone(&health_ready),
-            shutdown.clone(),
-            ready_sender.clone(),
+            context.clone(),
         ));
     }
-    if configured == 0 {
-        bail!("no listeners configured");
-    }
-    drop(ready_sender);
+    drop(context);
 
+    serve_ready_listeners(
+        listeners,
+        ready_receiver,
+        configured,
+        shutdown,
+        health_ready,
+        ready,
+    )
+    .await
+}
+
+async fn serve_ready_listeners(
+    mut listeners: JoinSet<Result<()>>,
+    mut ready_receiver: mpsc::UnboundedReceiver<()>,
+    configured: usize,
+    shutdown: CancellationToken,
+    health_ready: Arc<AtomicBool>,
+    ready: Option<oneshot::Sender<()>>,
+) -> Result<()> {
     wait_for_readiness(&mut listeners, &mut ready_receiver, configured, &shutdown).await?;
+    if shutdown.is_cancelled() {
+        return Ok(());
+    }
     health_ready.store(true, Ordering::Release);
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
     let result = wait_for_listeners(&mut listeners, &shutdown).await;
     health_ready.store(false, Ordering::Release);
     result
 }
 
-fn configured_listener_count(config: &ServerConfig) -> usize {
+fn require_configured_listener_count(config: &ServerConfig) -> Result<usize> {
+    let configured = configured_listener_count(config);
+    if configured == 0 {
+        bail!("no listeners configured");
+    }
+    Ok(configured)
+}
+
+pub fn configured_listener_count(config: &ServerConfig) -> usize {
     [
         config.tcp.is_some(),
         config.unix.is_some(),
@@ -212,22 +386,121 @@ fn listener_stopped(
     }
 }
 
+async fn bind_tcp_listener(
+    address: &str,
+    metadata: ListenerMetadata,
+    registry: &ListenerRegistry,
+    inherited: &InheritedListeners,
+) -> Result<tokio::net::TcpListener> {
+    #[cfg(unix)]
+    let listener = if let Some(fd) = inherited.take(&metadata) {
+        let listener = std::net::TcpListener::from(fd);
+        listener
+            .set_nonblocking(true)
+            .context("configure inherited TCP listener")?;
+        tokio::net::TcpListener::from_std(listener).context("inherit TCP listener")?
+    } else {
+        tokio::net::TcpListener::bind(address)
+            .await
+            .with_context(|| format!("bind TCP listener {address:?}"))?
+    };
+    #[cfg(not(unix))]
+    let listener = {
+        let _ = (metadata, registry, inherited);
+        tokio::net::TcpListener::bind(address)
+            .await
+            .with_context(|| format!("bind TCP listener {address:?}"))?
+    };
+    #[cfg(unix)]
+    registry.register(
+        metadata,
+        listener
+            .as_fd()
+            .try_clone_to_owned()
+            .context("clone TCP listener descriptor")?,
+    )?;
+    Ok(listener)
+}
+
+#[cfg(all(feature = "unix", unix))]
+fn bind_unix_listener(
+    path: &str,
+    metadata: ListenerMetadata,
+    registry: &ListenerRegistry,
+    inherited: &InheritedListeners,
+) -> Result<tokio::net::UnixListener> {
+    let listener = if let Some(fd) = inherited.take(&metadata) {
+        let listener = std::os::unix::net::UnixListener::from(fd);
+        listener
+            .set_nonblocking(true)
+            .context("configure inherited Unix listener")?;
+        tokio::net::UnixListener::from_std(listener).context("inherit Unix listener")?
+    } else {
+        tokio::net::UnixListener::bind(path)
+            .with_context(|| format!("bind Unix listener {path:?}"))?
+    };
+    registry.register(
+        metadata,
+        listener
+            .as_fd()
+            .try_clone_to_owned()
+            .context("clone Unix listener descriptor")?,
+    )?;
+    Ok(listener)
+}
+
+#[cfg(feature = "quic")]
+fn bind_quic_socket(
+    address: std::net::SocketAddr,
+    metadata: ListenerMetadata,
+    registry: &ListenerRegistry,
+    inherited: &InheritedListeners,
+) -> Result<std::net::UdpSocket> {
+    #[cfg(unix)]
+    let socket = if let Some(fd) = inherited.take(&metadata) {
+        std::net::UdpSocket::from(fd)
+    } else {
+        std::net::UdpSocket::bind(address).context("bind QUIC socket")?
+    };
+    #[cfg(not(unix))]
+    let socket = {
+        let _ = (metadata, registry, inherited);
+        std::net::UdpSocket::bind(address).context("bind QUIC socket")?
+    };
+    socket
+        .set_nonblocking(true)
+        .context("configure QUIC socket nonblocking")?;
+    #[cfg(unix)]
+    registry.register(
+        metadata,
+        socket
+            .as_fd()
+            .try_clone_to_owned()
+            .context("clone QUIC socket descriptor")?,
+    )?;
+    Ok(socket)
+}
+
 #[cfg(feature = "tcp")]
 async fn serve_tcp(
     config: fujin_runtime::fujin_server_config::TcpListenerConfig,
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    build: String,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
+    context: ListenerContext,
 ) -> Result<()> {
+    let ListenerContext {
+        catalog,
+        bind_middlewares,
+        build,
+        shutdown,
+        ready,
+        registry,
+        inherited,
+    } = context;
     let tls = match config.tls.as_ref() {
         Some(config) => Some(load_tls_acceptor(config).await?),
         None => None,
     };
-    let listener = tokio::net::TcpListener::bind(&config.listen)
-        .await
-        .with_context(|| format!("bind TCP listener {:?}", config.listen))?;
+    let metadata = ListenerMetadata::tcp(config.listen.clone());
+    let listener = bind_tcp_listener(&config.listen, metadata, &registry, &inherited).await?;
     let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
@@ -272,16 +545,18 @@ async fn serve_tcp(
 }
 
 #[cfg(all(feature = "unix", unix))]
-async fn serve_unix(
-    path: String,
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    build: String,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
-) -> Result<()> {
-    let listener = tokio::net::UnixListener::bind(&path)
-        .with_context(|| format!("bind Unix listener {path:?}"))?;
+async fn serve_unix(path: String, context: ListenerContext) -> Result<()> {
+    let ListenerContext {
+        catalog,
+        bind_middlewares,
+        build,
+        shutdown,
+        ready,
+        registry,
+        inherited,
+    } = context;
+    let metadata = ListenerMetadata::unix(path.clone());
+    let listener = bind_unix_listener(&path, metadata, &registry, &inherited)?;
     let _ = ready.send(());
     let mut sessions = JoinSet::new();
     loop {
@@ -309,6 +584,9 @@ async fn serve_unix(
     }
     drop(listener);
     let result = drain_sessions(&mut sessions).await;
+    if registry.is_handed_off() {
+        return result;
+    }
     match tokio::fs::remove_file(&path).await {
         Ok(()) => result,
         Err(error) if error.kind() == io::ErrorKind::NotFound => result,
@@ -338,19 +616,23 @@ struct WebSocketPolicy {
 #[cfg(feature = "websocket")]
 async fn serve_websocket(
     config: fujin_runtime::fujin_server_config::WebSocketListenerConfig,
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    build: String,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
+    context: ListenerContext,
 ) -> Result<()> {
+    let ListenerContext {
+        catalog,
+        bind_middlewares,
+        build,
+        shutdown,
+        ready,
+        registry,
+        inherited,
+    } = context;
     let tls = match config.tls.as_ref() {
         Some(config) => Some(load_tls_acceptor(config).await?),
         None => None,
     };
-    let listener = tokio::net::TcpListener::bind(&config.listen)
-        .await
-        .with_context(|| format!("bind WebSocket listener {:?}", config.listen))?;
+    let metadata = ListenerMetadata::tcp(config.listen.clone());
+    let listener = bind_tcp_listener(&config.listen, metadata, &registry, &inherited).await?;
     let policy = WebSocketPolicy {
         path: config.path.into(),
         allowed_origins: config.allowed_origins.into(),
@@ -638,13 +920,19 @@ fn websocket_origin_allowed(
 #[cfg(feature = "quic")]
 async fn serve_quic(
     config: fujin_runtime::fujin_server_config::QuicListenerConfig,
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    build: String,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
+    context: ListenerContext,
 ) -> Result<()> {
-    let address = config.listen.parse().context("parse QUIC listen address")?;
+    let ListenerContext {
+        catalog,
+        bind_middlewares,
+        build,
+        shutdown,
+        ready,
+        registry,
+        inherited,
+    } = context;
+    let address: std::net::SocketAddr =
+        config.listen.parse().context("parse QUIC listen address")?;
     let server_config = quic_server_config(
         &config.tls.certificate,
         &config.tls.private_key,
@@ -653,7 +941,15 @@ async fn serve_quic(
         config.keepalive_period,
     )
     .await?;
-    let endpoint = quinn::Endpoint::server(server_config, address).context("bind QUIC endpoint")?;
+    let metadata = ListenerMetadata::udp(config.listen.clone());
+    let socket = bind_quic_socket(address, metadata, &registry, &inherited)?;
+    let endpoint = quinn::Endpoint::new(
+        quinn::EndpointConfig::default(),
+        Some(server_config),
+        socket,
+        Arc::new(quinn::TokioRuntime),
+    )
+    .context("start QUIC endpoint")?;
     let _ = ready.send(());
     let mut connections = JoinSet::new();
     loop {
@@ -870,18 +1166,24 @@ async fn load_pem_directory(directory: &str) -> Result<Vec<u8>> {
 #[cfg(feature = "grpc")]
 async fn serve_grpc(
     config: fujin_runtime::fujin_server_config::GrpcListenerConfig,
-    catalog: Arc<Catalog>,
-    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
+    context: ListenerContext,
 ) -> Result<()> {
     use fujin_proto::fujin::v1 as pb;
     use tokio_stream::wrappers::TcpListenerStream;
     use tonic::transport::{Identity, Server, ServerTlsConfig};
 
-    let listener = tokio::net::TcpListener::bind(&config.listen)
-        .await
-        .with_context(|| format!("bind gRPC listener {:?}", config.listen))?;
+    let ListenerContext {
+        catalog,
+        bind_middlewares,
+        shutdown,
+        ready,
+        registry,
+        inherited,
+        ..
+    } = context;
+
+    let metadata = ListenerMetadata::grpc(config.listen.clone());
+    let listener = bind_tcp_listener(&config.listen, metadata, &registry, &inherited).await?;
     let mut builder = Server::builder()
         .max_concurrent_streams(config.max_concurrent_streams)
         .initial_stream_window_size(config.initial_window_size)
@@ -949,12 +1251,17 @@ async fn serve_grpc(
 async fn serve_health(
     address: String,
     readiness: Arc<AtomicBool>,
-    shutdown: CancellationToken,
-    ready: mpsc::UnboundedSender<()>,
+    context: ListenerContext,
 ) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind(&address)
-        .await
-        .with_context(|| format!("bind health listener {address:?}"))?;
+    let ListenerContext {
+        shutdown,
+        ready,
+        registry,
+        inherited,
+        ..
+    } = context;
+    let metadata = ListenerMetadata::tcp(address.clone());
+    let listener = bind_tcp_listener(&address, metadata, &registry, &inherited).await?;
     let _ = ready.send(());
     let mut connections = JoinSet::new();
     loop {
@@ -1029,6 +1336,10 @@ fn health_response(path: &[u8], ready: bool) -> &'static [u8] {
 mod tests {
     use super::*;
     use fujin_core::{DescriptorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    #[cfg(unix)]
+    use fujin_native::{RequestCode, ResponseCode};
+    #[cfg(unix)]
+    use std::os::fd::{AsFd, OwnedFd};
     use tokio::time::{Duration, timeout};
 
     async fn empty_catalog() -> Arc<Catalog> {
@@ -1042,6 +1353,64 @@ mod tests {
                 .await
                 .expect("compile empty catalog"),
         )
+    }
+
+    #[cfg(unix)]
+    async fn transfer_listener(
+        metadata: ListenerMetadata,
+        fd: OwnedFd,
+        name: &str,
+    ) -> (
+        fujin_upgrade::UpgradeClient,
+        InheritedListeners,
+        tokio::task::JoinHandle<Result<(), fujin_upgrade::UpgradeError>>,
+        CancellationToken,
+        std::path::PathBuf,
+    ) {
+        let path = std::path::PathBuf::from(format!(
+            "/tmp/fujin-server-{name}-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let registry = ListenerRegistry::new(1);
+        registry
+            .register(metadata, fd)
+            .expect("register old listener");
+        let shutdown = CancellationToken::new();
+        let drain = CancellationToken::new();
+        let server_path = path.clone();
+        let server_shutdown = shutdown.clone();
+        let server_drain = drain.clone();
+        let server = tokio::spawn(async move {
+            fujin_upgrade::listen_for_upgrade(server_path, registry, server_shutdown, server_drain)
+                .await
+        });
+        timeout(Duration::from_secs(1), async {
+            while !path.exists() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("upgrade socket readiness");
+        let client = fujin_upgrade::request_upgrade(&path)
+            .await
+            .expect("request listener handoff");
+        let inherited = client.inherited();
+        (client, inherited, server, drain, path)
+    }
+
+    #[cfg(unix)]
+    fn hello_frame() -> Vec<u8> {
+        let mut frame = vec![RequestCode::Hello as u8, 1, 1, 1];
+        for value in [b"test".as_slice(), b"dev".as_slice()] {
+            frame.extend_from_slice(
+                &u32::try_from(value.len())
+                    .expect("HELLO field length")
+                    .to_be_bytes(),
+            );
+            frame.extend_from_slice(value);
+        }
+        frame
     }
 
     #[test]
@@ -1074,6 +1443,131 @@ mod tests {
         .await
         .expect("serve and drain TCP listener");
         catalog.close().await.expect("close catalog");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn inherited_tcp_listener_serves_native_session() {
+        let old_listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind old listener");
+        let address = old_listener.local_addr().expect("old listener address");
+        let metadata = ListenerMetadata::tcp(address.to_string());
+        let (client, inherited, upgrade_server, drain, upgrade_path) = transfer_listener(
+            metadata,
+            old_listener
+                .as_fd()
+                .try_clone_to_owned()
+                .expect("clone old listener"),
+            "tcp-upgrade",
+        )
+        .await;
+        let catalog = empty_catalog().await;
+        let shutdown = CancellationToken::new();
+        let server_shutdown = shutdown.clone();
+        let server_catalog = Arc::clone(&catalog);
+        let registry = ListenerRegistry::new(1);
+        let (ready_sender, ready_receiver) = oneshot::channel();
+        let server = tokio::spawn(async move {
+            serve_with_readiness_and_upgrade(
+                ServerConfig {
+                    build: "test".into(),
+                    tcp: Some(fujin_runtime::fujin_server_config::TcpListenerConfig {
+                        listen: address.to_string(),
+                        tls: None,
+                    }),
+                    ..ServerConfig::default()
+                },
+                server_catalog,
+                Arc::new(fujin_core::NoBindMiddleware),
+                server_shutdown,
+                ready_sender,
+                registry,
+                inherited,
+            )
+            .await
+        });
+        timeout(Duration::from_secs(2), ready_receiver)
+            .await
+            .expect("inherited TCP readiness timeout")
+            .expect("inherited TCP readiness");
+        client
+            .signal_ready()
+            .await
+            .expect("complete listener handoff");
+        timeout(Duration::from_secs(1), drain.cancelled())
+            .await
+            .expect("old process drain request");
+        drop(old_listener);
+
+        let mut stream = tokio::net::TcpStream::connect(address)
+            .await
+            .expect("connect inherited TCP listener");
+        stream
+            .write_all(&hello_frame())
+            .await
+            .expect("write HELLO to inherited listener");
+        let response = timeout(Duration::from_secs(1), stream.read_u8())
+            .await
+            .expect("HELLO response timeout")
+            .expect("read HELLO response");
+        assert_eq!(response, ResponseCode::Hello as u8);
+
+        shutdown.cancel();
+        server
+            .await
+            .expect("server task")
+            .expect("serve inherited TCP listener");
+        upgrade_server
+            .await
+            .expect("upgrade server task")
+            .expect("upgrade server");
+        catalog.close().await.expect("close catalog");
+        let _ = std::fs::remove_file(upgrade_path);
+    }
+
+    #[cfg(all(unix, feature = "quic"))]
+    #[tokio::test]
+    async fn inherited_quic_socket_receives_datagrams() {
+        let old_socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("bind old QUIC socket");
+        let address = old_socket.local_addr().expect("old QUIC socket address");
+        let metadata = ListenerMetadata::udp(address.to_string());
+        let (client, inherited, upgrade_server, drain, upgrade_path) = transfer_listener(
+            metadata.clone(),
+            old_socket
+                .as_fd()
+                .try_clone_to_owned()
+                .expect("clone old QUIC socket"),
+            "quic-upgrade",
+        )
+        .await;
+        let registry = ListenerRegistry::new(1);
+        let socket = bind_quic_socket(address, metadata, &registry, &inherited)
+            .expect("inherit QUIC socket");
+        client.signal_ready().await.expect("complete QUIC handoff");
+        timeout(Duration::from_secs(1), drain.cancelled())
+            .await
+            .expect("old process drain request");
+        drop(old_socket);
+
+        let receiver = tokio::net::UdpSocket::from_std(socket).expect("wrap inherited QUIC socket");
+        let sender = tokio::net::UdpSocket::bind("127.0.0.1:0")
+            .await
+            .expect("bind QUIC probe sender");
+        sender
+            .send_to(b"fujin", address)
+            .await
+            .expect("send QUIC probe datagram");
+        let mut buffer = [0_u8; 5];
+        let (size, _) = timeout(Duration::from_secs(1), receiver.recv_from(&mut buffer))
+            .await
+            .expect("QUIC datagram timeout")
+            .expect("receive QUIC datagram");
+        assert_eq!(&buffer[..size], b"fujin");
+
+        upgrade_server
+            .await
+            .expect("upgrade server task")
+            .expect("upgrade server");
+        let _ = std::fs::remove_file(upgrade_path);
     }
 
     #[tokio::test]
@@ -1255,10 +1749,15 @@ mod grpc_health_tests {
                         fujin_runtime::fujin_server_config::ServerKeepAliveConfig::default(),
                     tls: None,
                 },
-                server_catalog,
-                Arc::new(fujin_core::NoBindMiddleware),
-                server_shutdown,
-                ready_tx,
+                ListenerContext {
+                    catalog: server_catalog,
+                    bind_middlewares: Arc::new(fujin_core::NoBindMiddleware),
+                    build: "test".into(),
+                    shutdown: server_shutdown,
+                    ready: ready_tx,
+                    registry: ListenerRegistry::new(1),
+                    inherited: InheritedListeners::default(),
+                },
             )
             .await
         });

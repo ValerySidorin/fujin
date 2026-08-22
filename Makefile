@@ -19,7 +19,7 @@ ifeq ($(OS),Windows_NT)
     MKDIR := mkdir
     COPY := copy /Y
     PATHSEP := \\
-    RUNCONF := set "FUJIN_CONFIG=./config.dev.yaml"
+    RUNCONF := set "FUJIN_CONFIGURATOR=yaml" && set "FUJIN_CONFIGURATOR_YAML_PATHS=./config.dev.yaml" &&
     RUST_BUILD_ENV :=
 else
     DETECTED_OS := $(shell uname -s)
@@ -29,7 +29,7 @@ else
     MKDIR := mkdir -p
     COPY := cp
     PATHSEP := /
-    RUNCONF := FUJIN_CONFIG=./config.dev.yaml
+    RUNCONF := FUJIN_CONFIGURATOR=yaml FUJIN_CONFIGURATOR_YAML_PATHS=./config.dev.yaml
     ifeq ($(DETECTED_OS),Darwin)
         RUST_BUILD_ENV := CPLUS_INCLUDE_PATH=$(shell xcrun --show-sdk-path)/usr/include/c++/v1
     else
@@ -47,7 +47,7 @@ all: clean build run
 .PHONY: build
 build:
 	@echo "==> Building ${APP_NAME} with Rust for ${DETECTED_OS} (Version: ${VERSION}, Features: [${RUST_FEATURES}])"
-	@$(RUST_BUILD_ENV) FUJIN_VERSION="$(VERSION)" cargo build --manifest-path $(RUST_ROOT)/Cargo.toml --profile $(RUST_PROFILE) -p fujin --features "$(RUST_FEATURES)"
+	@$(RUST_BUILD_ENV) VERSION="$(VERSION)" cargo build --manifest-path $(RUST_ROOT)/Cargo.toml --profile $(RUST_PROFILE) -p fujin --features "$(RUST_FEATURES)"
 	@$(MKDIR) $(BIN_DIR)
 	@$(COPY) $(RUST_BINARY) $(BINARY)
 	@echo "==> Binary created: $(BINARY)"

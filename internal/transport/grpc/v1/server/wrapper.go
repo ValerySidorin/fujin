@@ -45,6 +45,15 @@ func (w *GRPCServerWrapper) Done() <-chan struct{} {
 	return w.server.Done()
 }
 
+// Endpoint returns the actual gRPC listener endpoint after readiness.
+func (w *GRPCServerWrapper) Endpoint() transport.Endpoint {
+	address := w.server.conf.Addr
+	if w.server.lis != nil {
+		address = w.server.lis.Addr().String()
+	}
+	return transport.Endpoint{Interface: "grpc", Network: "tcp", Address: address, TLS: w.server.conf.TLS != nil}
+}
+
 // ListenerFDs implements transport.ListenerFDProvider.
 func (w *GRPCServerWrapper) ListenerFDs() ([]transport.ListenerFD, error) {
 	if w.server.lis == nil {

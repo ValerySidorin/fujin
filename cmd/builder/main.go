@@ -11,6 +11,7 @@ import (
 
 const (
 	fujinService = "github.com/fujin-io/fujin/public/service"
+	fujinCABI    = "github.com/fujin-io/fujin/public/embedded/cabi"
 	moduleName   = "tmpfujin"
 )
 
@@ -26,6 +27,7 @@ var (
 	extraLdflags    = flag.String("ldflags", "", "Extra ldflags (e.g. -X main.Version=1.0.0)")
 	cgoEnabled      = flag.Bool("cgo", false, "Enable CGO (required by some plugins)")
 	localModule     = flag.Bool("local", false, "Use local fujin module (for builds from source)")
+	outputKind      = flag.String("buildmode", "executable", "Output kind: executable, c-shared, or c-archive")
 )
 
 type stringSlice []string
@@ -48,7 +50,12 @@ func init() {
 func main() {
 	flag.Parse()
 
-	if err := validateInputs(); err != nil {
+	kind, err := parseBuildKind(*outputKind)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if err := validateInputs(kind); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -59,14 +66,33 @@ func main() {
 		replacements: replacements,
 		tags:         *buildTags,
 		extraLdflags: *extraLdflags,
-		cgoEnabled:   *cgoEnabled,
+		cgoEnabled:   *cgoEnabled || kind != buildExecutable,
 		localModule:  *localModule,
+		kind:         kind,
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Fujin binary built successfully: %s\n", *output)
+	fmt.Printf("Fujin %s built successfully: %s\n", kind, *output)
+}
+
+type buildKind string
+
+const (
+	buildExecutable buildKind = "executable"
+	buildCShared    buildKind = "c-shared"
+	buildCArchive   buildKind = "c-archive"
+)
+
+func parseBuildKind(value string) (buildKind, error) {
+	kind := buildKind(strings.TrimSpace(value))
+	switch kind {
+	case buildExecutable, buildCShared, buildCArchive:
+		return kind, nil
+	default:
+		return "", fmt.Errorf("invalid buildmode %q: expected executable, c-shared, or c-archive", value)
+	}
 }
 
 type buildOpts struct {
@@ -77,6 +103,7 @@ type buildOpts struct {
 	extraLdflags string
 	cgoEnabled   bool
 	localModule  bool
+	kind         buildKind
 }
 
 func runBuild(opts buildOpts) error {
@@ -107,7 +134,11 @@ func runBuild(opts buildOpts) error {
 			return fmt.Errorf("add replace directive %q: %w", replacement, err)
 		}
 	}
-	if err := runGo(tmpDir, "get", fujinService); err != nil {
+	rootPackage := fujinService
+	if opts.kind != buildExecutable {
+		rootPackage = fujinCABI
+	}
+	if err := runGo(tmpDir, "get", rootPackage); err != nil {
 		return err
 	}
 
@@ -117,13 +148,17 @@ func runBuild(opts buildOpts) error {
 		}
 	}
 
-	mainContent := generateMain(pluginsByType{
+	plugins := pluginsByType{
 		configurators:   configurators,
 		connectors:      connectors,
 		transports:      transports,
 		bindMiddlewares: bindMiddlewares,
 		connMiddlewares: connMiddlewares,
-	})
+	}
+	mainContent := generateMain(plugins)
+	if opts.kind != buildExecutable {
+		mainContent = generateLibraryMain(plugins)
+	}
 	mainPath := filepath.Join(tmpDir, "main.go")
 	if err := os.WriteFile(mainPath, []byte(mainContent), 0644); err != nil {
 		return fmt.Errorf("write main.go: %w", err)
@@ -143,16 +178,21 @@ func runBuild(opts buildOpts) error {
 		cgo = "1"
 	}
 	env := append(os.Environ(), "CGO_ENABLED="+cgo)
-	if err := runGoWithEnv(tmpDir, env, "build", "-ldflags", ldflags, "-tags", opts.tags, "-o", outPath, "."); err != nil {
+	args := []string{"build"}
+	if opts.kind != buildExecutable {
+		args = append(args, "-buildmode="+string(opts.kind))
+	}
+	args = append(args, "-ldflags", ldflags, "-tags", opts.tags, "-o", outPath, ".")
+	if err := runGoWithEnv(tmpDir, env, args...); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func validateInputs() error {
-	if len(configurators) == 0 {
-		return fmt.Errorf("at least one configurator is required (e.g. -configurator github.com/fujin-io/fujin/public/plugins/configurator/file)")
+func validateInputs(kind buildKind) error {
+	if kind == buildExecutable && len(configurators) == 0 {
+		return fmt.Errorf("at least one configurator is required for executable builds (e.g. -configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml)")
 	}
 	if len(connectors) == 0 {
 		return fmt.Errorf("at least one connector is required (e.g. -connector github.com/fujin-io/fujin/public/plugins/connector/kafka/franz)")
@@ -170,7 +210,8 @@ func validateInputs() error {
 			return fmt.Errorf("plugin package path cannot be empty")
 		}
 	}
-	if err := validatePluginRequirements(connectors, *buildTags, *cgoEnabled); err != nil {
+	effectiveCGO := *cgoEnabled || kind != buildExecutable
+	if err := validatePluginRequirements(connectors, *buildTags, effectiveCGO); err != nil {
 		return err
 	}
 	for _, replacement := range replacements {

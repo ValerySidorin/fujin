@@ -45,6 +45,15 @@ func NewServer(conf serverconfig.TCPServerConfig, catalog *connector.Catalog, l 
 // FDKey implements transport.FDKeyProvider.
 func (s *Server) FDKey() string { return "tcp:" + s.conf.Addr }
 
+// Endpoint returns the actual TCP listener endpoint after readiness.
+func (s *Server) Endpoint() transport.Endpoint {
+	address := s.conf.Addr
+	if s.ln != nil {
+		address = s.ln.Addr().String()
+	}
+	return transport.Endpoint{Interface: "native", Transport: "tcp", Network: "tcp", Address: address, TLS: s.conf.TLS != nil}
+}
+
 // ListenerFDs implements transport.ListenerFDProvider.
 func (s *Server) ListenerFDs() ([]transport.ListenerFD, error) {
 	if s.ln == nil {

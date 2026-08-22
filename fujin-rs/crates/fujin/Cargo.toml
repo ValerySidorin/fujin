@@ -11,7 +11,18 @@ workspace = true
 
 [features]
 default = []
-full = ["kafka", "tcp", "unix", "websocket", "quic", "grpc"]
+full = [
+    "configurator-env",
+    "configurator-yaml",
+    "kafka",
+    "tcp",
+    "unix",
+    "websocket",
+    "quic",
+    "grpc",
+]
+configurator-env = []
+configurator-yaml = []
 kafka = ["dep:fujin-kafka", "fujin-kafka/rdkafka"]
 tcp = ["fujin-server/tcp"]
 unix = ["fujin-server/unix"]
@@ -22,10 +33,10 @@ grpc = ["fujin-server/grpc"]
 [dependencies]
 anyhow.workspace = true
 fujin-core = { path = "../fujin-core" }
-fujin-plugin-api = { path = "../fujin-plugin-api" }
 fujin-kafka = { path = "../fujin-kafka", optional = true }
 fujin-runtime = { path = "../fujin-runtime" }
 fujin-server = { path = "../fujin-server", default-features = false }
+fujin-upgrade = { path = "../fujin-upgrade" }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

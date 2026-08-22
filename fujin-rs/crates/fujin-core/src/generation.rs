@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     sync::{
         Arc,
@@ -23,6 +23,7 @@ use crate::{
 };
 
 const DEFAULT_CATALOG_CLEANUP_TIMEOUT: Duration = Duration::from_secs(30);
+const GENERATION_TRANSITION_LIMIT: usize = 64;
 static NEXT_GENERATION_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Explicit registry of statically linked connector compilers.
@@ -65,6 +66,11 @@ impl DescriptorRegistry {
         }
         descriptors.insert(name, descriptor);
         Ok(())
+    }
+
+    #[must_use]
+    pub fn list(&self) -> Vec<String> {
+        self.descriptors.read().keys().cloned().collect()
     }
 
     fn get(&self, name: &str) -> Option<Arc<dyn ConnectorDescriptor>> {
@@ -603,6 +609,85 @@ async fn close_generation_resources(
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenerationState {
+    Published,
+    Draining,
+    Retired,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenerationStatus {
+    pub id: u64,
+    pub state: GenerationState,
+    pub bindings: usize,
+    pub error: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenerationTransition {
+    pub sequence: u64,
+    pub generation: GenerationStatus,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct CatalogStatus {
+    pub current: Option<GenerationStatus>,
+    pub draining: Vec<GenerationStatus>,
+    pub retired_total: u64,
+    pub recent_transitions: Vec<GenerationTransition>,
+}
+
+#[derive(Debug, Default)]
+struct CatalogLifecycle {
+    draining: Mutex<BTreeMap<u64, Arc<Generation>>>,
+    retired_total: AtomicU64,
+    transition_sequence: AtomicU64,
+    transitions: Mutex<VecDeque<GenerationTransition>>,
+}
+
+impl CatalogLifecycle {
+    fn record(&self, generation: &Generation, state: GenerationState, error: String) {
+        let sequence = self.transition_sequence.fetch_add(1, Ordering::Relaxed) + 1;
+        let mut transitions = self.transitions.lock();
+        transitions.push_back(GenerationTransition {
+            sequence,
+            generation: GenerationStatus {
+                id: generation.id(),
+                state,
+                bindings: generation.binding_count(),
+                error,
+            },
+        });
+        while transitions.len() > GENERATION_TRANSITION_LIMIT {
+            transitions.pop_front();
+        }
+    }
+
+    fn track_draining(self: &Arc<Self>, generation: Arc<Generation>) {
+        if self
+            .draining
+            .lock()
+            .insert(generation.id(), Arc::clone(&generation))
+            .is_some()
+        {
+            return;
+        }
+        self.record(&generation, GenerationState::Draining, String::new());
+        let lifecycle = Arc::clone(self);
+        tokio::spawn(async move {
+            let error = generation
+                .wait_closed()
+                .await
+                .err()
+                .map_or_else(String::new, |error| error.to_string());
+            lifecycle.draining.lock().remove(&generation.id());
+            lifecycle.retired_total.fetch_add(1, Ordering::Relaxed);
+            lifecycle.record(&generation, GenerationState::Retired, error);
+        });
+    }
+}
+
 /// Atomically publishes complete immutable connector generations.
 pub struct Catalog {
     compiler: Arc<GenerationCompiler>,
@@ -610,6 +695,7 @@ pub struct Catalog {
     reload: AsyncMutex<()>,
     closed: AtomicBool,
     closing: Mutex<Option<Arc<Generation>>>,
+    lifecycle: Arc<CatalogLifecycle>,
 }
 
 impl fmt::Debug for Catalog {
@@ -637,17 +723,48 @@ impl Catalog {
             generation.abort().await;
             return Err(error);
         }
+        let lifecycle = Arc::new(CatalogLifecycle::default());
+        lifecycle.record(&generation, GenerationState::Published, String::new());
         Ok(Self {
             compiler,
             current: ArcSwapOption::new(Some(generation)),
             reload: AsyncMutex::new(()),
             closed: AtomicBool::new(false),
             closing: Mutex::new(None),
+            lifecycle,
         })
     }
 
     pub fn current(&self) -> Option<Arc<Generation>> {
         self.current.load_full()
+    }
+
+    #[must_use]
+    pub fn status(&self) -> CatalogStatus {
+        let mut draining = self
+            .lifecycle
+            .draining
+            .lock()
+            .values()
+            .map(|generation| GenerationStatus {
+                id: generation.id(),
+                state: GenerationState::Draining,
+                bindings: generation.binding_count(),
+                error: String::new(),
+            })
+            .collect::<Vec<_>>();
+        draining.sort_by_key(|generation| generation.id);
+        CatalogStatus {
+            current: self.current.load_full().map(|generation| GenerationStatus {
+                id: generation.id(),
+                state: GenerationState::Published,
+                bindings: generation.binding_count(),
+                error: String::new(),
+            }),
+            draining,
+            retired_total: self.lifecycle.retired_total.load(Ordering::Relaxed),
+            recent_transitions: self.lifecycle.transitions.lock().iter().cloned().collect(),
+        }
     }
 
     /// Compiles and atomically publishes one complete replacement snapshot.
@@ -667,7 +784,10 @@ impl Catalog {
             return Err(error);
         }
         let previous = self.current.swap(Some(Arc::clone(&next)));
+        self.lifecycle
+            .record(&next, GenerationState::Published, String::new());
         if let Some(previous) = previous {
+            self.lifecycle.track_draining(Arc::clone(&previous));
             previous.retire();
         }
         Ok(next)
@@ -696,6 +816,7 @@ impl Catalog {
         } else {
             let generation = self.current.swap(None);
             if let Some(generation) = generation.as_ref() {
+                self.lifecycle.track_draining(Arc::clone(generation));
                 generation.retire();
             }
             self.closing.lock().clone_from(&generation);
@@ -940,6 +1061,14 @@ mod tests {
             .reload(&config("test"))
             .await
             .expect("publish replacement");
+        let status = catalog.status();
+        assert_eq!(
+            status.current.as_ref().map(|current| current.id),
+            catalog.current().map(|current| current.id())
+        );
+        assert_eq!(status.draining.len(), 1);
+        assert_eq!(status.draining[0].id, old.id());
+        assert_eq!(status.draining[0].bindings, 1);
         assert!(
             timeout(Duration::from_millis(20), old.wait_closed())
                 .await
@@ -952,6 +1081,17 @@ mod tests {
             .expect("generation should close")
             .expect("generation cleanup");
         assert_eq!(closes.load(Ordering::Acquire), 1);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let status = catalog.status();
+                if status.draining.is_empty() && status.retired_total == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("catalog status should observe retirement");
         catalog.close().await.expect("close catalog");
     }
 }

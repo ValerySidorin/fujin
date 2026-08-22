@@ -24,6 +24,22 @@ type TransportServer interface {
 	Done() <-chan struct{}
 }
 
+// Endpoint describes one listener after it has started. Address is the actual
+// bound address, so callers can safely configure port zero for ephemeral ports.
+type Endpoint struct {
+	Interface string `json:"interface"`
+	Transport string `json:"transport,omitempty"`
+	Network   string `json:"network"`
+	Address   string `json:"address"`
+	Path      string `json:"path,omitempty"`
+	TLS       bool   `json:"tls"`
+}
+
+// EndpointProvider exposes the actual listener address after readiness.
+type EndpointProvider interface {
+	Endpoint() Endpoint
+}
+
 // Config is the user-facing transport config from YAML (type + settings).
 // Same pattern as connector.ConnectorConfig: each plugin parses its own Settings.
 type Config struct {

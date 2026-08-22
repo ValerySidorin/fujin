@@ -100,7 +100,7 @@ func (q *connectorRuntimeQueue) Status() configurator.ConnectorRuntimeStatus {
 }
 
 func (q *connectorRuntimeQueue) SetSourceConnected(connected bool) {
-	q.controller.setSourceConnected(connected)
+	q.controller.SetSourceConnected(connected)
 }
 
 func (q *connectorRuntimeQueue) Close() {

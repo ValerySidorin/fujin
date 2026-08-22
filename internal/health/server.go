@@ -18,14 +18,18 @@ type Server struct {
 	server     *http.Server
 	ready      atomic.Bool
 	listenAddr atomic.Value // stores string
+	readyCh    chan struct{}
+	done       chan struct{}
 	l          *slog.Logger
 }
 
 // NewServer creates a new health check HTTP server.
 func NewServer(conf config.HealthConfig, l *slog.Logger) *Server {
 	s := &Server{
-		conf: conf,
-		l:    l.With("server", "health"),
+		conf:    conf,
+		readyCh: make(chan struct{}),
+		done:    make(chan struct{}),
+		l:       l.With("server", "health"),
 	}
 
 	mux := http.NewServeMux()
@@ -44,6 +48,7 @@ func NewServer(conf config.HealthConfig, l *slog.Logger) *Server {
 // ListenAndServe starts the health check HTTP server.
 // It blocks until the context is cancelled, then gracefully shuts down.
 func (s *Server) ListenAndServe(ctx context.Context) error {
+	defer close(s.done)
 	ln, err := net.Listen("tcp", s.conf.Addr)
 	if err != nil {
 		return fmt.Errorf("health server listen: %w", err)
@@ -51,6 +56,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 	addr := ln.Addr().String()
 	s.listenAddr.Store(addr)
+	close(s.readyCh)
 	s.l.Info("health server listening", "addr", addr)
 
 	go func() {
@@ -74,6 +80,21 @@ func (s *Server) Addr() string {
 	}
 	return v.(string)
 }
+
+// ReadyForConnections waits until the listener has bound successfully.
+func (s *Server) ReadyForConnections(timeout time.Duration) bool {
+	select {
+	case <-s.readyCh:
+		return true
+	case <-s.done:
+		return false
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// Done is closed after listener shutdown or startup failure.
+func (s *Server) Done() <-chan struct{} { return s.done }
 
 // Stop gracefully shuts down the health check server.
 func (s *Server) Stop() {

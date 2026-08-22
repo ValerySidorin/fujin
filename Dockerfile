@@ -14,7 +14,7 @@ COPY fujin-rs/crates ./fujin-rs/crates
 COPY fujin-rs/plugins ./fujin-rs/plugins
 COPY public/proto ./public/proto
 
-RUN FUJIN_VERSION="${VERSION}" cargo build \
+RUN VERSION="${VERSION}" cargo build \
     --manifest-path fujin-rs/Cargo.toml \
     --release \
     -p fujin \
@@ -25,13 +25,15 @@ FROM alpine:3.22 AS runtime
 
 RUN apk add --no-cache ca-certificates libgcc libstdc++ \
  && addgroup -S fujin \
- && adduser -S -G fujin -h /nonexistent -s /sbin/nologin fujin
+ && adduser -S -G fujin -h /nonexistent -s /sbin/nologin fujin \
+ && install -d -m 0700 -o fujin -g fujin /run/fujin
 
 COPY --from=builder /app/fujin-rs/target/release/fujin /fujin
 
 USER fujin
-ENV FUJIN_CONFIG=/config/config.yaml \
-    RUST_LOG=info
+ENV FUJIN_CONFIGURATOR=yaml \
+    FUJIN_CONFIGURATOR_YAML_PATHS=/config/config.yaml \
+    FUJIN_LOG_LEVEL=INFO
 STOPSIGNAL SIGTERM
 EXPOSE 4850/tcp 4848/udp 4849/tcp 4851/tcp 8080/tcp
 

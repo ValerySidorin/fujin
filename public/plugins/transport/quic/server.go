@@ -50,6 +50,15 @@ func NewServer(conf serverconfig.QUICServerConfig, catalog *connector.Catalog, l
 // FDKey implements transport.FDKeyProvider.
 func (s *FujinServer) FDKey() string { return "udp:" + s.conf.Addr }
 
+// Endpoint returns the actual QUIC listener endpoint after readiness.
+func (s *FujinServer) Endpoint() transport.Endpoint {
+	address := s.conf.Addr
+	if s.udpConn != nil {
+		address = s.udpConn.LocalAddr().String()
+	}
+	return transport.Endpoint{Interface: "native", Transport: "quic", Network: "udp", Address: address, TLS: true}
+}
+
 // ListenerFDs implements transport.ListenerFDProvider.
 func (s *FujinServer) ListenerFDs() ([]transport.ListenerFD, error) {
 	if s.udpConn == nil {

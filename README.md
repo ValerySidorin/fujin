@@ -55,15 +55,13 @@ service reports `fujin.v1.FujinService` readiness.
 
 ```bash
 make build
-FUJIN_CONFIG=./config.dev.yaml ./bin/fujin
+FUJIN_CONFIGURATOR=yaml \
+FUJIN_CONFIGURATOR_YAML_PATHS=./config.dev.yaml \
+  ./bin/fujin
 ```
 
-The binary also accepts the configuration path as its first argument:
-
-```bash
-./bin/fujin ./config.dev.yaml
-./bin/fujin --version
-```
+`FUJIN_CONFIGURATOR` is required. The full binary includes `yaml` and `env`; configuration source
+selection stays in the configurator plugin layer. `./bin/fujin --version` prints the build version.
 
 Use [`config.dev.yaml`](config.dev.yaml) as the complete local example and
 [`examples/assets/config/config.deployment.example.yaml`](examples/assets/config/config.deployment.example.yaml)
@@ -78,32 +76,32 @@ The default production build is the Rust workspace under `fujin-rs/`.
 make build
 
 # Minimal statically linked binary
-cargo build --manifest-path fujin-rs/Cargo.toml --release -p fujin --features kafka,tcp
-```
+cargo build --manifest-path fujin-rs/Cargo.toml --release -p fujin --features configurator-yaml,kafka,tcp
 
-Available application features: `kafka`, `tcp`, `unix`, `websocket`, `quic`, and `grpc`; `full`
-enables all of them. `FUJIN_VERSION` sets the build string returned by `--version` and native HELLO.
+Available application features: `configurator-yaml`, `configurator-env`, `kafka`, `tcp`, `unix`,
+`websocket`, `quic`, and `grpc`; `full` enables all of them. Minimal executable builds must include
+at least one configurator feature. `VERSION` sets the build string returned by `--version` and
+native HELLO.
 
-### Dynamic Connector Plugins
+Connector and transport availability is fixed by Cargo features, matching the Go builder/import
+model. The executable does not discover runtime plugin libraries from environment variables.
 
-Set `FUJIN_CONNECTOR_PLUGINS` to a platform-native path list of connector libraries. Libraries are
-loaded before the initial connector snapshot is compiled and remain loaded through catalog
-shutdown.
-
-```bash
-cargo build --manifest-path fujin-rs/Cargo.toml --release -p fujin-plugin-nop
-FUJIN_CONNECTOR_PLUGINS=./fujin-rs/target/release/libfujin_plugin_nop.so \
-  ./bin/fujin ./config.yaml
-```
-
-The example plugin is under [`fujin-rs/plugins/nop`](fujin-rs/plugins/nop). Dynamic plugins are a
-trusted-code boundary and must be built from the same Fujin source revision and Rust toolchain as
-the host. The versioned C symbol stabilizes discovery; connector trait objects retain Rust's
-compiler-specific ABI.
+Runtime logging uses the Go environment contract: `FUJIN_LOG_LEVEL` accepts `DEBUG`, `INFO`,
+`WARN`, or `ERROR`, and `FUJIN_LOG_TYPE=json` selects structured JSON output. On Unix, SIGHUP
+reloads `FUJIN_LOG_LEVEL` together with startup-only configurator connector reload behavior.
 
 ## Configuration
 
-Configuration is one complete YAML or JSON bootstrap document:
+The selected configurator loads one complete YAML or JSON bootstrap document. The built-in sources
+preserve the Go plugin contract:
+
+- `FUJIN_CONFIGURATOR=yaml` reads the first existing comma-separated path in
+  `FUJIN_CONFIGURATOR_YAML_PATHS`; defaults are `./config.yaml`, `conf/config.yaml`, and
+  `config/config.yaml`.
+- `FUJIN_CONFIGURATOR=env` reads YAML or JSON directly from
+  `FUJIN_CONFIGURATOR_ENV_CONFIG`.
+
+The bootstrap document shape is:
 
 ```yaml
 fujin:
@@ -149,8 +147,9 @@ docker run --rm -p 4850:4850 -p 4849:4849 -p 8080:8080 \
   -v "$PWD/config.yaml:/config/config.yaml:ro" fujin
 ```
 
-The image sets `FUJIN_CONFIG=/config/config.yaml`, runs as an unprivileged user, and contains the
-full Rust feature set.
+The image selects the `yaml` configurator and sets
+`FUJIN_CONFIGURATOR_YAML_PATHS=/config/config.yaml`. It runs as an unprivileged user and contains
+the full Rust feature set.
 
 ### Kubernetes
 
@@ -166,8 +165,9 @@ under [`examples/deployment/`](examples/deployment/).
 
 ### Connector Reload
 
-On Unix, `SIGHUP` reloads only the complete `connectors` snapshot from the selected bootstrap file:
-
+On Unix, `SIGHUP` reuses the selected startup-only configurator and reloads only its complete
+`connectors` snapshot. Configurators with a live connector watcher exclusively own runtime
+connector state, so SIGHUP does not race or override them:
 ```bash
 kill -HUP $(pgrep fujin)
 ```
@@ -179,6 +179,28 @@ bootstrap-only.
 
 `SIGTERM`, Ctrl-C, or process cancellation stops listeners, drains session tasks, and closes the
 connector catalog.
+
+### Graceful Binary Upgrade
+
+On Unix, a running Fujin process exposes a local control socket and can transfer its TCP,
+WebSocket, gRPC, health, Unix, and QUIC listener descriptors to a replacement process with
+`SCM_RIGHTS`. Launch the replacement with the same listener configuration:
+
+```bash
+FUJIN_UPGRADE=1 \
+FUJIN_UPGRADE_SOCK=/run/fujin/upgrade.sock \
+  /path/to/new/fujin
+```
+
+`FUJIN_UPGRADE_SOCK` defaults to `/run/fujin/upgrade.sock`. The replacement requests the
+descriptors, starts every configured listener, reapplies TLS in the new process, and reports
+readiness. Only then does the old process stop accepting and drain its existing sessions. A failed
+or incomplete replacement leaves the old process serving.
+
+Both processes must run on the same Unix host, have access to the control socket, and use
+compatible listener addresses and transport types. The container image creates `/run/fujin` for
+the unprivileged `fujin` user. Windows supports normal server operation but not listener descriptor
+handoff.
 
 ### Health Checks
 

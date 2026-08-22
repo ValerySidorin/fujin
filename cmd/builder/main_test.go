@@ -21,6 +21,38 @@ func TestGenerateMainPropagatesVersionToService(t *testing.T) {
 	}
 }
 
+func TestGenerateLibraryMainExportsVersionedABI(t *testing.T) {
+	generated := generateLibraryMain(pluginsByType{
+		connectors: []string{"example/connector"},
+		transports: []string{"example/transport"},
+	})
+	for _, required := range []string{
+		"//export fujin_abi_version",
+		"//export fujin_v1_start",
+		"//export fujin_v1_status",
+		"//export fujin_v1_apply_connector_snapshot",
+		"//export fujin_v1_stop",
+		`_ "example/connector"`,
+		`_ "example/transport"`,
+		"cabi.BuildVersion = Version",
+	} {
+		if !strings.Contains(generated, required) {
+			t.Fatalf("generated library main does not contain %q", required)
+		}
+	}
+}
+
+func TestParseBuildKind(t *testing.T) {
+	for _, value := range []string{"executable", "c-shared", "c-archive"} {
+		if kind, err := parseBuildKind(value); err != nil || string(kind) != value {
+			t.Fatalf("parseBuildKind(%q): kind=%q err=%v", value, kind, err)
+		}
+	}
+	if _, err := parseBuildKind("plugin"); err == nil {
+		t.Fatal("expected invalid buildmode error")
+	}
+}
+
 func TestNormalizeReplacementResolvesLocalPath(t *testing.T) {
 	base := filepath.Join(string(filepath.Separator), "workspace", "fujin")
 	replacement, err := normalizeReplacement("github.com/fujin-io/fujin-control-plane=../fujin-control-plane", base)
