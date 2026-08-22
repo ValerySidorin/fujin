@@ -5,6 +5,7 @@ import importlib.util
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("compare_go_rust_matrix.py")
@@ -50,6 +51,12 @@ class MatrixDriverTest(unittest.TestCase):
             matrix.grouped_cells([tcp, quic, grpc, larger]),
             [[tcp, quic], [grpc], [larger]],
         )
+        large_batch_one = matrix.Cell("fetch", "tcp", "32KiB", 1, 16)
+        large_batch_many = matrix.Cell("fetch", "tcp", "32KiB", 32, 16)
+        self.assertNotEqual(
+            matrix.go_group_key(large_batch_one),
+            matrix.go_group_key(large_batch_many),
+        )
         self.assertEqual(
             matrix.go_benchmark_pattern(tcp), "^Benchmark_Session_Fetch_Native$"
         )
@@ -74,6 +81,12 @@ class MatrixDriverTest(unittest.TestCase):
             parsed[matrix.Cell("fetch", "tcp", "1B", 256, 128)]["ns_per_operation"],
             5000,
         )
+
+    def test_rust_runner_reports_the_failed_cell(self) -> None:
+        cell = matrix.Cell("fetch", "unix", "32KiB", 32, 128)
+        with mock.patch.object(matrix, "run_checked", side_effect=RuntimeError("boom")):
+            with self.assertRaisesRegex(RuntimeError, cell.key):
+                matrix.run_rust(Path("/tmp"), cell, 1000, "30s", False)
 
     def test_result_parser_requires_exactly_one_valid_row(self) -> None:
         row = (

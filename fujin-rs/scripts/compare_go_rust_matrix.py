@@ -117,7 +117,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--small-operations", type=int, default=10_000)
     parser.add_argument("--large-operations", type=int, default=1_000)
     parser.add_argument("--allocation-operations", type=int, default=1_000)
-    parser.add_argument("--deadline", default="60s")
+    parser.add_argument("--deadline", default="300s")
     parser.add_argument("--output-json", type=Path, required=True)
     parser.add_argument("--output-markdown", type=Path)
     parser.add_argument("--no-build", action="store_true")
@@ -222,13 +222,14 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
     return environment
 
 
-def go_group_key(cell: Cell) -> tuple[str, str, str]:
+def go_group_key(cell: Cell) -> tuple[str, str, str, str]:
     interface = "grpc" if cell.transport == "grpc" else "native"
-    return (cell.operation, interface, cell.payload)
+    shape = "matrix" if PAYLOADS[cell.payload] <= 1024 else f"{cell.batch}/{cell.concurrency}"
+    return (cell.operation, interface, cell.payload, shape)
 
 
 def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
-    groups: dict[tuple[str, str, str], list[Cell]] = {}
+    groups: dict[tuple[str, str, str, str], list[Cell]] = {}
     for cell in cells:
         groups.setdefault(go_group_key(cell), []).append(cell)
     return list(groups.values())
@@ -256,6 +257,10 @@ def go_group_environment(cells: list[Cell], operations: int, deadline: str) -> d
     )
     return environment
 
+
+def go_group_timeout(cells: list[Cell], deadline: str) -> int:
+    per_cell = int(deadline[:-1]) + 5
+    return max(180, per_cell * len(cells) + 60)
 
 def parse_go_results(output: str, operation: str) -> dict[Cell, dict[str, float]]:
     expected_native = f"Benchmark_Session_{OPERATION_NAMES[operation]}_Native"
@@ -313,7 +318,7 @@ def run_go_group(
         ],
         root,
         go_group_environment(cells, operations, deadline),
-        int(deadline[:-1]) + 120,
+        go_group_timeout(cells, deadline),
     )
     parsed = parse_go_results(output, first.operation)
     missing = [cell.key for cell in cells if cell not in parsed]
@@ -331,12 +336,16 @@ def rust_binary(root: Path, cell: Cell, allocation: bool) -> Path:
 def run_rust(
     root: Path, cell: Cell, operations: int, deadline: str, allocation: bool
 ) -> dict[str, float]:
-    output = run_checked(
-        [str(rust_binary(root, cell, allocation))],
-        root / "fujin-rs",
-        benchmark_environment(cell, operations, deadline),
-        int(deadline[:-1]) + 120,
-    )
+    try:
+        output = run_checked(
+            [str(rust_binary(root, cell, allocation))],
+            root / "fujin-rs",
+            benchmark_environment(cell, operations, deadline),
+            int(deadline[:-1]) + 120,
+        )
+    except (RuntimeError, subprocess.TimeoutExpired) as error:
+        mode = "allocation" if allocation else "timing"
+        raise RuntimeError(f"Rust {mode} benchmark failed for {cell.key}: {error}") from error
     return parse_metrics(RUST_RESULT, output, "Rust")
 
 
@@ -695,16 +704,17 @@ def main() -> int:
                     measured = run_go_group(root, group, operations, args.deadline)
                     for cell in missing:
                         results[cell.key]["go"].append(measured[cell])
+                    persist()
                 else:
                     for cell in missing:
                         results[cell.key]["rust"].append(
                             run_rust(root, cell, operations, args.deadline, False)
                         )
-                persist()
+                        persist()
             if timing_missing["go"] or timing_missing["rust"]:
                 print(
                     f"timing {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{go_group_key(group[0])[2]} "
+                    f"{go_group_key(group[0])[2]}/{go_group_key(group[0])[3]} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
@@ -732,7 +742,7 @@ def main() -> int:
             if rust_allocation_missing:
                 print(
                     f"alloc  {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{go_group_key(group[0])[2]} "
+                    f"{go_group_key(group[0])[2]}/{go_group_key(group[0])[3]} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
