@@ -1,6 +1,6 @@
 # Fujin Go-to-Rust Production Migration Evidence
 
-**Date:** 2026-08-21  
+**Date:** 2026-08-22
 **Host:** Apple M2, Darwin 24.6.0 arm64  
 **Rust:** 1.97.1  
 **Production image tested:** `fujin:rust-cutover`, build version `v0.5.0-rust`
@@ -27,7 +27,8 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - HTTP liveness and readiness endpoints.
 - Immutable connector generations and SIGHUP connector-snapshot reload on Unix.
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
-- Process-lifetime dynamic connector loading through a versioned entry symbol.
+- Public `ApplicationBuilder` embedding facade with explicit compile-time registries for connectors,
+  configurators, native transports, BIND middleware, and connector middleware.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -119,4 +120,4 @@ The production fix raises the bounded response relay and benchmark in-flight win
 
 ## Cutover conclusion
 
-The Rust binary is the verified build, container, Compose, Helm, and release path. Native and gRPC behavior, Kafka broker semantics, all transport adapters, dynamic plugin loading, shutdown, and readiness have direct execution evidence. The retained Go tree is not referenced by production deployment assets and exists only as migration support code.
+The Rust binary is the verified build, container, Compose, Helm, and release path. Native and gRPC behavior, Kafka broker semantics, all transport adapters, explicit statically linked plugin registration, shutdown, and readiness have direct execution evidence. The retained Go tree is not referenced by production deployment assets and exists only as migration support code.

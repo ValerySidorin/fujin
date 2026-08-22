@@ -1,4 +1,6 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+#[cfg(feature = "quic")]
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use fujin_core::BoxFuture;
@@ -86,6 +88,7 @@ fn tls_config(
     }))
 }
 
+#[cfg(feature = "quic")]
 fn parse_duration(name: &str, value: Option<&str>) -> Result<Option<Duration>> {
     value
         .map(|value| humantime::parse_duration(value).with_context(|| format!("parse {name}")))

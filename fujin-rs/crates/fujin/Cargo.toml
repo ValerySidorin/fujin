@@ -47,3 +47,7 @@ tracing-subscriber.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 yaml_serde.workspace = true
+
+[[example]]
+name = "embed"
+required-features = ["tcp"]

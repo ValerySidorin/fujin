@@ -409,6 +409,10 @@ impl fmt::Debug for ApplicationHandle {
 }
 
 impl ApplicationHandle {
+    #[must_use]
+    pub fn watches_connectors(&self) -> bool {
+        self.configurator.watches_connectors()
+    }
     pub fn shutdown(&self) {
         self.shutdown_requested.cancel();
     }
@@ -802,7 +806,7 @@ mod tests {
 
     fn embedded_config() -> RuntimeConfig {
         yaml_serde::from_str(
-            r#"
+            r"
 fujin:
   transports:
     - type: tcp
@@ -813,7 +817,7 @@ connectors:
   primary:
     type: nop
     settings: {}
-"#,
+",
         )
         .expect("parse embedded config")
     }

@@ -25,8 +25,9 @@ Fujin decouples applications from brokers. Your app talks to Fujin over TCP, QUI
 
 ## Supported Brokers
 
-The production Rust binary includes Kafka through `kafka_franz`. Additional connector types can be
-loaded as trusted dynamic libraries without rebuilding the server.
+The production Rust binary includes Kafka through `kafka_franz`. Additional connectors,
+configurators, native transports, and middleware are ordinary Rust crates linked into an embedded
+application or custom binary and registered explicitly through `ApplicationBuilder`.
 
 | Broker | Configuration `type` |
 |---|---|
@@ -85,6 +86,58 @@ native HELLO.
 
 Connector and transport availability is fixed by Cargo features, matching the Go builder/import
 model. The executable does not discover runtime plugin libraries from environment variables.
+
+## Rust Embedding and Plugins
+
+`fujin` is both the production CLI package and the supported embedding facade. The CLI and embedded
+applications use the same `ApplicationBuilder`, plugin registries, listener lifecycle, runtime
+connector snapshots, readiness reporting, and graceful shutdown path.
+
+```rust
+use fujin::{Application, plugins};
+
+let application = plugins::full(Application::builder()).build().await?;
+let running = application.start().await?;
+println!("listeners: {:?}", running.endpoints());
+running.shutdown().await?;
+```
+
+A complete TCP embedding example is in
+[`fujin-rs/crates/fujin/examples/embed.rs`](fujin-rs/crates/fujin/examples/embed.rs):
+
+```bash
+cargo run --manifest-path fujin-rs/Cargo.toml -p fujin --example embed --features tcp
+```
+
+Third-party plugins use the contracts re-exported by `fujin` or the lightweight
+`fujin-plugin-api` crate. A connector crate exposes an explicit constructor:
+
+```rust
+use fujin::connector::{ConnectorPlugin, ConnectorDescriptor};
+
+pub fn plugin() -> ConnectorPlugin {
+    ConnectorPlugin::new("acme_sqs", SqsDescriptor)
+}
+```
+
+The host registers it without process-global state or side-effect imports:
+
+```rust
+let application = Application::builder()
+    .connector(acme_fujin_connector_sqs::plugin())
+    .transport(plugins::transport::tcp())
+    .build()
+    .await?;
+```
+
+Equivalent constructors exist for `ConfiguratorPlugin`, `TransportRegistration`,
+`BindMiddlewareRegistration`, and `ConnectorMiddlewareRegistration`. Registration rejects empty or
+duplicate names during `build()`. Configured but unregistered plugin names are rejected before any
+listener binds.
+
+Rust dynamic-library loading is intentionally unsupported: Rust trait-object ABI is not stable.
+Plugins are statically linked Cargo dependencies, matching Go's build-time import model while
+keeping composition explicit and allowing different plugin sets per `Application` instance.
 
 Runtime logging uses the Go environment contract: `FUJIN_LOG_LEVEL` accepts `DEBUG`, `INFO`,
 `WARN`, or `ERROR`, and `FUJIN_LOG_TYPE=json` selects structured JSON output. On Unix, SIGHUP
