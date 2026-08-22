@@ -41,11 +41,15 @@ class MatrixDriverTest(unittest.TestCase):
             )
         )
 
-    def test_go_grouping_batches_native_transports(self) -> None:
+    def test_go_grouping_batches_native_transports_per_payload(self) -> None:
         tcp = matrix.Cell("fetch", "tcp", "1B", 256, 128)
         quic = matrix.Cell("fetch", "quic", "1B", 256, 128)
         grpc = matrix.Cell("fetch", "grpc", "1B", 256, 128)
-        self.assertEqual(matrix.grouped_cells([tcp, quic, grpc]), [[tcp, quic], [grpc]])
+        larger = matrix.Cell("fetch", "tcp", "128B", 256, 128)
+        self.assertEqual(
+            matrix.grouped_cells([tcp, quic, grpc, larger]),
+            [[tcp, quic], [grpc], [larger]],
+        )
         self.assertEqual(
             matrix.go_benchmark_pattern(tcp), "^Benchmark_Session_Fetch_Native$"
         )

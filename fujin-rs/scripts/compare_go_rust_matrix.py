@@ -224,8 +224,7 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
 
 def go_group_key(cell: Cell) -> tuple[str, str, str]:
     interface = "grpc" if cell.transport == "grpc" else "native"
-    size_class = "large" if cell.payload == "1MiB" else "small"
-    return (cell.operation, interface, size_class)
+    return (cell.operation, interface, cell.payload)
 
 
 def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
