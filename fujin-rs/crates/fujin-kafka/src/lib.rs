@@ -782,3 +782,9 @@ mod implementation {
 
 #[cfg(feature = "rdkafka")]
 pub use implementation::{KafkaDescriptor, descriptor};
+
+#[cfg(feature = "rdkafka")]
+#[must_use]
+pub fn plugin() -> fujin_core::ConnectorPlugin {
+    fujin_core::ConnectorPlugin::new("kafka_franz", KafkaDescriptor)
+}

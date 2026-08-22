@@ -1,6 +1,7 @@
 //! Fujin embedding facade and public plugin development surface.
 
 mod application;
+pub mod plugins;
 
 pub use application::{Application, ApplicationBuilder, ApplicationHandle, RunningApplication};
 pub use fujin_plugin_api::{configurator, connector, middleware, transport};
