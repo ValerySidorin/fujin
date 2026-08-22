@@ -20,6 +20,10 @@ use parking_lot::Mutex;
 use tokio::sync::{Notify, Semaphore};
 use tokio_util::sync::CancellationToken;
 
+const SESSION_BENCH_MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
+static SESSION_BENCH_PAYLOAD: [u8; SESSION_BENCH_MAX_PAYLOAD_BYTES] =
+    [0; SESSION_BENCH_MAX_PAYLOAD_BYTES];
+
 /// Builds the one-route, locally-acknowledged connector used by protocol benchmarks.
 ///
 /// # Errors
@@ -188,12 +192,19 @@ pub async fn session_bench_catalog(
     subscribe_permits: Vec<Arc<Semaphore>>,
     subscribe_gate: Arc<SubscribeGate>,
 ) -> fujin_core::Result<Arc<Catalog>> {
+    let payload = SESSION_BENCH_PAYLOAD
+        .get(..payload_size)
+        .ok_or_else(|| {
+            fujin_core::CoreError::InvalidConfig(format!(
+                "session benchmark payload is {payload_size} bytes, maximum is {SESSION_BENCH_MAX_PAYLOAD_BYTES}"
+            ))
+        })?;
     let registry = Arc::new(ConnectorRegistry::default());
     registry.register(
         "session_bench",
         Arc::new(SessionBenchDescriptor {
             plan: Arc::new(SessionBenchPlan {
-                payload: Bytes::from(vec![0; payload_size]),
+                payload: Bytes::from_static(payload),
                 subscribe_limits: Mutex::new(subscribe_limits.into()),
                 subscribe_permits: Mutex::new(subscribe_permits.into()),
                 subscribe_gate,
@@ -552,6 +563,28 @@ mod tests {
         );
         assert!(validate_benchmark_shape(BenchmarkOperation::Produce, 128, 32, 1, 1000).is_err());
         assert!(validate_benchmark_shape(BenchmarkOperation::Produce, 128, 1, 128, 100).is_err());
+    }
+
+    #[tokio::test]
+    async fn session_benchmark_payload_uses_static_storage_with_a_bounded_size() {
+        let catalog = session_bench_catalog(
+            SESSION_BENCH_MAX_PAYLOAD_BYTES,
+            Vec::new(),
+            Vec::new(),
+            Arc::new(SubscribeGate::default()),
+        )
+        .await;
+        assert!(catalog.is_ok());
+
+        let error = session_bench_catalog(
+            SESSION_BENCH_MAX_PAYLOAD_BYTES + 1,
+            Vec::new(),
+            Vec::new(),
+            Arc::new(SubscribeGate::default()),
+        )
+        .await
+        .expect_err("oversized benchmark payload must fail");
+        assert!(error.to_string().contains("maximum is 1048576"));
     }
 
     #[test]
