@@ -1,19 +1,19 @@
 # Fujin Rust Nop Connector Performance Report
 
-**Generated:** 2026-08-22T22:27:09Z
-**Source:** `db75ae3` (clean)
+**Generated:** 2026-08-23T09:17:54Z
+**Source:** `bb509be`
 **Environment:** `rustc 1.97.1 (8bab26f4f 2026-07-14)` on `Darwin 24.6.0 arm64`
 
 ## Scope
 
-The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Rust Fujin's Session Core and real localhost wire adapters using the built-in **`nop` connector**. The connector accepts every message locally and performs no broker I/O. Results therefore isolate protocol, Session Core, scheduling, encoding, callback, and transport overhead.
+The synchronous matrix measures end-to-end **PRODUCE** request/response operations through Rust Fujin's Session Core and real localhost wire adapters using the registered **`nop` connector plugin**. The connector accepts every message locally and performs no broker I/O. Results therefore isolate protocol, Session Core, scheduling, encoding, callback, and transport overhead.
 
 - **Measured transports:** native TCP and gRPC. The production runtime also supports QUIC, Unix sockets, and WebSocket; those adapters are outside this focused no-broker benchmark.
 - **Synchronous matrix payloads:** 1B,128B,1MiB
 - **Synchronous concurrent sessions:** 1,16,128
 - **Synchronous batch:** 1 message per operation
-- **Synchronous operations per cell:** 1000 for 1B/128B; 100 for 1MiB
-- **Pipeline peak:** 1 B payload, one session, 10000 messages for native TCP and gRPC
+- **Synchronous operations per cell:** 10000 for 1B/128B; 1000 for 1MiB
+- **Pipeline peak:** 1 B payload, one session, 1000000 messages for native TCP and gRPC
 - **Allocation metrics:** a separate `stats_alloc` instrumented process; latency and throughput come only from normal allocator runs.
 
 > These are single-host no-broker snapshots. They do not characterize connector durability, broker acknowledgement latency, unmeasured transports, or cross-machine performance.
@@ -22,24 +22,24 @@ The synchronous matrix measures end-to-end **PRODUCE** request/response operatio
 
 | Transport | Payload | Concurrent sessions | Messages/s | Mmsg/s | Throughput | p99 operation latency | Allocations/op | Bytes/op |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| native TCP | 1B | 1 | 26627 | 0.027 | 0.03 MB/s | 107.00 µs | 0.01 | 2 |
-| native TCP | 1B | 16 | 65686 | 0.066 | 0.07 MB/s | 1438.88 µs | 0.08 | 21 |
-| native TCP | 1B | 128 | 69623 | 0.070 | 0.07 MB/s | 2417.21 µs | 0.59 | 170 |
-| native TCP | 128B | 1 | 27715 | 0.028 | 3.55 MB/s | 100.42 µs | 0.01 | 2 |
-| native TCP | 128B | 16 | 62116 | 0.062 | 7.95 MB/s | 533.38 µs | 0.08 | 21 |
-| native TCP | 128B | 128 | 56970 | 0.057 | 7.29 MB/s | 2330.62 µs | 0.55 | 169 |
-| native TCP | 1MiB | 1 | 4601 | 0.005 | 4824.40 MB/s | 456.54 µs | 0.39 | 179812 |
-| native TCP | 1MiB | 16 | 5377 | 0.005 | 5638.48 MB/s | 4040.50 µs | 1.83 | 740378 |
-| native TCP | 1MiB | 128 | 5552 | 0.006 | 5822.17 MB/s | 14853.21 µs | 6.77 | 909166 |
-| gRPC | 1B | 1 | 23946 | 0.024 | 0.02 MB/s | 98.17 µs | 5.01 | 53 |
-| gRPC | 1B | 16 | 68549 | 0.069 | 0.07 MB/s | 357.67 µs | 5.04 | 184 |
-| gRPC | 1B | 128 | 77580 | 0.078 | 0.08 MB/s | 2356.62 µs | 5.01 | 44 |
-| gRPC | 128B | 1 | 24485 | 0.024 | 3.13 MB/s | 91.25 µs | 4.01 | 276 |
-| gRPC | 128B | 16 | 77381 | 0.077 | 9.90 MB/s | 347.83 µs | 4.03 | 407 |
-| gRPC | 128B | 128 | 68512 | 0.069 | 8.77 MB/s | 2578.25 µs | 4.01 | 267 |
-| gRPC | 1MiB | 1 | 1959 | 0.002 | 2054.18 MB/s | 1099.46 µs | 193.53 | 3148931 |
-| gRPC | 1MiB | 16 | 2996 | 0.003 | 3141.44 MB/s | 9168.08 µs | 193.34 | 3148023 |
-| gRPC | 1MiB | 128 | 3696 | 0.004 | 3875.70 MB/s | 26326.17 µs | 194.68 | 3159534 |
+| native TCP | 1B | 1 | 50439 | 0.050 | 0.05 MB/s | 75.62 µs | 0.00 | 0 |
+| native TCP | 1B | 16 | 147885 | 0.148 | 0.15 MB/s | 442.33 µs | 0.00 | 2 |
+| native TCP | 1B | 128 | 154416 | 0.154 | 0.15 MB/s | 2381.33 µs | 0.05 | 16 |
+| native TCP | 128B | 1 | 41048 | 0.041 | 5.25 MB/s | 73.79 µs | 0.00 | 0 |
+| native TCP | 128B | 16 | 153210 | 0.153 | 19.61 MB/s | 480.12 µs | 0.00 | 2 |
+| native TCP | 128B | 128 | 153092 | 0.153 | 19.59 MB/s | 2756.12 µs | 0.05 | 16 |
+| native TCP | 1MiB | 1 | 8231 | 0.008 | 8630.63 MB/s | 248.17 µs | 0.06 | 36716 |
+| native TCP | 1MiB | 16 | 11928 | 0.012 | 12507.82 MB/s | 3236.62 µs | 0.21 | 94515 |
+| native TCP | 1MiB | 128 | 8946 | 0.009 | 9380.93 MB/s | 23463.46 µs | 1.42 | 604108 |
+| gRPC | 1B | 1 | 35402 | 0.035 | 0.04 MB/s | 57.62 µs | 5.00 | 44 |
+| gRPC | 1B | 16 | 141663 | 0.142 | 0.14 MB/s | 241.96 µs | 5.00 | 58 |
+| gRPC | 1B | 128 | 170184 | 0.170 | 0.17 MB/s | 2263.75 µs | 5.02 | 156 |
+| gRPC | 128B | 1 | 34878 | 0.035 | 4.46 MB/s | 78.04 µs | 4.00 | 267 |
+| gRPC | 128B | 16 | 136258 | 0.136 | 17.44 MB/s | 250.08 µs | 4.00 | 281 |
+| gRPC | 128B | 128 | 166472 | 0.166 | 21.31 MB/s | 2346.08 µs | 4.02 | 379 |
+| gRPC | 1MiB | 1 | 2546 | 0.003 | 2669.19 MB/s | 794.00 µs | 193.58 | 3148632 |
+| gRPC | 1MiB | 16 | 4258 | 0.004 | 4464.38 MB/s | 8143.38 µs | 193.62 | 3148982 |
+| gRPC | 1MiB | 128 | 3819 | 0.004 | 4004.28 MB/s | 51832.38 µs | 193.34 | 3148666 |
 
 ### Reading the two result modes
 
@@ -47,12 +47,12 @@ The synchronous matrix reports request/response behavior at the stated concurren
 
 ## 1 B pipelined throughput
 
-Both rows use one client session, exactly 10000 PRODUCE messages, concurrent response draining, and the nop connector. Native TCP uses 512 KiB buffered writes and reads while validating every pre-encoded request and six-byte response. gRPC keeps at most 4096 operations in flight, matching the server response relay capacity so Tonic can coalesce ready messages up to its 32 KiB encoder yield threshold.
+Both rows use one client session, exactly 1000000 PRODUCE messages, concurrent response draining, and the nop connector. Native TCP uses 512 KiB buffered writes and reads while validating every pre-encoded request and six-byte response. gRPC keeps at most 4096 operations in flight, matching the server response relay capacity so Tonic can coalesce ready messages up to its 32 KiB encoder yield threshold.
 
 | Transport | Payload | Session mode | Messages | Messages/s | Mmsg/s | Wire throughput | Allocations/op | Bytes/op |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| native TCP | 1 B | One full-duplex pipelined session | 10000 | 8547009 | 8.547 | 8.54 MB/s | 0.00 | 190 |
-| gRPC | 1 B | One bounded full-duplex session | 10000 | 1893939 | 1.894 | 1.89 MB/s | 5.02 | 125 |
+| native TCP | 1 B | One full-duplex pipelined session | 1000000 | 13888889 | 13.889 | 13.78 MB/s | 0.00 | 14 |
+| gRPC | 1 B | One bounded full-duplex session | 1000000 | 2415459 | 2.415 | 2.41 MB/s | 5.01 | 109 |
 
 ## Reproduce
 

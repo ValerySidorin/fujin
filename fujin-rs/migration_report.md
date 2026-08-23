@@ -1,6 +1,6 @@
 # Fujin Go-to-Rust Production Migration Evidence
 
-**Date:** 2026-08-22
+**Date:** 2026-08-23
 **Host:** Apple M2, Darwin 24.6.0 arm64  
 **Rust:** 1.97.1  
 **Production image tested:** `fujin:rust-cutover`, build version `v0.5.0-rust`
@@ -27,8 +27,11 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - HTTP liveness and readiness endpoints.
 - Immutable connector generations and SIGHUP connector-snapshot reload on Unix.
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
-- Public `ApplicationBuilder` embedding facade with explicit compile-time registries for connectors,
+- Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
+- Native transports and configurators are ordinary optional plugin crates. Generic runtime,
+  server, and transport crates contain no concrete TCP, QUIC, Unix, WebSocket, YAML, or
+  environment plugin implementation and no feature checks for those plugins.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -37,12 +40,44 @@ Unsupported Go-only settings are rejected instead of ignored. These currently in
 ### Complete Rust workspace
 
 ```text
-cargo fmt --all
+cargo fmt --all -- --check
+cargo check --workspace --all-features --all-targets
 cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **58 tests passed across 17 suites; clippy passed with warnings denied.**
+Result: **66 tests passed across 29 suites**; the complete feature graph compiled and clippy
+passed with warnings denied.
+
+### Plugin composition and feature matrix
+
+The final application crate was checked with no features, with each optional feature alone
+(`configurator-env`, `configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and
+`grpc`), and with all features. Every configuration compiled.
+
+```text
+cargo test -p fujin --no-default-features --lib \
+  builder_accepts_registered_configurator_and_transport_plugins
+```
+
+Result: **PASS**. The test composes arbitrary registered configurator and transport
+implementations without enabling or referencing any concrete adapter crate.
+
+### Cross-target plugin builds
+
+```text
+cargo zigbuild -p fujin --target aarch64-unknown-linux-musl \
+  --no-default-features \
+  --features configurator-env,configurator-yaml,tcp,unix,websocket,quic,grpc
+cargo zigbuild -p fujin --target x86_64-pc-windows-gnu \
+  --no-default-features \
+  --features configurator-env,configurator-yaml,tcp,unix,websocket,quic,grpc
+```
+
+Result: **PASS** for Linux and Windows, including the target-gated Unix plugin selection.
+The Kafka feature was excluded from this cross-target command: vendored `rdkafka-sys` needs
+target libcurl headers that are not present in the Zig cross sysroot. Kafka remains covered by
+the native workspace build and broker-backed test below.
 
 ### Kafka broker-backed test
 
@@ -57,15 +92,16 @@ Result: **1 test passed**. Covered broker acknowledgement, header delivery, subs
 
 ### Transport smoke matrix
 
-Each cell performed 100 end-to-end 128-byte PRODUCE operations with two concurrent sessions through the real Rust server adapter and NOP connector.
+Each cell performed 100 end-to-end 1-byte PRODUCE operations through the real listener,
+Session Core, registered transport plugin, and NOP connector plugin.
 
-| Adapter | Result | Median operation time from smoke run | p99 |
+| Adapter | Result | Operation time | p99 |
 |---|---:|---:|---:|
-| TCP | PASS | 31,749 ns | 83,291 ns |
-| QUIC | PASS | 40,845 ns | 128,625 ns |
-| Unix | PASS | 11,319 ns | 40,708 ns |
-| WebSocket | PASS | 23,071 ns | 92,833 ns |
-| gRPC | PASS | 34,720 ns | 106,125 ns |
+| TCP | PASS | 81,955 ns | 98,625 ns |
+| QUIC | PASS | 90,887 ns | 114,375 ns |
+| Unix | PASS | 7,890 ns | 16,708 ns |
+| WebSocket | PASS | 73,372 ns | 119,958 ns |
+| gRPC | PASS | 87,342 ns | 118,958 ns |
 
 ### Packaged binary and container
 
@@ -105,6 +141,23 @@ Negative delta means Rust completed an operation faster.
 
 Across the 18 common cells, Rust's geometric-mean operation-time delta was **-33.0%** and its geometric-mean p99 delta was **-48.6%**. Rust was faster in 16 of 18 median operation-time cells and had lower p99 in all 18. The two operation-time regressions were 1 MiB gRPC at concurrency 1 (+1.3%) and 128 (+1.1%); these small deltas were not treated as statistically significant claims because this comparison reports five-sample medians rather than confidence intervals.
 
+## Bounded full-path matrix
+
+A bounded one-sample sweep completed every comparable cell across nine operations, TCP,
+QUIC, Unix, WebSocket, and gRPC, five payload sizes, valid batches up to 256 messages under
+the 4 MiB operation bound, and concurrency 1, 16, and 128.
+
+- Complete comparable cells: **1,095 / 1,095** for Go timing, Rust timing, and Rust allocation runs.
+- Geometric-mean Rust/Go operation-time ratio: **0.675x**.
+- Geometric-mean Rust/Go p99 ratio: **0.538x**.
+- Rust was faster in **948** cells; **103** cells were more than 10% slower.
+- Geometric-mean allocation-count ratio: **0.556x**; allocated-byte ratio: **3.149x**.
+
+This sweep proves path completeness and exposes the remaining allocation and tail cells, but
+one sample per runtime is not a statistical no-regression certification. The repeated focused
+comparison above remains the confidence-bearing evidence; the full-path sweep is bounded
+diagnostic evidence and is not presented as a significance claim.
+
 ## gRPC pipelined throughput correction
 
 The initial one-session gRPC pipeline result was limited by the server response relay's one-message capacity. Tonic's streaming encoder therefore became pending after every response and emitted one small HTTP/2 DATA frame per message. Raising only the client in-flight window to 1024 was invalid: h2 terminated the connection with `ENHANCE_YOUR_CALM` / `too_many_data_frames` after 1417 responses.
@@ -114,10 +167,14 @@ The production fix raises the bounded response relay and benchmark in-flight win
 ## Cleanup evidence
 
 - Every Fujin smoke process and Kafka container stack was stopped.
-- Local `bin/` and Rust `target/` artifacts were removed before final validation and rebuilt only as needed.
-- Docker Desktop was recovered from a stuck daemon state.
-- `docker builder prune -af` reclaimed **21.95 GB** of build cache.
+- No benchmark listener or service process remained active after verification.
+- Cross-target and benchmark build artifacts remain under the ignored Rust `target/` directory.
 
 ## Cutover conclusion
 
-The Rust binary is the verified build, container, Compose, Helm, and release path. Native and gRPC behavior, Kafka broker semantics, all transport adapters, explicit statically linked plugin registration, shutdown, and readiness have direct execution evidence. The retained Go tree is not referenced by production deployment assets and exists only as migration support code.
+The Rust binary is the verified build, container, Compose, Helm, and release path. Native and
+gRPC behavior, Kafka broker semantics, plugin-neutral application composition, all listener
+plugins, shutdown, readiness, and cross-target transport/configurator builds have direct
+execution evidence. The retained Go tree is not referenced by production deployment assets
+and exists only as migration support code. The bounded full-path sweep is complete but is not
+misrepresented as a repeated statistical no-regression certification.
