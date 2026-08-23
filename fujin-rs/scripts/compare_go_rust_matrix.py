@@ -251,6 +251,9 @@ def go_group_environment(cells: list[Cell], operations: int, deadline: str) -> d
     environment = os.environ.copy()
     environment.update(
         {
+            "FUJIN_BENCH_TRANSPORT": ",".join(
+                dict.fromkeys(cell.transport for cell in cells if cell.transport != "grpc")
+            ),
             "FUJIN_BENCH_PAYLOAD": ",".join(dict.fromkeys(cell.payload for cell in cells)),
             "FUJIN_BENCH_BATCH": ",".join(
                 map(str, dict.fromkeys(cell.batch for cell in cells))

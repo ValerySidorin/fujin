@@ -129,6 +129,9 @@ func benchmarkNativeSessionTransports(
 	transports []string,
 ) {
 	for _, transport := range transports {
+		if !sessionBenchmarkTransportEnabled(transport) {
+			continue
+		}
 		for _, payload := range benchmarkPayloadSizes {
 			if !sessionBenchmarkPayloadEnabled(payload.name) {
 				continue
@@ -311,6 +314,10 @@ func sessionBenchmarkConcurrencyEnabled(concurrency int) bool {
 	return sessionBenchmarkValueEnabled(strconv.Itoa(concurrency), os.Getenv("FUJIN_BENCH_CONCURRENCY"))
 }
 
+func sessionBenchmarkTransportEnabled(transport string) bool {
+	return sessionBenchmarkValueEnabled(transport, os.Getenv("FUJIN_BENCH_TRANSPORT"))
+}
+
 func sessionBenchmarkValueEnabled(value, filter string) bool {
 	if filter == "" {
 		return true
@@ -341,6 +348,16 @@ func TestSessionBenchmarkValueEnabled(t *testing.T) {
 				t.Fatalf("sessionBenchmarkValueEnabled(%q, %q): got %t, want %t", test.value, test.filter, got, test.want)
 			}
 		})
+	}
+}
+
+func TestSessionBenchmarkTransportEnabled(t *testing.T) {
+	t.Setenv("FUJIN_BENCH_TRANSPORT", "tcp, unix")
+	if !sessionBenchmarkTransportEnabled("tcp") || !sessionBenchmarkTransportEnabled("unix") {
+		t.Fatal("listed transports were not enabled")
+	}
+	if sessionBenchmarkTransportEnabled("quic") {
+		t.Fatal("unlisted transport was enabled")
 	}
 }
 

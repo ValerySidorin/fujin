@@ -69,6 +69,14 @@ class MatrixDriverTest(unittest.TestCase):
             matrix.go_benchmark_pattern(grpc), "^Benchmark_Session_Fetch_GRPC$"
         )
 
+    def test_go_group_environment_filters_native_transports(self) -> None:
+        cells = [
+            matrix.Cell("subscribe", "tcp", "1MiB", 1, 128),
+            matrix.Cell("subscribe", "websocket", "1MiB", 1, 128),
+        ]
+        environment = matrix.go_group_environment(cells, 1000, "300s")
+        self.assertEqual(environment["FUJIN_BENCH_TRANSPORT"], "tcp,websocket")
+
     def test_go_parser_returns_every_transport_cell(self) -> None:
         output = "\n".join(
             (
