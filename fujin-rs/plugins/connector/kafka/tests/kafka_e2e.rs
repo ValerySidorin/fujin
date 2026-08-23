@@ -1,5 +1,3 @@
-#![cfg(feature = "kafka")]
-
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bytes::Bytes;
@@ -60,7 +58,7 @@ async fn kafka_produce_subscribe_settle_and_transaction() {
     let transactional_id = format!("fujin-rs-tx-{unique}");
     let registry = Arc::new(ConnectorRegistry::default());
     registry
-        .register("kafka", fujin_connectors::kafka::descriptor())
+        .register("kafka", fujin_connector_kafka::descriptor())
         .expect("register Kafka connector");
     let compiler = Arc::new(GenerationCompiler::new(
         registry,

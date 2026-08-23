@@ -10,9 +10,14 @@ members = [
     "crates/fujin-runtime",
     "crates/fujin-transport",
     "crates/fujin-upgrade",
-    "plugins/configurators",
-    "plugins/connectors",
-    "plugins/transports",
+    "plugins/connector/kafka",
+    "plugins/connector/nop",
+    "plugins/configurator/env",
+    "plugins/configurator/yaml",
+    "plugins/transport/quic",
+    "plugins/transport/tcp",
+    "plugins/transport/unix",
+    "plugins/transport/websocket",
 ]
 
 [workspace.package]

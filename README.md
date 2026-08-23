@@ -93,11 +93,27 @@ model. The executable does not discover runtime plugin libraries from environmen
 applications use the same `ApplicationBuilder`, plugin registries, listener lifecycle, runtime
 connector snapshots, readiness reporting, and graceful shutdown path.
 
-Small adapters are grouped by category: `fujin-connectors` contains Kafka and NOP,
-`fujin-configurators` contains the environment and YAML loaders, and `fujin-transports` contains
-TCP, Unix, WebSocket, and QUIC. Application features select individual modules; the public
-`fujin::plugins::*` namespace hides their physical crate layout. Shared certificate loading and
-listener TLS setup live in `fujin-transport::tls`, alongside the listener boundary they support.
+Every built-in plugin is one independent crate, matching the Go package boundary:
+
+```text
+plugins/
+├── connector/
+│   ├── kafka/        # fujin-connector-kafka
+│   └── nop/          # fujin-connector-nop
+├── configurator/
+│   ├── env/          # fujin-configurator-env
+│   └── yaml/         # fujin-configurator-yaml
+└── transport/
+    ├── quic/         # fujin-transport-quic
+    ├── tcp/          # fujin-transport-tcp
+    ├── unix/         # fujin-transport-unix
+    └── websocket/    # fujin-transport-websocket
+```
+
+The singular category directories are namespaces, not Cargo packages. Application features select
+individual leaf crates; `fujin::plugins::*` provides stable convenience constructors without an
+aggregate plugin crate. Shared certificate loading and listener TLS setup live in
+`fujin-transport::tls`, alongside the listener contract they support.
 
 ```rust
 use fujin::{Application, plugins};

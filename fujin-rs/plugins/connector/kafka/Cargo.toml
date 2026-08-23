@@ -1,5 +1,5 @@
 [package]
-name = "fujin-connectors"
+name = "fujin-connector-kafka"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,18 +9,12 @@ repository.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-full = ["kafka", "nop"]
-kafka = ["dep:rdkafka"]
-nop = []
-
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-fujin-core = { path = "../../crates/fujin-core" }
+fujin-core = { path = "../../../crates/fujin-core" }
 parking_lot.workspace = true
-rdkafka = { workspace = true, optional = true }
+rdkafka.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

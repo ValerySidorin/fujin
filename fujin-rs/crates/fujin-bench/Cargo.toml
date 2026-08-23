@@ -23,7 +23,10 @@ fujin-native = { path = "../fujin-native" }
 fujin-proto = { path = "../fujin-proto" }
 fujin-runtime = { path = "../fujin-runtime", features = ["grpc"] }
 fujin-transport = { path = "../fujin-transport" }
-fujin-transports = { path = "../../plugins/transports", features = ["full"] }
+fujin-transport-quic = { path = "../../plugins/transport/quic" }
+fujin-transport-tcp = { path = "../../plugins/transport/tcp" }
+fujin-transport-unix = { path = "../../plugins/transport/unix" }
+fujin-transport-websocket = { path = "../../plugins/transport/websocket" }
 futures-util.workspace = true
 parking_lot.workspace = true
 quinn.workspace = true

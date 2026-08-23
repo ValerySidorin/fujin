@@ -345,13 +345,17 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "fujin-configurators",
- "fujin-connectors",
+ "fujin-configurator-env",
+ "fujin-configurator-yaml",
+ "fujin-connector-kafka",
  "fujin-core",
  "fujin-plugin-api",
  "fujin-runtime",
  "fujin-transport",
- "fujin-transports",
+ "fujin-transport-quic",
+ "fujin-transport-tcp",
+ "fujin-transport-unix",
+ "fujin-transport-websocket",
  "fujin-upgrade",
  "serde_json",
  "tokio",
@@ -372,7 +376,10 @@ dependencies = [
  "fujin-proto",
  "fujin-runtime",
  "fujin-transport",
- "fujin-transports",
+ "fujin-transport-quic",
+ "fujin-transport-tcp",
+ "fujin-transport-unix",
+ "fujin-transport-websocket",
  "futures-util",
  "parking_lot",
  "quinn",
@@ -388,7 +395,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "fujin-configurators"
+name = "fujin-configurator-env"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "fujin-runtime",
+ "serde_json",
+ "tracing",
+ "yaml_serde",
+]
+
+[[package]]
+name = "fujin-configurator-yaml"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -400,7 +418,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fujin-connectors"
+name = "fujin-connector-kafka"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -414,6 +432,14 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "fujin-connector-nop"
+version = "0.1.0"
+dependencies = [
+ "fujin-core",
+ "serde_json",
 ]
 
 [[package]]
@@ -514,11 +540,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "fujin-transports"
+name = "fujin-transport-quic"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bytes",
  "fujin-core",
  "fujin-runtime",
  "fujin-transport",
@@ -529,8 +554,51 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tokio-tungstenite",
  "tokio-util",
+]
+
+[[package]]
+name = "fujin-transport-tcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-runtime",
+ "fujin-transport",
+ "fujin-upgrade",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fujin-transport-unix"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-transport",
+ "fujin-upgrade",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fujin-transport-websocket"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "fujin-core",
+ "fujin-runtime",
+ "fujin-transport",
+ "fujin-upgrade",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]

@@ -29,10 +29,10 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
 - Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
-- Connector implementations are modules of `fujin-connectors`, configurator implementations are
-  modules of `fujin-configurators`, and native transport implementations are modules of
-  `fujin-transports`. Cargo features select individual adapters without creating a manifest and
-  release unit for every small plugin.
+- Every connector, configurator, and native transport implementation is an independent leaf crate
+  under `plugins/connector/<name>`, `plugins/configurator/<name>`, or
+  `plugins/transport/<name>`. The category directories are namespaces only; application Cargo
+  features select concrete plugin crates directly, matching the Go package boundary.
 - Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
   live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
 - Shared certificate loading and listener TLS construction live in `fujin-transport::tls`; the
@@ -52,16 +52,15 @@ cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **66 tests passed across 22 suites**; the complete feature graph compiled and clippy
+Result: **66 tests passed across 27 suites**; the complete feature graph compiled and clippy
 passed with warnings denied.
 
 ### Plugin composition and feature matrix
 
 The final application crate was checked with no features, with each optional feature alone
 (`configurator-env`, `configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and
-`grpc`), and with all features. `fujin-connectors`, `fujin-configurators`, and
-`fujin-transports` were also checked without features and with every category feature
-independently. Every configuration compiled.
+`grpc`), and with all features. The complete workspace independently compiled and tested every
+leaf plugin crate. Every configuration compiled.
 
 ```text
 cargo test -p fujin --no-default-features --lib \
@@ -70,6 +69,11 @@ cargo test -p fujin --no-default-features --lib \
 
 Result: **PASS**. The test composes arbitrary registered configurator and transport
 implementations without enabling or referencing any concrete adapter crate.
+
+A temporary Cargo project outside the workspace depended only on `fujin`,
+`fujin-connector-nop`, and `fujin-transport-tcp`. It registered both plugins through
+`ApplicationBuilder`, bound an ephemeral TCP listener, reported the endpoint, and completed
+bounded shutdown. Result: **PASS**.
 
 ### Cross-target plugin builds
 
@@ -92,7 +96,7 @@ the native workspace build and broker-backed test below.
 A real Kafka container was started through `resources/docker-compose.kafka.yaml`; cleanup ran after the test.
 
 ```text
-FUJIN_KAFKA_E2E=1 cargo test -p fujin-connectors --features kafka \
+FUJIN_KAFKA_E2E=1 cargo test -p fujin-connector-kafka \
   --test kafka_e2e -- --nocapture
 ```
 
@@ -101,7 +105,7 @@ Result: **1 test passed**. Covered broker acknowledgement, header delivery, subs
 ### Transport smoke matrix
 
 Each cell performed 100 end-to-end 1-byte PRODUCE operations through the real listener,
-Session Core, registered adapter from the consolidated category crate, and NOP connector plugin.
+Session Core, an independently packaged transport plugin, and the NOP connector.
 
 | Adapter | Result | Operation time | p99 |
 |---|---:|---:|---:|

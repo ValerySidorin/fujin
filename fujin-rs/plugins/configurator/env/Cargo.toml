@@ -1,5 +1,5 @@
 [package]
-name = "fujin-configurators"
+name = "fujin-configurator-env"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,16 +9,9 @@ repository.workspace = true
 [lints]
 workspace = true
 
-[features]
-default = []
-full = ["env", "yaml"]
-env = []
-yaml = ["dep:tokio"]
-
 [dependencies]
 async-trait.workspace = true
-fujin-runtime = { path = "../../crates/fujin-runtime" }
+fujin-runtime = { path = "../../../crates/fujin-runtime" }
 serde_json.workspace = true
-tokio = { workspace = true, optional = true }
 tracing.workspace = true
 yaml_serde.workspace = true
