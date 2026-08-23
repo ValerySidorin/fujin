@@ -1,5 +1,5 @@
 [package]
-name = "fujin-runtime"
+name = "fujin-transport"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,16 +10,14 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-async-trait.workspace = true
-arc-swap.workspace = true
+anyhow.workspace = true
 fujin-core = { path = "../fujin-core" }
-humantime.workspace = true
+fujin-native = { path = "../fujin-native" }
+fujin-runtime = { path = "../fujin-runtime" }
+fujin-upgrade = { path = "../fujin-upgrade" }
 parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
-sha2.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
-
-[dev-dependencies]
+tracing.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "fujin-plugin-api"
+name = "fujin-tls"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,9 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-fujin-core = { path = "../fujin-core" }
+anyhow.workspace = true
 fujin-runtime = { path = "../fujin-runtime" }
-fujin-transport = { path = "../fujin-transport" }
-fujin-upgrade = { path = "../fujin-upgrade" }
+rustls.workspace = true
+rustls-pemfile.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true

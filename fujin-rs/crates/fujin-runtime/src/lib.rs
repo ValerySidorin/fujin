@@ -2,7 +2,7 @@
 
 pub mod configurator;
 
-use std::{path::Path, sync::Arc};
+use std::sync::Arc;
 
 use fujin_core::{
     Catalog, ConnectorMiddlewareCompiler, ConnectorRegistry, ConnectorsConfig, GenerationCompiler,
@@ -145,35 +145,6 @@ pub mod fujin_server_config {
         pub require_client_certificate: bool,
     }
 
-    #[derive(Clone, Debug)]
-    pub struct TcpListenerConfig {
-        pub listen: String,
-        pub tls: Option<TlsConfig>,
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct UnixListenerConfig {
-        pub path: String,
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct WebSocketListenerConfig {
-        pub listen: String,
-        pub path: String,
-        pub allowed_origins: Vec<String>,
-        pub max_message_bytes: usize,
-        pub tls: Option<TlsConfig>,
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct QuicListenerConfig {
-        pub listen: String,
-        pub tls: TlsConfig,
-        pub max_incoming_streams: u32,
-        pub max_idle_timeout: Option<Duration>,
-        pub keepalive_period: Option<Duration>,
-    }
-
     #[derive(Clone, Debug, Default)]
     pub struct ServerKeepAliveConfig {
         pub time: Option<Duration>,
@@ -217,11 +188,8 @@ pub enum RuntimeError {
         path: String,
         source: std::io::Error,
     },
-    #[error("parse configuration {path:?}: {source}")]
-    Parse {
-        path: String,
-        source: yaml_serde::Error,
-    },
+    #[error("parse configuration {path:?}: {message}")]
+    Parse { path: String, message: String },
     #[error("invalid configuration: {0}")]
     InvalidConfig(String),
     #[error(transparent)]
@@ -286,7 +254,7 @@ impl GrpcConfig {
             initial_window_size: self.initial_window_size,
             initial_connection_window_size: self.initial_conn_window_size,
             server_keepalive: self.server_keepalive.config()?,
-            tls: tls_config(&self.tls, "gRPC")?,
+            tls: self.tls.listener_config("gRPC")?,
         }))
     }
 }
@@ -308,39 +276,46 @@ impl GrpcServerKeepAliveSettings {
     }
 }
 
-fn tls_config(
-    settings: &TlsSettings,
-    listener: &str,
-) -> Result<Option<fujin_server_config::TlsConfig>, RuntimeError> {
-    if !settings.enabled {
-        if settings.require_and_verify_client_cert {
-            return Err(RuntimeError::InvalidConfig(format!(
-                "{listener} cannot require client certificates while TLS is disabled"
-            )));
+impl TlsSettings {
+    /// Compiles validated listener TLS settings without reading certificate files.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimeError::InvalidConfig`] for incomplete or contradictory TLS settings.
+    pub fn listener_config(
+        &self,
+        listener: &str,
+    ) -> Result<Option<fujin_server_config::TlsConfig>, RuntimeError> {
+        if !self.enabled {
+            if self.require_and_verify_client_cert {
+                return Err(RuntimeError::InvalidConfig(format!(
+                    "{listener} cannot require client certificates while TLS is disabled"
+                )));
+            }
+            return Ok(None);
         }
-        return Ok(None);
-    }
-    require_non_empty(
-        &settings.server_cert_pem_path,
-        &format!("{listener} certificate"),
-    )?;
-    require_non_empty(
-        &settings.server_key_pem_path,
-        &format!("{listener} private key"),
-    )?;
-    if settings.require_and_verify_client_cert {
         require_non_empty(
-            &settings.client_certs_dir,
-            &format!("{listener} client certificates directory"),
+            &self.server_cert_pem_path,
+            &format!("{listener} certificate"),
         )?;
+        require_non_empty(
+            &self.server_key_pem_path,
+            &format!("{listener} private key"),
+        )?;
+        if self.require_and_verify_client_cert {
+            require_non_empty(
+                &self.client_certs_dir,
+                &format!("{listener} client certificates directory"),
+            )?;
+        }
+        Ok(Some(fujin_server_config::TlsConfig {
+            certificate: self.server_cert_pem_path.clone(),
+            private_key: self.server_key_pem_path.clone(),
+            client_certificates: (!self.client_certs_dir.is_empty())
+                .then(|| self.client_certs_dir.clone()),
+            require_client_certificate: self.require_and_verify_client_cert,
+        }))
     }
-    Ok(Some(fujin_server_config::TlsConfig {
-        certificate: settings.server_cert_pem_path.clone(),
-        private_key: settings.server_key_pem_path.clone(),
-        client_certificates: (!settings.client_certs_dir.is_empty())
-            .then(|| settings.client_certs_dir.clone()),
-        require_client_certificate: settings.require_and_verify_client_cert,
-    }))
 }
 
 fn parse_duration(
@@ -372,41 +347,6 @@ fn require_non_empty(value: &str, name: &str) -> Result<(), RuntimeError> {
     }
 }
 
-/// Loads one complete YAML runtime snapshot from disk.
-///
-/// # Errors
-///
-/// Returns [`RuntimeError::Read`] when the file cannot be read or [`RuntimeError::Parse`] when
-/// its contents do not match the runtime schema.
-pub async fn load(path: impl AsRef<Path>) -> Result<RuntimeConfig, RuntimeError> {
-    let path = path.as_ref();
-    let bytes = tokio::fs::read(path)
-        .await
-        .map_err(|source| RuntimeError::Read {
-            path: path.display().to_string(),
-            source,
-        })?;
-    yaml_serde::from_slice(&bytes).map_err(|source| RuntimeError::Parse {
-        path: path.display().to_string(),
-        source,
-    })
-}
-
-/// Reloads only the complete connector snapshot from a Go-compatible bootstrap file.
-///
-/// # Errors
-///
-/// Returns the load, compilation, preflight, or publication error. Listener settings are not
-/// changed by runtime reload.
-pub async fn reload_connectors(
-    path: impl AsRef<Path>,
-    catalog: &Catalog,
-) -> Result<(), RuntimeError> {
-    let config = load(path).await?;
-    catalog.reload(&config.connectors).await?;
-    Ok(())
-}
-
 /// Compiles and publishes the initial connector generation without broker I/O unless a connector
 /// explicitly requests eager runtime preflight.
 ///
@@ -430,205 +370,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_go_compatible_transport_entries_and_connector_snapshot() {
-        let config: RuntimeConfig = yaml_serde::from_str(
-            r"
-fujin:
-  transports:
-    - type: tcp
-      settings:
-        addr: 127.0.0.1:4848
-    - type: quic
-      enabled: true
-      settings:
-        addr: 127.0.0.1:4849
-        max_incoming_streams: 2048
-        tls:
-          enabled: true
-          server_cert_pem_path: cert.pem
-          server_key_pem_path: key.pem
-grpc:
-  enabled: false
-connectors:
-  primary:
-    type: kafka_franz
-    settings:
-      common:
-        brokers: [localhost:9092]
-      routes:
-        events:
-          produce_topic: events
-",
-        )
+    fn parses_transport_entries_and_connector_snapshot() {
+        let config: RuntimeConfig = serde_json::from_value(serde_json::json!({
+            "fujin": {
+                "transports": [
+                    {"type": "tcp", "settings": {"addr": "127.0.0.1:4848"}},
+                    {"type": "quic", "enabled": true, "settings": {"max_incoming_streams": 2048}}
+                ]
+            },
+            "grpc": {"enabled": false},
+            "connectors": {
+                "primary": {"type": "kafka_franz", "settings": {}}
+            }
+        }))
         .expect("parse runtime config");
         let control_plane = config
             .control_plane_config("test")
-            .expect("convert control-plane config");
+            .expect("convert control plane");
 
         assert_eq!(config.connectors["primary"].connector_type, "kafka_franz");
         assert_eq!(config.fujin.transports.len(), 2);
         assert_eq!(config.fujin.transports[0].transport_type, "tcp");
-        assert_eq!(
-            config.fujin.transports[0].settings["addr"],
-            "127.0.0.1:4848"
-        );
         assert_eq!(config.fujin.transports[1].transport_type, "quic");
-        assert_eq!(
-            config.fujin.transports[1].settings["max_incoming_streams"],
-            2048
-        );
         assert!(control_plane.grpc.is_none());
     }
 
     #[test]
-    fn rejects_grpc_controls_not_supported_by_base_build() {
-        let config: RuntimeConfig = yaml_serde::from_str(
-            r#"
-grpc:
-  enabled: true
-  addr: "127.0.0.1:4849"
-  client_keepalive:
-    min_time: 10s
-"#,
-        )
+    fn rejects_unsupported_grpc_controls() {
+        let config: RuntimeConfig = serde_json::from_value(serde_json::json!({
+            "grpc": {
+                "enabled": true,
+                "addr": "127.0.0.1:4849",
+                "client_keepalive": {"min_time": "10s"}
+            }
+        }))
         .expect("parse gRPC controls");
 
         assert!(matches!(
             config.control_plane_config("test"),
             Err(RuntimeError::InvalidConfig(message)) if message.contains("unavailable")
         ));
-    }
-
-    #[tokio::test]
-    #[allow(clippy::too_many_lines)]
-    async fn reloads_complete_connector_snapshot_and_preserves_rejected_generation() {
-        use std::collections::BTreeMap;
-
-        use fujin_core::{
-            AcceptanceGuarantee, BoxFuture, Capabilities, CompiledConnector, CompletionSink,
-            ConnectorDescriptor, ConnectorRuntime, CoreError, Reader, ReaderEventSink, Result,
-            RouteProfile, Writer,
-        };
-
-        #[derive(Debug)]
-        struct Descriptor;
-
-        impl ConnectorDescriptor for Descriptor {
-            fn compile(&self, settings: &Value) -> Result<Arc<dyn CompiledConnector>> {
-                let version = settings
-                    .get("version")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| CoreError::InvalidConfig("missing test version".into()))?;
-                Ok(Arc::new(Compiled {
-                    version: version.to_owned(),
-                    routes: BTreeMap::from([(
-                        "route".into(),
-                        RouteProfile {
-                            capabilities: Capabilities::PRODUCE,
-                            produce_guarantee: AcceptanceGuarantee::Local,
-                            ..RouteProfile::default()
-                        },
-                    )]),
-                }))
-            }
-        }
-
-        #[derive(Debug)]
-        struct Compiled {
-            version: String,
-            routes: BTreeMap<String, RouteProfile>,
-        }
-
-        impl CompiledConnector for Compiled {
-            fn routes(&self) -> &BTreeMap<String, RouteProfile> {
-                &self.routes
-            }
-
-            fn open_runtime(&self) -> Result<Arc<dyn ConnectorRuntime>> {
-                Ok(Arc::new(TestRuntime {
-                    _version: self.version.clone(),
-                }))
-            }
-        }
-
-        #[derive(Debug)]
-        struct TestRuntime {
-            _version: String,
-        }
-
-        impl ConnectorRuntime for TestRuntime {
-            fn open_reader(
-                &self,
-                _route: &str,
-                _auto_settle: bool,
-                _events: Arc<dyn ReaderEventSink>,
-            ) -> Result<Arc<dyn Reader>> {
-                Err(CoreError::OperationUnsupported)
-            }
-
-            fn open_writer(
-                &self,
-                _route: &str,
-                _completions: Arc<dyn CompletionSink>,
-            ) -> Result<Arc<dyn Writer>> {
-                Err(CoreError::OperationUnsupported)
-            }
-
-            fn close(self: Arc<Self>) -> BoxFuture<'static, Result<()>> {
-                Box::pin(async { Ok(()) })
-            }
-        }
-
-        let registry = Arc::new(ConnectorRegistry::default());
-        registry
-            .register("test", Arc::new(Descriptor))
-            .expect("register test descriptor");
-        let path = std::env::temp_dir().join(format!(
-            "fujin-rust-reload-{}-{}.yaml",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("runtime")
-        ));
-        let initial = r"
-grpc: { enabled: false }
-connectors:
-  connector:
-    type: test
-    settings: { version: v1 }
-";
-        tokio::fs::write(&path, initial)
-            .await
-            .expect("write initial config");
-        let config = load(&path).await.expect("load initial config");
-        let catalog = compile_catalog(
-            &config,
-            registry,
-            Arc::new(fujin_core::NoConnectorMiddleware),
-        )
-        .await
-        .expect("compile initial catalog");
-        let initial_generation = catalog.current().expect("initial generation");
-
-        tokio::fs::write(&path, initial.replace("v1", "v2"))
-            .await
-            .expect("write replacement config");
-        reload_connectors(&path, &catalog)
-            .await
-            .expect("publish replacement");
-        let replacement = catalog.current().expect("replacement generation");
-        assert!(!Arc::ptr_eq(&initial_generation, &replacement));
-
-        tokio::fs::write(&path, initial.replace("version: v1", "invalid: true"))
-            .await
-            .expect("write rejected config");
-        assert!(reload_connectors(&path, &catalog).await.is_err());
-        assert!(Arc::ptr_eq(
-            &replacement,
-            &catalog.current().expect("replacement remains active")
-        ));
-
-        catalog.close().await.expect("close catalog");
-        tokio::fs::remove_file(path)
-            .await
-            .expect("remove test config");
     }
 }

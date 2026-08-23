@@ -1,6 +1,3 @@
-#[cfg(not(any(feature = "configurator-yaml", feature = "configurator-env")))]
-compile_error!("the fujin binary requires at least one configurator feature");
-
 use std::env;
 
 use anyhow::{Context, Result, bail};

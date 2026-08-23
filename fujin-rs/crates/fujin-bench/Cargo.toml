@@ -1,0 +1,64 @@
+[package]
+name = "fujin-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+bench = []
+bench-alloc = ["bench", "dep:stats_alloc"]
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+fujin-core = { path = "../fujin-core" }
+fujin-native = { path = "../fujin-native" }
+fujin-proto = { path = "../fujin-proto" }
+fujin-runtime = { path = "../fujin-runtime" }
+fujin-server = { path = "../fujin-server", features = ["grpc"] }
+fujin-transport = { path = "../fujin-transport" }
+fujin-transport-quic = { path = "../../plugins/transport-quic" }
+fujin-transport-tcp = { path = "../../plugins/transport-tcp" }
+fujin-transport-websocket = { path = "../../plugins/transport-websocket" }
+futures-util.workspace = true
+parking_lot.workspace = true
+quinn.workspace = true
+rcgen.workspace = true
+rustls.workspace = true
+serde_json.workspace = true
+stats_alloc = { workspace = true, optional = true }
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-tungstenite.workspace = true
+tokio-util.workspace = true
+tonic.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+fujin-transport-unix = { path = "../../plugins/transport-unix" }
+
+[[bin]]
+name = "session-bench"
+path = "src/bin/session-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "grpc-session-bench"
+path = "src/bin/grpc-session-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "session-matrix-bench"
+path = "src/bin/session-matrix-bench.rs"
+required-features = ["bench"]
+
+[[bin]]
+name = "grpc-session-matrix-bench"
+path = "src/bin/grpc-session-matrix-bench.rs"
+required-features = ["bench"]

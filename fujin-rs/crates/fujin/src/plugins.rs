@@ -1,11 +1,11 @@
-//! Statically linked first-party plugins selected by Cargo features.
+//! Optional plugin dependencies selected by the final application build.
 
 /// Bootstrap configurators.
 pub mod configurator {
     #[cfg(feature = "configurator-env")]
-    pub use fujin_runtime::configurator::env_plugin as env;
+    pub use fujin_configurator_env::plugin as env;
     #[cfg(feature = "configurator-yaml")]
-    pub use fujin_runtime::configurator::yaml_plugin as yaml;
+    pub use fujin_configurator_yaml::plugin as yaml;
 }
 
 /// Connector implementations.
@@ -17,16 +17,16 @@ pub mod connector {
 /// Native protocol transports.
 pub mod transport {
     #[cfg(feature = "quic")]
-    pub use fujin_server::transport::quic_plugin as quic;
+    pub use fujin_transport_quic::plugin as quic;
     #[cfg(feature = "tcp")]
-    pub use fujin_server::transport::tcp_plugin as tcp;
+    pub use fujin_transport_tcp::plugin as tcp;
     #[cfg(all(feature = "unix", unix))]
-    pub use fujin_server::transport::unix_plugin as unix;
+    pub use fujin_transport_unix::plugin as unix;
     #[cfg(feature = "websocket")]
-    pub use fujin_server::transport::websocket_plugin as websocket;
+    pub use fujin_transport_websocket::plugin as websocket;
 }
 
-/// Registers every first-party plugin enabled in this build.
+/// Registers every plugin dependency enabled in this build.
 #[must_use]
 pub fn full(builder: crate::ApplicationBuilder) -> crate::ApplicationBuilder {
     let builder = builder;

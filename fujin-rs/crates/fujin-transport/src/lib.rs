@@ -1,5 +1,8 @@
 //! Public native transport plugin contracts and explicit registry.
 
+pub mod listener;
+pub mod settings;
+
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use anyhow::{Result, bail};
@@ -13,22 +16,6 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
-#[cfg(any(
-    feature = "tcp",
-    all(feature = "unix", unix),
-    feature = "websocket",
-    feature = "quic"
-))]
-mod builtin;
-
-#[cfg(feature = "quic")]
-pub use builtin::quic_plugin;
-#[cfg(feature = "tcp")]
-pub use builtin::tcp_plugin;
-#[cfg(all(feature = "unix", unix))]
-pub use builtin::unix_plugin;
-#[cfg(feature = "websocket")]
-pub use builtin::websocket_plugin;
 
 /// One listener after it has bound its actual address.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -300,6 +287,16 @@ impl TransportContext {
     #[must_use]
     pub fn shutdown(&self) -> CancellationToken {
         self.shutdown.clone()
+    }
+
+    #[must_use]
+    pub fn catalog(&self) -> Arc<Catalog> {
+        Arc::clone(&self.catalog)
+    }
+
+    #[must_use]
+    pub fn bind_middlewares(&self) -> Arc<dyn BindMiddlewareRunner> {
+        Arc::clone(&self.bind_middlewares)
     }
 
     #[must_use]

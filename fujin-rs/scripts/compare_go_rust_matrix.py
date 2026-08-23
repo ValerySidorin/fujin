@@ -367,7 +367,7 @@ def build_rust(root: Path, allocations: bool) -> None:
         "build",
         "--release",
         "-p",
-        "fujin-server",
+        "fujin-bench",
         "--bin",
         "session-matrix-bench",
         "--bin",

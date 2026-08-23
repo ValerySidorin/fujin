@@ -12,7 +12,8 @@ use fujin_runtime::configurator::{
     bootstrap_snapshot, selected_configurator,
 };
 use fujin_runtime::{RuntimeConfig, RuntimeError};
-use fujin_server::{Endpoint, ServerConfig, TransportRegistration, TransportRegistry};
+use fujin_server::{Endpoint, ServerConfig};
+use fujin_transport::{TransportRegistration, TransportRegistry};
 use fujin_upgrade::{InheritedListeners, ListenerRegistry};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -823,6 +824,60 @@ connectors:
         .expect("parse embedded config")
     }
 
+    fn plugin_config() -> RuntimeConfig {
+        serde_json::from_value(serde_json::json!({
+            "fujin": {
+                "transports": [{"type": "test_transport", "settings": {}}]
+            },
+            "grpc": {"enabled": false},
+            "connectors": {}
+        }))
+        .expect("parse plugin config")
+    }
+
+    #[derive(Debug)]
+    struct TestTransportPlugin;
+
+    impl fujin_transport::TransportPlugin for TestTransportPlugin {
+        fn compile(
+            &self,
+            _settings: &serde_json::Value,
+        ) -> Result<Arc<dyn fujin_transport::CompiledTransport>> {
+            Ok(Arc::new(TestTransport))
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestTransport;
+
+    impl fujin_transport::CompiledTransport for TestTransport {
+        fn serve(
+            self: Arc<Self>,
+            _context: fujin_transport::TransportContext,
+        ) -> BoxFuture<'static, Result<()>> {
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    #[tokio::test]
+    async fn builder_accepts_registered_configurator_and_transport_plugins() {
+        let application = Application::builder()
+            .graceful_upgrade(false)
+            .configurator(ConfiguratorPlugin::new("test_configurator", || {
+                Ok(StaticConfigurator(plugin_config()))
+            }))
+            .selected_configurator("test_configurator")
+            .transport(TransportRegistration::new(
+                "test_transport",
+                TestTransportPlugin,
+            ))
+            .build()
+            .await
+            .expect("build application from registered plugins");
+
+        assert_eq!(application.server_config.transports.len(), 1);
+    }
+
     #[tokio::test]
     #[cfg(feature = "tcp")]
     async fn embedded_application_starts_reports_actual_endpoint_and_shuts_down() {
@@ -830,7 +885,7 @@ connectors:
             .graceful_upgrade(false)
             .config(embedded_config())
             .connector(ConnectorPlugin::new("nop", NopDescriptor))
-            .transport(fujin_server::transport::tcp_plugin())
+            .transport(crate::plugins::transport::tcp())
             .build()
             .await
             .expect("build embedded application");

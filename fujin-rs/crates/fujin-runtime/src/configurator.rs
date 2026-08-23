@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, env, fmt, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, env, fmt, sync::Arc};
 
 use async_trait::async_trait;
 use fujin_core::{Catalog, CatalogStatus, ConnectorsConfig};
@@ -13,10 +13,6 @@ use tokio_util::sync::CancellationToken;
 use crate::{RuntimeConfig, RuntimeError};
 
 pub const CONFIGURATOR_ENV: &str = "FUJIN_CONFIGURATOR";
-pub const YAML_PATHS_ENV: &str = "FUJIN_CONFIGURATOR_YAML_PATHS";
-pub const ENV_CONFIG_ENV: &str = "FUJIN_CONFIGURATOR_ENV_CONFIG";
-
-const DEFAULT_YAML_PATHS: [&str; 3] = ["./config.yaml", "conf/config.yaml", "config/config.yaml"];
 
 type ConfiguratorFactory =
     Arc<dyn Fn() -> Result<Arc<dyn Configurator>, RuntimeError> + Send + Sync + 'static>;
@@ -183,113 +179,6 @@ pub fn selected_configurator(
         )));
     }
     registry.create(&name)
-}
-
-#[derive(Debug)]
-pub struct YamlConfigurator {
-    paths: Vec<PathBuf>,
-}
-
-impl YamlConfigurator {
-    #[must_use]
-    pub fn from_environment() -> Self {
-        let paths = env::var(YAML_PATHS_ENV).map_or_else(
-            |_| DEFAULT_YAML_PATHS.iter().map(PathBuf::from).collect(),
-            |value| {
-                value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|path| !path.is_empty())
-                    .map(PathBuf::from)
-                    .collect()
-            },
-        );
-
-        Self { paths }
-    }
-
-    #[must_use]
-    pub fn new(paths: Vec<PathBuf>) -> Self {
-        Self { paths }
-    }
-}
-#[must_use]
-pub fn yaml_plugin() -> ConfiguratorPlugin {
-    ConfiguratorPlugin::new("yaml", || Ok(YamlConfigurator::from_environment()))
-}
-
-#[async_trait]
-impl Configurator for YamlConfigurator {
-    async fn load(&self) -> Result<RuntimeConfig, RuntimeError> {
-        if self.paths.is_empty() {
-            return Err(RuntimeError::InvalidConfig(format!(
-                "yaml configurator: {YAML_PATHS_ENV} contains no paths"
-            )));
-        }
-        for path in &self.paths {
-            match tokio::fs::read(path).await {
-                Ok(bytes) => {
-                    tracing::info!(path = %path.display(), "loading configuration with yaml configurator");
-                    return decode_config(&bytes, &path.display().to_string());
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(source) => {
-                    return Err(RuntimeError::Read {
-                        path: path.display().to_string(),
-                        source,
-                    });
-                }
-            }
-        }
-        Err(RuntimeError::InvalidConfig(format!(
-            "yaml configurator: failed to find configuration in paths {:?}",
-            self.paths
-        )))
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct EnvConfigurator;
-
-#[async_trait]
-impl Configurator for EnvConfigurator {
-    async fn load(&self) -> Result<RuntimeConfig, RuntimeError> {
-        let value = env::var(ENV_CONFIG_ENV).map_err(|_| {
-            RuntimeError::InvalidConfig(format!(
-                "env configurator: {ENV_CONFIG_ENV} is not set or empty"
-            ))
-        })?;
-        if value.is_empty() {
-            return Err(RuntimeError::InvalidConfig(format!(
-                "env configurator: {ENV_CONFIG_ENV} is not set or empty"
-            )));
-        }
-
-        tracing::info!(
-            variable = ENV_CONFIG_ENV,
-            "loading configuration with env configurator"
-        );
-        decode_config(value.as_bytes(), ENV_CONFIG_ENV)
-    }
-}
-#[must_use]
-pub fn env_plugin() -> ConfiguratorPlugin {
-    ConfiguratorPlugin::new("env", || Ok(EnvConfigurator))
-}
-
-/// Decodes one complete JSON or YAML bootstrap document.
-///
-/// # Errors
-///
-/// Returns [`RuntimeError::Parse`] when neither format matches [`RuntimeConfig`].
-pub fn decode_config(bytes: &[u8], source: &str) -> Result<RuntimeConfig, RuntimeError> {
-    if let Ok(config) = serde_json::from_slice(bytes) {
-        return Ok(config);
-    }
-    yaml_serde::from_slice(bytes).map_err(|error| RuntimeError::Parse {
-        path: source.to_owned(),
-        source: error,
-    })
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -725,28 +614,6 @@ mod tests {
             .create("missing")
             .expect_err("missing configurator");
         assert!(error.to_string().contains("available"));
-    }
-
-    #[tokio::test]
-    async fn yaml_configurator_uses_first_existing_path_and_decodes_json() {
-        let directory = std::env::temp_dir().join(format!(
-            "fujin-configurator-{}-{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("runtime")
-        ));
-        tokio::fs::create_dir_all(&directory)
-            .await
-            .expect("create fixture directory");
-        let existing = directory.join("config.json");
-        tokio::fs::write(&existing, br#"{"grpc":{"enabled":false}}"#)
-            .await
-            .expect("write fixture");
-        let configurator = YamlConfigurator::new(vec![directory.join("missing"), existing]);
-        let config = configurator.load().await.expect("load first existing path");
-        assert!(!config.grpc.enabled);
-        tokio::fs::remove_dir_all(directory)
-            .await
-            .expect("remove fixture directory");
     }
 
     #[derive(Debug, Default)]

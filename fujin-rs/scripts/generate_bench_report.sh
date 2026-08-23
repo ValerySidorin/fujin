@@ -59,7 +59,7 @@ for payload in "${payload_values[@]}"; do
 				FUJIN_BENCH_CONCURRENCY="$sessions" \
 				FUJIN_BENCH_OPERATIONS="$operations" \
 				FUJIN_BENCH_DEADLINE="$deadline" \
-				cargo run --release -q -p fujin-server --bin "$binary" --features bench
+				cargo run --release -q -p fujin-bench --bin "$binary" --features bench
 			) >>"$raw" 2>&1; then
 				printf 'benchmark failed for %s payload=%s concurrency=%s; preserved existing report at %s\n' "$binary" "$payload" "$sessions" "$output" >&2
 				exit 1
@@ -72,7 +72,7 @@ for payload in "${payload_values[@]}"; do
 				FUJIN_BENCH_OPERATIONS="$operations" \
 				FUJIN_BENCH_DEADLINE="$deadline" \
 				CARGO_TARGET_DIR=target/bench-alloc \
-				cargo run --release -q -p fujin-server --bin "$binary" --features bench-alloc
+				cargo run --release -q -p fujin-bench --bin "$binary" --features bench-alloc
 			) >>"$alloc_raw" 2>&1; then
 				printf 'allocation benchmark failed for %s payload=%s concurrency=%s; preserved existing report at %s\n' "$binary" "$payload" "$sessions" "$output" >&2
 				exit 1
@@ -89,7 +89,7 @@ for binary in session-bench grpc-session-bench; do
 		FUJIN_BENCH_CONCURRENCY=1 \
 		FUJIN_BENCH_OPERATIONS="$peak_operations" \
 		FUJIN_BENCH_DEADLINE="$deadline" \
-		cargo run --release -q -p fujin-server --bin "$binary" --features bench
+		cargo run --release -q -p fujin-bench --bin "$binary" --features bench
 	) >>"$raw" 2>&1; then
 		printf 'pipeline benchmark failed for %s; preserved existing report at %s\n' "$binary" "$output" >&2
 		exit 1
@@ -102,7 +102,7 @@ for binary in session-bench grpc-session-bench; do
 		FUJIN_BENCH_OPERATIONS="$peak_operations" \
 		FUJIN_BENCH_DEADLINE="$deadline" \
 		CARGO_TARGET_DIR=target/bench-alloc \
-		cargo run --release -q -p fujin-server --bin "$binary" --features bench-alloc
+		cargo run --release -q -p fujin-bench --bin "$binary" --features bench-alloc
 	) >>"$alloc_raw" 2>&1; then
 		printf 'pipeline allocation benchmark failed for %s; preserved existing report at %s\n' "$binary" "$output" >&2
 		exit 1

@@ -345,17 +345,77 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "fujin-configurator-env",
+ "fujin-configurator-yaml",
  "fujin-core",
  "fujin-kafka",
  "fujin-plugin-api",
  "fujin-runtime",
  "fujin-server",
+ "fujin-transport",
+ "fujin-transport-quic",
+ "fujin-transport-tcp",
+ "fujin-transport-unix",
+ "fujin-transport-websocket",
  "fujin-upgrade",
  "serde_json",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "yaml_serde",
+]
+
+[[package]]
+name = "fujin-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "fujin-core",
+ "fujin-native",
+ "fujin-proto",
+ "fujin-runtime",
+ "fujin-server",
+ "fujin-transport",
+ "fujin-transport-quic",
+ "fujin-transport-tcp",
+ "fujin-transport-unix",
+ "fujin-transport-websocket",
+ "futures-util",
+ "parking_lot",
+ "quinn",
+ "rcgen",
+ "rustls",
+ "serde_json",
+ "stats_alloc",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tonic",
+]
+
+[[package]]
+name = "fujin-configurator-env"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "fujin-runtime",
+ "serde_json",
+ "tracing",
+ "yaml_serde",
+]
+
+[[package]]
+name = "fujin-configurator-yaml"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "fujin-runtime",
+ "serde_json",
+ "tokio",
+ "tracing",
  "yaml_serde",
 ]
 
@@ -411,7 +471,7 @@ version = "0.1.0"
 dependencies = [
  "fujin-core",
  "fujin-runtime",
- "fujin-server",
+ "fujin-transport",
  "fujin-upgrade",
 ]
 
@@ -448,8 +508,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
- "tracing",
- "yaml_serde",
 ]
 
 [[package]]
@@ -462,27 +520,112 @@ dependencies = [
  "fujin-native",
  "fujin-proto",
  "fujin-runtime",
+ "fujin-transport",
  "fujin-upgrade",
- "futures-util",
- "humantime",
  "parking_lot",
  "prost",
- "quinn",
- "rcgen",
- "rustls",
- "rustls-pemfile",
- "serde",
  "serde_json",
- "stats_alloc",
  "tokio",
- "tokio-rustls",
  "tokio-stream",
- "tokio-tungstenite",
  "tokio-util",
  "tonic",
  "tonic-health",
  "tonic-prost",
  "tracing",
+]
+
+[[package]]
+name = "fujin-tls"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-runtime",
+ "rustls",
+ "rustls-pemfile",
+ "tokio",
+ "tokio-rustls",
+]
+
+[[package]]
+name = "fujin-transport"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-native",
+ "fujin-runtime",
+ "fujin-upgrade",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "fujin-transport-quic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-runtime",
+ "fujin-tls",
+ "fujin-transport",
+ "fujin-upgrade",
+ "futures-util",
+ "humantime",
+ "quinn",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "fujin-transport-tcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-runtime",
+ "fujin-tls",
+ "fujin-transport",
+ "fujin-upgrade",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fujin-transport-unix"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin-core",
+ "fujin-transport",
+ "fujin-upgrade",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "fujin-transport-websocket"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "fujin-core",
+ "fujin-runtime",
+ "fujin-tls",
+ "fujin-transport",
+ "fujin-upgrade",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
