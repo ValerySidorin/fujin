@@ -514,24 +514,11 @@ func runSessionBenchmarkWorkers(b *testing.B, workers []sessionBenchmarkWorker, 
 	}
 }
 func warmSessionBenchmarkWorkers(workers []sessionBenchmarkWorker) error {
-	errs := make(chan error, len(workers))
-	var wg sync.WaitGroup
-	for i := range workers {
-		workerID := i
-		worker := &workers[i]
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := worker.run(); err != nil {
-				errs <- fmt.Errorf("warmup worker %d: %w", workerID, err)
-			}
-		}()
-	}
-	wg.Wait()
-	close(errs)
 	var result error
-	for err := range errs {
-		result = errors.Join(result, err)
+	for i := range workers {
+		if err := workers[i].run(); err != nil {
+			result = errors.Join(result, fmt.Errorf("warmup worker %d: %w", i, err))
+		}
 	}
 	return result
 }

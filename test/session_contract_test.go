@@ -402,29 +402,31 @@ func TestGenConnectorSubscribeLimitStopsUntilCancellation(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestSessionBenchmarkWarmupRunsWorkersConcurrently(t *testing.T) {
+func TestSessionBenchmarkWarmupRunsWorkersSequentially(t *testing.T) {
 	entered := make(chan int, 2)
-	release := make(chan struct{})
-	workers := make([]sessionBenchmarkWorker, 2)
-	for i := range workers {
-		workerID := i
-		workers[i].run = func() error {
-			entered <- workerID
-			<-release
+	releaseFirst := make(chan struct{})
+	workers := []sessionBenchmarkWorker{
+		{run: func() error {
+			entered <- 0
+			<-releaseFirst
 			return nil
-		}
+		}},
+		{run: func() error {
+			entered <- 1
+			return nil
+		}},
 	}
 
 	done := make(chan error, 1)
 	go func() { done <- warmSessionBenchmarkWorkers(workers) }()
-	for range workers {
-		select {
-		case <-entered:
-		case <-time.After(time.Second):
-			t.Fatal("warmup workers did not enter concurrently")
-		}
+	require.Equal(t, 0, <-entered)
+	select {
+	case workerID := <-entered:
+		t.Fatalf("worker %d entered before the first warmup completed", workerID)
+	case <-time.After(25 * time.Millisecond):
 	}
-	close(release)
+	close(releaseFirst)
+	require.Equal(t, 1, <-entered)
 	require.NoError(t, <-done)
 }
 
