@@ -1,12 +1,10 @@
 //! Fujin runtime host, configuration, connector reload, and listener orchestration.
 
-mod config;
 pub mod configurator;
 #[cfg(feature = "grpc")]
 mod grpc;
 mod server;
 
-pub use config::*;
 pub use fujin_transport::Endpoint;
 #[cfg(feature = "grpc")]
 pub use grpc::{GrpcOutput, GrpcService, GrpcSession};

@@ -7,10 +7,12 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use fujin_core::{
-    BindMiddlewareRunner, Catalog, Completion, CompletionSink, CoreError, Message, OperationToken,
-    Result as CoreResult, SessionCore, SessionEventSink, SessionState, StatusCode,
+use fujin_connector::{
+    Catalog, Completion, CompletionSink, Delivery, Header, Message, OperationToken,
 };
+use fujin_core::{SessionCore, SessionEventSink, SessionState};
+use fujin_error::{CoreError, Result as CoreResult, StatusCode};
+use fujin_middleware::BindMiddlewareRunner;
 use parking_lot::Mutex;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -191,7 +193,7 @@ impl CompletionSink for AdapterSink {
 }
 
 impl SessionEventSink for AdapterSink {
-    fn delivery(&self, subscription_id: u8, delivery: fujin_core::Delivery) {
+    fn delivery(&self, subscription_id: u8, delivery: Delivery) {
         self.send_frame(encode::delivery(subscription_id, &delivery));
     }
 
@@ -463,7 +465,7 @@ impl NativeSession {
         correlation_id: u32,
         route: &str,
         message: Bytes,
-        headers: Option<Vec<fujin_core::Header>>,
+        headers: Option<Vec<Header>>,
     ) -> Result<SessionAction, NativeError> {
         let code = response_code(false, headers.is_some());
         let token = operation_token(code, correlation_id)?;
@@ -480,7 +482,7 @@ impl NativeSession {
         &mut self,
         correlation_id: u32,
         message: Bytes,
-        headers: Option<Vec<fujin_core::Header>>,
+        headers: Option<Vec<Header>>,
     ) -> Result<SessionAction, NativeError> {
         let code = response_code(true, headers.is_some());
         let token = operation_token(code, correlation_id)?;
@@ -580,7 +582,7 @@ impl NativeSession {
     }
 }
 
-fn message_from(payload: Bytes, headers: Option<Vec<fujin_core::Header>>) -> Message {
+fn message_from(payload: Bytes, headers: Option<Vec<Header>>) -> Message {
     match headers {
         Some(values) => Message::with_headers(payload, values),
         None => Message::new(payload),

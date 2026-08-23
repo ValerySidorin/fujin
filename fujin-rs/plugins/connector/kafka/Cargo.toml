@@ -12,7 +12,8 @@ workspace = true
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-fujin-core = { path = "../../../crates/fujin-core" }
+fujin-connector = { path = "../../../crates/fujin-connector" }
+fujin-error = { path = "../../../crates/fujin-error" }
 parking_lot.workspace = true
 rdkafka.workspace = true
 serde.workspace = true
@@ -21,3 +22,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+fujin-core = { path = "../../../crates/fujin-core" }
+fujin-middleware = { path = "../../../crates/fujin-middleware" }

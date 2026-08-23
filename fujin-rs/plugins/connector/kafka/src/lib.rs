@@ -11,13 +11,13 @@ mod implementation {
     };
 
     use bytes::{BufMut, Bytes, BytesMut};
-    use fujin_core::{
+    use fujin_connector::{
         AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, CompiledConnector,
-        Completion, CompletionSink, ConnectorDescriptor, ConnectorRuntime, CoreError, Delivery,
-        Header, Message, NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink,
-        ReadyCallback, Result, RouteProfile, SettlementKind, SettlementProfile, SettlementResult,
-        Writer,
+        Completion, CompletionSink, ConnectorDescriptor, ConnectorRuntime, Delivery, Header,
+        Message, NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink, ReadyCallback,
+        RouteProfile, SettlementKind, SettlementProfile, SettlementResult, Writer,
     };
+    use fujin_error::{CoreError, Result};
     use parking_lot::Mutex;
     use rdkafka::{
         ClientConfig, Message as KafkaMessage, Offset, TopicPartitionList,
@@ -782,6 +782,6 @@ mod implementation {
 pub use implementation::{KafkaDescriptor, descriptor};
 
 #[must_use]
-pub fn plugin() -> fujin_core::ConnectorPlugin {
-    fujin_core::ConnectorPlugin::new("kafka_franz", KafkaDescriptor)
+pub fn plugin() -> fujin_connector::ConnectorPlugin {
+    fujin_connector::ConnectorPlugin::new("kafka_franz", KafkaDescriptor)
 }

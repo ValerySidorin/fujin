@@ -1,33 +1,14 @@
 //! Transport-neutral contracts and session semantics for Fujin.
 
-pub mod config;
-pub mod connector;
-pub mod error;
-pub mod generation;
-pub mod middleware;
-pub mod overrides;
 pub mod session;
-mod writer_contract;
 
-pub use config::{ConnectorConfig, ConnectorsConfig, MiddlewareConfig};
-pub use connector::{
-    AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, CompiledConnector, Completion,
-    CompletionSink, ConnectorDescriptor, ConnectorRuntime, Delivery, Header, Headers, Message,
+pub(crate) use fujin_connector::{
+    AckGranularity, Binding, Capabilities, Catalog, Completion, CompletionSink, Delivery, Message,
     NackEffect, OperationToken, Reader, ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile,
-    SettlementKind, SettlementProfile, SettlementResult, Writer,
+    SettlementKind, SettlementResult, Writer, validate_headers,
 };
-pub use error::{CoreError, OperationError, OperationOutcome, Result, StatusCode};
-pub use generation::{
-    Binding, Catalog, CatalogStatus, ConnectorPlugin, ConnectorRegistry, Generation,
-    GenerationCompiler, GenerationState, GenerationStatus, GenerationTransition,
-};
-pub use middleware::{
-    BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistration,
-    BindMiddlewareRegistry, BindMiddlewareRunner, CompiledConnectorMiddleware,
-    ConnectorMiddlewareCompiler, ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistration,
-    ConnectorMiddlewareRegistry, NoBindMiddleware, NoConnectorMiddleware,
-};
-pub use overrides::{apply_overrides, validate_override_path};
+pub(crate) use fujin_error::{CoreError, Result};
+pub(crate) use fujin_middleware::BindMiddlewareRunner;
 pub use session::{
     BindResult, FetchResult, NoSessionEvents, SessionCore, SessionEventSink, SessionState,
 };

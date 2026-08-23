@@ -1,11 +1,13 @@
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bytes::Bytes;
-use fujin_core::{
-    Catalog, Completion, CompletionSink, ConnectorConfig, ConnectorRegistry, GenerationCompiler,
-    Header, Message, NoBindMiddleware, NoConnectorMiddleware, OperationToken, SessionCore,
-    SessionEventSink,
+use fujin_connector::{
+    Catalog, Completion, CompletionSink, ConnectorConfig, ConnectorRegistry, Delivery,
+    GenerationCompiler, Header, Message, NoConnectorMiddleware, OperationToken,
 };
+use fujin_core::{SessionCore, SessionEventSink};
+use fujin_error::CoreError;
+use fujin_middleware::NoBindMiddleware;
 use tokio::sync::mpsc;
 
 #[derive(Debug)]
@@ -19,21 +21,21 @@ impl CompletionSink for CompletionChannel {
 
 #[derive(Debug)]
 enum SessionEvent {
-    Delivery(u8, fujin_core::Delivery),
-    Terminal(fujin_core::CoreError),
+    Delivery(u8, Delivery),
+    Terminal(CoreError),
 }
 
 #[derive(Debug)]
 struct EventChannel(mpsc::UnboundedSender<SessionEvent>);
 
 impl SessionEventSink for EventChannel {
-    fn delivery(&self, subscription_id: u8, delivery: fujin_core::Delivery) {
+    fn delivery(&self, subscription_id: u8, delivery: Delivery) {
         let _ = self
             .0
             .send(SessionEvent::Delivery(subscription_id, delivery));
     }
 
-    fn subscription_terminal(&self, _subscription_id: u8, error: fujin_core::CoreError) {
+    fn subscription_terminal(&self, _subscription_id: u8, error: CoreError) {
         let _ = self.0.send(SessionEvent::Terminal(error));
     }
 }

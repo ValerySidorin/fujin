@@ -23,7 +23,7 @@ pub enum NativeError {
     #[error("native stream I/O: {0}")]
     Io(#[from] io::Error),
     #[error("native session: {0}")]
-    Session(#[from] fujin_core::CoreError),
+    Session(#[from] fujin_error::CoreError),
     #[error("native session output closed")]
     OutputClosed,
 }

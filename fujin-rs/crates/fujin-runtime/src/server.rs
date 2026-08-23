@@ -8,16 +8,20 @@ use std::sync::{
 };
 
 use anyhow::{Context, Result, bail};
-use fujin_core::{BindMiddlewareRunner, Catalog};
-use fujin_transport::{ConfiguredTransport, Endpoint, TransportContext};
-use fujin_upgrade::{InheritedListeners, ListenerRegistry};
+use fujin_configurator::server_config::{
+    ControlPlaneConfig, GrpcListenerConfig, SocketListenerConfig,
+};
+use fujin_transport::{
+    ConfiguredTransport, Endpoint, InheritedListeners, ListenerRegistry, TransportContext,
+};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinSet,
 };
 use tokio_util::sync::CancellationToken;
 
-use crate::server_config::{ControlPlaneConfig, GrpcListenerConfig, SocketListenerConfig};
+use fujin_connector::Catalog;
+use fujin_middleware::BindMiddlewareRunner;
 #[cfg(feature = "grpc")]
 use grpc_listener::serve as serve_grpc;
 use health::serve as serve_health;

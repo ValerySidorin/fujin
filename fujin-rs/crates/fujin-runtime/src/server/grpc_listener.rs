@@ -1,11 +1,13 @@
 use anyhow::{Context, Result};
+use fujin_configurator::server_config::GrpcListenerConfig;
+#[cfg(test)]
+use fujin_configurator::server_config::ServerKeepAliveConfig;
 use fujin_proto::fujin::v1 as pb;
-use fujin_transport::{Endpoint, TransportContext, listener::bind_tcp};
-use fujin_upgrade::ListenerMetadata;
+use fujin_transport::{Endpoint, ListenerMetadata, TransportContext, listener::bind_tcp};
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
-use crate::{GrpcService, server_config::GrpcListenerConfig};
+use crate::GrpcService;
 
 pub(super) async fn serve(config: GrpcListenerConfig, context: TransportContext) -> Result<()> {
     let catalog = context.catalog();
@@ -90,9 +92,9 @@ pub(super) async fn serve(config: GrpcListenerConfig, context: TransportContext)
 mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
-    use fujin_core::{Catalog, ConnectorRegistry, GenerationCompiler, NoConnectorMiddleware};
-    use fujin_transport::TransportContext;
-    use fujin_upgrade::{InheritedListeners, ListenerRegistry};
+    use fujin_connector::{Catalog, ConnectorRegistry, GenerationCompiler, NoConnectorMiddleware};
+    use fujin_middleware::NoBindMiddleware;
+    use fujin_transport::{InheritedListeners, ListenerRegistry, TransportContext};
     use tokio::{
         sync::mpsc,
         time::{Duration, timeout},
@@ -134,12 +136,12 @@ mod tests {
                     max_send_message_size: None,
                     initial_window_size: None,
                     initial_connection_window_size: None,
-                    server_keepalive: crate::server_config::ServerKeepAliveConfig::default(),
+                    server_keepalive: ServerKeepAliveConfig::default(),
                     tls: None,
                 },
                 TransportContext::new(
                     server_catalog,
-                    Arc::new(fujin_core::NoBindMiddleware),
+                    Arc::new(NoBindMiddleware),
                     "test".into(),
                     server_shutdown,
                     ready_tx,

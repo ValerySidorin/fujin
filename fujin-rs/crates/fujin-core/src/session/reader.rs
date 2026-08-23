@@ -1,3 +1,7 @@
+use crate::{
+    AckGranularity, Capabilities, CoreError, Delivery, NackEffect, Reader, ReaderEvent,
+    ReaderEventSink, Result, RouteProfile, SettlementKind, SettlementResult, validate_headers,
+};
 use bytes::{BufMut, Bytes, BytesMut};
 use parking_lot::Mutex;
 use std::{
@@ -9,12 +13,6 @@ use std::{
     },
 };
 use tokio::sync::oneshot;
-
-use crate::{
-    AckGranularity, Capabilities, CoreError, Delivery, NackEffect, Reader, ReaderEvent,
-    ReaderEventSink, Result, RouteProfile, SettlementKind, SettlementResult,
-    connector::validate_headers,
-};
 
 use super::SessionCore;
 

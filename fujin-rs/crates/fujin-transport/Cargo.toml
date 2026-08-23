@@ -11,7 +11,8 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
-fujin-core = { path = "../fujin-core" }
+fujin-connector = { path = "../fujin-connector" }
+fujin-middleware = { path = "../fujin-middleware" }
 fujin-native = { path = "../fujin-native" }
 fujin-upgrade = { path = "../fujin-upgrade" }
 parking_lot.workspace = true

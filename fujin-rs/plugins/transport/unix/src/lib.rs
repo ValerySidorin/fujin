@@ -5,13 +5,12 @@
 use std::{io, sync::Arc};
 
 use anyhow::{Context, Result, bail};
-use fujin_core::BoxFuture;
 use fujin_transport::{
-    CompiledTransport, Endpoint, TransportContext, TransportPlugin, TransportRegistration,
+    BoxFuture, CompiledTransport, Endpoint, ListenerMetadata, TransportContext, TransportPlugin,
+    TransportRegistration,
     listener::{bind_unix, drain_tasks},
     settings::NativeProtocolSettings,
 };
-use fujin_upgrade::ListenerMetadata;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::task::JoinSet;

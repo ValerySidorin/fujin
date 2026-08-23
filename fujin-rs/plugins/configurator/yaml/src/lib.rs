@@ -3,10 +3,7 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use fujin_runtime::{
-    RuntimeConfig, RuntimeError,
-    configurator::{Configurator, ConfiguratorPlugin},
-};
+use fujin_configurator::{Configurator, ConfiguratorPlugin, RuntimeConfig, RuntimeError};
 
 pub const PATHS_ENV: &str = "FUJIN_CONFIGURATOR_YAML_PATHS";
 const DEFAULT_PATHS: [&str; 3] = ["./config.yaml", "conf/config.yaml", "config/config.yaml"];

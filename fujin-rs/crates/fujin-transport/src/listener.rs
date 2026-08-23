@@ -1,8 +1,8 @@
 #[cfg(unix)]
 use std::os::fd::AsFd;
 
+use crate::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 use anyhow::{Context, Result};
-use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 use tokio::task::JoinSet;
 
 /// Binds or inherits a TCP listener and registers it for graceful handoff.

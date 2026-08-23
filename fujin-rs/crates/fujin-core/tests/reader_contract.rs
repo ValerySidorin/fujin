@@ -9,10 +9,10 @@ use std::{
 };
 
 use bytes::Bytes;
-use fujin_core::{
-    CoreError, Delivery, Header, Message, NoBindMiddleware, OperationToken, SessionCore,
-    SessionEventSink,
-};
+use fujin_connector::{Delivery, Header, Message, OperationToken};
+use fujin_core::{SessionCore, SessionEventSink};
+use fujin_error::CoreError;
+use fujin_middleware::NoBindMiddleware;
 use support::{
     CompletionRecorder, FetchPlan, ReaderPlan, SessionRecorder, SettlementPlan, catalog_and_state,
 };

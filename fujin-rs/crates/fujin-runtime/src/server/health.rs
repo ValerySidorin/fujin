@@ -5,10 +5,9 @@ use std::sync::{
 
 use anyhow::{Context, Result};
 use fujin_transport::{
-    Endpoint, TransportContext,
+    Endpoint, ListenerMetadata, TransportContext,
     listener::{bind_tcp, drain_tasks},
 };
-use fujin_upgrade::ListenerMetadata;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     task::JoinSet,

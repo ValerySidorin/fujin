@@ -345,17 +345,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "fujin-configurator-env",
- "fujin-configurator-yaml",
- "fujin-connector-kafka",
- "fujin-core",
- "fujin-plugin-api",
+ "fujin-configurator",
+ "fujin-connector",
+ "fujin-error",
+ "fujin-middleware",
  "fujin-runtime",
  "fujin-transport",
- "fujin-transport-quic",
  "fujin-transport-tcp",
- "fujin-transport-unix",
- "fujin-transport-websocket",
  "fujin-upgrade",
  "serde_json",
  "tokio",
@@ -370,6 +366,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fujin",
+ "fujin-configurator-env",
+ "fujin-configurator-yaml",
+ "fujin-connector-kafka",
+ "fujin-transport-quic",
+ "fujin-transport-tcp",
+ "fujin-transport-unix",
+ "fujin-transport-websocket",
  "tokio",
  "tokio-util",
  "tracing",
@@ -382,7 +385,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "fujin-core",
+ "fujin-connector",
+ "fujin-error",
+ "fujin-middleware",
  "fujin-native",
  "fujin-proto",
  "fujin-runtime",
@@ -406,11 +411,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fujin-configurator"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "fujin-connector",
+ "fujin-error",
+ "fujin-transport",
+ "humantime",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio-util",
+]
+
+[[package]]
 name = "fujin-configurator-env"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "fujin-runtime",
+ "fujin-configurator",
  "serde_json",
  "tracing",
  "yaml_serde",
@@ -421,11 +442,24 @@ name = "fujin-configurator-yaml"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "fujin-runtime",
+ "fujin-configurator",
  "serde_json",
  "tokio",
  "tracing",
  "yaml_serde",
+]
+
+[[package]]
+name = "fujin-connector"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "bytes",
+ "fujin-error",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -434,7 +468,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
+ "fujin-connector",
  "fujin-core",
+ "fujin-error",
+ "fujin-middleware",
  "parking_lot",
  "rdkafka",
  "serde",
@@ -446,20 +483,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "fujin-connector-nop"
-version = "0.1.0"
-dependencies = [
- "fujin-core",
- "serde_json",
-]
-
-[[package]]
 name = "fujin-core"
 version = "0.1.0"
 dependencies = [
  "arc-swap",
  "async-trait",
  "bytes",
+ "fujin-connector",
+ "fujin-error",
+ "fujin-middleware",
  "parking_lot",
  "serde",
  "serde_json",
@@ -471,25 +503,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "fujin-error"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "fujin-middleware"
+version = "0.1.0"
+dependencies = [
+ "fujin-connector",
+ "fujin-error",
+ "parking_lot",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "fujin-native"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "fujin-connector",
  "fujin-core",
+ "fujin-error",
+ "fujin-middleware",
  "parking_lot",
  "thiserror",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "fujin-plugin-api"
-version = "0.1.0"
-dependencies = [
- "fujin-core",
- "fujin-runtime",
- "fujin-transport",
- "fujin-upgrade",
 ]
 
 [[package]]
@@ -510,7 +554,11 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "bytes",
+ "fujin-configurator",
+ "fujin-connector",
  "fujin-core",
+ "fujin-error",
+ "fujin-middleware",
  "fujin-native",
  "fujin-proto",
  "fujin-transport",
@@ -536,7 +584,8 @@ name = "fujin-transport"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fujin-core",
+ "fujin-connector",
+ "fujin-middleware",
  "fujin-native",
  "fujin-upgrade",
  "parking_lot",
@@ -555,10 +604,7 @@ name = "fujin-transport-quic"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fujin-core",
- "fujin-runtime",
  "fujin-transport",
- "fujin-upgrade",
  "futures-util",
  "humantime",
  "quinn",
@@ -573,10 +619,7 @@ name = "fujin-transport-tcp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fujin-core",
- "fujin-runtime",
  "fujin-transport",
- "fujin-upgrade",
  "serde",
  "serde_json",
  "tokio",
@@ -587,9 +630,7 @@ name = "fujin-transport-unix"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fujin-core",
  "fujin-transport",
- "fujin-upgrade",
  "serde",
  "serde_json",
  "tokio",
@@ -601,10 +642,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "fujin-core",
- "fujin-runtime",
  "fujin-transport",
- "fujin-upgrade",
  "futures-util",
  "serde",
  "serde_json",

@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use fujin_core::{
+use fujin_connector::{
     Catalog, ConnectorMiddlewareCompiler, ConnectorRegistry, ConnectorsConfig, GenerationCompiler,
 };
-pub use fujin_transport::TransportConfig;
+pub use fujin_transport::{TransportConfig, settings::TlsSettings};
 use serde::Deserialize;
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -148,21 +148,6 @@ pub mod server_config {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct TlsSettings {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub client_certs_dir: String,
-    #[serde(default)]
-    pub server_cert_pem_path: String,
-    #[serde(default)]
-    pub server_key_pem_path: String,
-    #[serde(default)]
-    pub require_and_verify_client_cert: bool,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
     #[error("read configuration {path:?}: {source}")]
@@ -175,7 +160,7 @@ pub enum RuntimeError {
     #[error("invalid configuration: {0}")]
     InvalidConfig(String),
     #[error(transparent)]
-    Core(#[from] fujin_core::CoreError),
+    Core(#[from] fujin_error::CoreError),
 }
 
 impl RuntimeConfig {
@@ -234,7 +219,10 @@ impl GrpcConfig {
             initial_window_size: self.initial_window_size,
             initial_connection_window_size: self.initial_conn_window_size,
             server_keepalive: self.server_keepalive.config()?,
-            tls: self.tls.listener_config("gRPC")?,
+            tls: self
+                .tls
+                .listener_config("gRPC")
+                .map_err(|error| RuntimeError::InvalidConfig(error.to_string()))?,
         }))
     }
 }
@@ -253,48 +241,6 @@ impl GrpcServerKeepAliveSettings {
                 self.max_connection_age_grace.as_deref(),
             )?,
         })
-    }
-}
-
-impl TlsSettings {
-    /// Compiles validated listener TLS settings without reading certificate files.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`RuntimeError::InvalidConfig`] for incomplete or contradictory TLS settings.
-    pub fn listener_config(
-        &self,
-        listener: &str,
-    ) -> Result<Option<server_config::TlsConfig>, RuntimeError> {
-        if !self.enabled {
-            if self.require_and_verify_client_cert {
-                return Err(RuntimeError::InvalidConfig(format!(
-                    "{listener} cannot require client certificates while TLS is disabled"
-                )));
-            }
-            return Ok(None);
-        }
-        require_non_empty(
-            &self.server_cert_pem_path,
-            &format!("{listener} certificate"),
-        )?;
-        require_non_empty(
-            &self.server_key_pem_path,
-            &format!("{listener} private key"),
-        )?;
-        if self.require_and_verify_client_cert {
-            require_non_empty(
-                &self.client_certs_dir,
-                &format!("{listener} client certificates directory"),
-            )?;
-        }
-        Ok(Some(server_config::TlsConfig {
-            certificate: self.server_cert_pem_path.clone(),
-            private_key: self.server_key_pem_path.clone(),
-            client_certificates: (!self.client_certs_dir.is_empty())
-                .then(|| self.client_certs_dir.clone()),
-            require_client_certificate: self.require_and_verify_client_cert,
-        }))
     }
 }
 

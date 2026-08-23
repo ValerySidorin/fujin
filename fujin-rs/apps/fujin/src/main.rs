@@ -1,12 +1,14 @@
 use std::env;
 
 use anyhow::{Context, Result, bail};
-use fujin::{Application, ApplicationHandle, plugins};
+use fujin::{Application, ApplicationHandle};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{
     EnvFilter, Registry, layer::SubscriberExt, reload, util::SubscriberInitExt,
 };
+
+mod plugins;
 
 const BUILD_VERSION: &str = env!("FUJIN_BUILD_VERSION");
 

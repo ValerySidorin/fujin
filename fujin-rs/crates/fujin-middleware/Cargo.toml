@@ -1,5 +1,5 @@
 [package]
-name = "fujin-connector-nop"
+name = "fujin-middleware"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,5 +10,10 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-fujin-core = { path = "../../../crates/fujin-core" }
+fujin-connector = { path = "../fujin-connector" }
+fujin-error = { path = "../fujin-error" }
+parking_lot.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

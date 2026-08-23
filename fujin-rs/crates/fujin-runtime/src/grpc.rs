@@ -5,12 +5,13 @@ use std::{
 };
 
 use bytes::Bytes;
-use fujin_core::{
-    AcceptanceGuarantee, AckGranularity, BindMiddlewareRunner, Capabilities, Catalog, Completion,
-    CompletionSink, CoreError, Delivery, Header, Message, NackEffect, OperationError,
-    OperationOutcome, OperationToken, Result as CoreResult, RouteProfile, SessionCore,
-    SessionEventSink, SettlementResult, StatusCode,
+use fujin_connector::{
+    AcceptanceGuarantee, AckGranularity, Capabilities, Catalog, Completion, CompletionSink,
+    Delivery, Header, Message, NackEffect, OperationToken, RouteProfile, SettlementResult,
 };
+use fujin_core::{FetchResult, SessionCore, SessionEventSink};
+use fujin_error::{CoreError, OperationError, OperationOutcome, Result as CoreResult, StatusCode};
+use fujin_middleware::BindMiddlewareRunner;
 use fujin_proto::fujin::v1 as pb;
 use parking_lot::Mutex;
 use tokio::sync::{Notify, mpsc};
@@ -720,7 +721,7 @@ fn delivery_response(subscription_id: u8, delivery: Delivery) -> pb::fujin_respo
 fn fetch_response(
     with_headers: bool,
     correlation_id: u32,
-    result: CoreResult<fujin_core::FetchResult>,
+    result: CoreResult<FetchResult>,
 ) -> pb::fujin_response::Response {
     match result {
         Ok(fetched) if with_headers => pb::fujin_response::Response::Hfetch(pb::HFetchResponse {

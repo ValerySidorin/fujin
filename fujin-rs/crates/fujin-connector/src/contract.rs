@@ -3,7 +3,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{CoreError, Result};
+use fujin_error::{CoreError, Result};
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -217,7 +217,8 @@ impl OperationToken {
         self.0 & Self::INTERNAL_BIT != 0
     }
 
-    pub(crate) const fn internal(sequence: u64) -> Self {
+    #[doc(hidden)]
+    pub const fn internal(sequence: u64) -> Self {
         Self(Self::INTERNAL_BIT | (sequence & !Self::INTERNAL_BIT))
     }
 }

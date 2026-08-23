@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use bytes::Bytes;
-use fujin_core::Header;
+use fujin_connector::Header;
 
 pub const HELLO_FORMAT: u8 = 1;
 pub const WIRE_VERSION: u8 = 1;

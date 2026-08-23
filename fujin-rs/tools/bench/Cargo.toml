@@ -18,7 +18,9 @@ bench-alloc = ["bench", "dep:stats_alloc"]
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-fujin-core = { path = "../../crates/fujin-core" }
+fujin-connector = { path = "../../crates/fujin-connector" }
+fujin-error = { path = "../../crates/fujin-error" }
+fujin-middleware = { path = "../../crates/fujin-middleware" }
 fujin-native = { path = "../../crates/fujin-native" }
 fujin-proto = { path = "../../crates/fujin-proto" }
 fujin-runtime = { path = "../../crates/fujin-runtime", features = ["grpc"] }

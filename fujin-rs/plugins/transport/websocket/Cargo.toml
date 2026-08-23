@@ -12,10 +12,7 @@ workspace = true
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-fujin-core = { path = "../../../crates/fujin-core" }
-fujin-runtime = { path = "../../../crates/fujin-runtime" }
 fujin-transport = { path = "../../../crates/fujin-transport" }
-fujin-upgrade = { path = "../../../crates/fujin-upgrade" }
 futures-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true

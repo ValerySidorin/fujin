@@ -9,13 +9,14 @@ use std::{
 };
 
 use bytes::Bytes;
-use fujin_core::{
+use fujin_connector::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
     Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
     ConnectorRuntime, Delivery, GenerationCompiler, Header, Message, NackEffect, OperationToken,
     Reader, ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile, SettlementKind,
-    SettlementProfile, Writer,
+    SettlementProfile, SettlementResult, Writer,
 };
+use fujin_error::{CoreError, Result};
 use parking_lot::Mutex;
 use tokio::sync::{Notify, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -29,7 +30,7 @@ static SESSION_BENCH_PAYLOAD: [u8; SESSION_BENCH_MAX_PAYLOAD_BYTES] =
 /// # Errors
 ///
 /// Returns an error if the in-process Nop connector cannot be registered or compiled.
-pub async fn nop_catalog() -> fujin_core::Result<Arc<Catalog>> {
+pub async fn nop_catalog() -> Result<Arc<Catalog>> {
     let registry = Arc::new(ConnectorRegistry::default());
     registry.register("nop", Arc::new(NopDescriptor))?;
     let compiler = Arc::new(GenerationCompiler::without_middlewares(registry));
@@ -191,11 +192,11 @@ pub async fn session_bench_catalog(
     subscribe_limits: Vec<usize>,
     subscribe_permits: Vec<Arc<Semaphore>>,
     subscribe_gate: Arc<SubscribeGate>,
-) -> fujin_core::Result<Arc<Catalog>> {
+) -> Result<Arc<Catalog>> {
     let payload = SESSION_BENCH_PAYLOAD
         .get(..payload_size)
         .ok_or_else(|| {
-            fujin_core::CoreError::InvalidConfig(format!(
+            CoreError::InvalidConfig(format!(
                 "session benchmark payload is {payload_size} bytes, maximum is {SESSION_BENCH_MAX_PAYLOAD_BYTES}"
             ))
         })?;
@@ -230,10 +231,7 @@ struct SessionBenchDescriptor {
 }
 
 impl ConnectorDescriptor for SessionBenchDescriptor {
-    fn compile(
-        &self,
-        _settings: &serde_json::Value,
-    ) -> fujin_core::Result<Arc<dyn CompiledConnector>> {
+    fn compile(&self, _settings: &serde_json::Value) -> Result<Arc<dyn CompiledConnector>> {
         Ok(Arc::new(SessionBenchCompiled {
             plan: Arc::clone(&self.plan),
             routes: BTreeMap::from([
@@ -284,7 +282,7 @@ impl CompiledConnector for SessionBenchCompiled {
         &self.routes
     }
 
-    fn open_runtime(&self) -> fujin_core::Result<Arc<dyn ConnectorRuntime>> {
+    fn open_runtime(&self) -> Result<Arc<dyn ConnectorRuntime>> {
         Ok(Arc::new(SessionBenchRuntime {
             plan: Arc::clone(&self.plan),
         }))
@@ -301,9 +299,9 @@ impl ConnectorRuntime for SessionBenchRuntime {
         route: &str,
         auto_settle: bool,
         events: Arc<dyn ReaderEventSink>,
-    ) -> fujin_core::Result<Arc<dyn Reader>> {
+    ) -> Result<Arc<dyn Reader>> {
         if route != "sub" {
-            return Err(fujin_core::CoreError::RouteNotFound(route.into()));
+            return Err(CoreError::RouteNotFound(route.into()));
         }
         Ok(Arc::new(SessionBenchReader {
             payload: self.plan.payload.clone(),
@@ -320,14 +318,14 @@ impl ConnectorRuntime for SessionBenchRuntime {
         &self,
         route: &str,
         completions: Arc<dyn CompletionSink>,
-    ) -> fujin_core::Result<Arc<dyn Writer>> {
+    ) -> Result<Arc<dyn Writer>> {
         if route != "pub" && route != "tx" {
-            return Err(fujin_core::CoreError::RouteNotFound(route.into()));
+            return Err(CoreError::RouteNotFound(route.into()));
         }
         Ok(Arc::new(NopWriter { completions }))
     }
 
-    fn close(self: Arc<Self>) -> BoxFuture<'static, fujin_core::Result<()>> {
+    fn close(self: Arc<Self>) -> BoxFuture<'static, Result<()>> {
         Box::pin(async { Ok(()) })
     }
 }
@@ -358,7 +356,7 @@ impl SessionBenchReader {
 }
 
 impl Reader for SessionBenchReader {
-    fn subscribe(&self, with_headers: bool, ready: ReadyCallback) -> fujin_core::Result<()> {
+    fn subscribe(&self, with_headers: bool, ready: ReadyCallback) -> Result<()> {
         ready()?;
         let events = Arc::clone(&self.events);
         let payload = self.payload.clone();
@@ -395,14 +393,9 @@ impl Reader for SessionBenchReader {
         Ok(())
     }
 
-    fn fetch(
-        &self,
-        token: OperationToken,
-        maximum: u32,
-        with_headers: bool,
-    ) -> fujin_core::Result<()> {
+    fn fetch(&self, token: OperationToken, maximum: u32, with_headers: bool) -> Result<()> {
         let count = usize::try_from(maximum)
-            .map_err(|_| fujin_core::CoreError::InvalidConfig("fetch size overflow".into()))?;
+            .map_err(|_| CoreError::InvalidConfig("fetch size overflow".into()))?;
         self.events.emit(ReaderEvent::FetchComplete {
             token,
             reported_count: maximum,
@@ -416,8 +409,8 @@ impl Reader for SessionBenchReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        settlements: Vec<fujin_core::SettlementResult>,
-    ) -> fujin_core::Result<()> {
+        settlements: Vec<SettlementResult>,
+    ) -> Result<()> {
         self.events.emit(ReaderEvent::SettlementComplete {
             token,
             result: Ok(()),
@@ -434,7 +427,7 @@ impl Reader for SessionBenchReader {
         self.auto_settle
     }
 
-    fn close(self: Arc<Self>) -> BoxFuture<'static, fujin_core::Result<()>> {
+    fn close(self: Arc<Self>) -> BoxFuture<'static, Result<()>> {
         Box::pin(async move {
             self.closed.cancel();
             Ok(())
@@ -445,10 +438,7 @@ impl Reader for SessionBenchReader {
 struct NopDescriptor;
 
 impl ConnectorDescriptor for NopDescriptor {
-    fn compile(
-        &self,
-        _settings: &serde_json::Value,
-    ) -> fujin_core::Result<Arc<dyn CompiledConnector>> {
+    fn compile(&self, _settings: &serde_json::Value) -> Result<Arc<dyn CompiledConnector>> {
         Ok(Arc::new(NopCompiled {
             routes: BTreeMap::from([(
                 "pub".into(),
@@ -473,7 +463,7 @@ impl CompiledConnector for NopCompiled {
         &self.routes
     }
 
-    fn open_runtime(&self) -> fujin_core::Result<Arc<dyn ConnectorRuntime>> {
+    fn open_runtime(&self) -> Result<Arc<dyn ConnectorRuntime>> {
         Ok(Arc::new(NopRuntime))
     }
 }
@@ -486,19 +476,19 @@ impl ConnectorRuntime for NopRuntime {
         _route: &str,
         _auto_settle: bool,
         _events: Arc<dyn ReaderEventSink>,
-    ) -> fujin_core::Result<Arc<dyn Reader>> {
-        Err(fujin_core::CoreError::OperationUnsupported)
+    ) -> Result<Arc<dyn Reader>> {
+        Err(CoreError::OperationUnsupported)
     }
 
     fn open_writer(
         &self,
         _route: &str,
         completions: Arc<dyn CompletionSink>,
-    ) -> fujin_core::Result<Arc<dyn Writer>> {
+    ) -> Result<Arc<dyn Writer>> {
         Ok(Arc::new(NopWriter { completions }))
     }
 
-    fn close(self: Arc<Self>) -> BoxFuture<'static, fujin_core::Result<()>> {
+    fn close(self: Arc<Self>) -> BoxFuture<'static, Result<()>> {
         Box::pin(async { Ok(()) })
     }
 }
@@ -517,32 +507,32 @@ impl NopWriter {
 }
 
 impl Writer for NopWriter {
-    fn produce(&self, token: OperationToken, _message: Message) -> fujin_core::Result<()> {
+    fn produce(&self, token: OperationToken, _message: Message) -> Result<()> {
         self.complete(token);
         Ok(())
     }
 
-    fn flush(&self, token: OperationToken) -> fujin_core::Result<()> {
+    fn flush(&self, token: OperationToken) -> Result<()> {
         self.complete(token);
         Ok(())
     }
 
-    fn begin_transaction(&self, token: OperationToken) -> fujin_core::Result<()> {
+    fn begin_transaction(&self, token: OperationToken) -> Result<()> {
         self.complete(token);
         Ok(())
     }
 
-    fn commit_transaction(&self, token: OperationToken) -> fujin_core::Result<()> {
+    fn commit_transaction(&self, token: OperationToken) -> Result<()> {
         self.complete(token);
         Ok(())
     }
 
-    fn rollback_transaction(&self, token: OperationToken) -> fujin_core::Result<()> {
+    fn rollback_transaction(&self, token: OperationToken) -> Result<()> {
         self.complete(token);
         Ok(())
     }
 
-    fn close(self: Arc<Self>) -> BoxFuture<'static, fujin_core::Result<()>> {
+    fn close(self: Arc<Self>) -> BoxFuture<'static, Result<()>> {
         Box::pin(async { Ok(()) })
     }
 

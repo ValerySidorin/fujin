@@ -4,11 +4,12 @@ pub mod listener;
 pub mod settings;
 pub mod tls;
 
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::{collections::BTreeMap, fmt, future::Future, pin::Pin, sync::Arc};
 
 use anyhow::{Result, bail};
-use fujin_core::{BindMiddlewareRunner, BoxFuture, Catalog};
-use fujin_upgrade::{InheritedListeners, ListenerRegistry};
+use fujin_connector::Catalog;
+use fujin_middleware::BindMiddlewareRunner;
+pub use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 use parking_lot::RwLock;
 use serde::Deserialize;
 use serde_json::Value;
@@ -17,6 +18,8 @@ use tokio::{
     sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
+
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// One configured native transport plugin instance.
 #[derive(Clone, Debug, Deserialize)]

@@ -9,13 +9,15 @@ use std::{
     },
 };
 
-use fujin_core::{
+use fujin_connector::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
     Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
-    ConnectorRuntime, ConnectorsConfig, CoreError, Delivery, GenerationCompiler, Message,
-    NackEffect, NoConnectorMiddleware, OperationToken, Reader, ReaderEvent, ReaderEventSink,
-    ReadyCallback, Result, RouteProfile, SessionEventSink, SettlementKind, Writer,
+    ConnectorRuntime, ConnectorsConfig, Delivery, GenerationCompiler, Message, NackEffect,
+    NoConnectorMiddleware, OperationToken, Reader, ReaderEvent, ReaderEventSink, ReadyCallback,
+    RouteProfile, SettlementKind, SettlementProfile, SettlementResult, Writer,
 };
+use fujin_core::SessionEventSink;
+use fujin_error::{CoreError, Result};
 use parking_lot::Mutex;
 use serde_json::Value;
 
@@ -133,14 +135,14 @@ impl TestDescriptor {
                 .union(Capabilities::SUBSCRIBE)
                 .union(Capabilities::FETCH)
                 .union(Capabilities::MANUAL_SETTLEMENT),
-            settlement: fujin_core::SettlementProfile {
+            settlement: SettlementProfile {
                 ack: AckGranularity::Cumulative,
                 nack: NackEffect::Requeue,
             },
             ..RouteProfile::default()
         };
         let reader_no_nack = RouteProfile {
-            settlement: fujin_core::SettlementProfile {
+            settlement: SettlementProfile {
                 ack: AckGranularity::Cumulative,
                 nack: NackEffect::Unsupported,
             },
@@ -455,7 +457,7 @@ impl Reader for TestReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        mut settlements: Vec<fujin_core::SettlementResult>,
+        mut settlements: Vec<SettlementResult>,
     ) -> Result<()> {
         self.settlement_count.fetch_add(1, Ordering::Relaxed);
         let plan = self.plan.lock().settlements.pop_front().unwrap_or_default();

@@ -1,4 +1,4 @@
-use fujin::{Application, FujinConfig, GrpcConfig, RuntimeConfig, TransportConfig, plugins};
+use fujin::{Application, FujinConfig, GrpcConfig, RuntimeConfig, TransportConfig};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let application = Application::builder()
         .graceful_upgrade(false)
         .config(config)
-        .transport(plugins::transport::tcp())
+        .transport(fujin_transport_tcp::plugin())
         .build()
         .await?;
     let running = application.start().await?;

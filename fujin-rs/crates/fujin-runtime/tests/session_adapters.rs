@@ -10,13 +10,15 @@ use std::{
 };
 
 use bytes::Bytes;
-use fujin_core::{
+use fujin_connector::{
     AcceptanceGuarantee, AckGranularity, BoxFuture, Capabilities, Catalog, CompiledConnector,
     Completion, CompletionSink, ConnectorConfig, ConnectorDescriptor, ConnectorRegistry,
-    ConnectorRuntime, Delivery, GenerationCompiler, Header, NackEffect, NoBindMiddleware,
-    OperationToken, Reader, ReaderEvent, ReaderEventSink, ReadyCallback, Result, RouteProfile,
-    SettlementKind, SettlementProfile, Writer,
+    ConnectorRuntime, Delivery, GenerationCompiler, Header, Message, NackEffect, OperationToken,
+    Reader, ReaderEvent, ReaderEventSink, ReadyCallback, RouteProfile, SettlementKind,
+    SettlementProfile, SettlementResult, Writer,
 };
+use fujin_error::Result;
+use fujin_middleware::NoBindMiddleware;
 use fujin_native::{RequestCode, ResponseCode};
 use fujin_proto::fujin::v1 as pb;
 use fujin_runtime::GrpcService;
@@ -151,7 +153,7 @@ struct TestWriter {
 }
 
 impl Writer for TestWriter {
-    fn produce(&self, token: OperationToken, _message: fujin_core::Message) -> Result<()> {
+    fn produce(&self, token: OperationToken, _message: Message) -> Result<()> {
         self.state
             .pending_produces
             .lock()
@@ -218,7 +220,7 @@ impl Reader for TestReader {
         &self,
         token: OperationToken,
         _kind: SettlementKind,
-        settlements: Vec<fujin_core::SettlementResult>,
+        settlements: Vec<SettlementResult>,
     ) -> Result<()> {
         self.events.emit(ReaderEvent::SettlementComplete {
             token,

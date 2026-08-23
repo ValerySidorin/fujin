@@ -22,18 +22,25 @@ full = [
     "quic",
     "grpc",
 ]
-configurator-env = ["fujin/configurator-env"]
-configurator-yaml = ["fujin/configurator-yaml"]
-kafka = ["fujin/kafka"]
-tcp = ["fujin/tcp"]
-unix = ["fujin/unix"]
-websocket = ["fujin/websocket"]
-quic = ["fujin/quic"]
+configurator-env = ["dep:fujin-configurator-env"]
+configurator-yaml = ["dep:fujin-configurator-yaml"]
+kafka = ["dep:fujin-connector-kafka"]
+tcp = ["dep:fujin-transport-tcp"]
+unix = ["dep:fujin-transport-unix"]
+websocket = ["dep:fujin-transport-websocket"]
+quic = ["dep:fujin-transport-quic"]
 grpc = ["fujin/grpc"]
 
 [dependencies]
 anyhow.workspace = true
 fujin = { path = "../../crates/fujin", default-features = false }
+fujin-configurator-env = { path = "../../plugins/configurator/env", optional = true }
+fujin-configurator-yaml = { path = "../../plugins/configurator/yaml", optional = true }
+fujin-connector-kafka = { path = "../../plugins/connector/kafka", optional = true }
+fujin-transport-quic = { path = "../../plugins/transport/quic", optional = true }
+fujin-transport-tcp = { path = "../../plugins/transport/tcp", optional = true }
+fujin-transport-unix = { path = "../../plugins/transport/unix", optional = true }
+fujin-transport-websocket = { path = "../../plugins/transport/websocket", optional = true }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

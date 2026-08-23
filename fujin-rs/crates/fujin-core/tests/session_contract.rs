@@ -3,10 +3,12 @@ mod support;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use bytes::Bytes;
-use fujin_core::{
-    BindMiddlewareRunner, Capabilities, CompletionSink, ConnectorConfig, CoreError, Header,
-    Message, NoBindMiddleware, OperationToken, Result, SessionCore, SessionState,
+use fujin_connector::{
+    Capabilities, CompletionSink, ConnectorConfig, Header, Message, OperationToken,
 };
+use fujin_core::{SessionCore, SessionState};
+use fujin_error::{CoreError, Result};
+use fujin_middleware::{BindMiddlewareRunner, NoBindMiddleware};
 use parking_lot::Mutex;
 use support::{CompletionRecorder, WriterPlan, catalog_and_state};
 

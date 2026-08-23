@@ -9,15 +9,13 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use bytes::{Buf, Bytes, BytesMut};
-use fujin_core::BoxFuture;
-use fujin_runtime::TlsSettings;
-use fujin_transport::tls::TlsConfig;
 use fujin_transport::{
-    CompiledTransport, Endpoint, TransportContext, TransportPlugin, TransportRegistration,
+    BoxFuture, CompiledTransport, Endpoint, ListenerMetadata, TransportContext, TransportPlugin,
+    TransportRegistration,
     listener::{bind_tcp, drain_tasks},
-    settings::NativeProtocolSettings,
+    settings::{NativeProtocolSettings, TlsSettings},
+    tls::TlsConfig,
 };
-use fujin_upgrade::ListenerMetadata;
 use futures_util::{Sink, Stream};
 use serde::Deserialize;
 use serde_json::Value;

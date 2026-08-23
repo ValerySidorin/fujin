@@ -11,7 +11,7 @@ use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
 use crate::{
     BindMiddlewareRunner, Binding, Capabilities, Catalog, Completion, CompletionSink, CoreError,
-    Message, OperationToken, Result, RouteProfile, Writer, connector::validate_headers,
+    Message, OperationToken, Result, RouteProfile, Writer, validate_headers,
 };
 
 const DEFAULT_CLEANUP_TIMEOUT: Duration = Duration::from_secs(30);

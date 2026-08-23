@@ -1,10 +1,7 @@
 //! Optional bootstrap configurator reading JSON or YAML from one environment variable.
 
 use async_trait::async_trait;
-use fujin_runtime::{
-    RuntimeConfig, RuntimeError,
-    configurator::{Configurator, ConfiguratorPlugin},
-};
+use fujin_configurator::{Configurator, ConfiguratorPlugin, RuntimeConfig, RuntimeError};
 
 pub const CONFIG_ENV: &str = "FUJIN_CONFIGURATOR_ENV_CONFIG";
 

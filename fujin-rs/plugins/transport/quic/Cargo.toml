@@ -11,10 +11,7 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
-fujin-core = { path = "../../../crates/fujin-core" }
-fujin-runtime = { path = "../../../crates/fujin-runtime" }
 fujin-transport = { path = "../../../crates/fujin-transport" }
-fujin-upgrade = { path = "../../../crates/fujin-upgrade" }
 futures-util.workspace = true
 humantime.workspace = true
 quinn.workspace = true

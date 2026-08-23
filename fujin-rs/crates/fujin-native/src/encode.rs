@@ -1,8 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
-use fujin_core::{
-    BindResult, CoreError, Delivery, FetchResult, Header, OperationError, Result as CoreResult,
-    RouteProfile, SettlementResult, StatusCode,
-};
+use fujin_connector::{Delivery, Header, RouteProfile, SettlementResult};
+use fujin_core::{BindResult, FetchResult};
+use fujin_error::{CoreError, OperationError, OperationOutcome, Result as CoreResult, StatusCode};
 
 use crate::{HELLO_FORMAT, NativeError, ResponseCode, WIRE_VERSION};
 
@@ -25,12 +24,7 @@ pub(crate) fn hello_failure(
     output.put_u8(ResponseCode::Hello as u8);
     put_operation_error(
         &mut output,
-        &OperationError::new(
-            code,
-            fujin_core::OperationOutcome::NotApplied,
-            reason,
-            message,
-        ),
+        &OperationError::new(code, OperationOutcome::NotApplied, reason, message),
     )?;
     Ok(output.freeze())
 }

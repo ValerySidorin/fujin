@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use bytes::{Buf, Bytes, BytesMut};
-use fujin_core::Header;
+use fujin_connector::Header;
 
 use crate::{DEFAULT_MAX_FRAME_SIZE, HelloRequest, NativeError, Request, RequestCode};
 

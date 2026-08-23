@@ -2,18 +2,21 @@ use std::{collections::BTreeSet, fmt, sync::Arc};
 
 use anyhow::{Context, Result, bail};
 use async_trait::async_trait;
-use fujin_core::{
-    BindMiddlewareRegistration, BindMiddlewareRegistry, Catalog, ConnectorMiddlewareRegistration,
-    ConnectorMiddlewareRegistry, ConnectorPlugin, ConnectorRegistry,
+use fujin_configurator::{
+    ApplyResult, Configurator, ConfiguratorPlugin, ConfiguratorRegistry, ConnectorRuntime,
+    ConnectorRuntimeStatus, ConnectorSnapshot, RuntimeConfig, RuntimeError, bootstrap_snapshot,
+    compile_catalog, selected_configurator,
 };
-use fujin_runtime::configurator::{
-    ApplyResult, Configurator, ConfiguratorPlugin, ConfiguratorRegistry, ConnectorReloader,
-    ConnectorRuntime, ConnectorRuntimeStatus, ConnectorSnapshot, RuntimeController, RuntimeQueue,
-    bootstrap_snapshot, selected_configurator,
+use fujin_connector::{Catalog, ConnectorPlugin, ConnectorRegistry};
+use fujin_middleware::{
+    BindMiddlewareRegistration, BindMiddlewareRegistry, ConnectorMiddlewareRegistration,
+    ConnectorMiddlewareRegistry,
 };
-use fujin_runtime::{Endpoint, RuntimeConfig, RuntimeError, ServerConfig};
-use fujin_transport::{TransportRegistration, TransportRegistry};
-use fujin_upgrade::{InheritedListeners, ListenerRegistry};
+use fujin_runtime::configurator::{ConnectorReloader, RuntimeController, RuntimeQueue};
+use fujin_runtime::{Endpoint, ServerConfig};
+use fujin_transport::{
+    InheritedListeners, ListenerRegistry, TransportRegistration, TransportRegistry,
+};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -223,7 +226,7 @@ impl ApplicationBuilder {
 
         let initial_snapshot = bootstrap_snapshot(configurator.as_ref(), &config)
             .context("validate configurator bootstrap snapshot")?;
-        let catalog = fujin_runtime::compile_catalog(
+        let catalog = compile_catalog(
             &config,
             Arc::clone(&connector_registry),
             connector_middleware_registry.clone(),
@@ -678,13 +681,12 @@ mod tests {
     use super::*;
     use std::{collections::BTreeMap, sync::Arc};
 
-    use fujin_core::{
+    use fujin_connector::{
         AcceptanceGuarantee, BoxFuture, Capabilities, CompiledConnector, Completion,
-        CompletionSink, ConnectorDescriptor, ConnectorRuntime as CoreConnectorRuntime, CoreError,
-        Message, OperationToken, Reader, ReaderEventSink, Result as CoreResult, RouteProfile,
-        Writer,
+        CompletionSink, ConnectorDescriptor, ConnectorRuntime as CoreConnectorRuntime, Message,
+        OperationToken, Reader, ReaderEventSink, RouteProfile, Writer,
     };
-    #[cfg(feature = "tcp")]
+    use fujin_error::{CoreError, Result as CoreResult};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[derive(Debug)]
@@ -878,13 +880,12 @@ connectors:
     }
 
     #[tokio::test]
-    #[cfg(feature = "tcp")]
     async fn embedded_application_starts_reports_actual_endpoint_and_shuts_down() {
         let application = Application::builder()
             .graceful_upgrade(false)
             .config(embedded_config())
             .connector(ConnectorPlugin::new("nop", NopDescriptor))
-            .transport(crate::plugins::transport::tcp())
+            .transport(fujin_transport_tcp::plugin())
             .build()
             .await
             .expect("build embedded application");

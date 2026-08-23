@@ -30,21 +30,29 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
 - Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
+- Public plugin-authoring contracts are split by ownership: `fujin-connector` owns connector
+  configuration, catalog generations, reader/writer contracts, and writer enforcement;
+  `fujin-configurator` owns bootstrap configuration and runtime snapshot source contracts;
+  `fujin-middleware` owns BIND and connector middleware registries; `fujin-error` owns the shared
+  operation and status error model; `fujin-transport` owns native transport and listener seams.
+- `fujin-core` now contains only transport-neutral Session Core semantics. `fujin-core`,
+  `fujin-native`, `fujin-runtime`, and `fujin-upgrade` are internal host implementation crates and
+  are marked `publish = false`; plugin crates do not depend on them in production.
+- The `fujin` facade re-exports the public authoring contracts while keeping internal host types
+  private. Native and gRPC adapters depend on Session Core directly and translate only wire data.
 - The plugin taxonomy has four families: connector, configurator, transport, and middleware.
   Middleware is divided into BIND and connector middleware. Every implementation is an independent
   leaf crate under `plugins/<family>/<name>` or `plugins/middleware/<kind>/<name>`; family
   directories are namespaces only, matching the Go package boundary.
-- Rust exposes registries and public contracts for both middleware kinds through
-  `fujin::middleware::bind` and `fujin::middleware::connector`. Built-in Rust middleware
-  implementation crates have not yet been ported and are not represented by placeholders.
-- Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
-  live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
-- Shared certificate loading and listener TLS construction live in `fujin-transport::tls`; the
-  standalone `fujin-tls` crate was removed because TLS is listener infrastructure, not a separate
-  runtime or domain boundary.
-- Workspace roles are separated explicitly: reusable libraries live under `crates/`, the standard
-  production executable under `apps/fujin`, independently packaged plugins under `plugins/`, and
-  non-production benchmark binaries under `tools/bench`.
+- Built-in composition belongs to `fujin-app`; the removed production NOP connector and shallow
+  plugin API barrel are not part of the runtime or public dependency graph.
+- Connector reload, listener lifecycle, health, and the protobuf gRPC adapter remain cohesive host
+  modules in `fujin-runtime`. Shared certificate loading and listener TLS construction remain in
+  `fujin-transport::tls`.
+- Workspace roles are explicit: reusable public contracts and wire libraries live under `crates/`,
+  internal host crates are non-publishable, the standard production executable lives under
+  `apps/fujin`, independently packaged plugins under `plugins/`, and non-production benchmark
+  binaries under `tools/bench`.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -59,7 +67,7 @@ cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **66 tests passed across 27 suites**; the complete feature graph compiled and clippy
+Result: **66 tests passed across 29 suites**; the complete feature graph compiled and clippy
 passed with warnings denied.
 
 ### Plugin composition and feature matrix
@@ -78,10 +86,10 @@ cargo test -p fujin --no-default-features --lib \
 Result: **PASS**. The test composes arbitrary registered configurator and transport
 implementations without enabling or referencing any concrete adapter crate.
 
-A temporary Cargo project outside the workspace depended only on `fujin`,
-`fujin-connector-nop`, and `fujin-transport-tcp`. It registered both plugins through
-`ApplicationBuilder`, bound an ephemeral TCP listener, reported the endpoint, and completed
-bounded shutdown. Result: **PASS**.
+A temporary Cargo project outside the workspace depended only on the public `fujin` facade and
+`fujin-transport-tcp`. It implemented and registered a connector through `fujin::connector`, bound
+an ephemeral TCP listener, completed native HELLO, and performed bounded shutdown without any
+dependency on the internal Session Core or runtime crates. Result: **PASS**.
 
 ### Cross-target plugin builds
 
@@ -188,7 +196,7 @@ The production fix raises the bounded response relay and benchmark in-flight win
 
 - Every Fujin smoke process and Kafka container stack was stopped.
 - No benchmark listener or service process remained active after verification.
-- Cross-target and benchmark build artifacts remain under the ignored Rust `target/` directory.
+- Rust workspace, cross-target, external-smoke, and benchmark-smoke build caches were removed after verification.
 
 ## Cutover conclusion
 

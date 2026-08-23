@@ -11,7 +11,7 @@ workspace = true
 
 [dependencies]
 async-trait.workspace = true
-fujin-runtime = { path = "../../../crates/fujin-runtime" }
+fujin-configurator = { path = "../../../crates/fujin-configurator" }
 serde_json.workspace = true
 tracing.workspace = true
 yaml_serde.workspace = true

@@ -3,9 +3,9 @@
 /// Bootstrap configurators.
 pub mod configurator {
     #[cfg(feature = "configurator-env")]
-    pub use fujin_configurator_env::{EnvConfigurator, plugin as env};
+    pub use fujin_configurator_env::plugin as env;
     #[cfg(feature = "configurator-yaml")]
-    pub use fujin_configurator_yaml::{YamlConfigurator, plugin as yaml};
+    pub use fujin_configurator_yaml::plugin as yaml;
 }
 
 /// Connector implementations.
@@ -28,7 +28,7 @@ pub mod transport {
 
 /// Registers every plugin dependency enabled in this build.
 #[must_use]
-pub fn full(builder: crate::ApplicationBuilder) -> crate::ApplicationBuilder {
+pub fn full(builder: fujin::ApplicationBuilder) -> fujin::ApplicationBuilder {
     let builder = builder;
     #[cfg(feature = "configurator-env")]
     let builder = builder.configurator(configurator::env());
