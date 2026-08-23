@@ -53,9 +53,14 @@ class MatrixDriverTest(unittest.TestCase):
         )
         large_batch_one = matrix.Cell("fetch", "tcp", "32KiB", 1, 16)
         large_batch_many = matrix.Cell("fetch", "tcp", "32KiB", 32, 16)
+        large_other_transport = matrix.Cell("fetch", "quic", "32KiB", 1, 16)
         self.assertNotEqual(
             matrix.go_group_key(large_batch_one),
             matrix.go_group_key(large_batch_many),
+        )
+        self.assertNotEqual(
+            matrix.go_group_key(large_batch_one),
+            matrix.go_group_key(large_other_transport),
         )
         self.assertEqual(
             matrix.go_benchmark_pattern(tcp), "^Benchmark_Session_Fetch_Native$"

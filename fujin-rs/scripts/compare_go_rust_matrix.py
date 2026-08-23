@@ -222,14 +222,22 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
     return environment
 
 
-def go_group_key(cell: Cell) -> tuple[str, str, str, str]:
+def go_group_key(cell: Cell) -> tuple[str, ...]:
     interface = "grpc" if cell.transport == "grpc" else "native"
-    shape = "matrix" if PAYLOADS[cell.payload] <= 1024 else f"{cell.batch}/{cell.concurrency}"
-    return (cell.operation, interface, cell.payload, shape)
+    if PAYLOADS[cell.payload] <= 1024:
+        return (cell.operation, interface, cell.payload, "matrix")
+    return (
+        cell.operation,
+        interface,
+        cell.payload,
+        cell.transport,
+        str(cell.batch),
+        str(cell.concurrency),
+    )
 
 
 def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
-    groups: dict[tuple[str, str, str, str], list[Cell]] = {}
+    groups: dict[tuple[str, ...], list[Cell]] = {}
     for cell in cells:
         groups.setdefault(go_group_key(cell), []).append(cell)
     return list(groups.values())
@@ -713,8 +721,7 @@ def main() -> int:
                         persist()
             if timing_missing["go"] or timing_missing["rust"]:
                 print(
-                    f"timing {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{go_group_key(group[0])[2]}/{go_group_key(group[0])[3]} "
+                    f"timing {'/'.join(go_group_key(group[0]))} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
@@ -741,8 +748,7 @@ def main() -> int:
                 persist()
             if rust_allocation_missing:
                 print(
-                    f"alloc  {group[0].operation}/{go_group_key(group[0])[1]}/"
-                    f"{go_group_key(group[0])[2]}/{go_group_key(group[0])[3]} "
+                    f"alloc  {'/'.join(go_group_key(group[0]))} "
                     f"cells={len(group)} sample={sample + 1}/{args.samples}",
                     flush=True,
                 )
