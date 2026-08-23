@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use fujin_plugin_api::connector::{
+use fujin_core::{
     AcceptanceGuarantee, BoxFuture, Capabilities, CompiledConnector, Completion, CompletionSink,
     ConnectorDescriptor, ConnectorPlugin, ConnectorRuntime, CoreError, Message, OperationToken,
     Reader, ReaderEventSink, Result, RouteProfile, Writer,

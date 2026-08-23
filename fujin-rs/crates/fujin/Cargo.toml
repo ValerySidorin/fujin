@@ -23,7 +23,7 @@ full = [
 ]
 configurator-env = ["dep:fujin-configurators", "fujin-configurators/env"]
 configurator-yaml = ["dep:fujin-configurators", "fujin-configurators/yaml"]
-kafka = ["dep:fujin-kafka", "fujin-kafka/rdkafka"]
+kafka = ["dep:fujin-connectors", "fujin-connectors/kafka"]
 tcp = ["dep:fujin-transports", "fujin-transports/tcp"]
 unix = ["dep:fujin-transports", "fujin-transports/unix"]
 websocket = ["dep:fujin-transports", "fujin-transports/websocket"]
@@ -35,7 +35,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-configurators = { path = "../../plugins/configurators", optional = true }
-fujin-kafka = { path = "../fujin-kafka", optional = true }
+fujin-connectors = { path = "../../plugins/connectors", optional = true }
 fujin-plugin-api = { path = "../fujin-plugin-api" }
 fujin-runtime = { path = "../fujin-runtime" }
 fujin-transport = { path = "../fujin-transport" }

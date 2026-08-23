@@ -11,7 +11,7 @@ pub mod configurator {
 /// Connector implementations.
 pub mod connector {
     #[cfg(feature = "kafka")]
-    pub use fujin_kafka::plugin as kafka;
+    pub use fujin_connectors::kafka::plugin as kafka;
 }
 
 /// Native protocol transports.

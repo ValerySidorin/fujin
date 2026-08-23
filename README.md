@@ -93,10 +93,10 @@ model. The executable does not discover runtime plugin libraries from environmen
 applications use the same `ApplicationBuilder`, plugin registries, listener lifecycle, runtime
 connector snapshots, readiness reporting, and graceful shutdown path.
 
-Small adapters are grouped by category: `fujin-transports` contains the TCP, Unix, WebSocket, and
-QUIC modules, while `fujin-configurators` contains the environment and YAML modules. Application
-features select those modules; the public `fujin::plugins::*` namespace hides their physical
-crate layout.
+Small adapters are grouped by category: `fujin-connectors` contains Kafka and NOP,
+`fujin-configurators` contains the environment and YAML loaders, and `fujin-transports` contains
+TCP, Unix, WebSocket, and QUIC. Application features select individual modules; the public
+`fujin::plugins::*` namespace hides their physical crate layout.
 
 ```rust
 use fujin::{Application, plugins};

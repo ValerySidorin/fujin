@@ -346,8 +346,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "fujin-configurators",
+ "fujin-connectors",
  "fujin-core",
- "fujin-kafka",
  "fujin-plugin-api",
  "fujin-runtime",
  "fujin-transport",
@@ -400,6 +400,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "fujin-connectors"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "fujin-core",
+ "parking_lot",
+ "rdkafka",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "fujin-core"
 version = "0.1.0"
 dependencies = [
@@ -410,23 +427,6 @@ dependencies = [
  "serde",
  "serde_json",
  "subtle",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "fujin-kafka"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bytes",
- "fujin-core",
- "parking_lot",
- "rdkafka",
- "serde",
- "serde_json",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -453,14 +453,6 @@ dependencies = [
  "fujin-runtime",
  "fujin-transport",
  "fujin-upgrade",
-]
-
-[[package]]
-name = "fujin-plugin-nop"
-version = "0.1.0"
-dependencies = [
- "fujin-plugin-api",
- "serde_json",
 ]
 
 [[package]]

@@ -1,20 +1,19 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/fujin-core",
-    "crates/fujin-plugin-api",
-    "crates/fujin-native",
-    "crates/fujin-proto",
-    "crates/fujin-transport",
-    "crates/fujin-bench",
-    "crates/fujin-tls",
-    "plugins/configurators",
-    "plugins/transports",
-    "crates/fujin-runtime",
-    "crates/fujin-kafka",
-    "crates/fujin-upgrade",
     "crates/fujin",
-    "plugins/nop",
+    "crates/fujin-bench",
+    "crates/fujin-core",
+    "crates/fujin-native",
+    "crates/fujin-plugin-api",
+    "crates/fujin-proto",
+    "crates/fujin-runtime",
+    "crates/fujin-tls",
+    "crates/fujin-transport",
+    "crates/fujin-upgrade",
+    "plugins/configurators",
+    "plugins/connectors",
+    "plugins/transports",
 ]
 
 [workspace.package]

@@ -29,9 +29,10 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
 - Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
-- Native transports are modules of the optional `fujin-transports` category crate; environment
-  and YAML loaders are modules of `fujin-configurators`. Cargo features select modules without
-  creating a manifest and release unit for every small adapter.
+- Connector implementations are modules of `fujin-connectors`, configurator implementations are
+  modules of `fujin-configurators`, and native transport implementations are modules of
+  `fujin-transports`. Cargo features select individual adapters without creating a manifest and
+  release unit for every small plugin.
 - Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
   live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
 
@@ -48,15 +49,16 @@ cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **66 tests passed across 24 suites**; the complete feature graph compiled and clippy
+Result: **66 tests passed across 23 suites**; the complete feature graph compiled and clippy
 passed with warnings denied.
 
 ### Plugin composition and feature matrix
 
 The final application crate was checked with no features, with each optional feature alone
 (`configurator-env`, `configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and
-`grpc`), and with all features. `fujin-transports` and `fujin-configurators` were also checked
-without features and with every category feature independently. Every configuration compiled.
+`grpc`), and with all features. `fujin-connectors`, `fujin-configurators`, and
+`fujin-transports` were also checked without features and with every category feature
+independently. Every configuration compiled.
 
 ```text
 cargo test -p fujin --no-default-features --lib \
@@ -87,7 +89,7 @@ the native workspace build and broker-backed test below.
 A real Kafka container was started through `resources/docker-compose.kafka.yaml`; cleanup ran after the test.
 
 ```text
-FUJIN_KAFKA_E2E=1 cargo test -p fujin-kafka --features rdkafka \
+FUJIN_KAFKA_E2E=1 cargo test -p fujin-connectors --features kafka \
   --test kafka_e2e -- --nocapture
 ```
 

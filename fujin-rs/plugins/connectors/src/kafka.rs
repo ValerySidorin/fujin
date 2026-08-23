@@ -1,6 +1,6 @@
 //! Kafka connector for Fujin, backed by librdkafka.
 
-#[cfg(feature = "rdkafka")]
+#[cfg(feature = "kafka")]
 mod implementation {
     use std::{
         collections::BTreeMap,
@@ -780,10 +780,10 @@ mod implementation {
     }
 }
 
-#[cfg(feature = "rdkafka")]
+#[cfg(feature = "kafka")]
 pub use implementation::{KafkaDescriptor, descriptor};
 
-#[cfg(feature = "rdkafka")]
+#[cfg(feature = "kafka")]
 #[must_use]
 pub fn plugin() -> fujin_core::ConnectorPlugin {
     fujin_core::ConnectorPlugin::new("kafka_franz", KafkaDescriptor)
