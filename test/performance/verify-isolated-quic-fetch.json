@@ -1,0 +1,259 @@
+{
+  "configuration": {
+    "allocation_operations": 0,
+    "batches": [
+      1
+    ],
+    "concurrency": [
+      128
+    ],
+    "deadline": "300s",
+    "go_allocation_source": "timing_pass",
+    "interleaved": true,
+    "large_operations": 1000,
+    "max_batch_payload_bytes": 4194304,
+    "operations": [
+      "fetch"
+    ],
+    "payloads": [
+      "1B"
+    ],
+    "samples": 10,
+    "small_operations": 10000,
+    "transports": [
+      "quic"
+    ]
+  },
+  "environment": {
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "go": "go version go1.26.1 darwin/arm64",
+    "machine": "arm64",
+    "platform": "macOS-15.6.1-arm64-arm-64bit-Mach-O",
+    "processor": "arm",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "source": "bfd8392-dirty"
+  },
+  "generated_at": "2026-08-23T05:18:28.148562+00:00",
+  "results": [
+    {
+      "cell": {
+        "batch": 1,
+        "concurrency": 128,
+        "operation": "fetch",
+        "payload": "1B",
+        "transport": "quic"
+      },
+      "go": [
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1109.0,
+          "megabytes_per_second": 0.27,
+          "ns_per_operation": 3753.0,
+          "p99_ns": 1032417.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1085.0,
+          "megabytes_per_second": 0.32,
+          "ns_per_operation": 3116.0,
+          "p99_ns": 889542.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1097.0,
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3219.0,
+          "p99_ns": 1025417.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1090.0,
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3233.0,
+          "p99_ns": 1429917.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1084.0,
+          "megabytes_per_second": 0.32,
+          "ns_per_operation": 3090.0,
+          "p99_ns": 1171917.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1086.0,
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3215.0,
+          "p99_ns": 1209250.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1084.0,
+          "megabytes_per_second": 0.33,
+          "ns_per_operation": 3056.0,
+          "p99_ns": 1221959.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1085.0,
+          "megabytes_per_second": 0.29,
+          "ns_per_operation": 3423.0,
+          "p99_ns": 1767666.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1089.0,
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3294.0,
+          "p99_ns": 976417.0
+        },
+        {
+          "allocations_per_operation": 26.0,
+          "bytes_per_operation": 1087.0,
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3298.0,
+          "p99_ns": 1002750.0
+        }
+      ],
+      "go_alloc": [],
+      "key": "fetch/quic/1B/1/128",
+      "rust": [
+        {
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3249.0,
+          "p99_ns": 710917.0
+        },
+        {
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3273.0,
+          "p99_ns": 737375.0
+        },
+        {
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3316.0,
+          "p99_ns": 756792.0
+        },
+        {
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3327.0,
+          "p99_ns": 871167.0
+        },
+        {
+          "megabytes_per_second": 0.32,
+          "ns_per_operation": 3112.0,
+          "p99_ns": 661625.0
+        },
+        {
+          "megabytes_per_second": 0.31,
+          "ns_per_operation": 3246.0,
+          "p99_ns": 885417.0
+        },
+        {
+          "megabytes_per_second": 0.29,
+          "ns_per_operation": 3463.0,
+          "p99_ns": 822333.0
+        },
+        {
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3384.0,
+          "p99_ns": 914875.0
+        },
+        {
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3359.0,
+          "p99_ns": 783333.0
+        },
+        {
+          "megabytes_per_second": 0.3,
+          "ns_per_operation": 3368.0,
+          "p99_ns": 758750.0
+        }
+      ],
+      "rust_alloc": []
+    }
+  ],
+  "summary": {
+    "by_operation": {
+      "fetch": {
+        "cells": 1,
+        "geomean_allocations_ratio": null,
+        "geomean_bytes_ratio": null,
+        "geomean_ns_ratio": 1.0296032238065715,
+        "geomean_p99_ratio": 0.6995686679060433,
+        "rust_faster_cells": 0,
+        "rust_slower_10_percent_cells": 0,
+        "significant_regressions": 0
+      }
+    },
+    "by_transport": {
+      "quic": {
+        "cells": 1,
+        "geomean_allocations_ratio": null,
+        "geomean_bytes_ratio": null,
+        "geomean_ns_ratio": 1.0296032238065715,
+        "geomean_p99_ratio": 0.6995686679060433,
+        "rust_faster_cells": 0,
+        "rust_slower_10_percent_cells": 0,
+        "significant_regressions": 0
+      }
+    },
+    "cells": [
+      {
+        "allocations_ratio": null,
+        "batch": 1,
+        "bytes_ratio": null,
+        "concurrency": 128,
+        "go_allocations_per_operation": 26.0,
+        "go_bytes_per_operation": 1086.5,
+        "go_ns_per_operation": 3226.0,
+        "go_p99_ns": 1102167.0,
+        "key": "fetch/quic/1B/1/128",
+        "ns_p_value": 0.16197241048012603,
+        "ns_ratio": 1.0296032238065715,
+        "operation": "fetch",
+        "p99_ratio": 0.6995686679060433,
+        "payload": "1B",
+        "rust_allocations_per_operation": null,
+        "rust_bytes_per_operation": null,
+        "rust_ns_per_operation": 3321.5,
+        "rust_p99_ns": 771041.5,
+        "samples": 10,
+        "transport": "quic"
+      }
+    ],
+    "overall": {
+      "cells": 1,
+      "geomean_allocations_ratio": null,
+      "geomean_bytes_ratio": null,
+      "geomean_ns_ratio": 1.0296032238065715,
+      "geomean_p99_ratio": 0.6995686679060433,
+      "rust_faster_cells": 0,
+      "rust_slower_10_percent_cells": 0,
+      "significant_regressions": 0
+    },
+    "worst_latency_cells": [
+      {
+        "allocations_ratio": null,
+        "batch": 1,
+        "bytes_ratio": null,
+        "concurrency": 128,
+        "go_allocations_per_operation": 26.0,
+        "go_bytes_per_operation": 1086.5,
+        "go_ns_per_operation": 3226.0,
+        "go_p99_ns": 1102167.0,
+        "key": "fetch/quic/1B/1/128",
+        "ns_p_value": 0.16197241048012603,
+        "ns_ratio": 1.0296032238065715,
+        "operation": "fetch",
+        "p99_ratio": 0.6995686679060433,
+        "payload": "1B",
+        "rust_allocations_per_operation": null,
+        "rust_bytes_per_operation": null,
+        "rust_ns_per_operation": 3321.5,
+        "rust_p99_ns": 771041.5,
+        "samples": 10,
+        "transport": "quic"
+      }
+    ]
+  }
+}

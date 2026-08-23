@@ -223,17 +223,18 @@ def benchmark_environment(cell: Cell, operations: int, deadline: str) -> dict[st
 
 
 def go_group_key(cell: Cell) -> tuple[str, ...]:
-    interface = "grpc" if cell.transport == "grpc" else "native"
-    if PAYLOADS[cell.payload] <= 1024:
-        return (cell.operation, interface, cell.payload, "matrix")
-    return (
-        cell.operation,
-        interface,
-        cell.payload,
-        cell.transport,
-        str(cell.batch),
-        str(cell.concurrency),
-    )
+    if cell.transport == "grpc":
+        return (cell.operation, "grpc", cell.payload, "matrix")
+    if cell.transport == "quic" or PAYLOADS[cell.payload] > 1024:
+        return (
+            cell.operation,
+            "native",
+            cell.payload,
+            cell.transport,
+            str(cell.batch),
+            str(cell.concurrency),
+        )
+    return (cell.operation, "native", cell.payload, "matrix")
 
 
 def grouped_cells(cells: list[Cell]) -> list[list[Cell]]:
