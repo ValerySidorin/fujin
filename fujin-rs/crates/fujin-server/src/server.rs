@@ -910,62 +910,77 @@ pub(crate) async fn serve_quic(
                 let bind_middlewares = Arc::clone(&bind_middlewares);
                 let build = build.clone();
                 let connection_shutdown = shutdown.clone();
-                connections.spawn(async move {
-                    let connection = incoming.await.context("accept QUIC connection")?;
-                    let mut streams = FuturesUnordered::new();
-                    let mut session_error = None;
-                    loop {
-                        tokio::select! {
-                            () = connection_shutdown.cancelled() => break,
-                            stream = connection.accept_bi() => match stream {
-                                Ok((send, recv)) => {
-                                    let catalog = Arc::clone(&catalog);
-                                    let bind_middlewares = Arc::clone(&bind_middlewares);
-                                    let build = build.clone();
-                                    let stream_shutdown = connection_shutdown.clone();
-                                    streams.push(async move {
-                                        fujin_native::run_with_shutdown(
-                                            QuicStream { recv, send },
-                                            catalog,
-                                            bind_middlewares,
-                                            build,
-                                            stream_shutdown.cancelled_owned(),
-                                        )
-                                        .await
-                                        .map_err(anyhow::Error::from)
-                                    });
-                                }
-                                Err(
-                                    quinn::ConnectionError::ApplicationClosed(_)
-                                    | quinn::ConnectionError::LocallyClosed,
-                                ) => break,
-                                Err(error) => return Err(error).context("accept QUIC stream"),
-                            },
-                            result = streams.next(), if !streams.is_empty() => {
-                                if let Some(Err(error)) = result
-                                    && session_error.is_none()
-                                {
-                                    session_error = Some(error);
-                                }
-                            }
-                        }
-                    }
-                    connection.close(quinn::VarInt::from_u32(0), b"server shutdown");
-                    while let Some(result) = streams.next().await {
-                        if let Err(error) = result
-                            && session_error.is_none()
-                        {
-                            session_error = Some(error);
-                        }
-                    }
-                    session_error.map_or(Ok(()), Err)
-                });
+                connections.spawn(serve_quic_connection(
+                    incoming,
+                    catalog,
+                    bind_middlewares,
+                    build,
+                    connection_shutdown,
+                ));
             }
         }
     }
     endpoint.close(quinn::VarInt::from_u32(0), b"server shutdown");
     endpoint.wait_idle().await;
     drain_sessions(&mut connections).await
+}
+
+#[cfg(feature = "quic")]
+async fn serve_quic_connection(
+    incoming: quinn::Incoming,
+    catalog: Arc<Catalog>,
+    bind_middlewares: Arc<dyn BindMiddlewareRunner>,
+    build: String,
+    shutdown: CancellationToken,
+) -> Result<()> {
+    let connection = incoming.await.context("accept QUIC connection")?;
+    let mut streams = FuturesUnordered::new();
+    let mut session_error = None;
+    loop {
+        tokio::select! {
+            () = shutdown.cancelled() => break,
+            stream = connection.accept_bi() => match stream {
+                Ok((send, recv)) => {
+                    let catalog = Arc::clone(&catalog);
+                    let bind_middlewares = Arc::clone(&bind_middlewares);
+                    let build = build.clone();
+                    let stream_shutdown = shutdown.clone();
+                    streams.push(async move {
+                        fujin_native::run_with_shutdown(
+                            QuicStream { recv, send },
+                            catalog,
+                            bind_middlewares,
+                            build,
+                            stream_shutdown.cancelled_owned(),
+                        )
+                        .await
+                        .map_err(anyhow::Error::from)
+                    });
+                }
+                Err(
+                    quinn::ConnectionError::ApplicationClosed(_)
+                    | quinn::ConnectionError::LocallyClosed,
+                ) => break,
+                Err(error) => return Err(error).context("accept QUIC stream"),
+            },
+            result = streams.next(), if !streams.is_empty() => {
+                if let Some(Err(error)) = result
+                    && session_error.is_none()
+                {
+                    session_error = Some(error);
+                }
+            }
+        }
+    }
+    connection.close(quinn::VarInt::from_u32(0), b"server shutdown");
+    while let Some(result) = streams.next().await {
+        if let Err(error) = result
+            && session_error.is_none()
+        {
+            session_error = Some(error);
+        }
+    }
+    session_error.map_or(Ok(()), Err)
 }
 
 #[cfg(feature = "quic")]
