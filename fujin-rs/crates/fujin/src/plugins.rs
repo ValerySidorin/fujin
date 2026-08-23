@@ -3,9 +3,9 @@
 /// Bootstrap configurators.
 pub mod configurator {
     #[cfg(feature = "configurator-env")]
-    pub use fujin_configurator_env::plugin as env;
+    pub use fujin_configurators::env::{EnvConfigurator, plugin as env};
     #[cfg(feature = "configurator-yaml")]
-    pub use fujin_configurator_yaml::plugin as yaml;
+    pub use fujin_configurators::yaml::{YamlConfigurator, plugin as yaml};
 }
 
 /// Connector implementations.
@@ -17,13 +17,13 @@ pub mod connector {
 /// Native protocol transports.
 pub mod transport {
     #[cfg(feature = "quic")]
-    pub use fujin_transport_quic::plugin as quic;
+    pub use fujin_transports::quic::plugin as quic;
     #[cfg(feature = "tcp")]
-    pub use fujin_transport_tcp::plugin as tcp;
+    pub use fujin_transports::tcp::plugin as tcp;
     #[cfg(all(feature = "unix", unix))]
-    pub use fujin_transport_unix::plugin as unix;
+    pub use fujin_transports::unix::plugin as unix;
     #[cfg(feature = "websocket")]
-    pub use fujin_transport_websocket::plugin as websocket;
+    pub use fujin_transports::websocket::plugin as websocket;
 }
 
 /// Registers every plugin dependency enabled in this build.

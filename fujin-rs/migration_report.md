@@ -29,9 +29,11 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
 - Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
-- Native transports and configurators are ordinary optional plugin crates. Generic runtime,
-  server, and transport crates contain no concrete TCP, QUIC, Unix, WebSocket, YAML, or
-  environment plugin implementation and no feature checks for those plugins.
+- Native transports are modules of the optional `fujin-transports` category crate; environment
+  and YAML loaders are modules of `fujin-configurators`. Cargo features select modules without
+  creating a manifest and release unit for every small adapter.
+- Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
+  live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -46,14 +48,15 @@ cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **66 tests passed across 29 suites**; the complete feature graph compiled and clippy
+Result: **66 tests passed across 24 suites**; the complete feature graph compiled and clippy
 passed with warnings denied.
 
 ### Plugin composition and feature matrix
 
 The final application crate was checked with no features, with each optional feature alone
 (`configurator-env`, `configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and
-`grpc`), and with all features. Every configuration compiled.
+`grpc`), and with all features. `fujin-transports` and `fujin-configurators` were also checked
+without features and with every category feature independently. Every configuration compiled.
 
 ```text
 cargo test -p fujin --no-default-features --lib \
@@ -93,15 +96,15 @@ Result: **1 test passed**. Covered broker acknowledgement, header delivery, subs
 ### Transport smoke matrix
 
 Each cell performed 100 end-to-end 1-byte PRODUCE operations through the real listener,
-Session Core, registered transport plugin, and NOP connector plugin.
+Session Core, registered adapter from the consolidated category crate, and NOP connector plugin.
 
 | Adapter | Result | Operation time | p99 |
 |---|---:|---:|---:|
-| TCP | PASS | 81,955 ns | 98,625 ns |
-| QUIC | PASS | 90,887 ns | 114,375 ns |
-| Unix | PASS | 7,890 ns | 16,708 ns |
-| WebSocket | PASS | 73,372 ns | 119,958 ns |
-| gRPC | PASS | 87,342 ns | 118,958 ns |
+| TCP | PASS | 87,114 ns | 130,333 ns |
+| QUIC | PASS | 78,135 ns | 119,709 ns |
+| Unix | PASS | 8,710 ns | 23,375 ns |
+| WebSocket | PASS | 78,311 ns | 95,500 ns |
+| gRPC | PASS | 87,051 ns | 116,542 ns |
 
 ### Packaged binary and container
 

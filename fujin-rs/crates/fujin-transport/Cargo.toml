@@ -13,7 +13,6 @@ workspace = true
 anyhow.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-native = { path = "../fujin-native" }
-fujin-runtime = { path = "../fujin-runtime" }
 fujin-upgrade = { path = "../fujin-upgrade" }
 parking_lot.workspace = true
 serde.workspace = true

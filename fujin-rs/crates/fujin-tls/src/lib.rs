@@ -3,9 +3,17 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result, bail};
-use fujin_runtime::fujin_server_config::TlsConfig;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tokio_rustls::TlsAcceptor;
+
+/// Validated listener TLS identity and optional client trust roots.
+#[derive(Clone, Debug)]
+pub struct TlsConfig {
+    pub certificate: String,
+    pub private_key: String,
+    pub client_certificates: Option<String>,
+    pub require_client_certificate: bool,
+}
 
 pub fn install_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();

@@ -11,8 +11,7 @@ use fujin_runtime::configurator::{
     ConnectorRuntime, ConnectorRuntimeStatus, ConnectorSnapshot, RuntimeController, RuntimeQueue,
     bootstrap_snapshot, selected_configurator,
 };
-use fujin_runtime::{RuntimeConfig, RuntimeError};
-use fujin_server::{Endpoint, ServerConfig};
+use fujin_runtime::{Endpoint, RuntimeConfig, RuntimeError, ServerConfig};
 use fujin_transport::{TransportRegistration, TransportRegistry};
 use fujin_upgrade::{InheritedListeners, ListenerRegistry};
 use tokio::task::JoinHandle;
@@ -300,7 +299,7 @@ impl Application {
             UpgradeSetup {
                 client: None,
                 inherited: InheritedListeners::default(),
-                registry: ListenerRegistry::new(fujin_server::configured_listener_count(
+                registry: ListenerRegistry::new(fujin_runtime::configured_listener_count(
                     &self.server_config,
                 )),
                 socket: String::new(),
@@ -308,7 +307,7 @@ impl Application {
             }
         };
         let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
-        let mut server_task = tokio::spawn(fujin_server::serve_with_readiness_and_upgrade(
+        let mut server_task = tokio::spawn(fujin_runtime::serve_with_readiness_and_upgrade(
             self.server_config,
             Arc::clone(&self.catalog),
             self.bind_middlewares,
@@ -584,7 +583,7 @@ async fn prepare_upgrade(
         InheritedListeners::default,
         fujin_upgrade::UpgradeClient::inherited,
     );
-    let registry = ListenerRegistry::new(fujin_server::configured_listener_count(server_config));
+    let registry = ListenerRegistry::new(fujin_runtime::configured_listener_count(server_config));
     let socket = fujin_upgrade::socket_path_from_environment();
     let task = client.is_none().then(|| {
         spawn_upgrade_listener(

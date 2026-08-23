@@ -21,37 +21,31 @@ full = [
     "quic",
     "grpc",
 ]
-configurator-env = ["dep:fujin-configurator-env"]
-configurator-yaml = ["dep:fujin-configurator-yaml"]
+configurator-env = ["dep:fujin-configurators", "fujin-configurators/env"]
+configurator-yaml = ["dep:fujin-configurators", "fujin-configurators/yaml"]
 kafka = ["dep:fujin-kafka", "fujin-kafka/rdkafka"]
-tcp = ["dep:fujin-transport-tcp"]
-unix = ["dep:fujin-transport-unix"]
-websocket = ["dep:fujin-transport-websocket"]
-quic = ["dep:fujin-transport-quic"]
-grpc = ["fujin-server/grpc"]
+tcp = ["dep:fujin-transports", "fujin-transports/tcp"]
+unix = ["dep:fujin-transports", "fujin-transports/unix"]
+websocket = ["dep:fujin-transports", "fujin-transports/websocket"]
+quic = ["dep:fujin-transports", "fujin-transports/quic"]
+grpc = ["fujin-runtime/grpc"]
 
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
 fujin-core = { path = "../fujin-core" }
-fujin-configurator-env = { path = "../../plugins/configurator-env", optional = true }
-fujin-configurator-yaml = { path = "../../plugins/configurator-yaml", optional = true }
+fujin-configurators = { path = "../../plugins/configurators", optional = true }
 fujin-kafka = { path = "../fujin-kafka", optional = true }
 fujin-plugin-api = { path = "../fujin-plugin-api" }
 fujin-runtime = { path = "../fujin-runtime" }
-fujin-server = { path = "../fujin-server", default-features = false }
 fujin-transport = { path = "../fujin-transport" }
-fujin-transport-tcp = { path = "../../plugins/transport-tcp", optional = true }
-fujin-transport-websocket = { path = "../../plugins/transport-websocket", optional = true }
-fujin-transport-quic = { path = "../../plugins/transport-quic", optional = true }
+fujin-transports = { path = "../../plugins/transports", optional = true }
 fujin-upgrade = { path = "../fujin-upgrade" }
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-[target.'cfg(unix)'.dependencies]
-fujin-transport-unix = { path = "../../plugins/transport-unix", optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -10,7 +10,8 @@ use std::{
 use anyhow::{Context, Result, bail};
 use bytes::{Buf, Bytes, BytesMut};
 use fujin_core::BoxFuture;
-use fujin_runtime::{TlsSettings, fujin_server_config::TlsConfig};
+use fujin_runtime::TlsSettings;
+use fujin_tls::TlsConfig;
 use fujin_transport::{
     CompiledTransport, Endpoint, TransportContext, TransportPlugin, TransportRegistration,
     listener::{bind_tcp, drain_tasks},

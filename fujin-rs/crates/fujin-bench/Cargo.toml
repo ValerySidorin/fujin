@@ -21,12 +21,9 @@ bytes.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-native = { path = "../fujin-native" }
 fujin-proto = { path = "../fujin-proto" }
-fujin-runtime = { path = "../fujin-runtime" }
-fujin-server = { path = "../fujin-server", features = ["grpc"] }
+fujin-runtime = { path = "../fujin-runtime", features = ["grpc"] }
 fujin-transport = { path = "../fujin-transport" }
-fujin-transport-quic = { path = "../../plugins/transport-quic" }
-fujin-transport-tcp = { path = "../../plugins/transport-tcp" }
-fujin-transport-websocket = { path = "../../plugins/transport-websocket" }
+fujin-transports = { path = "../../plugins/transports", features = ["full"] }
 futures-util.workspace = true
 parking_lot.workspace = true
 quinn.workspace = true
@@ -40,8 +37,6 @@ tokio-tungstenite.workspace = true
 tokio-util.workspace = true
 tonic.workspace = true
 
-[target.'cfg(unix)'.dependencies]
-fujin-transport-unix = { path = "../../plugins/transport-unix" }
 
 [[bin]]
 name = "session-bench"

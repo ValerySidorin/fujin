@@ -6,6 +6,5 @@ pub mod plugins;
 pub use application::{Application, ApplicationBuilder, ApplicationHandle, RunningApplication};
 pub use fujin_plugin_api::{configurator, connector, middleware, transport};
 pub use fujin_runtime::{
-    FujinConfig, GrpcConfig, HealthConfig, RuntimeConfig, RuntimeError, TransportConfig,
+    Endpoint, FujinConfig, GrpcConfig, HealthConfig, RuntimeConfig, RuntimeError, TransportConfig,
 };
-pub use fujin_server::Endpoint;

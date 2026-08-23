@@ -19,7 +19,7 @@ use fujin_core::{
 };
 use fujin_native::{RequestCode, ResponseCode};
 use fujin_proto::fujin::v1 as pb;
-use fujin_server::GrpcService;
+use fujin_runtime::GrpcService;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream},
     net::TcpListener,

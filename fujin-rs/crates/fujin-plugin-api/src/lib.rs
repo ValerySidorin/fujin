@@ -26,9 +26,9 @@ pub mod configurator {
 
 /// Native-protocol transport contracts.
 pub mod transport {
-    pub use fujin_runtime::TransportConfig;
     pub use fujin_transport::{
-        CompiledTransport, TransportContext, TransportPlugin, TransportRegistration,
+        CompiledTransport, TransportConfig, TransportContext, TransportPlugin,
+        TransportRegistration,
     };
     pub use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 }

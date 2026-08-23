@@ -7,15 +7,30 @@ use std::{collections::BTreeMap, fmt, sync::Arc};
 
 use anyhow::{Result, bail};
 use fujin_core::{BindMiddlewareRunner, BoxFuture, Catalog};
-use fujin_runtime::TransportConfig;
 use fujin_upgrade::{InheritedListeners, ListenerRegistry};
 use parking_lot::RwLock;
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::mpsc,
 };
 use tokio_util::sync::CancellationToken;
+
+/// One configured native transport plugin instance.
+#[derive(Clone, Debug, Deserialize)]
+pub struct TransportConfig {
+    #[serde(rename = "type")]
+    pub transport_type: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub settings: Value,
+}
+
+const fn default_enabled() -> bool {
+    true
+}
 
 /// One listener after it has bound its actual address.
 #[derive(Clone, Debug, Eq, PartialEq)]
