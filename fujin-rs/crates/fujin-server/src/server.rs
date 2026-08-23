@@ -23,9 +23,12 @@ use fujin_runtime::fujin_server_config::{
     ControlPlaneConfig, GrpcListenerConfig, SocketListenerConfig,
 };
 use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
+#[cfg(feature = "quic")]
+use futures_util::StreamExt;
+#[cfg(feature = "quic")]
+use futures_util::stream::FuturesUnordered;
 #[cfg(feature = "websocket")]
 use futures_util::{Sink, Stream};
-#[cfg(feature = "websocket")]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -909,7 +912,8 @@ pub(crate) async fn serve_quic(
                 let connection_shutdown = shutdown.clone();
                 connections.spawn(async move {
                     let connection = incoming.await.context("accept QUIC connection")?;
-                    let mut streams = JoinSet::new();
+                    let mut streams = FuturesUnordered::new();
+                    let mut session_error = None;
                     loop {
                         tokio::select! {
                             () = connection_shutdown.cancelled() => break,
@@ -919,7 +923,7 @@ pub(crate) async fn serve_quic(
                                     let bind_middlewares = Arc::clone(&bind_middlewares);
                                     let build = build.clone();
                                     let stream_shutdown = connection_shutdown.clone();
-                                    streams.spawn(async move {
+                                    streams.push(async move {
                                         fujin_native::run_with_shutdown(
                                             QuicStream { recv, send },
                                             catalog,
@@ -936,11 +940,25 @@ pub(crate) async fn serve_quic(
                                     | quinn::ConnectionError::LocallyClosed,
                                 ) => break,
                                 Err(error) => return Err(error).context("accept QUIC stream"),
+                            },
+                            result = streams.next(), if !streams.is_empty() => {
+                                if let Some(Err(error)) = result
+                                    && session_error.is_none()
+                                {
+                                    session_error = Some(error);
+                                }
                             }
                         }
                     }
                     connection.close(quinn::VarInt::from_u32(0), b"server shutdown");
-                    drain_sessions(&mut streams).await
+                    while let Some(result) = streams.next().await {
+                        if let Err(error) = result
+                            && session_error.is_none()
+                        {
+                            session_error = Some(error);
+                        }
+                    }
+                    session_error.map_or(Ok(()), Err)
                 });
             }
         }
