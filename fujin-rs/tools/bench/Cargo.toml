@@ -18,11 +18,11 @@ bench-alloc = ["bench", "dep:stats_alloc"]
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-fujin-core = { path = "../fujin-core" }
-fujin-native = { path = "../fujin-native" }
-fujin-proto = { path = "../fujin-proto" }
-fujin-runtime = { path = "../fujin-runtime", features = ["grpc"] }
-fujin-transport = { path = "../fujin-transport" }
+fujin-core = { path = "../../crates/fujin-core" }
+fujin-native = { path = "../../crates/fujin-native" }
+fujin-proto = { path = "../../crates/fujin-proto" }
+fujin-runtime = { path = "../../crates/fujin-runtime", features = ["grpc"] }
+fujin-transport = { path = "../../crates/fujin-transport" }
 fujin-transport-quic = { path = "../../plugins/transport/quic" }
 fujin-transport-tcp = { path = "../../plugins/transport/tcp" }
 fujin-transport-unix = { path = "../../plugins/transport/unix" }

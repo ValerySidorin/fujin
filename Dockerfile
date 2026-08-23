@@ -11,13 +11,15 @@ WORKDIR /app
 
 COPY fujin-rs/Cargo.toml fujin-rs/Cargo.lock ./fujin-rs/
 COPY fujin-rs/crates ./fujin-rs/crates
+COPY fujin-rs/apps ./fujin-rs/apps
 COPY fujin-rs/plugins ./fujin-rs/plugins
+COPY fujin-rs/tools ./fujin-rs/tools
 COPY public/proto ./public/proto
 
 RUN VERSION="${VERSION}" cargo build \
     --manifest-path fujin-rs/Cargo.toml \
     --release \
-    -p fujin \
+    -p fujin-app \
     --features full \
  && ./fujin-rs/target/release/fujin --version
 

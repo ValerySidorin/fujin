@@ -9,7 +9,8 @@
 
 The supported production entry points now select the Rust implementation:
 
-- `make build` builds `fujin-rs/crates/fujin` with the `full` feature set.
+- `make build` builds the `fujin-app` production package under `fujin-rs/apps/fujin` with the
+  `full` feature set; the resulting binary remains `fujin`.
 - `Dockerfile` builds and packages the Rust binary as an unprivileged Alpine container.
 - `.github/workflows/release-image.yml` publishes and smoke-tests the Rust image.
 - Docker Compose and Helm select the `yaml` configurator with `FUJIN_CONFIGURATOR=yaml`, provide `/config/config.yaml` through `FUJIN_CONFIGURATOR_YAML_PATHS`, and use the Go-compatible `FUJIN_LOG_LEVEL` logging control.
@@ -41,6 +42,9 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Shared certificate loading and listener TLS construction live in `fujin-transport::tls`; the
   standalone `fujin-tls` crate was removed because TLS is listener infrastructure, not a separate
   runtime or domain boundary.
+- Workspace roles are separated explicitly: reusable libraries live under `crates/`, the standard
+  production executable under `apps/fujin`, independently packaged plugins under `plugins/`, and
+  non-production benchmark binaries under `tools/bench`.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -60,10 +64,11 @@ passed with warnings denied.
 
 ### Plugin composition and feature matrix
 
-The final application crate was checked with no features, with each optional feature alone
-(`configurator-env`, `configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and
-`grpc`), and with all features. The complete workspace independently compiled and tested every
-leaf plugin crate. Every configuration compiled.
+The public `fujin` embedding library and the final `fujin-app` production package were checked with
+no features, with each optional application feature alone (`configurator-env`,
+`configurator-yaml`, `kafka`, `tcp`, `unix`, `websocket`, `quic`, and `grpc`), and with all
+features. The complete workspace independently compiled and tested every leaf plugin and tooling
+crate. Every configuration compiled.
 
 ```text
 cargo test -p fujin --no-default-features --lib \
@@ -81,10 +86,10 @@ bounded shutdown. Result: **PASS**.
 ### Cross-target plugin builds
 
 ```text
-cargo zigbuild -p fujin --target aarch64-unknown-linux-musl \
+cargo zigbuild -p fujin-app --target aarch64-unknown-linux-musl \
   --no-default-features \
   --features configurator-env,configurator-yaml,tcp,unix,websocket,quic,grpc
-cargo zigbuild -p fujin --target x86_64-pc-windows-gnu \
+cargo zigbuild -p fujin-app --target x86_64-pc-windows-gnu \
   --no-default-features \
   --features configurator-env,configurator-yaml,tcp,unix,websocket,quic,grpc
 ```

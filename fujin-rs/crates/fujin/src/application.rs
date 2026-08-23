@@ -17,7 +17,7 @@ use fujin_upgrade::{InheritedListeners, ListenerRegistry};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-const BUILD_VERSION: &str = env!("FUJIN_BUILD_VERSION");
+const BUILD_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Builder for one independently configured Fujin application instance.
 pub struct ApplicationBuilder {

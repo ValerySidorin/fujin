@@ -361,8 +361,19 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "tracing-subscriber",
  "yaml_serde",
+]
+
+[[package]]
+name = "fujin-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fujin",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

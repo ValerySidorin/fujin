@@ -47,7 +47,7 @@ all: clean build run
 .PHONY: build
 build:
 	@echo "==> Building ${APP_NAME} with Rust for ${DETECTED_OS} (Version: ${VERSION}, Features: [${RUST_FEATURES}])"
-	@$(RUST_BUILD_ENV) VERSION="$(VERSION)" cargo build --manifest-path $(RUST_ROOT)/Cargo.toml --profile $(RUST_PROFILE) -p fujin --features "$(RUST_FEATURES)"
+	@$(RUST_BUILD_ENV) VERSION="$(VERSION)" cargo build --manifest-path $(RUST_ROOT)/Cargo.toml --profile $(RUST_PROFILE) -p fujin-app --features "$(RUST_FEATURES)"
 	@$(MKDIR) $(BIN_DIR)
 	@$(COPY) $(RUST_BINARY) $(BINARY)
 	@echo "==> Binary created: $(BINARY)"

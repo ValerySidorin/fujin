@@ -76,22 +76,25 @@ The default production build is the Rust workspace under `fujin-rs/`.
 # Full production binary: Kafka, TCP, QUIC, WebSocket, Unix, and gRPC
 make build
 
-# Minimal statically linked binary
-cargo build --manifest-path fujin-rs/Cargo.toml --release -p fujin --features configurator-yaml,kafka,tcp
+# Minimal statically linked production binary
+cargo build --manifest-path fujin-rs/Cargo.toml --release \
+  -p fujin-app --no-default-features \
+  --features configurator-yaml,kafka,tcp
 
-Available application features: `configurator-yaml`, `configurator-env`, `kafka`, `tcp`, `unix`,
-`websocket`, `quic`, and `grpc`; `full` enables all of them. Minimal executable builds must include
-at least one configurator feature. `VERSION` sets the build string returned by `--version` and
-native HELLO.
+Available `fujin-app` features: `configurator-yaml`, `configurator-env`, `kafka`, `tcp`, `unix`,
+`websocket`, `quic`, and `grpc`; `full` enables all of them and is the default. Minimal executable
+builds must include at least one configurator feature. `VERSION` sets the build string returned by
+`--version` and native HELLO.
 
 Connector and transport availability is fixed by Cargo features, matching the Go builder/import
 model. The executable does not discover runtime plugin libraries from environment variables.
 
 ## Rust Embedding and Plugins
 
-`fujin` is both the production CLI package and the supported embedding facade. The CLI and embedded
-applications use the same `ApplicationBuilder`, plugin registries, listener lifecycle, runtime
-connector snapshots, readiness reporting, and graceful shutdown path.
+`fujin` is the supported embedding library and public plugin facade. The standard production
+executable is the separate `fujin-app` package under `apps/fujin`; it composes the built-in plugins,
+logging, signal handling, reload behavior, and CLI version output around the same
+`ApplicationBuilder` lifecycle available to embedded and third-party binaries.
 
 The plugin taxonomy mirrors the Go implementation. Every implementation is one independent leaf
 crate under one of four families:
@@ -120,6 +123,10 @@ plugin crates. Rust currently has contracts and registries for both middleware b
 built-in middleware implementation crates have been ported yet. Their public contracts are under
 `fujin::middleware::bind` and `fujin::middleware::connector`. Shared certificate loading and
 listener TLS setup live in `fujin-transport::tls`, alongside the listener contract they support.
+
+Workspace roles are explicit: reusable libraries live under `crates/`, the standard executable
+lives under `apps/fujin`, plugin implementations live under `plugins/`, and non-production
+benchmark binaries live under `tools/bench` while retaining the Cargo package name `fujin-bench`.
 
 ```rust
 use fujin::{Application, plugins};

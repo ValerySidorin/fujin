@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let application = plugins::full(Application::builder())
+    let application = plugins::full(Application::builder().build_version(BUILD_VERSION))
         .build()
         .await
         .context("build Fujin application")?;
