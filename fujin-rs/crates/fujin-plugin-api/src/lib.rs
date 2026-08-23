@@ -33,12 +33,21 @@ pub mod transport {
     pub use fujin_upgrade::{InheritedListeners, ListenerMetadata, ListenerRegistry};
 }
 
-/// BIND and connector middleware contracts.
+/// Middleware plugin contracts, separated by lifecycle and direction.
 pub mod middleware {
-    pub use fujin_core::{
-        BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistration,
-        CompiledConnectorMiddleware, ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistration,
-    };
+    /// Middleware invoked while establishing a BIND.
+    pub mod bind {
+        pub use fujin_core::{
+            BindContext, BindMiddleware, BindMiddlewarePlugin, BindMiddlewareRegistration,
+        };
+    }
+
+    /// Generation-scoped middleware wrapping connector reader and writer leases.
+    pub mod connector {
+        pub use fujin_core::{
+            CompiledConnectorMiddleware, ConnectorMiddlewarePlugin, ConnectorMiddlewareRegistration,
+        };
+    }
 }
 
 pub use configurator::ConfiguratorPlugin;

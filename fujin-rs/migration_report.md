@@ -29,10 +29,13 @@ The Go implementation remains in the repository only for compatibility tests, mi
 - Kafka produce, subscribe, fetch, manual settlement, headers, and transactions.
 - Public `ApplicationBuilder` embedding facade with explicit registries for connectors,
   configurators, native transports, BIND middleware, and connector middleware.
-- Every connector, configurator, and native transport implementation is an independent leaf crate
-  under `plugins/connector/<name>`, `plugins/configurator/<name>`, or
-  `plugins/transport/<name>`. The category directories are namespaces only; application Cargo
-  features select concrete plugin crates directly, matching the Go package boundary.
+- The plugin taxonomy has four families: connector, configurator, transport, and middleware.
+  Middleware is divided into BIND and connector middleware. Every implementation is an independent
+  leaf crate under `plugins/<family>/<name>` or `plugins/middleware/<kind>/<name>`; family
+  directories are namespaces only, matching the Go package boundary.
+- Rust exposes registries and public contracts for both middleware kinds through
+  `fujin::middleware::bind` and `fujin::middleware::connector`. Built-in Rust middleware
+  implementation crates have not yet been ported and are not represented by placeholders.
 - Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
   live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
 - Shared certificate loading and listener TLS construction live in `fujin-transport::tls`; the

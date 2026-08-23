@@ -93,27 +93,33 @@ model. The executable does not discover runtime plugin libraries from environmen
 applications use the same `ApplicationBuilder`, plugin registries, listener lifecycle, runtime
 connector snapshots, readiness reporting, and graceful shutdown path.
 
-Every built-in plugin is one independent crate, matching the Go package boundary:
+The plugin taxonomy mirrors the Go implementation. Every implementation is one independent leaf
+crate under one of four families:
 
 ```text
 plugins/
 ├── connector/
-│   ├── kafka/        # fujin-connector-kafka
-│   └── nop/          # fujin-connector-nop
+│   ├── kafka/                  # fujin-connector-kafka
+│   └── nop/                    # fujin-connector-nop
 ├── configurator/
-│   ├── env/          # fujin-configurator-env
-│   └── yaml/         # fujin-configurator-yaml
+│   ├── env/                    # fujin-configurator-env
+│   └── yaml/                   # fujin-configurator-yaml
+├── middleware/
+│   ├── bind/<name>/            # fujin-middleware-bind-<name>
+│   └── connector/<name>/       # fujin-middleware-connector-<name>
 └── transport/
-    ├── quic/         # fujin-transport-quic
-    ├── tcp/          # fujin-transport-tcp
-    ├── unix/         # fujin-transport-unix
-    └── websocket/    # fujin-transport-websocket
+    ├── quic/                   # fujin-transport-quic
+    ├── tcp/                    # fujin-transport-tcp
+    ├── unix/                   # fujin-transport-unix
+    └── websocket/              # fujin-transport-websocket
 ```
 
-The singular category directories are namespaces, not Cargo packages. Application features select
-individual leaf crates; `fujin::plugins::*` provides stable convenience constructors without an
-aggregate plugin crate. Shared certificate loading and listener TLS setup live in
-`fujin-transport::tls`, alongside the listener contract they support.
+The singular family directories are namespaces, not Cargo packages. Application features select
+individual leaf crates; `fujin::plugins::*` provides convenience constructors without aggregate
+plugin crates. Rust currently has contracts and registries for both middleware branches, but no
+built-in middleware implementation crates have been ported yet. Their public contracts are under
+`fujin::middleware::bind` and `fujin::middleware::connector`. Shared certificate loading and
+listener TLS setup live in `fujin-transport::tls`, alongside the listener contract they support.
 
 ```rust
 use fujin::{Application, plugins};
@@ -153,9 +159,10 @@ let application = Application::builder()
 ```
 
 Equivalent constructors exist for `ConfiguratorPlugin`, `TransportRegistration`,
-`BindMiddlewareRegistration`, and `ConnectorMiddlewareRegistration`. Registration rejects empty or
-duplicate names during `build()`. Configured but unregistered plugin names are rejected before any
-listener binds.
+`middleware::bind::BindMiddlewareRegistration`, and
+`middleware::connector::ConnectorMiddlewareRegistration`. Registration rejects empty or duplicate
+names during `build()`. Configured but unregistered plugin names are rejected before any listener
+binds.
 
 Rust dynamic-library loading is intentionally unsupported: Rust trait-object ABI is not stable.
 Plugins are statically linked Cargo dependencies, matching Go's build-time import model while
