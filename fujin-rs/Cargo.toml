@@ -8,7 +8,6 @@ members = [
     "crates/fujin-plugin-api",
     "crates/fujin-proto",
     "crates/fujin-runtime",
-    "crates/fujin-tls",
     "crates/fujin-transport",
     "crates/fujin-upgrade",
     "plugins/configurators",

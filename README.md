@@ -96,7 +96,8 @@ connector snapshots, readiness reporting, and graceful shutdown path.
 Small adapters are grouped by category: `fujin-connectors` contains Kafka and NOP,
 `fujin-configurators` contains the environment and YAML loaders, and `fujin-transports` contains
 TCP, Unix, WebSocket, and QUIC. Application features select individual modules; the public
-`fujin::plugins::*` namespace hides their physical crate layout.
+`fujin::plugins::*` namespace hides their physical crate layout. Shared certificate loading and
+listener TLS setup live in `fujin-transport::tls`, alongside the listener boundary they support.
 
 ```rust
 use fujin::{Application, plugins};

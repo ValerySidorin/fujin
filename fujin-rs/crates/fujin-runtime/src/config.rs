@@ -125,7 +125,7 @@ pub mod server_config {
         pub listen: String,
     }
 
-    pub use fujin_tls::TlsConfig;
+    pub use fujin_transport::tls::TlsConfig;
 
     #[derive(Clone, Debug, Default)]
     pub struct ServerKeepAliveConfig {

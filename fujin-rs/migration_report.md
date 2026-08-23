@@ -35,6 +35,9 @@ The Go implementation remains in the repository only for compatibility tests, mi
   release unit for every small plugin.
 - Configuration, connector reload, listener lifecycle, health, and the protobuf gRPC adapter now
   live as cohesive modules in `fujin-runtime`; the shallow `fujin-server` crate was removed.
+- Shared certificate loading and listener TLS construction live in `fujin-transport::tls`; the
+  standalone `fujin-tls` crate was removed because TLS is listener infrastructure, not a separate
+  runtime or domain boundary.
 
 Unsupported Go-only settings are rejected instead of ignored. These currently include native ping/write tuning, gRPC client keepalive enforcement, gRPC `connection_timeout`, and `server_keepalive.max_connection_idle`.
 
@@ -49,7 +52,7 @@ cargo test --workspace --all-features --all-targets
 cargo clippy --workspace --all-features --all-targets -- -D warnings
 ```
 
-Result: **66 tests passed across 23 suites**; the complete feature graph compiled and clippy
+Result: **66 tests passed across 22 suites**; the complete feature graph compiled and clippy
 passed with warnings denied.
 
 ### Plugin composition and feature matrix

@@ -12,17 +12,16 @@ workspace = true
 [features]
 default = []
 full = ["tcp", "unix", "websocket", "quic"]
-tcp = ["dep:fujin-tls"]
+tcp = []
 unix = []
-websocket = ["dep:bytes", "dep:fujin-tls", "dep:futures-util", "dep:tokio-tungstenite"]
-quic = ["dep:fujin-tls", "dep:futures-util", "dep:humantime", "dep:quinn", "dep:tokio-util"]
+websocket = ["dep:bytes", "dep:futures-util", "dep:tokio-tungstenite"]
+quic = ["dep:futures-util", "dep:humantime", "dep:quinn", "dep:tokio-util"]
 
 [dependencies]
 anyhow.workspace = true
 bytes = { workspace = true, optional = true }
 fujin-core = { path = "../../crates/fujin-core" }
 fujin-runtime = { path = "../../crates/fujin-runtime" }
-fujin-tls = { path = "../../crates/fujin-tls", optional = true }
 fujin-transport = { path = "../../crates/fujin-transport" }
 fujin-upgrade = { path = "../../crates/fujin-upgrade" }
 futures-util = { workspace = true, optional = true }

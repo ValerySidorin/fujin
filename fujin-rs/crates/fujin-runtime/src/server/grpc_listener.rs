@@ -41,7 +41,7 @@ pub(super) async fn serve(config: GrpcListenerConfig, context: TransportContext)
             ServerTlsConfig::new().identity(Identity::from_pem(certificate, private_key));
         if let Some(directory) = tls.client_certificates.as_ref() {
             tls_config = tls_config.client_ca_root(tonic::transport::Certificate::from_pem(
-                fujin_tls::load_pem_directory(directory).await?,
+                fujin_transport::tls::load_pem_directory(directory).await?,
             ));
         }
         builder = builder

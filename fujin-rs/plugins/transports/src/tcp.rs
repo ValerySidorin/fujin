@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result, bail};
 use fujin_core::BoxFuture;
 use fujin_runtime::TlsSettings;
-use fujin_tls::TlsConfig;
+use fujin_transport::tls::TlsConfig;
 use fujin_transport::{
     CompiledTransport, Endpoint, TransportContext, TransportPlugin, TransportRegistration,
     listener::{bind_tcp, drain_tasks},
@@ -59,7 +59,7 @@ impl CompiledTransport for Transport {
 impl Transport {
     async fn run(&self, context: TransportContext) -> Result<()> {
         let tls = match self.tls.as_ref() {
-            Some(config) => Some(fujin_tls::load_acceptor(config, "TCP").await?),
+            Some(config) => Some(fujin_transport::tls::load_acceptor(config, "TCP").await?),
             None => None,
         };
         let listener = bind_tcp(

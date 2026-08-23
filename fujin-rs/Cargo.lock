@@ -476,7 +476,6 @@ dependencies = [
  "fujin-core",
  "fujin-native",
  "fujin-proto",
- "fujin-tls",
  "fujin-transport",
  "fujin-upgrade",
  "humantime",
@@ -496,17 +495,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fujin-tls"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "rustls",
- "rustls-pemfile",
- "tokio",
- "tokio-rustls",
-]
-
-[[package]]
 name = "fujin-transport"
 version = "0.1.0"
 dependencies = [
@@ -515,9 +503,12 @@ dependencies = [
  "fujin-native",
  "fujin-upgrade",
  "parking_lot",
+ "rustls",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "tracing",
 ]
@@ -530,7 +521,6 @@ dependencies = [
  "bytes",
  "fujin-core",
  "fujin-runtime",
- "fujin-tls",
  "fujin-transport",
  "fujin-upgrade",
  "futures-util",

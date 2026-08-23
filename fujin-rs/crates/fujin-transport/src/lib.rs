@@ -2,6 +2,7 @@
 
 pub mod listener;
 pub mod settings;
+pub mod tls;
 
 use std::{collections::BTreeMap, fmt, sync::Arc};
 

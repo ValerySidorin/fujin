@@ -20,7 +20,6 @@ async-trait.workspace = true
 bytes.workspace = true
 fujin-core = { path = "../fujin-core" }
 fujin-proto = { path = "../fujin-proto", optional = true }
-fujin-tls = { path = "../fujin-tls" }
 fujin-transport = { path = "../fujin-transport" }
 fujin-upgrade = { path = "../fujin-upgrade" }
 humantime.workspace = true

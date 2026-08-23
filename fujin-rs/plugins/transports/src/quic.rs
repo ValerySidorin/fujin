@@ -11,7 +11,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use fujin_core::BoxFuture;
 use fujin_runtime::TlsSettings;
-use fujin_tls::TlsConfig;
+use fujin_transport::tls::TlsConfig;
 use fujin_transport::{
     CompiledTransport, Endpoint, TransportContext, TransportPlugin, TransportRegistration,
     listener::bind_udp, settings::NativeProtocolSettings,
@@ -138,7 +138,7 @@ impl Transport {
     }
 
     async fn server_config(&self) -> Result<quinn::ServerConfig> {
-        let (certificates, key) = fujin_tls::load_identity(&self.tls, "QUIC").await?;
+        let (certificates, key) = fujin_transport::tls::load_identity(&self.tls, "QUIC").await?;
         let mut server = quinn::ServerConfig::with_single_cert(certificates, key)
             .context("build QUIC server config")?;
         let mut transport = quinn::TransportConfig::default();
