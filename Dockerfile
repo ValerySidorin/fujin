@@ -5,38 +5,37 @@ ARG RUST_VERSION=1.97.1
 FROM rust:${RUST_VERSION}-alpine AS builder
 
 ARG VERSION=dev
+ARG FUJIN_BUILD_MANIFEST=deploy/docker/fujin.build.toml
+ARG FUJIN_BUILD_LOCK=Cargo.lock
 
-RUN apk add --no-cache build-base cmake curl-dev perl pkgconf protobuf-dev
+RUN apk add --no-cache build-base ca-certificates cmake curl-dev perl pkgconf protobuf-dev
 WORKDIR /app
 
-COPY fujin-rs/Cargo.toml fujin-rs/Cargo.lock ./fujin-rs/
-COPY fujin-rs/crates ./fujin-rs/crates
-COPY fujin-rs/apps ./fujin-rs/apps
-COPY fujin-rs/plugins ./fujin-rs/plugins
-COPY fujin-rs/tools ./fujin-rs/tools
-COPY public/proto ./public/proto
+COPY . .
 
-RUN VERSION="${VERSION}" cargo build \
-    --manifest-path fujin-rs/Cargo.toml \
-    --release \
-    -p fujin-app \
-    --features full \
- && ./fujin-rs/target/release/fujin --version
+RUN set -eux; \
+    set --; \
+    if [ -n "${FUJIN_BUILD_LOCK}" ]; then \
+        set -- --lockfile "${FUJIN_BUILD_LOCK}"; \
+    fi; \
+    FUJIN_BUILD_VERSION="${VERSION}" cargo run --release --locked -p cargo-fujin -- \
+        --manifest "${FUJIN_BUILD_MANIFEST}" \
+        build --profile release --output /runtime/fujin --clean-after "$@"; \
+    /runtime/fujin --version; \
+    install -d -m 0755 /runtime/etc/ssl/certs; \
+    install -d -m 0700 -o 65532 -g 65532 /runtime/run/fujin; \
+    cp /etc/ssl/certs/ca-certificates.crt /runtime/etc/ssl/certs/
 
-FROM alpine:3.22 AS runtime
+FROM scratch AS runtime
 
-RUN apk add --no-cache ca-certificates libgcc libstdc++ \
- && addgroup -S fujin \
- && adduser -S -G fujin -h /nonexistent -s /sbin/nologin fujin \
- && install -d -m 0700 -o fujin -g fujin /run/fujin
+COPY --from=builder /runtime/ /
 
-COPY --from=builder /app/fujin-rs/target/release/fujin /fujin
-
-USER fujin
-ENV FUJIN_CONFIGURATOR=yaml \
-    FUJIN_CONFIGURATOR_YAML_PATHS=/config/config.yaml \
-    FUJIN_LOG_LEVEL=INFO
+USER 65532:65532
+ENV FUJIN_CONFIGURATOR=file \
+    FUJIN_CONFIGURATOR_FILE_PATHS=/config/config.yaml \
+    FUJIN_LOG_LEVEL=INFO \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 STOPSIGNAL SIGTERM
-EXPOSE 4850/tcp 4848/udp 4849/tcp 4851/tcp 8080/tcp
+EXPOSE 4850/tcp 8080/tcp
 
 ENTRYPOINT ["/fujin"]

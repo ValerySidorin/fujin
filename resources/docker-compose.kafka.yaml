@@ -1,6 +1,6 @@
 services:
   zoo1:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.9.1
     hostname: zoo1
     container_name: zoo1
     ports:
@@ -10,6 +10,11 @@ services:
       ZOOKEEPER_SERVER_ID: 1
       ZOOKEEPER_SERVERS: zoo1:2888:3888
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 40"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
   kafka1:
     image: confluentinc/cp-kafka:7.9.1
     hostname: kafka1
@@ -27,8 +32,14 @@ services:
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:19092 1 40"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
     depends_on:
-      - zoo1
+      zoo1:
+        condition: service_healthy
   kafka2:
     image: confluentinc/cp-kafka:7.9.1
     hostname: kafka2
@@ -46,8 +57,14 @@ services:
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:19093 1 40"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
     depends_on:
-      - zoo1
+      zoo1:
+        condition: service_healthy
   kafka3:
     image: confluentinc/cp-kafka:7.9.1
     hostname: kafka3
@@ -65,5 +82,11 @@ services:
       KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.authorizer.AclAuthorizer
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:19094 1 40"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
     depends_on:
-      - zoo1
+      zoo1:
+        condition: service_healthy

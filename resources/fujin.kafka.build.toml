@@ -1,0 +1,31 @@
+[application]
+name = "fujin-kafka"
+version = "0.6.0-alpha.1"
+output = ".fujin/fujin-kafka"
+artifact = "binary"
+generated_directory = ".fujin/generated-kafka"
+fujin = { path = "../crates/fujin", features = ["grpc"] }
+
+[[plugin]]
+family = "configurator"
+name = "file"
+package = "fujin-configurator-file"
+path = "../plugins/configurator/file"
+
+[[plugin]]
+family = "connector"
+name = "kafka"
+package = "fujin-connector-kafka"
+path = "../plugins/connector/kafka"
+
+[[plugin]]
+family = "transport"
+name = "quic"
+package = "fujin-transport-quic"
+path = "../plugins/transport/quic"
+
+[[plugin]]
+family = "transport"
+name = "tcp"
+package = "fujin-transport-tcp"
+path = "../plugins/transport/tcp"

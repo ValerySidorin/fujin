@@ -1,0 +1,63 @@
+name: Go SDKs
+
+on:
+  pull_request:
+    paths:
+      - "sdk/go/**"
+      - "proto/grpc/v1/fujin.proto"
+      - "plugins/transport/quic/**"
+      - "crates/**"
+      - "tools/cargo-fujin/**"
+      - "Makefile"
+      - ".github/workflows/go-sdk.yml"
+  push:
+    branches: [main]
+    paths:
+      - "sdk/go/**"
+      - "proto/grpc/v1/fujin.proto"
+      - "plugins/transport/quic/**"
+      - "crates/**"
+      - "tools/cargo-fujin/**"
+      - "Makefile"
+      - ".github/workflows/go-sdk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.1"
+          cache-dependency-path: |
+            sdk/go/client/go.sum
+            sdk/go/embed/go.mod
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: "32.1"
+      - name: Install Go protobuf generator
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+      - name: Verify generated protobuf
+        run: |
+          make -C sdk/go/client generate
+          git diff --exit-code -- proto/grpc/v1/fujin.proto sdk/go/client/grpc/v1/proto/fujin.pb.go
+      - name: Test Go modules
+        run: make sdk-test
+
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.1"
+          cache-dependency-path: sdk/go/client/go.sum
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+      - name: Test native QUIC and gRPC against current server
+        run: make sdk-compat

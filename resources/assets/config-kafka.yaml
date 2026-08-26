@@ -1,0 +1,36 @@
+fujin:
+  transports:
+    - type: quic
+      settings:
+        addr: 0.0.0.0:4848
+        tls:
+          enabled: true
+          server_cert_pem_path: /assets/certs/fujin.io.pem
+          server_key_pem_path: /assets/certs/fujin.io-key.pem
+    - type: tcp
+      settings:
+        addr: 0.0.0.0:4850
+grpc:
+  enabled: true
+  addr: 0.0.0.0:4849
+health:
+  enabled: true
+  addr: 0.0.0.0:8080
+connectors:
+  connector:
+    type: kafka
+    settings:
+      common:
+        brokers: [kafka1:19092, kafka2:19093, kafka3:19094]
+        properties: {}
+      routes:
+        pub:
+          produce_topic: my_pub_topic
+          properties:
+            allow.auto.create.topics: "true"
+        sub:
+          consume_topics: [my_pub_topic]
+          group: fujin
+          properties:
+            auto.offset.reset: earliest
+            allow.auto.create.topics: "true"

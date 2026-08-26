@@ -3,7 +3,7 @@ mode: standalone
 
 image:
   repository: ghcr.io/fujin-io/fujin
-  tag: "v0.5.0"
+  tag: "v0.6.0-alpha.1"
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -16,14 +16,13 @@ config:
         settings:
           addr: 0.0.0.0:4850
   grpc:
-    enabled: true
-    addr: 0.0.0.0:4849
+    enabled: false
   health:
     enabled: true
     addr: 0.0.0.0:8080
   connectors: {}
   #  kafka_connector:
-  #    type: kafka_franz
+  #    type: kafka
   #    settings:
   #      common:
   #        brokers: ["kafka:9092"]
@@ -42,7 +41,6 @@ log:
 # Ports exposed by the container / Service
 ports:
   tcp: 4850
-  grpc: 4849
   health: 8080
 
 # Health probes (applied in standalone mode)

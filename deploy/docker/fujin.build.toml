@@ -1,0 +1,25 @@
+[application]
+name = "fujin-docker"
+version = "0.6.0-alpha.1"
+output = ".fujin/fujin"
+artifact = "binary"
+generated_directory = ".fujin/generated"
+fujin = { path = "../../crates/fujin" }
+
+[[plugin]]
+family = "configurator"
+name = "file"
+package = "fujin-configurator-file"
+path = "../../plugins/configurator/file"
+
+[[plugin]]
+family = "connector"
+name = "kafka"
+package = "fujin-connector-kafka"
+path = "../../plugins/connector/kafka"
+
+[[plugin]]
+family = "transport"
+name = "tcp"
+package = "fujin-transport-tcp"
+path = "../../plugins/transport/tcp"
