@@ -1,0 +1,30 @@
+[package]
+name = "fujin-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait.workspace = true
+arc-swap.workspace = true
+bytes.workspace = true
+fujin-connector = { path = "../fujin-connector" }
+fujin-error = { path = "../fujin-error" }
+fujin-middleware = { path = "../fujin-middleware" }
+parking_lot.workspace = true
+serde.workspace = true
+subtle.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

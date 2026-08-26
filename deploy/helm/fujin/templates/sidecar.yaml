@@ -18,19 +18,14 @@
   imagePullPolicy: {{ .Values.image.pullPolicy }}
   env:
     - name: FUJIN_CONFIGURATOR
-      value: "yaml"
-    - name: FUJIN_CONFIGURATOR_YAML_PATHS
+      value: "file"
+    - name: FUJIN_CONFIGURATOR_FILE_PATHS
       value: "/config/config.yaml"
     - name: FUJIN_LOG_LEVEL
-      value: {{ .Values.log.level | quote }}
-    - name: FUJIN_LOG_TYPE
-      value: {{ .Values.log.type | quote }}
+      value: {{ .Values.log.level | upper | quote }}
   ports:
     - name: tcp
       containerPort: {{ .Values.ports.tcp }}
-      protocol: TCP
-    - name: grpc
-      containerPort: {{ .Values.ports.grpc }}
       protocol: TCP
     - name: health
       containerPort: {{ .Values.ports.health }}

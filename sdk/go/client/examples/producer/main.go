@@ -1,0 +1,79 @@
+package main
+
+import (
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"log"
+	"log/slog"
+	"os"
+	"os/signal"
+	"time"
+
+	client "github.com/fujin-io/fujin/sdk/go/client"
+	"github.com/fujin-io/fujin/sdk/go/client/fujin"
+)
+
+type TestMsg struct {
+	Field string `json:"field"`
+}
+
+func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	defer fmt.Println("disconnected")
+
+	conn, err := fujin.Dial(ctx, "localhost:4848", &tls.Config{InsecureSkipVerify: true}, nil,
+		fujin.WithTimeout(100*time.Second),
+		fujin.WithLogger(
+			slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+				AddSource: true,
+				Level:     slog.LevelDebug,
+			})),
+		),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("client connected")
+
+	defer conn.Close()
+
+	s, err := conn.Bind(ctx, "connector")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("stream connected")
+
+	defer s.Close(context.Background())
+
+	msg := TestMsg{
+		Field: "test",
+	}
+
+	data, err := json.Marshal(&msg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if err := s.Produce(ctx, "pub", data); err != nil {
+				log.Fatal(err)
+			}
+			if err := s.HProduce(ctx, "pub", data, []client.Header{{
+				Key: []byte("key"), Value: []byte("value"),
+			}}); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("message sent")
+			time.Sleep(1 * time.Second)
+		}
+	}
+}

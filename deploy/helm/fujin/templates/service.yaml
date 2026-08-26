@@ -12,10 +12,6 @@ spec:
       port: {{ .Values.ports.tcp }}
       targetPort: tcp
       protocol: TCP
-    - name: grpc
-      port: {{ .Values.ports.grpc }}
-      targetPort: grpc
-      protocol: TCP
     - name: health
       port: {{ .Values.ports.health }}
       targetPort: health

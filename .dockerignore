@@ -1,0 +1,9 @@
+.git
+.gitignore
+.fujin
+**/.fujin
+target
+**/target
+/bin
+test/performance
+.DS_Store

@@ -1,0 +1,22 @@
+{
+  "servers": {
+    "rust-analyzer": {
+      "rootMarkers": ["Cargo.toml"],
+      "initOptions": {
+        "cargo": {
+          "features": "all"
+        },
+        "linkedProjects": ["Cargo.toml"]
+      },
+      "settings": {
+        "rust-analyzer": {
+          "checkOnSave": false,
+          "cargo": {
+            "features": "all"
+          },
+          "linkedProjects": ["Cargo.toml"]
+        }
+      }
+    }
+  }
+}

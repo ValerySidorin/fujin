@@ -1,0 +1,25 @@
+[application]
+name = "fujin-go-embed-example"
+version = "0.1.0"
+output = ".fujin/libfujin_embed_example"
+artifact = "cdylib"
+generated_directory = ".fujin/generated"
+fujin = { path = "../../../../../crates/fujin" }
+
+[[plugin]]
+family = "configurator"
+name = "env"
+package = "fujin-configurator-env"
+path = "../../../../../plugins/configurator/env"
+
+[[plugin]]
+family = "connector"
+name = "test-connector"
+package = "fujin-go-test-connector"
+path = "../../testdata/connector"
+
+[[plugin]]
+family = "transport"
+name = "tcp"
+package = "fujin-transport-tcp"
+path = "../../../../../plugins/transport/tcp"

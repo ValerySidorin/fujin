@@ -1,0 +1,31 @@
+services:
+  fujin:
+    image: fujin:kafka-${BUILD_TAG:-v0.6.0-alpha.1}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${BUILD_TAG:-v0.6.0-alpha.1}
+        FUJIN_BUILD_MANIFEST: resources/fujin.kafka.build.toml
+        FUJIN_BUILD_LOCK: Cargo.kafka.lock
+    container_name: fujin
+    environment:
+      FUJIN_CONFIGURATOR: file
+      FUJIN_CONFIGURATOR_FILE_PATHS: /assets/config-kafka.yaml
+      FUJIN_LOG_LEVEL: ${FUJIN_LOG_LEVEL:-INFO}
+      FUJIN_LOG_TYPE: ${FUJIN_LOG_TYPE:-json}
+    ports:
+      - "4848:4848/udp"
+      - "4849:4849"
+      - "4850:4850"
+      - "8080:8080"
+    volumes:
+      - ./assets:/assets:ro
+    depends_on:
+      kafka1:
+        condition: service_healthy
+      kafka2:
+        condition: service_healthy
+      kafka3:
+        condition: service_healthy
+    restart: unless-stopped

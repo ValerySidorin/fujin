@@ -1,0 +1,48 @@
+[package]
+name = "fujin-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = ["full"]
+full = [
+    "configurator-env",
+    "configurator-file",
+    "connector-kafka",
+    "transport-tcp",
+    "transport-unix",
+    "transport-websocket",
+    "transport-quic",
+    "grpc",
+]
+configurator-env = ["dep:fujin-configurator-env"]
+configurator-file = ["dep:fujin-configurator-file"]
+connector-kafka = ["dep:fujin-connector-kafka"]
+transport-tcp = ["dep:fujin-transport-tcp"]
+transport-unix = ["dep:fujin-transport-unix"]
+transport-websocket = ["dep:fujin-transport-websocket"]
+transport-quic = ["dep:fujin-transport-quic"]
+grpc = ["fujin/grpc"]
+
+[dependencies]
+anyhow.workspace = true
+fujin = { path = "../../crates/fujin", default-features = false }
+fujin-configurator-env = { path = "../../plugins/configurator/env", optional = true }
+fujin-configurator-file = { path = "../../plugins/configurator/file", optional = true }
+fujin-connector-kafka = { path = "../../plugins/connector/kafka", optional = true }
+fujin-transport-quic = { path = "../../plugins/transport/quic", optional = true }
+fujin-transport-tcp = { path = "../../plugins/transport/tcp", optional = true }
+fujin-transport-unix = { path = "../../plugins/transport/unix", optional = true }
+fujin-transport-websocket = { path = "../../plugins/transport/websocket", optional = true }
+tokio.workspace = true
+
+[[bin]]
+name = "fujin"
+path = "src/main.rs"

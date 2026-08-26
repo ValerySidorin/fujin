@@ -1,21 +1,20 @@
 services:
   fujin:
     build:
-      # context: https://github.com/fujin-io/fujin.git#v0.5.0
+      # context: https://github.com/fujin-io/fujin.git#fujin/v0.6.0-alpha.1
       context: ../..
       dockerfile: Dockerfile
       args:
-        VERSION: ${BUILD_TAG:-v0.5.0}
-        FUJIN_CONNECTORS: github.com/fujin-io/fujin/public/plugins/connector/kafka/franz
-        FUJIN_GO_TAGS: fujin,grpc
+        VERSION: ${BUILD_TAG:-v0.6.0-alpha.1}
+        FUJIN_BUILD_MANIFEST: ${FUJIN_BUILD_MANIFEST:-deploy/docker/fujin.build.toml}
+        FUJIN_BUILD_LOCK: ${FUJIN_BUILD_LOCK-Cargo.lock}
     container_name: fujin
     environment:
-      FUJIN_CONFIGURATOR: yaml
-      FUJIN_CONFIGURATOR_YAML_PATHS: /config/config.yaml
+      FUJIN_CONFIGURATOR: file
+      FUJIN_CONFIGURATOR_FILE_PATHS: /config/config.yaml
+      FUJIN_LOG_LEVEL: INFO
     ports:
       - "4850:4850"
-      - "4848:4848/udp"
-      - "4849:4849"
       - "8080:8080"
     depends_on:
       - kafka1
@@ -23,7 +22,6 @@ services:
       - kafka3
     volumes:
       - ../assets/config/config.deployment.example.yaml:/config/config.yaml:ro
-      - ../assets/certs:/certs:ro
     restart: always
   zoo1:
     image: confluentinc/cp-zookeeper:7.9.1

@@ -1,0 +1,25 @@
+[application]
+name = "fujin-go-client-compat"
+version = "0.1.0"
+output = ".fujin/fujin-go-client-compat"
+artifact = "binary"
+generated_directory = ".fujin/generated"
+fujin = { path = "../../../../../crates/fujin", features = ["grpc"] }
+
+[[plugin]]
+family = "configurator"
+name = "env"
+package = "fujin-configurator-env"
+path = "../../../../../plugins/configurator/env"
+
+[[plugin]]
+family = "connector"
+name = "compat"
+package = "fujin-go-client-compat-connector"
+path = "connector"
+
+[[plugin]]
+family = "transport"
+name = "quic"
+package = "fujin-transport-quic"
+path = "../../../../../plugins/transport/quic"

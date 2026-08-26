@@ -1,47 +1,41 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.25.1
+ARG RUST_VERSION=1.97.1
 
-FROM golang:${GO_VERSION}-alpine AS builder
+FROM rust:${RUST_VERSION}-alpine AS builder
 
-ARG FUJIN_CONFIGURATORS
-ARG FUJIN_CONNECTORS
-ARG FUJIN_TRANSPORTS
-ARG FUJIN_BIND_MIDDLEWARES
-ARG FUJIN_CONNECTOR_MIDDLEWARES
-ARG FUJIN_GO_TAGS=fujin,grpc
 ARG VERSION=dev
+ARG FUJIN_BUILD_MANIFEST=deploy/docker/fujin.build.toml
+ARG FUJIN_BUILD_LOCK=Cargo.lock
 
+RUN apk add --no-cache build-base ca-certificates cmake curl-dev perl pkgconf protobuf-dev
 WORKDIR /app
-
-COPY go.mod go.sum ./
-RUN go mod download
 
 COPY . .
 
-RUN apk add --no-cache bash dos2unix
-
-RUN chmod +x build.sh
-
-# For Windows compatibility
-RUN dos2unix build.sh
-
-RUN FUJIN_CONFIGURATORS="${FUJIN_CONFIGURATORS:-github.com/fujin-io/fujin/public/plugins/configurator/all}" \
-    FUJIN_CONNECTORS="${FUJIN_CONNECTORS:-github.com/fujin-io/fujin/public/plugins/connector/kafka/franz}" \
-    FUJIN_TRANSPORTS="${FUJIN_TRANSPORTS:-github.com/fujin-io/fujin/public/plugins/transport/all}" \
-    FUJIN_BIND_MIDDLEWARES="${FUJIN_BIND_MIDDLEWARES:-}" \
-    FUJIN_CONNECTOR_MIDDLEWARES="${FUJIN_CONNECTOR_MIDDLEWARES:-}" \
-    FUJIN_GO_TAGS="${FUJIN_GO_TAGS}" \
-    FUJIN_VERSION="${VERSION}" \
-    ./build.sh
+RUN set -eux; \
+    set --; \
+    if [ -n "${FUJIN_BUILD_LOCK}" ]; then \
+        set -- --lockfile "${FUJIN_BUILD_LOCK}"; \
+    fi; \
+    FUJIN_BUILD_VERSION="${VERSION}" cargo run --release --locked -p cargo-fujin -- \
+        --manifest "${FUJIN_BUILD_MANIFEST}" \
+        build --profile release --output /runtime/fujin --clean-after "$@"; \
+    /runtime/fujin --version; \
+    install -d -m 0755 /runtime/etc/ssl/certs; \
+    install -d -m 0700 -o 65532 -g 65532 /runtime/run/fujin; \
+    cp /etc/ssl/certs/ca-certificates.crt /runtime/etc/ssl/certs/
 
 FROM scratch AS runtime
 
-WORKDIR /
+COPY --from=builder /runtime/ /
 
-COPY --from=builder /app/bin/fujin /fujin
-
+USER 65532:65532
+ENV FUJIN_CONFIGURATOR=file \
+    FUJIN_CONFIGURATOR_FILE_PATHS=/config/config.yaml \
+    FUJIN_LOG_LEVEL=INFO \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 STOPSIGNAL SIGTERM
-EXPOSE 4850/tcp 4848/udp 4849/tcp 8080/tcp
+EXPOSE 4850/tcp 8080/tcp
 
 ENTRYPOINT ["/fujin"]

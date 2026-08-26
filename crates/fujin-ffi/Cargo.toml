@@ -1,0 +1,24 @@
+[package]
+name = "fujin-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+
+[dependencies]
+anyhow.workspace = true
+fujin = { path = "../fujin" }
+serde.workspace = true
+serde_json.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+fujin-transport-tcp = { path = "../../plugins/transport/tcp" }

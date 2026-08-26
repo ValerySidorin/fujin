@@ -3,10 +3,14 @@ name: Publish release image
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: Existing Fujin release tag to publish
+      tag:
+        description: Existing namespaced Fujin release tag
         required: true
-        default: v0.5.0
+        default: fujin/v0.6.0-alpha.1
+      version:
+        description: Product and image version
+        required: true
+        default: v0.6.0-alpha.1
 
 permissions:
   contents: read
@@ -16,19 +20,24 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate version
+      - name: Validate release identity
         env:
+          TAG: ${{ inputs.tag }}
           VERSION: ${{ inputs.version }}
         run: |
           case "$VERSION" in
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "version must be a v-prefixed semantic version" >&2; exit 1 ;;
           esac
+          test "$TAG" = "fujin/$VERSION" || {
+            echo "tag must equal fujin/$VERSION" >&2
+            exit 1
+          }
 
       - name: Check out release tag
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.version }}
+          ref: ${{ inputs.tag }}
 
       - name: Resolve release commit
         id: release
@@ -56,6 +65,8 @@ jobs:
           tags: ghcr.io/fujin-io/fujin:${{ inputs.version }}
           build-args: |
             VERSION=${{ inputs.version }}
+            FUJIN_BUILD_MANIFEST=deploy/docker/fujin.build.toml
+            FUJIN_BUILD_LOCK=Cargo.lock
           labels: |
             org.opencontainers.image.source=https://github.com/fujin-io/fujin
             org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
@@ -72,6 +83,6 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           docker pull --platform linux/amd64 "$IMAGE"
-          output=$(docker run --rm --platform linux/amd64 "$IMAGE" 2>&1 || true)
+          output=$(docker run --rm --platform linux/amd64 "$IMAGE" --version)
           echo "$output"
           echo "$output" | grep -F "version: $VERSION"

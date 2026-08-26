@@ -1,200 +1,131 @@
 # Contributing to Fujin
 
-Thank you for considering contributing to Fujin! This document provides guidelines and information for contributors.
+Fujin's active implementation is the Rust workspace at the repository root. The final Go release is
+`v0.5.0`; its source remains available through that tag and the `legacy/go-v0.5` branch.
 
-## Development Setup
+## Prerequisites
 
-### Prerequisites
+- Rust toolchain from `rust-toolchain.toml`
+- Make
+- Docker and Docker Compose for broker-backed tests and container validation
+- A C/C++ toolchain, CMake, and pkg-config for the Kafka connector
+- Protocol Buffers compiler support; `prost-build` uses the vendored `protoc` fallback when needed
 
-- **Go 1.25+** - Required for building (see `go.mod`)
-- **Make** - Cross-platform build automation (Windows/Linux/macOS)
-- **Docker & Docker Compose** - For running message brokers locally
-- **protoc** - Protocol Buffer compiler (optional, for regenerating proto files)
-
-### Quick Setup
+## Setup
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/fujin-io/fujin.git
 cd fujin
-
-# 2. Build the project
 make build
-
-# 3. Run tests
 make test
-
-# 4. Start development environment (Kafka example)
-make up-kafka
 ```
 
-## Project Structure
+## Repository structure
 
-The project uses a single Go module at the root:
-
-```
-fujin/
-├── cmd/                        # Entry points
-│   ├── main.go                 # Default server (all plugins)
-│   └── builder/                # Custom binary builder (selective plugins)
-├── public/                     # Public API and plugins
-│   ├── plugins/                # Connectors, configurators, middlewares
-│   │   ├── connector/          # Kafka, NATS, AMQP, MQTT, NSQ, RESP...
-│   │   ├── configurator/       # File-based config loader
-│   │   └── middleware/         # Bind (auth_api_key) and connector middlewares (prom, otel)
-│   ├── proto/                  # gRPC and Fujin protocol definitions
-│   ├── server/                 # Server abstraction and config
-│   └── service/                # Core service (RunCLI)
-├── internal/                   # Internal implementation (not exported)
-│   ├── proto/         # Fujin binary protocol (transport-agnostic)
-│   └── transport/              # Transport implementations (quic/, tcp/, grpc/)
-├── examples/                   # Sample configs and runnable examples
-├── resources/                  # Docker Compose, Grafana, example configs
-├── test/                       # Benchmarks and test helpers
-└── Makefile                    # Cross-platform build commands
+```text
+apps/fujin/                 Production binary composition
+crates/fujin/               Embedding facade and public plugin API
+crates/fujin-core/          Transport-neutral Session Core
+crates/fujin-native/        Incremental native protocol codec and adapter
+crates/fujin-runtime/       Listener, gRPC, health, reload, and upgrade lifecycle
+crates/fujin-connector/     Connector contracts and immutable generations
+crates/fujin-transport/     Shared transport contracts and listener handoff
+plugins/                    Built-in configurator, connector, and transport crates
+tools/cargo-fujin/          Custom composition CLI
+tools/bench/                Native and gRPC benchmark harnesses
+proto/grpc/v1/              Authoritative protobuf API
+examples/                   Deployment configuration and Compose examples
+resources/                  Broker and observability dependencies
+deploy/helm/fujin/          Helm chart
 ```
 
 ## Building
 
-### All Platforms
-
-The Makefile works on Windows, Linux, and macOS:
-
 ```bash
-# Default build (all connectors)
+# Full production binary
 make build
 
-# Minimal build (Kafka only)
-make build CONNECTORS=kafka
+# Minimal built-in composition
+cargo build --release -p fujin-app --no-default-features \
+  --features configurator-file,connector-kafka,transport-tcp
 
-# With specific connectors
-make build CONNECTORS="kafka,nats/core"
-
-# With specific transports
-make build GO_BUILD_TAGS="fujin,grpc"
+# Custom composition tool
+cargo install --path tools/cargo-fujin --locked
+cargo fujin init --fujin-path ./crates/fujin
 ```
 
-### Manual Build
+`VERSION` overrides the build string reported by `fujin --version` and native HELLO. Rust releases
+use namespaced Git tags such as `fujin/v0.6.0-alpha.1`; the product, Cargo, Helm, and image version is
+`v0.6.0-alpha.1` without the `fujin/` namespace.
 
-If you prefer not to use Make, use the builder directly:
+## Validation
 
-```bash
-go run ./cmd/builder -local \
-  -transport github.com/fujin-io/fujin/public/plugins/transport/tcp \
-  -configurator github.com/fujin-io/fujin/public/plugins/configurator/yaml \
-  -connector github.com/fujin-io/fujin/public/plugins/connector/kafka/franz \
-  -bind-middleware github.com/fujin-io/fujin/public/plugins/middleware/bind/auth_api_key \
-  -connector-middleware github.com/fujin-io/fujin/public/plugins/middleware/connector/prom \
-  -tags "fujin,grpc" \
-  -output ./bin/fujin
-```
-
-## Build Tags
-
-Fujin uses Go build tags for conditional compilation:
-  - `fujin` - Transport-agnostic Fujin protocol
-  - `grpc` - gRPC server (language-agnostic)
-
-The Fujin protocol code compiles when `fujin` tag is enabled. 
-
-## Testing
+Run focused package tests while iterating, then the relevant broader checks:
 
 ```bash
-# Run all tests
+cargo test -p fujin-core
+cargo test -p fujin-native
+cargo test -p fujin-runtime --all-features
+cargo test -p fujin-transport-tcp
+
+make fmt
+make lint
+make check
 make test
-
-# Run tests for specific package
-go test -v -tags="fujin,grpc" ./internal/...
-
-# Run benchmarks
-make bench
-
-# Custom benchmark
-make bench BENCH_FUNC="BenchmarkMyFunction" BENCH_TIME="10s"
 ```
 
-## Code Style
+For a Kafka-backed contract:
 
-### Go Code
+```bash
+make e2e-kafka
+```
 
-- Follow standard Go conventions
-- Run `gofmt` before committing
-- Use meaningful variable names
-- Add comments for exported functions
+The target starts Kafka, runs `plugins/connector/kafka/tests/kafka_e2e.rs`, and removes the broker
+stack. Do not replace broker acknowledgement, settlement, or transaction tests with mocks.
 
-## Generating Protocol Buffers
+## Code style
 
-If you modify `.proto` files:
+- Run `cargo fmt` on touched Rust code.
+- Keep Clippy clean under workspace lints.
+- Avoid allocation and copying in native parsing, response encoding, connector callbacks, and
+  transport loops.
+- Never hold locks across broker or network I/O.
+- Every spawned task, listener, reader, writer, and watcher needs a bounded cancellation path.
+- Preserve connector generation pinning and shared native/gRPC Session Core semantics.
+
+## Protocol changes
+
+Native wire changes require coordinated updates to `protocol.md`, `fujin-native`, fragmentation and
+contract tests, and compatible SDKs.
+
+The protobuf source is `proto/grpc/v1/fujin.proto`. After editing it:
 
 ```bash
 make generate
+cargo test -p fujin-grpc-proto -p fujin-runtime --all-features
 ```
 
-Or manually:
-```bash
-cd public/proto
-protoc --go_out=. --go_opt=paths=source_relative \
-       --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       grpc/v1/fujin.proto
-```
+Generated Rust bindings are emitted into Cargo build output and must not be committed.
 
-## Running Integration Tests
+## Plugins
 
-```bash
-# Start broker (example: Kafka)
-make up-kafka_franz
+Each built-in plugin is an independent crate under `plugins/<family>/<name>`. Export a stable
+`plugin()` constructor and register it through `ApplicationBuilder` or generated `cargo-fujin`
+composition. Rust dynamic plugin loading is intentionally unsupported.
 
-# Run tests
-go test -v -tags="fujin,grpc" ./test/...
+A plugin change must include configuration validation, focused tests, and user documentation. Add a
+broker-backed test when behavior depends on remote acknowledgement, settlement, reconnect, or
+transactions.
 
-# Clean up
-make down-kafka_franz
-```
+## Pull requests
 
-## Documentation
-
-- Update relevant `README.md` files
-- Add examples in `examples/` directory
-- Update `protocol.md` for protocol changes
-- Comment complex code sections
-
-## Pull Request Process
-
-1. **Fork & Branch**
-   - Fork the repository
-   - Create feature branch: `git checkout -b feat/my-feature`
-
-2. **Make Changes**
-   - Write clean, tested code
-   - Follow code style guidelines
-   - Update documentation
-
-3. **Test**
-   - Run `make test`
-   - Test on multiple platforms if possible
-   - Verify builds with different tag combinations
-
-4. **Commit**
-   - Use conventional commit messages
-   - Keep commits focused and atomic
-
-5. **Submit PR**
-   - Provide clear description
-   - Reference related issues
-   - Wait for review
-
-## Cross-Platform Testing
-
-If you're developing on Windows but want to ensure Linux/macOS compatibility:
-
-- Use Docker for testing
-- Avoid platform-specific APIs
-- Test with different Go versions
-- Use CI/CD results as reference
+1. Use a focused feature branch.
+2. Reuse existing contracts and lifecycle seams; do not introduce parallel registries or error
+   models.
+3. Update every affected caller, adapter, example, and document in the same change.
+4. Run focused tests, then the validation required by the changed contract.
+5. Include exact verification commands and any intentionally omitted broker or platform checks.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
-
-Thank you for contributing to Fujin! 🚀
-
+Contributions are licensed under the MIT License.

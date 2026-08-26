@@ -1,0 +1,45 @@
+[package]
+name = "fujin-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+grpc = ["dep:fujin-grpc-proto", "dep:tokio-stream", "dep:tonic", "dep:tonic-health", "dep:tonic-prost"]
+
+[dependencies]
+anyhow.workspace = true
+arc-swap.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+fujin-configurator = { path = "../fujin-configurator" }
+fujin-core = { path = "../fujin-core" }
+fujin-connector = { path = "../fujin-connector" }
+fujin-error = { path = "../fujin-error" }
+fujin-middleware = { path = "../fujin-middleware" }
+fujin-native = { path = "../fujin-native" }
+fujin-grpc-proto = { path = "../fujin-grpc-proto", optional = true }
+fujin-transport = { path = "../fujin-transport" }
+humantime.workspace = true
+nix.workspace = true
+parking_lot.workspace = true
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream = { workspace = true, optional = true }
+tokio-util.workspace = true
+tonic = { workspace = true, optional = true }
+tonic-health = { workspace = true, optional = true }
+tonic-prost = { workspace = true, optional = true }
+tracing.workspace = true
+
