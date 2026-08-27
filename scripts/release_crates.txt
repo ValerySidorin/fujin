@@ -1,0 +1,9 @@
+# One crates.io publication wave per line. Dependencies must appear in earlier waves.
+cargo-fujin fujin-error fujin-grpc-proto fujin-transport
+fujin-connector fujin-transport-quic fujin-transport-tcp fujin-transport-unix fujin-transport-websocket
+fujin-middleware fujin-configurator
+fujin-core fujin-configurator-env fujin-configurator-file
+fujin-native fujin-connector-kafka
+fujin-runtime
+fujin
+fujin-ffi

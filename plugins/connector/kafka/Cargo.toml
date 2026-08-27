@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Kafka connector plugin for Fujin"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
@@ -12,8 +17,8 @@ workspace = true
 [dependencies]
 async-trait.workspace = true
 bytes.workspace = true
-fujin-connector = { path = "../../../crates/fujin-connector" }
-fujin-error = { path = "../../../crates/fujin-error" }
+fujin-connector.workspace = true
+fujin-error.workspace = true
 parking_lot.workspace = true
 rdkafka.workspace = true
 serde.workspace = true
@@ -24,5 +29,5 @@ tokio-util.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-fujin-core = { path = "../../../crates/fujin-core" }
-fujin-middleware = { path = "../../../crates/fujin-middleware" }
+fujin-core.workspace = true
+fujin-middleware.workspace = true

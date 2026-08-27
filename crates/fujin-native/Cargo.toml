@@ -5,18 +5,22 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+description = "Native Fujin v1 protocol codec and session adapter"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
 
 [dependencies]
 bytes.workspace = true
-fujin-connector = { path = "../fujin-connector" }
-fujin-core = { path = "../fujin-core" }
-fujin-error = { path = "../fujin-error" }
-fujin-middleware = { path = "../fujin-middleware" }
-fujin-transport = { path = "../fujin-transport" }
+fujin-connector.workspace = true
+fujin-core.workspace = true
+fujin-error.workspace = true
+fujin-middleware.workspace = true
+fujin-transport.workspace = true
 parking_lot.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

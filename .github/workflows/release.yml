@@ -1,0 +1,310 @@
+name: Release Fujin
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated Fujin release tag
+        required: true
+        default: fujin/v0.6.0-alpha.1
+      version:
+        description: Unprefixed Cargo and chart version
+        required: true
+        default: 0.6.0-alpha.1
+      bootstrap_crates:
+        description: Use the one-time crates.io token instead of trusted publishing
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: fujin-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.1"
+          cache-dependency-path: |
+            sdk/go/client/go.sum
+            sdk/go/embed/go.mod
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev pkg-config protobuf-compiler
+      - name: Validate release identity and metadata
+        env:
+          VERSION: ${{ inputs.version }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          git fetch origin main --no-tags
+          test "$(git cat-file -t "$TAG")" = tag
+          test "$(git rev-list -n 1 "$TAG")" = "$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          ./scripts/validate_release.py "$VERSION" --tag "$TAG"
+      - name: Verify Rust workspace
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-features --all-targets -- -D warnings
+          cargo test --workspace --all-features --all-targets
+      - name: Validate every release crate package
+        env:
+          VERSION: ${{ inputs.version }}
+          DRY_RUN: "1"
+        run: ./scripts/publish_crates.sh
+      - name: Verify Go SDKs and server compatibility
+        run: make sdk-test sdk-compat
+      - name: Verify Kafka connector against Kafka
+        run: make e2e-kafka
+      - uses: azure/setup-helm@v4
+      - name: Render deployment assets
+        run: |
+          docker compose -f examples/deployment/docker-compose.yaml config --quiet
+          docker compose -f resources/docker-compose.kafka.yaml -f resources/docker-compose.fujin-kafka.yaml config --quiet
+          helm lint deploy/helm/fujin
+          helm template fujin deploy/helm/fujin >/dev/null
+
+  crates:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev pkg-config protobuf-compiler
+      - name: Acquire trusted-publishing token
+        if: ${{ !inputs.bootstrap_crates }}
+        uses: rust-lang/crates-io-auth-action@v1
+        id: crates-auth
+      - name: Publish crates with bootstrap token
+        if: ${{ inputs.bootstrap_crates }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          test -n "$CARGO_REGISTRY_TOKEN"
+          ./scripts/publish_crates.sh
+      - name: Publish crates with trusted publishing
+        if: ${{ !inputs.bootstrap_crates }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
+          VERSION: ${{ inputs.version }}
+        run: ./scripts/publish_crates.sh
+      - name: Verify version-only composition
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          root=$(mktemp -d)
+          cargo install cargo-fujin --version "=$VERSION" --locked --root "$root"
+          cp deploy/docker/fujin.build.toml "$root/fujin.build.toml"
+          sed -i \
+            -e "s|path = \"../../crates/fujin\"|version = \"=$VERSION\"|" \
+            -e "s|path = \"../../plugins/configurator/file\"|version = \"=$VERSION\"|" \
+            -e "s|path = \"../../plugins/connector/kafka\"|version = \"=$VERSION\"|" \
+            -e "s|path = \"../../plugins/transport/tcp\"|version = \"=$VERSION\"|" \
+            "$root/fujin.build.toml"
+          "$root/bin/cargo-fujin" --manifest "$root/fujin.build.toml" generate
+          cargo check --manifest-path "$root/.fujin/generated/Cargo.toml"
+
+  image:
+    needs: crates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Resolve release commit
+        id: release
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check immutable image tag
+        id: existing-image
+        env:
+          IMAGE: ghcr.io/fujin-io/fujin:v${{ inputs.version }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then
+            platforms=$(docker buildx imagetools inspect "$IMAGE" --raw | jq -r '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64")) | "\(.platform.os)/\(.platform.architecture)"] | unique | sort | join(",")')
+            test "$platforms" = "linux/amd64,linux/arm64"
+            for platform in linux/amd64 linux/arm64; do
+              docker pull --platform "$platform" "$IMAGE"
+              revision=$(docker image inspect --platform "$platform" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE")
+              test "$revision" = "$RELEASE_SHA"
+            done
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build and push multi-platform image
+        uses: docker/build-push-action@v7
+        if: ${{ steps.existing-image.outputs.exists != 'true' }}
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/fujin-io/fujin:v${{ inputs.version }}
+          build-args: |
+            VERSION=v${{ inputs.version }}
+            FUJIN_BUILD_MANIFEST=deploy/docker/fujin.build.toml
+            FUJIN_BUILD_LOCK=Cargo.lock
+          labels: |
+            org.opencontainers.image.source=https://github.com/fujin-io/fujin
+            org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
+            org.opencontainers.image.version=v${{ inputs.version }}
+      - name: Verify published image
+        run: |
+          image=ghcr.io/fujin-io/fujin:v${{ inputs.version }}
+          platforms=$(docker buildx imagetools inspect "$image" --raw | jq -r '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64")) | "\(.platform.os)/\(.platform.architecture)"] | unique | sort | join(",")')
+          test "$platforms" = "linux/amd64,linux/arm64"
+          for platform in linux/amd64 linux/arm64; do
+            docker pull --platform "$platform" "$image"
+            test "$(docker run --rm --platform "$platform" "$image" --version)" = "version: v${{ inputs.version }}"
+          done
+
+  sdk-tags:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - name: Publish Go module tags
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          tags=("sdk/go/client/v$VERSION" "sdk/go/embed/v$VERSION")
+          release_commit=$(git rev-parse HEAD)
+          for tag in "${tags[@]}"; do
+            if git rev-parse --verify --quiet "refs/tags/$tag"; then
+              test "$(git rev-list -n 1 "$tag")" = "$release_commit"
+            fi
+          done
+          for tag in "${tags[@]}"; do
+            if ! git rev-parse --verify --quiet "refs/tags/$tag"; then
+              git tag -a "$tag" -m "$tag"
+              git push origin "$tag"
+            fi
+          done
+
+  github-release:
+    needs: sdk-tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: azure/setup-helm@v4
+      - name: Package Helm chart
+        run: helm package deploy/helm/fujin --destination dist
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          flags=(--verify-tag --title "Fujin v$VERSION" --generate-notes)
+          if [[ "$VERSION" == *-* ]]; then
+            flags+=(--prerelease)
+          else
+            flags+=(--latest)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.tgz --clobber
+            if [[ "$VERSION" == *-* ]]; then
+              gh release edit "$TAG" --title "Fujin v$VERSION" --draft=false --prerelease --latest=false
+            else
+              gh release edit "$TAG" --title "Fujin v$VERSION" --draft=false --prerelease=false --latest
+            fi
+          else
+            gh release create "$TAG" dist/*.tgz "${flags[@]}"
+          fi
+
+  certify:
+    needs: github-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.1"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Certify public artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          release=$(gh release view "$TAG" --repo fujin-io/fujin --json isDraft,isPrerelease,tagName)
+          test "$(jq -r '.tagName' <<<"$release")" = "$TAG"
+          test "$(jq -r '.isDraft' <<<"$release")" = false
+          if [[ "$VERSION" == *-* ]]; then
+            test "$(jq -r '.isPrerelease' <<<"$release")" = true
+          else
+            test "$(jq -r '.isPrerelease' <<<"$release")" = false
+          fi
+          gh release download "$TAG" --repo fujin-io/fujin --pattern "fujin-$VERSION.tgz" --dir "$RUNNER_TEMP/release"
+          image="ghcr.io/fujin-io/fujin:v$VERSION"
+          platforms=$(docker buildx imagetools inspect "$image" --raw | jq -r '[.manifests[] | select(.platform.os == "linux" and (.platform.architecture == "amd64" or .platform.architecture == "arm64")) | "\(.platform.os)/\(.platform.architecture)"] | unique | sort | join(",")')
+          test "$platforms" = "linux/amd64,linux/arm64"
+          for platform in linux/amd64 linux/arm64; do
+            docker pull --platform "$platform" "$image"
+            test "$(docker run --rm --platform "$platform" "$image" --version)" = "version: v$VERSION"
+          done
+          for module in client embed; do
+            resolved=""
+            for attempt in $(seq 1 30); do
+              resolved=$(GOPROXY=https://proxy.golang.org go list -m -f '{{.Version}}' "github.com/fujin-io/fujin/sdk/go/$module@v$VERSION" 2>/dev/null || true)
+              [[ "$resolved" == "v$VERSION" ]] && break
+              echo "waiting for sdk/go/$module v$VERSION in proxy.golang.org ($attempt/30)"
+              sleep 10
+            done
+            test "$resolved" = "v$VERSION"
+          done
+          while IFS= read -r wave; do
+            [[ -z "$wave" || "$wave" == \#* ]] && continue
+            for crate in $wave; do
+              curl --fail --silent --show-error \
+                --user-agent "fujin-release/1.0 (https://github.com/fujin-io/fujin)" \
+                "https://crates.io/api/v1/crates/$crate/$VERSION" >/dev/null
+            done
+          done < scripts/release_crates.txt

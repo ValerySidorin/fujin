@@ -30,8 +30,31 @@ edition = "2024"
 rust-version = "1.97"
 license = "MIT"
 repository = "https://github.com/fujin-io/fujin"
+homepage = "https://fujin.io"
+documentation = "https://docs.rs/fujin"
+readme = "README.md"
+keywords = ["message-broker", "gateway", "kafka", "grpc"]
+categories = ["asynchronous", "network-programming"]
 
 [workspace.dependencies]
+fujin = { path = "crates/fujin", version = "=0.6.0-alpha.1" }
+fujin-configurator = { path = "crates/fujin-configurator", version = "=0.6.0-alpha.1" }
+fujin-connector = { path = "crates/fujin-connector", version = "=0.6.0-alpha.1" }
+fujin-core = { path = "crates/fujin-core", version = "=0.6.0-alpha.1" }
+fujin-error = { path = "crates/fujin-error", version = "=0.6.0-alpha.1" }
+fujin-ffi = { path = "crates/fujin-ffi", version = "=0.6.0-alpha.1" }
+fujin-grpc-proto = { path = "crates/fujin-grpc-proto", version = "=0.6.0-alpha.1" }
+fujin-middleware = { path = "crates/fujin-middleware", version = "=0.6.0-alpha.1" }
+fujin-native = { path = "crates/fujin-native", version = "=0.6.0-alpha.1" }
+fujin-runtime = { path = "crates/fujin-runtime", version = "=0.6.0-alpha.1" }
+fujin-transport = { path = "crates/fujin-transport", version = "=0.6.0-alpha.1" }
+fujin-configurator-env = { path = "plugins/configurator/env", version = "=0.6.0-alpha.1" }
+fujin-configurator-file = { path = "plugins/configurator/file", version = "=0.6.0-alpha.1" }
+fujin-connector-kafka = { path = "plugins/connector/kafka", version = "=0.6.0-alpha.1" }
+fujin-transport-quic = { path = "plugins/transport/quic", version = "=0.6.0-alpha.1" }
+fujin-transport-tcp = { path = "plugins/transport/tcp", version = "=0.6.0-alpha.1" }
+fujin-transport-unix = { path = "plugins/transport/unix", version = "=0.6.0-alpha.1" }
+fujin-transport-websocket = { path = "plugins/transport/websocket", version = "=0.6.0-alpha.1" }
 anyhow = "1.0.100"
 arc-swap = "1.9.2"
 async-trait = "0.1.89"

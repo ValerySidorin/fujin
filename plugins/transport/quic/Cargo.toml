@@ -5,13 +5,18 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "QUIC native protocol transport plugin for Fujin"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
 
 [dependencies]
 anyhow.workspace = true
-fujin-transport = { path = "../../../crates/fujin-transport" }
+fujin-transport.workspace = true
 futures-util.workspace = true
 humantime.workspace = true
 quinn.workspace = true

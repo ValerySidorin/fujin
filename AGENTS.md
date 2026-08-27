@@ -13,7 +13,7 @@ adapters delegate session semantics to one transport-neutral Session Core.
 - Required Rust version: `rust-toolchain.toml`
 - Workspace version: `Cargo.toml`
 - Primary documents: `README.md`, `protocol.md`, package-local crate documentation
-- gRPC schema: `proto/grpc/v1/fujin.proto`
+- gRPC schema: `crates/fujin-grpc-proto/proto/fujin.proto`
 
 ## Source of truth
 
@@ -166,7 +166,7 @@ Native protocol changes require coordinated updates to `protocol.md`, `crates/fu
 Session Core semantics where applicable, fragmentation tests, adapter contracts, and compatible
 SDKs.
 
-If `proto/grpc/v1/fujin.proto` changes:
+If `crates/fujin-grpc-proto/proto/fujin.proto` changes:
 
 ```bash
 make generate

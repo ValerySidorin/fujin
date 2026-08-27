@@ -5,7 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+description = "Listener, gRPC, reload, and process lifecycle runtime for Fujin"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
@@ -19,14 +23,14 @@ anyhow.workspace = true
 arc-swap.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
-fujin-configurator = { path = "../fujin-configurator" }
-fujin-core = { path = "../fujin-core" }
-fujin-connector = { path = "../fujin-connector" }
-fujin-error = { path = "../fujin-error" }
-fujin-middleware = { path = "../fujin-middleware" }
-fujin-native = { path = "../fujin-native" }
-fujin-grpc-proto = { path = "../fujin-grpc-proto", optional = true }
-fujin-transport = { path = "../fujin-transport" }
+fujin-configurator.workspace = true
+fujin-core.workspace = true
+fujin-connector.workspace = true
+fujin-error.workspace = true
+fujin-middleware.workspace = true
+fujin-native.workspace = true
+fujin-grpc-proto = { workspace = true, optional = true }
+fujin-transport.workspace = true
 humantime.workspace = true
 nix.workspace = true
 parking_lot.workspace = true

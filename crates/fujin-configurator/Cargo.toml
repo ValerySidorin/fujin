@@ -5,15 +5,20 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Runtime configuration contracts for Fujin"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
 
 [dependencies]
 async-trait.workspace = true
-fujin-connector = { path = "../fujin-connector" }
-fujin-error = { path = "../fujin-error" }
-fujin-transport = { path = "../fujin-transport" }
+fujin-connector.workspace = true
+fujin-error.workspace = true
+fujin-transport.workspace = true
 humantime.workspace = true
 serde.workspace = true
 serde_json.workspace = true

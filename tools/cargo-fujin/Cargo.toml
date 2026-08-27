@@ -6,6 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Cargo subcommand for composing Fujin binaries from plugin crates"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories = ["command-line-utilities", "development-tools::build-utils"]
 
 [lints]
 workspace = true

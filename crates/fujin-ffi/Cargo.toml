@@ -5,6 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Versioned C ABI for embedding generated Fujin applications"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints.rust]
 unsafe_code = "allow"
@@ -15,10 +20,10 @@ pedantic = "warn"
 
 [dependencies]
 anyhow.workspace = true
-fujin = { path = "../fujin" }
+fujin.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing-subscriber.workspace = true
 
 [dev-dependencies]
-fujin-transport-tcp = { path = "../../plugins/transport/tcp" }
+fujin-transport-tcp.workspace = true
