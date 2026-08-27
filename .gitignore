@@ -2,7 +2,7 @@
 target/
 
 # Packaged binaries and native libraries
-bin/
+/bin/
 *.exe
 *.dll
 *.so

@@ -44,7 +44,7 @@ jobs:
             sdk/go/client/go.sum
             sdk/go/embed/go.mod
       - name: Install native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev pkg-config protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev libssl-dev pkg-config protobuf-compiler
       - name: Validate release identity and metadata
         env:
           VERSION: ${{ inputs.version }}
@@ -92,7 +92,7 @@ jobs:
         with:
           toolchain: "1.97.1"
       - name: Install native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev pkg-config protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev libssl-dev pkg-config protobuf-compiler
       - name: Acquire trusted-publishing token
         if: ${{ !inputs.bootstrap_crates }}
         uses: rust-lang/crates-io-auth-action@v1
