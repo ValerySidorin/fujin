@@ -11,7 +11,7 @@ They remain separate modules so users of the embedding SDK do not inherit QUIC, 
 dependencies from the network client. `go.work` joins them for repository development only; neither
 published module depends on the workspace file.
 
-The server protobuf at [`proto/grpc/v1/fujin.proto`](../../proto/grpc/v1/fujin.proto) is the single
+The server protobuf at [`crates/fujin-grpc-proto/proto/fujin.proto`](../../crates/fujin-grpc-proto/proto/fujin.proto) is the single
 source for the client bindings. Run `make generate` from the repository root after changing it.
 `make sdk-test` tests both modules, and `make sdk-compat` builds a current Rust server fixture and
 exercises both client adapters end to end.

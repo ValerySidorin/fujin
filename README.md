@@ -7,7 +7,7 @@ Think of it as Envoy for message brokers instead of HTTP.
 
 The active implementation is the root Rust workspace. **v0.5.0** is the final Go release and
 remains available through the immutable `v0.5.0` tag and `legacy/go-v0.5` branch. Rust releases use
-namespaced Git tags beginning with `fujin/`; the first planned Rust release is
+namespaced Git tags beginning with `fujin/`; the Rust release line starts at
 `fujin/v0.6.0-alpha.1`.
 
 ## Why
@@ -41,7 +41,7 @@ application or custom binary and registered explicitly through `ApplicationBuild
 starts with HELLO, then delegates BIND, produce, fetch, subscribe, settlement, and transaction
 semantics to the shared Rust Session Core.
 
-**gRPC** — The protobuf API in [`proto/grpc/v1/fujin.proto`](proto/grpc/v1/fujin.proto).
+**gRPC** — The protobuf API in [`crates/fujin-grpc-proto/proto/fujin.proto`](crates/fujin-grpc-proto/proto/fujin.proto).
 It uses the same Session Core and route profiles as the native adapter. The standard gRPC health
 service reports `fujin.v1.FujinService` readiness.
 
@@ -160,7 +160,7 @@ lifecycle, logging, error, and host-responsibility details.
 
 The independently versioned [Go network client](sdk/go/client) supports native QUIC and protobuf
 gRPC. Its generated protobuf bindings come from this repository's canonical
-[`proto/grpc/v1/fujin.proto`](proto/grpc/v1/fujin.proto), so server and client contract changes land
+[`crates/fujin-grpc-proto/proto/fujin.proto`](crates/fujin-grpc-proto/proto/fujin.proto), so server and client contract changes land
 in one commit. See the [Go SDK module layout](sdk/go/README.md) for module paths and release tags.
 
 ## Rust Embedding and Plugins
@@ -421,7 +421,7 @@ tools exercise only the root Rust workspace.
 ## Documentation
 
 - [Native Protocol Specification](protocol.md)
-- [gRPC Proto Definition](proto/grpc/v1/fujin.proto)
+- [gRPC Proto Definition](crates/fujin-grpc-proto/proto/fujin.proto)
 - [Development Configuration](config.dev.yaml)
 - [Deployment Configuration](examples/assets/config/config.deployment.example.yaml)
 

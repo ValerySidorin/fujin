@@ -5,6 +5,12 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Composable high-performance message broker gateway"
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
@@ -16,13 +22,13 @@ grpc = ["fujin-runtime/grpc"]
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
-fujin-configurator = { path = "../fujin-configurator" }
-fujin-connector = { path = "../fujin-connector" }
-fujin-error = { path = "../fujin-error" }
-fujin-runtime = { path = "../fujin-runtime" }
-fujin-middleware = { path = "../fujin-middleware" }
-fujin-native = { path = "../fujin-native" }
-fujin-transport = { path = "../fujin-transport" }
+fujin-configurator.workspace = true
+fujin-connector.workspace = true
+fujin-error.workspace = true
+fujin-runtime.workspace = true
+fujin-middleware.workspace = true
+fujin-native.workspace = true
+fujin-transport.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing-subscriber.workspace = true
@@ -31,4 +37,4 @@ tracing.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 yaml_serde.workspace = true
-fujin-transport-tcp = { path = "../../plugins/transport/tcp" }
+fujin-transport-tcp.workspace = true

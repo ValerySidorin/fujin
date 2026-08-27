@@ -5,7 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+description = "Transport-neutral session core for Fujin"
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lints]
 workspace = true
@@ -14,9 +18,9 @@ workspace = true
 async-trait.workspace = true
 arc-swap.workspace = true
 bytes.workspace = true
-fujin-connector = { path = "../fujin-connector" }
-fujin-error = { path = "../fujin-error" }
-fujin-middleware = { path = "../fujin-middleware" }
+fujin-connector.workspace = true
+fujin-error.workspace = true
+fujin-middleware.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 subtle.workspace = true

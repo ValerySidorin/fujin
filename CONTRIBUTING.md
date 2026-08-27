@@ -98,7 +98,7 @@ stack. Do not replace broker acknowledgement, settlement, or transaction tests w
 Native wire changes require coordinated updates to `protocol.md`, `fujin-native`, fragmentation and
 contract tests, and compatible SDKs.
 
-The protobuf source is `proto/grpc/v1/fujin.proto`. After editing it:
+The protobuf source is `crates/fujin-grpc-proto/proto/fujin.proto`. After editing it:
 
 ```bash
 make generate
@@ -116,6 +116,29 @@ composition. Rust dynamic plugin loading is intentionally unsupported.
 A plugin change must include configuration validation, focused tests, and user documentation. Add a
 broker-backed test when behavior depends on remote acknowledgement, settlement, reconnect, or
 transactions.
+
+## Releases
+
+Fujin uses one workspace version for the Rust crate suite and namespaced product/SDK tags. Prepare a
+release on `develop` with an unprefixed semantic version:
+
+```bash
+./scripts/prepare_release.py 0.6.0-alpha.1
+./scripts/validate_release.py 0.6.0-alpha.1
+```
+
+After the release preparation is merged and verified on `main`, create annotated tag
+`fujin/v0.6.0-alpha.1` on that exact commit. The manually dispatched
+`.github/workflows/release.yml` publishes the ordered crates.io suite, multi-platform GHCR image,
+Go module tags, Helm chart, and GitHub Release. The workflow's `bootstrap_crates` input is used only
+for the first crates.io publication; subsequent releases use trusted publishing.
+
+The authoritative crate order is `scripts/release_crates.txt`. Do not publish crates manually out
+of order or reuse a version after any crate or image has become public.
+
+Rerun a failed workflow only for the unchanged release tag. The workflow verifies existing crate
+checksums, image commit labels, and SDK tag targets before resuming; if source must change after any
+artifact is public, prepare a new version.
 
 ## Pull requests
 

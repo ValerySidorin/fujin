@@ -1,7 +1,7 @@
 .PHONY: generate compat-server
 
 FUJIN_SERVER_ROOT ?= ../../..
-PROTO_SOURCE := $(FUJIN_SERVER_ROOT)/proto/grpc/v1/fujin.proto
+PROTO_SOURCE := $(FUJIN_SERVER_ROOT)/crates/fujin-grpc-proto/proto/fujin.proto
 
 generate:
 	@echo "==> Generating Go messages from $(PROTO_SOURCE)"

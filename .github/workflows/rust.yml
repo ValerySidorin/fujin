@@ -1,0 +1,93 @@
+name: Rust
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev libssl-dev pkg-config protobuf-compiler
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+      - name: Test workspace
+        run: cargo test --workspace --all-features --all-targets
+      - name: Validate release metadata
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fujin") | .version')
+          ./scripts/validate_release.py "$version"
+      - name: Validate every release crate package
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fujin") | .version')
+          VERSION="$version" DRY_RUN=1 ./scripts/publish_crates.sh
+
+  platform-check:
+    name: platform-check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: "32.1"
+      - name: Check cross-platform runtime and transports
+        shell: bash
+        run: cargo check -p fujin-runtime --all-features -p fujin-transport-tcp -p fujin-transport-quic -p fujin-transport-websocket
+      - name: Check Unix transport
+        if: runner.os != 'Windows'
+        run: cargo check -p fujin-transport-unix
+
+  kafka-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.97.1"
+      - uses: Swatinem/rust-cache@v2
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libcurl4-openssl-dev libssl-dev pkg-config
+      - name: Test Kafka connector against Kafka
+        run: make e2e-kafka
+
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - name: Render Compose examples
+        run: |
+          docker compose -f examples/deployment/docker-compose.yaml config --quiet
+          docker compose -f resources/docker-compose.kafka.yaml -f resources/docker-compose.fujin-kafka.yaml config --quiet
+      - name: Render Helm chart
+        run: helm lint deploy/helm/fujin && helm template fujin deploy/helm/fujin >/dev/null
+      - name: Build release image
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml)
+          docker build --build-arg VERSION="v$version" -t fujin-ci .
+          test "$(docker run --rm fujin-ci --version)" = "version: v$version"
