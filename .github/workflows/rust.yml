@@ -55,6 +55,7 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           version: "32.1"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check cross-platform runtime and transports
         shell: bash
         run: cargo check -p fujin-runtime --all-features -p fujin-transport-tcp -p fujin-transport-quic -p fujin-transport-websocket
@@ -79,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
       - name: Render Compose examples
         run: |
           docker compose -f examples/deployment/docker-compose.yaml config --quiet

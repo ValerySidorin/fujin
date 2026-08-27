@@ -225,7 +225,7 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cargo-fujin"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -448,7 +448,7 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "fujin"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-app"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-bench"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-configurator"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-connector",
@@ -533,7 +533,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-configurator-env"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-configurator",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-configurator-file"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-configurator",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-connector"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-connector-kafka"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-core"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-error"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -617,7 +617,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-ffi"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-grpc-proto"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "prost",
  "tonic",
@@ -639,7 +639,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-middleware"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-connector",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-native"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "bytes",
  "fujin-connector",
@@ -667,7 +667,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-runtime"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -700,7 +700,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "humantime",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport-quic"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin-transport",
@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport-tcp"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin-transport",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport-unix"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin-transport",
@@ -759,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport-websocket"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "bytes",

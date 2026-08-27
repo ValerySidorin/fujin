@@ -55,8 +55,8 @@ cargo fujin init --fujin-path ./crates/fujin
 ```
 
 `VERSION` overrides the build string reported by `fujin --version` and native HELLO. Rust releases
-use namespaced Git tags such as `fujin/v0.6.0-alpha.1`; the product, Cargo, Helm, and image version is
-`v0.6.0-alpha.1` without the `fujin/` namespace.
+use namespaced Git tags such as `fujin/v0.6.0`; the product, Cargo, Helm, and image version is
+`v0.6.0` without the `fujin/` namespace.
 
 ## Validation
 
@@ -123,12 +123,12 @@ Fujin uses one workspace version for the Rust crate suite and namespaced product
 release on `develop` with an unprefixed semantic version:
 
 ```bash
-./scripts/prepare_release.py 0.6.0-alpha.1
-./scripts/validate_release.py 0.6.0-alpha.1
+./scripts/prepare_release.py 0.6.0
+./scripts/validate_release.py 0.6.0
 ```
 
 After the release preparation is merged and verified on `main`, create annotated tag
-`fujin/v0.6.0-alpha.1` on that exact commit. The manually dispatched
+`fujin/v0.6.0` on that exact commit. The manually dispatched
 `.github/workflows/release.yml` publishes the ordered crates.io suite, multi-platform GHCR image,
 Go module tags, Helm chart, and GitHub Release. The workflow's `bootstrap_crates` input is used only
 for the first crates.io publication; subsequent releases use trusted publishing.

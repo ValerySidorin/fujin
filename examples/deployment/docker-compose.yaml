@@ -1,11 +1,11 @@
 services:
   fujin:
     build:
-      # context: https://github.com/fujin-io/fujin.git#fujin/v0.6.0-alpha.1
+      # context: https://github.com/fujin-io/fujin.git#fujin/v0.6.0
       context: ../..
       dockerfile: Dockerfile
       args:
-        VERSION: ${BUILD_TAG:-v0.6.0-alpha.1}
+        VERSION: ${BUILD_TAG:-v0.6.0}
         FUJIN_BUILD_MANIFEST: ${FUJIN_BUILD_MANIFEST:-deploy/docker/fujin.build.toml}
         FUJIN_BUILD_LOCK: ${FUJIN_BUILD_LOCK-Cargo.lock}
     container_name: fujin

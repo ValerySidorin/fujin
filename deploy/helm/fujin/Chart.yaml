@@ -2,5 +2,5 @@ apiVersion: v2
 name: fujin
 description: High-performance message broker gateway
 type: application
-version: 0.6.0-alpha.1
-appVersion: "v0.6.0-alpha.1"
+version: 0.6.0
+appVersion: "v0.6.0"
