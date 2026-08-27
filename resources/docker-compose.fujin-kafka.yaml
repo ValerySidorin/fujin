@@ -1,11 +1,11 @@
 services:
   fujin:
-    image: fujin:kafka-${BUILD_TAG:-v0.6.0-alpha.1}
+    image: fujin:kafka-${BUILD_TAG:-v0.6.0}
     build:
       context: ..
       dockerfile: Dockerfile
       args:
-        VERSION: ${BUILD_TAG:-v0.6.0-alpha.1}
+        VERSION: ${BUILD_TAG:-v0.6.0}
         FUJIN_BUILD_MANIFEST: resources/fujin.kafka.build.toml
         FUJIN_BUILD_LOCK: Cargo.kafka.lock
     container_name: fujin

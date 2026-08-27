@@ -1,6 +1,6 @@
 [application]
 name = "fujin-kafka"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 output = ".fujin/fujin-kafka"
 artifact = "binary"
 generated_directory = ".fujin/generated-kafka"

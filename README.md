@@ -7,8 +7,8 @@ Think of it as Envoy for message brokers instead of HTTP.
 
 The active implementation is the root Rust workspace. **v0.5.0** is the final Go release and
 remains available through the immutable `v0.5.0` tag and `legacy/go-v0.5` branch. Rust releases use
-namespaced Git tags beginning with `fujin/`; the Rust release line starts at
-`fujin/v0.6.0-alpha.1`.
+namespaced Git tags beginning with `fujin/`; the Rust release line starts with the namespaced
+`fujin/v0.6` series.
 
 ## Why
 
@@ -317,7 +317,7 @@ STOP termination. QUIC fields mirror `quinn::TransportConfig`; gRPC fields mirro
 ### Docker
 
 ```bash
-docker build --build-arg VERSION=v0.6.0-alpha.1 -t fujin .
+docker build --build-arg VERSION=v0.6.0 -t fujin .
 docker run --rm -p 4850:4850 -p 8080:8080 \
   -v "$PWD/config.yaml:/config/config.yaml:ro" fujin
 ```

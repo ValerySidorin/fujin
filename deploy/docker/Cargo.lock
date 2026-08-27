@@ -160,7 +160,7 @@ checksum = "d45db016d36b838f563236e9193d0ee6ce38f3f68b6c94e914b4929c96bbb890"
 
 [[package]]
 name = "fujin"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-configurator"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-connector",
@@ -195,7 +195,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-configurator-file"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-configurator",
@@ -207,7 +207,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-connector"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "arc-swap",
  "bytes",
@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-connector-kafka"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-core"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -258,7 +258,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-docker"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-error"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-middleware"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "fujin-connector",
@@ -289,7 +289,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-native"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "bytes",
  "fujin-connector",
@@ -305,7 +305,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-runtime"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "humantime",
@@ -351,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "fujin-transport-tcp"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "fujin-transport",

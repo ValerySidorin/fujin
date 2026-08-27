@@ -16,12 +16,12 @@ name = "my-fujin"
 artifact = "cdylib"
 
 [fujin]
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 
 [[plugins.transport]]
 name = "tcp"
 package = "fujin-transport-tcp"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 ```
 
 Build it with `cargo fujin build` (release is the default profile). The command prints the

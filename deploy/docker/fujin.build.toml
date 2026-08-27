@@ -1,6 +1,6 @@
 [application]
 name = "fujin-docker"
-version = "0.6.0-alpha.1"
+version = "0.6.0"
 output = ".fujin/fujin"
 artifact = "binary"
 generated_directory = ".fujin/generated"
